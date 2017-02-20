@@ -26,7 +26,7 @@ or
 <!--     cat local.html | monolith - > local.html -->
 
 ### Options
- - `-u`: output the result document as one big data-URI
+ - `-u`: output the result as one big data-URI
  - `-q`: be quiet
 <!--  - `-a`: fix anchor href="" attributes for remote documents -->
 
