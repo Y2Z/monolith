@@ -1,16 +1,15 @@
 # monolith
-A data hoarder's dream come true:  
-bundle any web page into a stand-alone HTML file.
+A data hoarder's dream come true: bundle any web page into a stand-alone HTML file.
 
 Unlike conventional "Save page as …", `monolith` saves the target  
 document **and** embeds JavaScript, CSS and image assets **all at once**,  
-resulting in a single HTML5 document that is easy to store and share.
+resulting in a single HTML5 document that is a joy to store and share.
 
 Works both on remote and local targets.
 
-If compared to saving websites with `wget -mpk`,  
-`monolith` embeds all assets as data-URIs and therefore would display the page  
-exactly the same at any time, not depending on the Internet connection.
+If compared to saving websites with `wget -mpk`, `monolith` embeds all assets  
+as data-URIs and therefore would display the page exactly the same at any time,  
+not depending on the Internet connection.
 
 However, keep in mind that `monolith` is not aware of your browser's session.
 
