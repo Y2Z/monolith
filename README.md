@@ -1,5 +1,7 @@
 # monolith
-A data hoarder's dream come true: bundle any web page into a stand-alone HTML file.
+A data hoarder's dream come true: bundle any web page into a stand-alone HTML file.  
+You can finally replace that gazillion of open tabs with a gazillion of  
+huge .html files stored somewhere on your precious little drive.
 
 Unlike conventional "Save page as …", `monolith` saves the target  
 document **and** embeds JavaScript, CSS and image assets **all at once**,  
@@ -18,11 +20,8 @@ However, keep in mind that `monolith` is not aware of your browser's session.
 
 ### Usage
     $ monolith https://github.com > github.html
-or
-
-    $ monolith -q [local path]/index.html > mysite.html
-
 <!-- or -->
+
 <!--     cat local.html | monolith - > local.html -->
 
 ### Options
