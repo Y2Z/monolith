@@ -1,5 +1,7 @@
 #!/usr/bin/env nodejs
 
+'use strict'
+
 var compactor = require('../compactor.js');
 var options = require('../options.js');
 
@@ -29,7 +31,7 @@ if (process.argv.length > 2) {
     }
 
     if (target) {
-        compactor(target, function(error, result) {
+        compactor(target, options, function(error, result) {
             console.log(result)
         })
     } else {

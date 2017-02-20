@@ -2,7 +2,7 @@
   "name": "monolith",
   "version": "0.4.5",
   "description": "Save HTML pages with ease",
-  "main": "index.js",
+  "main": "compactor.js",
   "dependencies": {
     "sync-request": "^3.0.1",
     "jsdom": "^9.9.1"
@@ -14,7 +14,11 @@
     "test": "bin/index.js https://github.com > github.html"
   },
   "keywords": [
-    "html5",
+    "hoarding",
+    "save-the-internet",
+    "procrastination",
+    "its-mine",
+    "no-more-404",
     "monolith",
     "one-for-all",
     "all-for-one"

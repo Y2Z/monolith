@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 'use strict'
 
 var path  = require('path')
@@ -26,7 +24,11 @@ var modules = [
     require('./modules/anchors.js').parser,
 ]
 
-function monolith (targetDocumentPath, callback) {
+function monolith (targetDocumentPath, _options, callback) {
+    // In case monolith got included as a library
+    for (var k in _options)
+        options[k] = _options[k]
+
     // Determine the absolute initial document path
     var absBasePath = isURL(targetDocumentPath)
                       ? absoluteURLPath(targetDocumentPath)
