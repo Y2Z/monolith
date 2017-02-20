@@ -15,8 +15,8 @@ not depending on the Internet connection.
 
 However, keep in mind that `monolith` is not aware of your browser's session.
 
-### Installation
-    $ sudo npm install -g git@github.com:Y2Z/monolith.git
+### Installing/Updating
+    $ sudo npm install -g https://github.com/Y2Z/monolith.git
 
 ### Usage
     $ monolith https://github.com > github.html
