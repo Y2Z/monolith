@@ -19,7 +19,8 @@ However, keep in mind that `monolith` is not aware of your browser's session.
 
 ### Usage
     $ monolith [local path]/index.html > mysite.html
-or  
+or
+
     $ monolith https://github.com > github.html
 
 <!-- or -->
