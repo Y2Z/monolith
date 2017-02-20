@@ -8,7 +8,7 @@ resulting in a single HTML5 document that is easy to store and share.
 
 Works both on remote and local targets.
 
-If compared to saving websites with `wget -mpk http://news.ycombinator.com`,  
+If compared to saving websites with `wget -mpk`,  
 `monolith` embeds all assets as data-URIs and therefore would display the page  
 exactly the same at any time, not depending on the Internet connection.
 
@@ -18,7 +18,7 @@ However, keep in mind that `monolith` is not aware of your browser's session.
     $ sudo npm install -g git@github.com:Y2Z/monolith.git
 
 ### Usage
-    $ monolith &lt;local path&gt;/index.html > mysite.html
+    $ monolith [local path]/index.html > mysite.html
 or
     $ monolith https://github.com > github.html
 <!-- or -->
