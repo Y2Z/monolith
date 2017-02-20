@@ -7,6 +7,12 @@ var options = require('./options.js');
 
 var cache = {}
 
+var request_options = {
+    'headers': {
+        'user-agent': options.userAgentString
+    }
+}
+
 // Note: http://site.com/image/icons/home.png -> http://site.com/image/icons
 function absoluteURLPath (aURL) {
     var URL = url.parse(aURL)
@@ -49,7 +55,7 @@ function retrieveFile (aAbsBasePath, aFilePath, aBinary) {
             return cache[cacheKey]
         } else {
             try {
-                var res = request('GET', fullFilePath)
+                var res = request('GET', fullFilePath, request_options)
 
                 if (!options.suppressVerboseOutput)
                     console.warn('Retrieving file', fullFilePath, '...')
