@@ -18,17 +18,17 @@ However, keep in mind that `monolith` is not aware of your browser's session.
     $ sudo npm install -g git@github.com:Y2Z/monolith.git
 
 ### Usage
-    $ monolith [local path]/index.html > mysite.html
+    $ monolith https://github.com > github.html
 or
 
-    $ monolith https://github.com > github.html
+    $ monolith -q [local path]/index.html > mysite.html
 
 <!-- or -->
 <!--     cat local.html | monolith - > local.html -->
 
 ### Options
  - `-u`: output the result document as one big data-URI
- - `-q`: don't be verbose
+ - `-q`: be quiet
 <!--  - `-a`: fix anchor href="" attributes for remote documents -->
 
 ### License
