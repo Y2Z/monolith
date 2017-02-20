@@ -1,0 +1,24 @@
+{
+  "name": "monolith",
+  "version": "0.4.5",
+  "description": "Save HTML pages with ease",
+  "main": "index.js",
+  "dependencies": {
+    "sync-request": "^3.0.1",
+    "jsdom": "^9.9.1"
+  },
+  "bin": {
+    "monolith": "bin/index.js"
+  },
+  "scripts": {
+    "test": "bin/index.js https://github.com > github.html"
+  },
+  "keywords": [
+    "html5",
+    "monolith",
+    "one-for-all",
+    "all-for-one"
+  ],
+  "author": "Y2Z",
+  "license": "GPL-3.0"
+}
