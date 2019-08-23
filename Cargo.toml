@@ -1,6 +1,6 @@
 [package]
 name = "monolith"
-version = "2.0.1"
+version = "2.0.2"
 authors = ["Sunshine <sunshine@uberspace.net>"]
 
 [dependencies]
