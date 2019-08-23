@@ -17,12 +17,7 @@ pub fn data_to_dataurl(mime: &str, data: &[u8]) -> String {
 }
 
 fn detect_mimetype(data: &[u8]) -> String {
-    let detected_mimetype = data.sniff_mime_type();
-    if detected_mimetype != None {
-        detected_mimetype.unwrap().to_string()
-    } else {
-        "".to_string()
-    }
+    data.sniff_mime_type().unwrap_or("").to_string()
 }
 
 #[cfg(test)]
@@ -34,6 +29,9 @@ mod tests {
         let mime = "application/javascript";
         let data = "var word = 'hello';\nalert(word);\n";
         let datauri = data_to_dataurl(mime, data.as_bytes());
-        assert_eq!(&datauri, "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK");
+        assert_eq!(
+            &datauri,
+            "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
+        );
     }
 }

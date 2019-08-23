@@ -13,7 +13,7 @@ pub fn is_url(path: &str) -> bool {
 }
 
 pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
-    let mut result = "".to_string();
+    let mut result = String::new();
 
     if is_url(to) { // (anything, http://site.com/css/main.css)
         result = to.to_string();
@@ -51,9 +51,9 @@ pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
 }
 
 pub fn url_is_data(url: &str) -> Result<bool, String> {
-    match Url::parse(&url) {
+    match Url::parse(url) {
         Ok(parsed_url) => Ok(parsed_url.scheme() == "data"),
-        Err(err) => return Err(format!("{}", err.to_string())),
+        Err(err) => return Err(format!("{}", err)),
     }
 }
 
