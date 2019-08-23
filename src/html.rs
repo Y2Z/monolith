@@ -1,13 +1,11 @@
-extern crate html5ever;
-
+use http::{is_valid_url, resolve_url, retrieve_asset};
 use std::default::Default;
 use std::io;
-use http::{is_url, retrieve_asset, resolve_url};
 
-use self::html5ever::parse_document;
-use self::html5ever::rcdom::{Handle, NodeData, RcDom};
-use self::html5ever::tendril::TendrilSink;
-use self::html5ever::serialize::{SerializeOpts, serialize};
+use html5ever::parse_document;
+use html5ever::rcdom::{Handle, NodeData, RcDom};
+use html5ever::serialize::{serialize, SerializeOpts};
+use html5ever::tendril::TendrilSink;
 
 enum NodeMatch {
     Icon,
@@ -19,19 +17,37 @@ enum NodeMatch {
     Other,
 }
 
-static PNG_PIXEL: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+const PNG_PIXEL: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
-static JS_DOM_EVENT_ATTRS: [&str; 21] = [
+const JS_DOM_EVENT_ATTRS: [&str; 21] = [
     // Input
-    "onfocus", "onblur", "onselect", "onchange", "onsubmit", "onreset", "onkeydown", "onkeypress", "onkeyup",
+    "onfocus",
+    "onblur",
+    "onselect",
+    "onchange",
+    "onsubmit",
+    "onreset",
+    "onkeydown",
+    "onkeypress",
+    "onkeyup",
     // Mouse
-    "onmouseover", "onmouseout", "onmousedown", "onmouseup", "onmousemove",
+    "onmouseover",
+    "onmouseout",
+    "onmousedown",
+    "onmouseup",
+    "onmousemove",
     // Click
-    "onclick", "ondblclick",
+    "onclick",
+    "ondblclick",
     // Load
-    "onload", "onunload", "onabort", "onerror", "onresize",
+    "onload",
+    "onunload",
+    "onabort",
+    "onerror",
+    "onresize",
 ];
 
+#[allow(clippy::cognitive_complexity)]
 pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_images: bool) {
     match node.data {
         NodeData::Document => {
@@ -39,28 +55,24 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(&url, child, opt_no_js, opt_no_images);
             }
-        },
+        }
 
-        NodeData::Doctype {
-            name: _,
-            public_id: _,
-            system_id: _,
-        } => {},
+        NodeData::Doctype { .. } => {}
 
-        NodeData::Text { contents: _, } => {},
+        NodeData::Text { .. } => {}
 
-        NodeData::Comment { contents: _, } => {
+        NodeData::Comment { .. } => {
             // Note: in case of opt_no_js being set to true, there's no need to worry about
             //       getting rid of comments that may contain scripts, e.g. <!--[if IE]><script>...
             //       since that's not part of W3C standard and gets ignored by browsers other than IE [5, 9]
-        },
+        }
 
         NodeData::Element {
             ref name,
             ref attrs,
             ..
         } => {
-            let ref mut attrs_mut = attrs.borrow_mut();
+            let attrs_mut = &mut attrs.borrow_mut();
             let mut found = NodeMatch::Other;
 
             if &name.local == "link" {
@@ -95,7 +107,7 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                             attr.value.push_slice(favicon_datauri.unwrap().as_str());
                         }
                     }
-                },
+                }
                 NodeMatch::Image => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "src" {
@@ -110,7 +122,7 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                             }
                         }
                     }
-                },
+                }
                 NodeMatch::Anchor => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
@@ -124,17 +136,18 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                             attr.value.push_slice(href_full_url.unwrap().as_str());
                         }
                     }
-                },
+                }
                 NodeMatch::StyleSheet => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             let href_full_url = resolve_url(&url, &attr.value.to_string());
-                            let css_datauri = retrieve_asset(&href_full_url.unwrap(), true, "text/css");
+                            let css_datauri =
+                                retrieve_asset(&href_full_url.unwrap(), true, "text/css");
                             attr.value.clear();
                             attr.value.push_slice(css_datauri.unwrap().as_str());
                         }
                     }
-                },
+                }
                 NodeMatch::Script => {
                     if opt_no_js {
                         // Get rid of src and inner content of SCRIPT tags
@@ -148,18 +161,22 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "src" {
                                 let src_full_url = resolve_url(&url, &attr.value.to_string());
-                                let js_datauri = retrieve_asset(&src_full_url.unwrap(), true, "application/javascript");
+                                let js_datauri = retrieve_asset(
+                                    &src_full_url.unwrap(),
+                                    true,
+                                    "application/javascript",
+                                );
                                 attr.value.clear();
                                 attr.value.push_slice(js_datauri.unwrap().as_str());
                             }
                         }
                     }
-                },
+                }
                 NodeMatch::Form => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "action" {
                             // Do not touch action props which are set to a URL
-                            if is_url(&attr.value) {
+                            if is_valid_url(&attr.value) {
                                 continue;
                             }
 
@@ -168,8 +185,8 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                             attr.value.push_slice(href_full_url.unwrap().as_str());
                         }
                     }
-                },
-                NodeMatch::Other => {},
+                }
+                NodeMatch::Other => {}
             }
 
             if opt_no_js {
@@ -179,13 +196,13 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                         attr.value.clear();
                     }
                 }
-            } 
+            }
 
             // Dig deeper
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(&url, child, opt_no_js, opt_no_images);
             }
-        },
+        }
 
         NodeData::ProcessingInstruction { .. } => unreachable!(),
     }

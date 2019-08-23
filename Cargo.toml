@@ -13,3 +13,5 @@ mime-sniffer = "0.1.2"
 regex = "1.2.1"
 reqwest = "0.9.20"
 url = "2.1.0"
+lazy_static = "1.3.0"
+
