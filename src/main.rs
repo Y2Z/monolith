@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate clap;
 extern crate monolith;
 
@@ -7,9 +8,9 @@ use monolith::html::{walk_and_embed_assets, html_to_dom, print_dom};
 
 fn main() {
     let command = App::new("monolith")
-        .version("2.0.4")
-        .author("Sunshine <sunshine@uberspace.net>")
-        .about("CLI tool to save web pages as single HTML files")
+        .version(crate_version!())
+        .author(crate_authors!())
+        .about(crate_description!())
         .arg(Arg::with_name("url")
                  .required(true)
                  .takes_value(true)
