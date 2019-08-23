@@ -1,6 +1,6 @@
 use regex::Regex;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
-use reqwest::Client;
+use reqwest::{Client, RedirectPolicy};
 use std::time::Duration;
 use url::{ParseError, Url};
 use utils::data_to_dataurl;
@@ -75,6 +75,7 @@ pub fn retrieve_asset(
         Ok(url.to_string())
     } else {
         let client = Client::builder()
+            .redirect(RedirectPolicy::limited(3))
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap();

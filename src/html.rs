@@ -146,8 +146,8 @@ pub fn walk_and_embed_assets(
                 NodeMatch::Anchor => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
-                            // Do not touch hrefs which begin with a hash sign
-                            if attr.value.to_string().chars().nth(0) == Some('#') {
+                            // Don't touch email links or hrefs which begin with a hash sign
+                            if attr.value.starts_with('#') || attr.value.starts_with("mailto:") {
                                 continue;
                             }
 
