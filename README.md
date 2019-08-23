@@ -1,29 +1,32 @@
 # monolith
-A data hoarder's dream come true: bundle any web page into a stand-alone HTML file.  
+
+A data hoarder's dream come true: bundle any web page into a single HTML file.  
 You can finally replace that gazillion of open tabs with a gazillion of .html files stored somewhere on your precious little drive.
 
-Unlike conventional "Save page as …", `monolith` not only saves the target document,
-but embeds JavaScript, CSS and image assets **all at once**, resulting in a single HTML5 document that is a joy to store and share.
+Unlike conventional "Save page as…", `monolith` not only saves the target document,
+it embeds CSS, image, and JavaScript assets **all at once**, producing a single HTML5 document that is a joy to store and share.
 
-Works both on remote and local targets.
+If compared to saving websites with `wget -mpk`, `monolith` embeds all assets as data URLs and therefore displays the saved page exactly the same, being completely separated from the Internet.
 
-If compared to saving websites with `wget -mpk`, `monolith` embeds all assets as data-URIs and therefore would display the page exactly the same at any given time, being completely independent from the Internet.
+<!-- `This program works both on remote and local targets. -->
 
-However, keep in mind that `monolith` is not aware of your browser's session.
-
-### Installing/Updating
-    $ sudo npm install -g https://github.com/Y2Z/monolith.git
+### Installation
+    $ git clone https://github.com/Y2Z/monolith.git
+    $ cd monolith
+    $ cargo install
 
 ### Usage
-    $ monolith https://github.com > github.html
+    $ monolith [options] https://github.com > github.html
 <!-- or -->
 
-<!--     cat local.html | monolith - > local.html -->
+<!-- cat local.html | monolith - > local.html -->
 
 ### Options
- - `-u`: output the result as one big data-URI
- - `-q`: be quiet
-<!--  - `-a`: fix anchor href="" attributes for remote documents -->
+ - `-j`: Remove JavaScript
+<!--  - `-a`: Don't make anchors link to remote documents -->
 
 ### License
-GPLv3
+The Unlicense
+
+<!-- Microtext -->
+<sub>Keep in mind that `monolith` is not aware of your browser's session</sub>

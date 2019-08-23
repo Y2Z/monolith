@@ -1,0 +1,14 @@
+[package]
+name = "monolith"
+version = "2.0.1"
+authors = ["Sunshine <sunshine@uberspace.net>"]
+
+[dependencies]
+base64 = "0.10.1"
+clap = "2.33.0"
+html5ever = "0.24.0"
+indicatif = "0.11.0"
+mime-sniffer = "0.1.2"
+regex = "1.2.1"
+reqwest = "0.9.20"
+url = "2.1.0"
