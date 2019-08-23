@@ -1,5 +1,4 @@
 extern crate html5ever;
-// extern crate reqwest;
 
 use std::default::Default;
 use std::io;
