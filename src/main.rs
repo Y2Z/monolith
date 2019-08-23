@@ -9,7 +9,7 @@ use monolith::http::{is_valid_url, retrieve_asset};
 fn main() {
     let command = App::new("monolith")
         .version(crate_version!())
-        .author(crate_authors!())
+        .author(crate_authors!("\n"))
         .about(crate_description!())
         .arg(
             Arg::with_name("url")
