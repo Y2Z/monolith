@@ -22,7 +22,7 @@ fn main() {
         )
         .args_from_usage("-j, --no-js 'Excludes JavaScript'")
         .args_from_usage("-i, --no-images 'Removes images'")
-        .args_from_usage("-u, --user-agent=<Iceweasel> 'Custom User-Agent string'")
+        .args_from_usage("-u, --user-agent=[Iceweasel] 'Custom User-Agent string'")
         .get_matches();
 
     // Process the command
