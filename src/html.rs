@@ -47,13 +47,23 @@ const JS_DOM_EVENT_ATTRS: [&str; 21] = [
     "onresize",
 ];
 
-#[allow(clippy::cognitive_complexity)]
-pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_images: bool) {
+pub fn walk_and_embed_assets(
+    url: &str,
+    node: &Handle,
+    opt_no_js: bool,
+    opt_no_images: bool,
+    opt_user_agent: &str,
+) {
     match node.data {
         NodeData::Document => {
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(&url, child, opt_no_js, opt_no_images);
+                walk_and_embed_assets(
+                    &url, child,
+                    opt_no_js,
+                    opt_no_images,
+                    opt_user_agent,
+                );
             }
         }
 
@@ -102,7 +112,12 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             let href_full_url = resolve_url(&url, &attr.value.to_string());
-                            let favicon_datauri = retrieve_asset(&href_full_url.unwrap(), true, "");
+                            let favicon_datauri = retrieve_asset(
+                                &href_full_url.unwrap(),
+                                true,
+                                "",
+                                opt_user_agent,
+                            );
                             attr.value.clear();
                             attr.value.push_slice(favicon_datauri.unwrap().as_str());
                         }
@@ -116,7 +131,12 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                                 attr.value.push_slice(PNG_PIXEL);
                             } else {
                                 let src_full_url = resolve_url(&url, &attr.value.to_string());
-                                let img_datauri = retrieve_asset(&src_full_url.unwrap(), true, "");
+                                let img_datauri = retrieve_asset(
+                                    &src_full_url.unwrap(),
+                                    true,
+                                    "",
+                                    opt_user_agent,
+                                );
                                 attr.value.clear();
                                 attr.value.push_slice(img_datauri.unwrap().as_str());
                             }
@@ -141,8 +161,12 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             let href_full_url = resolve_url(&url, &attr.value.to_string());
-                            let css_datauri =
-                                retrieve_asset(&href_full_url.unwrap(), true, "text/css");
+                            let css_datauri = retrieve_asset(
+                                &href_full_url.unwrap(),
+                                true,
+                                "text/css",
+                                opt_user_agent,
+                            );
                             attr.value.clear();
                             attr.value.push_slice(css_datauri.unwrap().as_str());
                         }
@@ -165,6 +189,7 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
                                     &src_full_url.unwrap(),
                                     true,
                                     "application/javascript",
+                                    opt_user_agent,
                                 );
                                 attr.value.clear();
                                 attr.value.push_slice(js_datauri.unwrap().as_str());
@@ -200,7 +225,13 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_i
 
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(&url, child, opt_no_js, opt_no_images);
+                walk_and_embed_assets(
+                    &url,
+                    child,
+                    opt_no_js,
+                    opt_no_images,
+                    opt_user_agent,
+                );
             }
         }
 
@@ -216,7 +247,6 @@ pub fn html_to_dom(data: &str) -> html5ever::rcdom::RcDom {
 }
 
 pub fn print_dom(handle: &Handle) {
-    // TODO: append <meta http-equiv="Access-Control-Allow-Origin" content="'self'"/> to the <head> if opt_isolate
     serialize(&mut io::stdout(), handle, SerializeOpts::default()).unwrap();
 }
 
