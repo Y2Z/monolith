@@ -5,14 +5,11 @@ use self::base64::encode;
 use self::mime_sniffer::MimeTypeSniffer;
 
 pub fn data_to_dataurl(mime: &str, data: &[u8]) -> String {
-    let mimetype: String;
-
-    if mime == "" {
-        mimetype = detect_mimetype(data);
+    let mimetype = if mime == "" {
+        detect_mimetype(data)
     } else {
-        mimetype = mime.to_string();
-    }
-
+        mime.to_string()
+    };
     format!("data:{};base64,{}", mimetype, encode(data))
 }
 

@@ -2,20 +2,22 @@
 extern crate clap;
 extern crate monolith;
 
-use clap::{Arg, App};
-use monolith::http::{is_url, retrieve_asset};
-use monolith::html::{walk_and_embed_assets, html_to_dom, print_dom};
+use clap::{App, Arg};
+use monolith::html::{html_to_dom, print_dom, walk_and_embed_assets};
+use monolith::http::{is_valid_url, retrieve_asset};
 
 fn main() {
     let command = App::new("monolith")
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
-        .arg(Arg::with_name("url")
-                 .required(true)
-                 .takes_value(true)
-                 .index(1)
-                 .help("URL to download"))
+        .arg(
+            Arg::with_name("url")
+                .required(true)
+                .takes_value(true)
+                .index(1)
+                .help("URL to download"),
+        )
         .args_from_usage("-j, --no-js 'Excludes JavaScript'")
         .args_from_usage("-i, --no-images 'Removes images'")
         .get_matches();
@@ -25,7 +27,7 @@ fn main() {
     let opt_no_js = command.is_present("no-js");
     let opt_no_img = command.is_present("no-images");
 
-    if is_url(arg_target) {
+    if is_valid_url(arg_target) {
         let data = retrieve_asset(&arg_target, false, "");
         let dom = html_to_dom(&data.unwrap());
 

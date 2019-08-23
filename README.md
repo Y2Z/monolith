@@ -13,7 +13,7 @@ If compared to saving websites with `wget -mpk`, `monolith` embeds all assets as
 ### Installation
     $ git clone https://github.com/Y2Z/monolith.git
     $ cd monolith
-    $ cargo install
+    $ cargo install --path .
 
 ### Usage
     $ monolith https://lyrics.github.io/db/p/portishead/dummy/roads/ > portishead-roads-lyrics.html
