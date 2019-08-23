@@ -19,6 +19,8 @@ enum NodeMatch {
     Other,
 }
 
+static PNG_PIXEL: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
 static JS_DOM_EVENT_ATTRS: [&str; 21] = [
     // Input
     "onfocus", "onblur", "onselect", "onchange", "onsubmit", "onreset", "onkeydown", "onkeypress", "onkeyup",
@@ -30,12 +32,12 @@ static JS_DOM_EVENT_ATTRS: [&str; 21] = [
     "onload", "onunload", "onabort", "onerror", "onresize",
 ];
 
-pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool) {
+pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool, opt_no_images: bool) {
     match node.data {
         NodeData::Document => {
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(&url, child, opt_no_js);
+                walk_and_embed_assets(&url, child, opt_no_js, opt_no_images);
             }
         },
 
@@ -97,10 +99,15 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool) {
                 NodeMatch::Image => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "src" {
-                            let href_full_url = resolve_url(&url, &attr.value.to_string());
-                            let favicon_datauri = retrieve_asset(&href_full_url.unwrap(), true, "");
-                            attr.value.clear();
-                            attr.value.push_slice(favicon_datauri.unwrap().as_str());
+                            if opt_no_images {
+                                attr.value.clear();
+                                attr.value.push_slice(PNG_PIXEL);
+                            } else {
+                                let src_full_url = resolve_url(&url, &attr.value.to_string());
+                                let img_datauri = retrieve_asset(&src_full_url.unwrap(), true, "");
+                                attr.value.clear();
+                                attr.value.push_slice(img_datauri.unwrap().as_str());
+                            }
                         }
                     }
                 },
@@ -122,9 +129,9 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool) {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             let href_full_url = resolve_url(&url, &attr.value.to_string());
-                            let favicon_datauri = retrieve_asset(&href_full_url.unwrap(), true, "text/css");
+                            let css_datauri = retrieve_asset(&href_full_url.unwrap(), true, "text/css");
                             attr.value.clear();
-                            attr.value.push_slice(favicon_datauri.unwrap().as_str());
+                            attr.value.push_slice(css_datauri.unwrap().as_str());
                         }
                     }
                 },
@@ -140,10 +147,10 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool) {
                     } else {
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "src" {
-                                let href_full_url = resolve_url(&url, &attr.value.to_string());
-                                let favicon_datauri = retrieve_asset(&href_full_url.unwrap(), true, "application/javascript");
+                                let src_full_url = resolve_url(&url, &attr.value.to_string());
+                                let js_datauri = retrieve_asset(&src_full_url.unwrap(), true, "application/javascript");
                                 attr.value.clear();
-                                attr.value.push_slice(favicon_datauri.unwrap().as_str());
+                                attr.value.push_slice(js_datauri.unwrap().as_str());
                             }
                         }
                     }
@@ -176,7 +183,7 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool) {
 
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(&url, child, opt_no_js);
+                walk_and_embed_assets(&url, child, opt_no_js, opt_no_images);
             }
         },
 
@@ -191,7 +198,7 @@ pub fn html_to_dom(data: &str) -> html5ever::rcdom::RcDom {
         .unwrap()
 }
 
-pub fn print_dom(handle: &Handle, _opt_isolate: bool) {
+pub fn print_dom(handle: &Handle) {
     // TODO: append <meta http-equiv="Access-Control-Allow-Origin" content="'self'"/> to the <head> if opt_isolate
     serialize(&mut io::stdout(), handle, SerializeOpts::default()).unwrap();
 }
