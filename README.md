@@ -16,7 +16,7 @@ If compared to saving websites with `wget -mpk`, `monolith` embeds all assets as
     $ cargo install
 
 ### Usage
-    $ monolith [options] https://github.com > github.html
+    $ monolith https://lyrics.github.io/db/p/portishead/dummy/roads/ > portishead-roads-lyrics.html
 <!-- or -->
 
 <!-- cat local.html | monolith - > local.html -->
