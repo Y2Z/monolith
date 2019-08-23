@@ -2,7 +2,7 @@ extern crate html5ever;
 
 use std::default::Default;
 use std::io;
-use http::{retrieve_asset, resolve_url};
+use http::{is_url, retrieve_asset, resolve_url};
 
 use self::html5ever::parse_document;
 use self::html5ever::rcdom::{Handle, NodeData, RcDom};
@@ -15,6 +15,7 @@ enum NodeMatch {
     StyleSheet,
     Anchor,
     Script,
+    Form,
     Other,
 }
 
@@ -78,6 +79,8 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool) {
                 found = NodeMatch::Anchor;
             } else if &name.local == "script" {
                 found = NodeMatch::Script;
+            } else if &name.local == "form" {
+                found = NodeMatch::Form;
             }
 
             match found {
@@ -145,6 +148,20 @@ pub fn walk_and_embed_assets(url: &str, node: &Handle, opt_no_js: bool) {
                         }
                     }
                 },
+                NodeMatch::Form => {
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "action" {
+                            // Do not touch action props which are set to a URL
+                            if is_url(&attr.value) {
+                                continue;
+                            }
+
+                            let href_full_url = resolve_url(&url, &attr.value.to_string());
+                            attr.value.clear();
+                            attr.value.push_slice(href_full_url.unwrap().as_str());
+                        }
+                    }
+                },
                 NodeMatch::Other => {},
             }
 
@@ -174,7 +191,8 @@ pub fn html_to_dom(data: &str) -> html5ever::rcdom::RcDom {
         .unwrap()
 }
 
-pub fn print_dom(handle: &Handle) {
+pub fn print_dom(handle: &Handle, _opt_isolate: bool) {
+    // TODO: append <meta http-equiv="Access-Control-Allow-Origin" content="'self'"/> to the <head> if opt_isolate
     serialize(&mut io::stdout(), handle, SerializeOpts::default()).unwrap();
 }
 

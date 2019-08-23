@@ -7,7 +7,7 @@ use monolith::html::{walk_and_embed_assets, html_to_dom, print_dom};
 
 fn main() {
     let command = App::new("monolith")
-        .version("2.0.1")
+        .version("2.0.2")
         .author("Sunshine <sunshine@uberspace.net>")
         .about("CLI tool to save web pages as single HTML files")
         .arg(Arg::with_name("url")
@@ -16,11 +16,13 @@ fn main() {
                  .index(1)
                  .help("URL to download"))
         .args_from_usage("-j, --nojs 'Remove JavaScript'")
+        // .args_from_usage("-i, --isolate 'Isolate the document'")
         .get_matches();
 
     // Process the command
     let arg_target = command.value_of("url").unwrap();
     let opt_no_js = command.is_present("nojs");
+    let opt_isolate = command.is_present("isolate");
 
     if is_url(arg_target) {
         let data = retrieve_asset(&arg_target, false, "");
@@ -28,6 +30,6 @@ fn main() {
 
         walk_and_embed_assets(&arg_target, &dom.document, opt_no_js);
 
-        print_dom(&dom.document);
+        print_dom(&dom.document, opt_isolate);
     }
 }
