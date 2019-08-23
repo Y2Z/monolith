@@ -1,5 +1,5 @@
 use regex::Regex;
-use reqwest::header::CONTENT_TYPE;
+use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use reqwest::Client;
 use std::time::Duration;
 use url::{ParseError, Url};
@@ -69,6 +69,7 @@ pub fn retrieve_asset(
     url: &str,
     as_dataurl: bool,
     as_mime: &str,
+    opt_user_agent: &str,
 ) -> Result<String, reqwest::Error> {
     if url_is_data(&url).unwrap() {
         Ok(url.to_string())
@@ -77,7 +78,11 @@ pub fn retrieve_asset(
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap();
-        let mut response = client.get(url).send().unwrap();
+        let mut response = client
+            .get(url)
+            .header(USER_AGENT, opt_user_agent)
+            .send()
+            .unwrap();
 
         if as_dataurl {
             // Convert response into a byte array
