@@ -7,7 +7,7 @@ use monolith::html::{walk_and_embed_assets, html_to_dom, print_dom};
 
 fn main() {
     let command = App::new("monolith")
-        .version("2.0.3")
+        .version("2.0.4")
         .author("Sunshine <sunshine@uberspace.net>")
         .about("CLI tool to save web pages as single HTML files")
         .arg(Arg::with_name("url")
@@ -31,5 +31,6 @@ fn main() {
         walk_and_embed_assets(&arg_target, &dom.document, opt_no_js, opt_no_img);
 
         print_dom(&dom.document);
+        println!(); // Ensure newline at end of output
     }
 }
