@@ -2,8 +2,10 @@ extern crate regex;
 extern crate reqwest;
 extern crate url;
 
-use self::reqwest::header::CONTENT_TYPE;
 use self::regex::Regex;
+use self::reqwest::Client;
+use self::reqwest::header::CONTENT_TYPE;
+use std::time::Duration;
 use self::url::{Url, ParseError};
 use utils::data_to_dataurl;
 
@@ -61,7 +63,14 @@ pub fn retrieve_asset(url: &str, as_dataurl: bool, as_mime: &str) -> Result<Stri
     if url_is_data(&url).unwrap() {
         Ok(url.to_string())
     } else {
-        let mut response = reqwest::get(url)?;
+        let client = Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap();
+        let mut response = client
+            .get(url)
+            .send()
+            .unwrap();
 
         if as_dataurl {
             // Convert response into a byte array
