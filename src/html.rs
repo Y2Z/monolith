@@ -1,6 +1,7 @@
 use http::{is_valid_url, resolve_url, retrieve_asset};
 use std::default::Default;
 use std::io;
+use utils::data_to_dataurl;
 
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
@@ -14,6 +15,7 @@ enum NodeMatch {
     Anchor,
     Script,
     Form,
+    IFrame,
     Other,
 }
 
@@ -85,26 +87,26 @@ pub fn walk_and_embed_assets(
             let attrs_mut = &mut attrs.borrow_mut();
             let mut found = NodeMatch::Other;
 
-            if &name.local == "link" {
-                for attr in attrs_mut.iter_mut() {
-                    if &attr.name.local == "rel" {
-                        if is_icon(&attr.value.to_string()) {
-                            found = NodeMatch::Icon;
-                            break;
-                        } else if attr.value.to_string() == "stylesheet" {
-                            found = NodeMatch::StyleSheet;
-                            break;
+            match name.local.as_ref() {
+                "link" => {
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "rel" {
+                            if is_icon(&attr.value.to_string()) {
+                                found = NodeMatch::Icon;
+                                break;
+                            } else if attr.value.to_string() == "stylesheet" {
+                                found = NodeMatch::StyleSheet;
+                                break;
+                            }
                         }
                     }
                 }
-            } else if &name.local == "img" {
-                found = NodeMatch::Image;
-            } else if &name.local == "a" {
-                found = NodeMatch::Anchor;
-            } else if &name.local == "script" {
-                found = NodeMatch::Script;
-            } else if &name.local == "form" {
-                found = NodeMatch::Form;
+                "img" => { found = NodeMatch::Image; }
+                "a" => { found = NodeMatch::Anchor; }
+                "script" => { found = NodeMatch::Script; }
+                "form" => { found = NodeMatch::Form; }
+                "iframe" => { found = NodeMatch::IFrame; }
+                _ => {}
             }
 
             match found {
@@ -208,6 +210,26 @@ pub fn walk_and_embed_assets(
                             let href_full_url = resolve_url(&url, &attr.value.to_string());
                             attr.value.clear();
                             attr.value.push_slice(href_full_url.unwrap().as_str());
+                        }
+                    }
+                }
+                NodeMatch::IFrame => {
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "src" {
+                            let src_full_url = resolve_url(&url, &attr.value.to_string()).unwrap();
+                            let iframe_data = retrieve_asset(
+                                &src_full_url,
+                                false,
+                                "text/html",
+                                opt_user_agent,
+                            );
+                            let dom = html_to_dom(&iframe_data.unwrap());
+                            walk_and_embed_assets(&src_full_url, &dom.document, opt_no_js, opt_no_images, opt_user_agent);
+                            let mut buf: Vec<u8> = Vec::new();
+                            serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+                            let iframe_datauri = data_to_dataurl("text/html", &buf);
+                            attr.value.clear();
+                            attr.value.push_slice(iframe_datauri.as_str());
                         }
                     }
                 }
