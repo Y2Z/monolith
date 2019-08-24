@@ -1,6 +1,7 @@
 use http::{is_valid_url, resolve_url, retrieve_asset};
 use std::default::Default;
 use std::io;
+use utils::data_to_dataurl;
 
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
@@ -14,10 +15,12 @@ enum NodeMatch {
     Anchor,
     Script,
     Form,
+    IFrame,
     Other,
 }
 
-const PNG_PIXEL: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+const TRANSPARENT_PIXEL: &str = "data:image/png;base64,\
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 const JS_DOM_EVENT_ATTRS: [&str; 21] = [
     // Input
@@ -74,7 +77,8 @@ pub fn walk_and_embed_assets(
         NodeData::Comment { .. } => {
             // Note: in case of opt_no_js being set to true, there's no need to worry about
             //       getting rid of comments that may contain scripts, e.g. <!--[if IE]><script>...
-            //       since that's not part of W3C standard and gets ignored by browsers other than IE [5, 9]
+            //       since that's not part of W3C standard and therefore gets ignored
+            //       by browsers other than IE [5, 9]
         }
 
         NodeData::Element {
@@ -85,26 +89,26 @@ pub fn walk_and_embed_assets(
             let attrs_mut = &mut attrs.borrow_mut();
             let mut found = NodeMatch::Other;
 
-            if &name.local == "link" {
-                for attr in attrs_mut.iter_mut() {
-                    if &attr.name.local == "rel" {
-                        if is_icon(&attr.value.to_string()) {
-                            found = NodeMatch::Icon;
-                            break;
-                        } else if attr.value.to_string() == "stylesheet" {
-                            found = NodeMatch::StyleSheet;
-                            break;
+            match name.local.as_ref() {
+                "link" => {
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "rel" {
+                            if is_icon(&attr.value.to_string()) {
+                                found = NodeMatch::Icon;
+                                break;
+                            } else if attr.value.to_string() == "stylesheet" {
+                                found = NodeMatch::StyleSheet;
+                                break;
+                            }
                         }
                     }
                 }
-            } else if &name.local == "img" {
-                found = NodeMatch::Image;
-            } else if &name.local == "a" {
-                found = NodeMatch::Anchor;
-            } else if &name.local == "script" {
-                found = NodeMatch::Script;
-            } else if &name.local == "form" {
-                found = NodeMatch::Form;
+                "img" => { found = NodeMatch::Image; }
+                "a" => { found = NodeMatch::Anchor; }
+                "script" => { found = NodeMatch::Script; }
+                "form" => { found = NodeMatch::Form; }
+                "iframe" => { found = NodeMatch::IFrame; }
+                _ => {}
             }
 
             match found {
@@ -128,7 +132,7 @@ pub fn walk_and_embed_assets(
                         if &attr.name.local == "src" {
                             if opt_no_images {
                                 attr.value.clear();
-                                attr.value.push_slice(PNG_PIXEL);
+                                attr.value.push_slice(TRANSPARENT_PIXEL);
                             } else {
                                 let src_full_url = resolve_url(&url, &attr.value.to_string());
                                 let img_datauri = retrieve_asset(
@@ -146,8 +150,8 @@ pub fn walk_and_embed_assets(
                 NodeMatch::Anchor => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
-                            // Do not touch hrefs which begin with a hash sign
-                            if attr.value.to_string().chars().nth(0) == Some('#') {
+                            // Don't touch email links or hrefs which begin with a hash sign
+                            if attr.value.starts_with('#') || attr.value.starts_with("mailto:") {
                                 continue;
                             }
 
@@ -208,6 +212,32 @@ pub fn walk_and_embed_assets(
                             let href_full_url = resolve_url(&url, &attr.value.to_string());
                             attr.value.clear();
                             attr.value.push_slice(href_full_url.unwrap().as_str());
+                        }
+                    }
+                }
+                NodeMatch::IFrame => {
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "src" {
+                            let src_full_url = resolve_url(&url, &attr.value.to_string()).unwrap();
+                            let iframe_data = retrieve_asset(
+                                &src_full_url,
+                                false,
+                                "text/html",
+                                opt_user_agent,
+                            );
+                            let dom = html_to_dom(&iframe_data.unwrap());
+                            walk_and_embed_assets(
+                                &src_full_url,
+                                &dom.document,
+                                opt_no_js,
+                                opt_no_images,
+                                opt_user_agent,
+                            );
+                            let mut buf: Vec<u8> = Vec::new();
+                            serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+                            let iframe_datauri = data_to_dataurl("text/html", &buf);
+                            attr.value.clear();
+                            attr.value.push_slice(iframe_datauri.as_str());
                         }
                     }
                 }

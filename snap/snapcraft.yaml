@@ -1,0 +1,34 @@
+name: monolith
+base: core18 
+version: git
+summary: Monolith - Save HTML pages with ease 
+description: |
+  A data hoarder's dream come true: bundle any web page into a single
+  HTML file. You can finally replace that gazillion of open tabs with
+  a gazillion of .html files stored somewhere on your precious little
+  drive.
+  Unlike conventional "Save page as…", monolith not only saves the
+  target document, it embeds CSS, image, and JavaScript assets all
+  at once, producing a single HTML5 document that is a joy to store
+  and share.
+  If compared to saving websites with wget -mpk, monolith embeds
+  all assets as data URLs and therefore displays the saved page
+  exactly the same, being completely separated from the Internet.
+
+confinement: strict
+
+parts:
+  monolith:
+    plugin: rust
+    source: .
+    build-packages:
+      - libssl-dev
+      - pkg-config
+
+apps:
+  monolith:
+    command: monolith
+    plugs:
+      - home
+      - network
+      - removable-media
