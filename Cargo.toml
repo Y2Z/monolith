@@ -2,7 +2,7 @@
 name = "monolith"
 version = "2.0.8"
 authors = ["Sunshine <sunshine@uberspace.net>"]
-description = "CLI tool to save webpages as a single HTML file"
+description = "CLI tool for saving web pages as a single HTML file"
 
 [dependencies]
 base64 = "0.10.1"
