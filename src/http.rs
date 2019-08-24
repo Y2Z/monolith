@@ -21,11 +21,11 @@ pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
         let mut re = String::new();
         if is_valid_url(from) {
             // It's a remote resource (HTTP)
-            if to.chars().nth(0) == Some('/') {
+            if to.starts_with('/') {
                 // (http://site.com/article/1, /...?)
                 let from_url = Url::parse(from)?;
 
-                if to.chars().nth(1) == Some('/') {
+                if to.starts_with("//") {
                     // (http://site.com/article/1, //images/1.png)
                     re.push_str(from_url.scheme());
                     re.push_str(":");
@@ -40,9 +40,8 @@ pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
             } else {
                 // (http://site.com, css/main.css)
                 // TODO improve to ensure no // or /// ever happen
-                re.push_str(from);
-                re.push_str("/");
-                re.push_str(to);
+                let base = Url::parse(from)?;
+                re = base.join(to)?.to_string();
             }
         } else {
             // It's a local resource (fs)
@@ -126,13 +125,19 @@ mod tests {
 
     #[test]
     fn test_resolve_url() -> Result<(), ParseError> {
-        let resolved_url = resolve_url("https://www.kernel.org", "../category/signatures.html")?;
+        let resolved_url = resolve_url(
+            "https://www.kernel.org",
+            "../category/signatures.html",
+        )?;
         assert_eq!(
             resolved_url.as_str(),
-            "https://www.kernel.org/../category/signatures.html"
+            "https://www.kernel.org/category/signatures.html"
         );
 
-        let resolved_url = resolve_url("https://www.kernel.org", "category/signatures.html")?;
+        let resolved_url = resolve_url(
+            "https://www.kernel.org",
+            "category/signatures.html",
+        )?;
         assert_eq!(
             resolved_url.as_str(),
             "https://www.kernel.org/category/signatures.html"
@@ -163,6 +168,15 @@ mod tests {
         assert_eq!(
             resolved_url.as_str(),
             "https://www.kernel.org/theme/images/logos/tux.png"
+        );
+
+        let resolved_url = resolve_url(
+            "https://www.w3schools.com/html/html_iframe.asp",
+            "default.asp",
+        )?;
+        assert_eq!(
+            resolved_url.as_str(),
+            "https://www.w3schools.com/html/default.asp"
         );
 
         Ok(())

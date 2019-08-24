@@ -1,6 +1,6 @@
 [package]
 name = "monolith"
-version = "2.0.7"
+version = "2.0.8"
 authors = ["Sunshine <sunshine@uberspace.net>"]
 description = "CLI tool to save webpages as a single HTML file"
 

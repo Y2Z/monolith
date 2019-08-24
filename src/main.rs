@@ -28,14 +28,14 @@ fn main() {
     // Process the command
     let arg_target = command.value_of("url").unwrap();
     let opt_no_js = command.is_present("no-js");
-    let opt_no_img = command.is_present("no-images");
+    let opt_no_images = command.is_present("no-images");
     let opt_user_agent = command.value_of("user-agent").unwrap_or(DEFAULT_USER_AGENT);
 
     if is_valid_url(arg_target) {
         let data = retrieve_asset(&arg_target, false, "", opt_user_agent);
         let dom = html_to_dom(&data.unwrap());
 
-        walk_and_embed_assets(&arg_target, &dom.document, opt_no_js, opt_no_img, opt_user_agent);
+        walk_and_embed_assets(&arg_target, &dom.document, opt_no_js, opt_no_images, opt_user_agent);
 
         print_dom(&dom.document);
         println!(); // Ensure newline at end of output
