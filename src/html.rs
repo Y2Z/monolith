@@ -19,7 +19,8 @@ enum NodeMatch {
     Other,
 }
 
-const PNG_PIXEL: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+const TRANSPARENT_PIXEL: &str = "data:image/png;base64,\
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 const JS_DOM_EVENT_ATTRS: [&str; 21] = [
     // Input
@@ -76,7 +77,8 @@ pub fn walk_and_embed_assets(
         NodeData::Comment { .. } => {
             // Note: in case of opt_no_js being set to true, there's no need to worry about
             //       getting rid of comments that may contain scripts, e.g. <!--[if IE]><script>...
-            //       since that's not part of W3C standard and gets ignored by browsers other than IE [5, 9]
+            //       since that's not part of W3C standard and therefore gets ignored
+            //       by browsers other than IE [5, 9]
         }
 
         NodeData::Element {
@@ -130,7 +132,7 @@ pub fn walk_and_embed_assets(
                         if &attr.name.local == "src" {
                             if opt_no_images {
                                 attr.value.clear();
-                                attr.value.push_slice(PNG_PIXEL);
+                                attr.value.push_slice(TRANSPARENT_PIXEL);
                             } else {
                                 let src_full_url = resolve_url(&url, &attr.value.to_string());
                                 let img_datauri = retrieve_asset(
@@ -224,7 +226,13 @@ pub fn walk_and_embed_assets(
                                 opt_user_agent,
                             );
                             let dom = html_to_dom(&iframe_data.unwrap());
-                            walk_and_embed_assets(&src_full_url, &dom.document, opt_no_js, opt_no_images, opt_user_agent);
+                            walk_and_embed_assets(
+                                &src_full_url,
+                                &dom.document,
+                                opt_no_js,
+                                opt_no_images,
+                                opt_user_agent,
+                            );
                             let mut buf: Vec<u8> = Vec::new();
                             serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
                             let iframe_datauri = data_to_dataurl("text/html", &buf);
