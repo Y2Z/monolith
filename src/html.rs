@@ -137,15 +137,20 @@ pub fn walk_and_embed_assets(
                 NodeMatch::Icon => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
-                            let href_full_url = resolve_url(&url, &attr.value.to_string());
-                            let favicon_datauri = retrieve_asset(
-                                &href_full_url.unwrap(),
-                                true,
-                                "",
-                                opt_user_agent,
-                            );
-                            attr.value.clear();
-                            attr.value.push_slice(favicon_datauri.unwrap().as_str());
+                            if opt_no_images {
+                                attr.value.clear();
+                                attr.value.push_slice(TRANSPARENT_PIXEL);
+                            } else {
+                                let href_full_url = resolve_url(&url, &attr.value.to_string());
+                                let favicon_datauri = retrieve_asset(
+                                    &href_full_url.unwrap(),
+                                    true,
+                                    "",
+                                    opt_user_agent,
+                                );
+                                attr.value.clear();
+                                attr.value.push_slice(favicon_datauri.unwrap().as_str());
+                            }
                         }
                     }
                 }
