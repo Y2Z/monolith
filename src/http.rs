@@ -9,6 +9,13 @@ lazy_static! {
     static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
 }
 
+pub fn is_data_url(url: &str) -> Result<bool, String> {
+    match Url::parse(url) {
+        Ok(parsed_url) => Ok(parsed_url.scheme() == "data"),
+        Err(err) => Err(format!("{}", err)),
+    }
+}
+
 pub fn is_valid_url(path: &str) -> bool {
     REGEX_URL.is_match(path)
 }
@@ -18,50 +25,10 @@ pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
         // (anything, http://site.com/css/main.css)
         to.to_string()
     } else {
-        let mut re = String::new();
-        if is_valid_url(from) {
-            // It's a remote resource (HTTP)
-            if to.starts_with('/') {
-                // (http://site.com/article/1, /...?)
-                let from_url = Url::parse(from)?;
-
-                if to.starts_with("//") {
-                    // (http://site.com/article/1, //images/1.png)
-                    re.push_str(from_url.scheme());
-                    re.push_str(":");
-                    re.push_str(to);
-                } else {
-                    // (http://site.com/article/1, /css/main.css)
-                    re.push_str(from_url.scheme());
-                    re.push_str("://");
-                    re.push_str(from_url.host_str().unwrap());
-                    re.push_str(to);
-                }
-            } else {
-                // (http://site.com, css/main.css)
-                // TODO improve to ensure no // or /// ever happen
-                let base = Url::parse(from)?;
-                re = base.join(to)?.to_string();
-            }
-        } else {
-            // It's a local resource (fs)
-            // TODO improve to ensure no // or /// ever happen
-            // TODO for fs use basepath instead of $from
-            re.push_str(from);
-            re.push_str("/");
-            re.push_str(to);
-        }
-        re
+        Url::parse(from)?.join(to)?.to_string()
     };
 
     Ok(result)
-}
-
-pub fn url_is_data(url: &str) -> Result<bool, String> {
-    match Url::parse(url) {
-        Ok(parsed_url) => Ok(parsed_url.scheme() == "data"),
-        Err(err) => Err(format!("{}", err)),
-    }
 }
 
 pub fn retrieve_asset(
@@ -70,7 +37,7 @@ pub fn retrieve_asset(
     as_mime: &str,
     opt_user_agent: &str,
 ) -> Result<String, reqwest::Error> {
-    if url_is_data(&url).unwrap() {
+    if is_data_url(&url).unwrap() {
         Ok(url.to_string())
     } else {
         let client = Client::builder()
@@ -162,6 +129,15 @@ mod tests {
         );
 
         let resolved_url = resolve_url(
+            "https://www.kernel.org",
+            "//another-host.org/theme/images/logos/tux.png",
+        )?;
+        assert_eq!(
+            resolved_url.as_str(),
+            "https://another-host.org/theme/images/logos/tux.png"
+        );
+
+        let resolved_url = resolve_url(
             "https://www.kernel.org/category/signatures.html",
             "/theme/images/logos/tux.png",
         )?;
@@ -183,12 +159,12 @@ mod tests {
     }
 
     #[test]
-    fn test_url_is_data() {
+    fn test_is_data_url() {
         assert!(
-            url_is_data("data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h")
+            is_data_url("data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h")
                 .unwrap_or(false)
         );
-        assert!(!url_is_data("https://kernel.org").unwrap_or(false));
-        assert!(!url_is_data("//kernel.org").unwrap_or(false));
+        assert!(!is_data_url("https://kernel.org").unwrap_or(false));
+        assert!(!is_data_url("//kernel.org").unwrap_or(false));
     }
 }
