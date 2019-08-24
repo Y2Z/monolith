@@ -1,6 +1,8 @@
-# monolith
-
 [![Travis CI Build Status](https://travis-ci.org/Y2Z/monolith.svg?branch=master)](https://travis-ci.com/Y2Z/monolith)
+[![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/j1v1d96sw952b1ch?svg=true)](https://ci.appveyor.com/project/vflyson/monolith)
+
+
+# monolith
 
 A data hoarder's dream come true: bundle any web page into a single HTML file.  
 You can finally replace that gazillion of open tabs with a gazillion of .html files stored somewhere on your precious little drive.
