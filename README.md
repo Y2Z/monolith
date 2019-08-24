@@ -1,5 +1,7 @@
 # monolith
 
+[![Travis CI Build Status](https://travis-ci.com/Y2Z/monolith.svg?branch=master)](https://travis-ci.com/Y2Z/monolith)
+
 A data hoarder's dream come true: bundle any web page into a single HTML file.  
 You can finally replace that gazillion of open tabs with a gazillion of .html files stored somewhere on your precious little drive.
 
