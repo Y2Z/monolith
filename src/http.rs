@@ -41,7 +41,6 @@ pub fn retrieve_asset(
         Ok(url.to_string())
     } else {
         let client = Client::builder()
-            .redirect(RedirectPolicy::limited(3))
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap();
@@ -50,6 +49,13 @@ pub fn retrieve_asset(
             .header(USER_AGENT, opt_user_agent)
             .send()
             .unwrap();
+        let final_url = response.url().as_str();
+
+        if url == final_url {
+            eprintln!("[ {} ]", &url);
+        } else {
+            eprintln!("[ {} -> {} ]", &url, &final_url);
+        }
 
         if as_dataurl {
             // Convert response into a byte array
