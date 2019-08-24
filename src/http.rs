@@ -79,7 +79,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_url() {
+    fn test_is_valid_url() {
         assert!(is_valid_url("https://www.rust-lang.org/"));
         assert!(is_valid_url("http://kernel.org"));
         assert!(!is_valid_url("./index.html"));
