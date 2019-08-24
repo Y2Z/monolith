@@ -11,6 +11,7 @@ use html5ever::tendril::TendrilSink;
 enum NodeMatch {
     Icon,
     Image,
+    Source,
     StyleSheet,
     Anchor,
     Script,
@@ -49,6 +50,26 @@ const JS_DOM_EVENT_ATTRS: [&str; 21] = [
     "onerror",
     "onresize",
 ];
+
+fn get_parent_node_name(node: &Handle) -> String {
+    let parent = node.parent.take().clone();
+    let parent_node = parent.and_then(|node| node.upgrade()).unwrap();
+
+    match &parent_node.data {
+        NodeData::Document => {"".to_string()}
+        NodeData::Doctype { .. } => {"".to_string()}
+        NodeData::Text { .. } => {"".to_string()}
+        NodeData::Comment { .. } => {"".to_string()}
+        NodeData::Element {
+            ref name,
+            attrs: _,
+            ..
+        } => {
+            name.local.as_ref().to_string()
+        }
+        NodeData::ProcessingInstruction { .. } => unreachable!()
+    }
+}
 
 pub fn walk_and_embed_assets(
     url: &str,
@@ -104,6 +125,7 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "img" => { found = NodeMatch::Image; }
+                "source" => { found = NodeMatch::Source; }
                 "a" => { found = NodeMatch::Anchor; }
                 "script" => { found = NodeMatch::Script; }
                 "form" => { found = NodeMatch::Form; }
@@ -143,6 +165,28 @@ pub fn walk_and_embed_assets(
                                 );
                                 attr.value.clear();
                                 attr.value.push_slice(img_datauri.unwrap().as_str());
+                            }
+                        }
+                    }
+                }
+                NodeMatch::Source => {
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "srcset" {
+                            if get_parent_node_name(&node) == "picture" {
+                                if opt_no_images {
+                                    attr.value.clear();
+                                    attr.value.push_slice(TRANSPARENT_PIXEL);
+                                } else {
+                                    let srcset_full_url = resolve_url(&url, &attr.value.to_string());
+                                    let source_datauri = retrieve_asset(
+                                        &srcset_full_url.unwrap(),
+                                        true,
+                                        "",
+                                        opt_user_agent,
+                                    );
+                                    attr.value.clear();
+                                    attr.value.push_slice(source_datauri.unwrap().as_str());
+                                }
                             }
                         }
                     }
@@ -265,7 +309,7 @@ pub fn walk_and_embed_assets(
             }
         }
 
-        NodeData::ProcessingInstruction { .. } => unreachable!(),
+        NodeData::ProcessingInstruction { .. } => unreachable!()
     }
 }
 
