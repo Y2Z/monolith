@@ -1,12 +1,16 @@
-use http::{is_valid_url, resolve_url, retrieve_asset};
-use std::default::Default;
-use std::io;
-use utils::data_to_dataurl;
-
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
 use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::TendrilSink;
+use http::{is_valid_url, resolve_url, retrieve_asset};
+use regex::Regex;
+use std::default::Default;
+use std::io;
+use utils::data_to_dataurl;
+
+lazy_static! {
+    static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
+}
 
 enum NodeMatch {
     Icon,
@@ -195,7 +199,7 @@ pub fn walk_and_embed_assets(
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             // Don't touch email links or hrefs which begin with a hash sign
-                            if attr.value.starts_with('#') || attr.value.starts_with("mailto:") {
+                            if attr.value.starts_with('#') || has_protocol(&attr.value) {
                                 continue;
                             }
 
@@ -313,6 +317,10 @@ pub fn walk_and_embed_assets(
     }
 }
 
+fn has_protocol(url: &str) -> bool {
+    HAS_PROTOCOL.is_match(&url.to_lowercase())
+}
+
 pub fn html_to_dom(data: &str) -> html5ever::rcdom::RcDom {
     parse_document(RcDom::default(), Default::default())
         .from_utf8()
@@ -339,5 +347,20 @@ mod tests {
     fn test_is_icon() {
         assert_eq!(is_icon("icon"), true);
         assert_eq!(is_icon("stylesheet"), false);
+    }
+
+    #[test]
+    fn test_has_protocol() {
+        assert_eq!(has_protocol("mailto:somebody@somewhere.com?subject=hello"), true);
+        assert_eq!(has_protocol("tel:5551234567"), true);
+        assert_eq!(has_protocol("ftp:user:password@some-ftp-server.com"), true);
+        assert_eq!(has_protocol("javascript:void(0)"), true);
+        assert_eq!(has_protocol("http://news.ycombinator.com"), true);
+        assert_eq!(has_protocol("https://github.com"), true);
+        assert_eq!(has_protocol("//some-hostname.com/some-file.html"), false);
+        assert_eq!(has_protocol("some-hostname.com/some-file.html"), false);
+        assert_eq!(has_protocol("/some-file.html"), false);
+        assert_eq!(has_protocol(""), false);
+        assert_eq!(has_protocol("MAILTO:somebody@somewhere.com?subject=hello"), true);
     }
 }
