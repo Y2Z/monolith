@@ -1,6 +1,6 @@
 use regex::Regex;
+use reqwest::Client;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
-use reqwest::{Client, RedirectPolicy};
 use std::time::Duration;
 use url::{ParseError, Url};
 use utils::data_to_dataurl;
