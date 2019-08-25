@@ -21,19 +21,21 @@ fn main() {
                 .index(1)
                 .help("URL to download"),
         )
-        .args_from_usage("-j, --no-js 'Excludes JavaScript'")
         .args_from_usage("-i, --no-images 'Removes images'")
+        .args_from_usage("-j, --no-js 'Excludes JavaScript'")
+        .args_from_usage("-s, --silent 'Suppress verbosity'")
         .args_from_usage("-u, --user-agent=[Iceweasel] 'Custom User-Agent string'")
         .get_matches();
 
     // Process the command
     let arg_target = command.value_of("url").unwrap();
-    let opt_no_js = command.is_present("no-js");
     let opt_no_images = command.is_present("no-images");
+    let opt_no_js = command.is_present("no-js");
+    let opt_silent = command.is_present("silent");
     let opt_user_agent = command.value_of("user-agent").unwrap_or(DEFAULT_USER_AGENT);
 
     if is_valid_url(arg_target) {
-        let data = retrieve_asset(&arg_target, false, "", opt_user_agent).unwrap();
+        let data = retrieve_asset(&arg_target, false, "", opt_user_agent, opt_silent).unwrap();
         let dom = html_to_dom(&data);
 
         walk_and_embed_assets(
@@ -42,6 +44,7 @@ fn main() {
             opt_no_js,
             opt_no_images,
             opt_user_agent,
+            opt_silent,
         );
 
         print_dom(&dom.document);
