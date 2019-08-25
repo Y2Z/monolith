@@ -25,6 +25,7 @@ If compared to saving websites with `wget -mpk`, `monolith` embeds all assets as
 ### Options
  - `-i`: Remove images
  - `-j`: Exclude JavaScript
+ - `-s`: Silent mode
  - `-u`: Specify custom User-Agent
 
 ### License

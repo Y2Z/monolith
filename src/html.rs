@@ -69,6 +69,7 @@ pub fn walk_and_embed_assets(
     opt_no_js: bool,
     opt_no_images: bool,
     opt_user_agent: &str,
+    opt_silent: bool,
 ) {
     match node.data {
         NodeData::Document => {
@@ -79,6 +80,7 @@ pub fn walk_and_embed_assets(
                     opt_no_js,
                     opt_no_images,
                     opt_user_agent,
+                    opt_silent,
                 );
             }
         }
@@ -130,6 +132,7 @@ pub fn walk_and_embed_assets(
                                         true,
                                         "",
                                         opt_user_agent,
+                                        opt_silent,
                                     ).unwrap_or(EMPTY_STRING.clone());
                                     attr.value.clear();
                                     attr.value.push_slice(favicon_datauri.as_str());
@@ -149,6 +152,7 @@ pub fn walk_and_embed_assets(
                                     true,
                                     "text/css",
                                     opt_user_agent,
+                                    opt_silent,
                                 ).unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(css_datauri.as_str());
@@ -185,6 +189,7 @@ pub fn walk_and_embed_assets(
                                     true,
                                     "",
                                     opt_user_agent,
+                                    opt_silent,
                                 ).unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(img_datauri.as_str());
@@ -210,6 +215,7 @@ pub fn walk_and_embed_assets(
                                         true,
                                         "",
                                         opt_user_agent,
+                                        opt_silent,
                                     ).unwrap_or(EMPTY_STRING.clone());
                                     attr.value.clear();
                                     attr.value.push_slice(source_datauri.as_str());
@@ -255,6 +261,7 @@ pub fn walk_and_embed_assets(
                                     true,
                                     "application/javascript",
                                     opt_user_agent,
+                                    opt_silent,
                                 ).unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(js_datauri.as_str());
@@ -287,6 +294,7 @@ pub fn walk_and_embed_assets(
                                 false,
                                 "text/html",
                                 opt_user_agent,
+                                opt_silent,
                             ).unwrap_or(EMPTY_STRING.clone());
                             let dom = html_to_dom(&iframe_data);
                             walk_and_embed_assets(
@@ -295,6 +303,7 @@ pub fn walk_and_embed_assets(
                                 opt_no_js,
                                 opt_no_images,
                                 opt_user_agent,
+                                opt_silent,
                             );
                             let mut buf: Vec<u8> = Vec::new();
                             serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -324,6 +333,7 @@ pub fn walk_and_embed_assets(
                     opt_no_js,
                     opt_no_images,
                     opt_user_agent,
+                    opt_silent,
                 );
             }
         }

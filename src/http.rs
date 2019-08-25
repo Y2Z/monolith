@@ -36,6 +36,7 @@ pub fn retrieve_asset(
     as_dataurl: bool,
     as_mime: &str,
     opt_user_agent: &str,
+    opt_silent: bool
 ) -> Result<String, reqwest::Error> {
     if is_data_url(&url).unwrap() {
         Ok(url.to_string())
@@ -49,10 +50,12 @@ pub fn retrieve_asset(
             .send()?;
         let final_url = response.url().as_str();
 
-        if url == final_url {
-            eprintln!("[ {} ]", &url);
-        } else {
-            eprintln!("[ {} -> {} ]", &url, &final_url);
+        if !opt_silent {
+            if url == final_url {
+                eprintln!("[ {} ]", &url);
+            } else {
+                eprintln!("[ {} -> {} ]", &url, &final_url);
+            }
         }
 
         if as_dataurl {
