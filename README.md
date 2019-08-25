@@ -1,4 +1,4 @@
-[![Travis CI Build Status](https://travis-ci.org/Y2Z/monolith.svg?branch=master)](https://travis-ci.com/Y2Z/monolith)
+[![Travis CI Build Status](https://travis-ci.org/Y2Z/monolith.svg?branch=master)](https://travis-ci.org/Y2Z/monolith)
 [![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/j1v1d96sw952b1ch?svg=true)](https://ci.appveyor.com/project/vflyson/monolith)
 
 
