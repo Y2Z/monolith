@@ -9,19 +9,11 @@ use std::io;
 use utils::data_to_dataurl;
 
 lazy_static! {
+    static ref EMPTY_STRING: String = String::new();
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
-}
-
-enum NodeMatch {
-    Icon,
-    Image,
-    Source,
-    StyleSheet,
-    Anchor,
-    Script,
-    Form,
-    IFrame,
-    Other,
+    static ref ICON_VALUES: Regex = Regex::new(
+        r"^icon|shortcut icon|mask-icon|apple-touch-icon$"
+    ).unwrap();
 }
 
 const TRANSPARENT_PIXEL: &str = "data:image/png;base64,\
@@ -60,15 +52,11 @@ fn get_parent_node_name(node: &Handle) -> String {
     let parent_node = parent.and_then(|node| node.upgrade()).unwrap();
 
     match &parent_node.data {
-        NodeData::Document => {"".to_string()}
-        NodeData::Doctype { .. } => {"".to_string()}
-        NodeData::Text { .. } => {"".to_string()}
-        NodeData::Comment { .. } => {"".to_string()}
-        NodeData::Element {
-            ref name,
-            attrs: _,
-            ..
-        } => {
+        NodeData::Document => { EMPTY_STRING.clone() }
+        NodeData::Doctype { .. } => { EMPTY_STRING.clone() }
+        NodeData::Text { .. } => { EMPTY_STRING.clone() }
+        NodeData::Comment { .. } => { EMPTY_STRING.clone() }
+        NodeData::Element { ref name, attrs: _, .. } => {
             name.local.as_ref().to_string()
         }
         NodeData::ProcessingInstruction { .. } => unreachable!()
@@ -94,91 +82,117 @@ pub fn walk_and_embed_assets(
                 );
             }
         }
-
         NodeData::Doctype { .. } => {}
-
         NodeData::Text { .. } => {}
-
         NodeData::Comment { .. } => {
             // Note: in case of opt_no_js being set to true, there's no need to worry about
             //       getting rid of comments that may contain scripts, e.g. <!--[if IE]><script>...
             //       since that's not part of W3C standard and therefore gets ignored
             //       by browsers other than IE [5, 9]
         }
-
         NodeData::Element {
             ref name,
             ref attrs,
             ..
         } => {
             let attrs_mut = &mut attrs.borrow_mut();
-            let mut found = NodeMatch::Other;
 
             match name.local.as_ref() {
                 "link" => {
+                    let mut link_type = "";
+
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "rel" {
                             if is_icon(&attr.value.to_string()) {
-                                found = NodeMatch::Icon;
+                                link_type = "icon";
                                 break;
                             } else if attr.value.to_string() == "stylesheet" {
-                                found = NodeMatch::StyleSheet;
+                                link_type = "stylesheet";
                                 break;
                             }
                         }
                     }
-                }
-                "img" => { found = NodeMatch::Image; }
-                "source" => { found = NodeMatch::Source; }
-                "a" => { found = NodeMatch::Anchor; }
-                "script" => { found = NodeMatch::Script; }
-                "form" => { found = NodeMatch::Form; }
-                "iframe" => { found = NodeMatch::IFrame; }
-                _ => {}
-            }
 
-            match found {
-                NodeMatch::Icon => {
-                    for attr in attrs_mut.iter_mut() {
-                        if &attr.name.local == "href" {
-                            if opt_no_images {
-                                attr.value.clear();
-                                attr.value.push_slice(TRANSPARENT_PIXEL);
-                            } else {
-                                let href_full_url = resolve_url(&url, &attr.value.to_string());
-                                let favicon_datauri = retrieve_asset(
-                                    &href_full_url.unwrap(),
+                    if link_type == "icon" {
+                        for attr in attrs_mut.iter_mut() {
+                            if &attr.name.local == "href" {
+                                if opt_no_images {
+                                    attr.value.clear();
+                                    attr.value.push_slice(TRANSPARENT_PIXEL);
+                                } else {
+                                    let href_full_url: String = resolve_url(
+                                            &url,
+                                            &attr.value.to_string()
+                                        )
+                                        .unwrap_or(EMPTY_STRING.clone());
+                                    let favicon_datauri = retrieve_asset(
+                                        &href_full_url,
+                                        true,
+                                        "",
+                                        opt_user_agent,
+                                    ).unwrap_or(EMPTY_STRING.clone());
+                                    attr.value.clear();
+                                    attr.value.push_slice(favicon_datauri.as_str());
+                                }
+                            }
+                        }
+                    } else if link_type == "stylesheet" {
+                        for attr in attrs_mut.iter_mut() {
+                            if &attr.name.local == "href" {
+                                let href_full_url: String = resolve_url(
+                                        &url,
+                                        &attr.value.to_string(),
+                                    )
+                                    .unwrap_or(EMPTY_STRING.clone());
+                                let css_datauri = retrieve_asset(
+                                    &href_full_url,
                                     true,
-                                    "",
+                                    "text/css",
                                     opt_user_agent,
-                                );
+                                ).unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
-                                attr.value.push_slice(favicon_datauri.unwrap().as_str());
+                                attr.value.push_slice(css_datauri.as_str());
+                            }
+                        }
+                    } else {
+                        for attr in attrs_mut.iter_mut() {
+                            if &attr.name.local == "href" {
+                                let href_full_url: String = resolve_url(
+                                        &url,
+                                        &attr.value.to_string(),
+                                    )
+                                    .unwrap_or(EMPTY_STRING.clone());
+                                attr.value.clear();
+                                attr.value.push_slice(&href_full_url.as_str());
                             }
                         }
                     }
                 }
-                NodeMatch::Image => {
+                "img" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "src" {
                             if opt_no_images {
                                 attr.value.clear();
                                 attr.value.push_slice(TRANSPARENT_PIXEL);
                             } else {
-                                let src_full_url = resolve_url(&url, &attr.value.to_string());
+                                let src_full_url: String = resolve_url(
+                                        &url,
+                                        &attr.value.to_string(),
+                                    )
+                                    .unwrap_or(EMPTY_STRING.clone());
                                 let img_datauri = retrieve_asset(
-                                    &src_full_url.unwrap(),
+                                    &src_full_url,
                                     true,
                                     "",
                                     opt_user_agent,
-                                );
+                                ).unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
-                                attr.value.push_slice(img_datauri.unwrap().as_str());
+                                attr.value.push_slice(img_datauri.as_str());
                             }
                         }
                     }
                 }
-                NodeMatch::Source => {
+                "source" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "srcset" {
                             if get_parent_node_name(&node) == "picture" {
@@ -186,21 +200,25 @@ pub fn walk_and_embed_assets(
                                     attr.value.clear();
                                     attr.value.push_slice(TRANSPARENT_PIXEL);
                                 } else {
-                                    let srcset_full_url = resolve_url(&url, &attr.value.to_string());
+                                    let srcset_full_url: String = resolve_url(
+                                            &url,
+                                            &attr.value.to_string(),
+                                        )
+                                        .unwrap_or(EMPTY_STRING.clone());
                                     let source_datauri = retrieve_asset(
-                                        &srcset_full_url.unwrap(),
+                                        &srcset_full_url,
                                         true,
                                         "",
                                         opt_user_agent,
-                                    );
+                                    ).unwrap_or(EMPTY_STRING.clone());
                                     attr.value.clear();
-                                    attr.value.push_slice(source_datauri.unwrap().as_str());
+                                    attr.value.push_slice(source_datauri.as_str());
                                 }
                             }
                         }
                     }
                 }
-                NodeMatch::Anchor => {
+                "a" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             // Don't touch email links or hrefs which begin with a hash sign
@@ -208,28 +226,14 @@ pub fn walk_and_embed_assets(
                                 continue;
                             }
 
-                            let href_full_url = resolve_url(&url, &attr.value.to_string());
+                            let href_full_url: String = resolve_url(&url, &attr.value.to_string())
+                                .unwrap_or(EMPTY_STRING.clone());
                             attr.value.clear();
-                            attr.value.push_slice(href_full_url.unwrap().as_str());
+                            attr.value.push_slice(href_full_url.as_str());
                         }
                     }
                 }
-                NodeMatch::StyleSheet => {
-                    for attr in attrs_mut.iter_mut() {
-                        if &attr.name.local == "href" {
-                            let href_full_url = resolve_url(&url, &attr.value.to_string());
-                            let css_datauri = retrieve_asset(
-                                &href_full_url.unwrap(),
-                                true,
-                                "text/css",
-                                opt_user_agent,
-                            );
-                            attr.value.clear();
-                            attr.value.push_slice(css_datauri.unwrap().as_str());
-                        }
-                    }
-                }
-                NodeMatch::Script => {
+                "script" => {
                     if opt_no_js {
                         // Get rid of src and inner content of SCRIPT tags
                         for attr in attrs_mut.iter_mut() {
@@ -241,20 +245,24 @@ pub fn walk_and_embed_assets(
                     } else {
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "src" {
-                                let src_full_url = resolve_url(&url, &attr.value.to_string());
+                                let src_full_url: String = resolve_url(
+                                        &url,
+                                        &attr.value.to_string(),
+                                    )
+                                    .unwrap_or(EMPTY_STRING.clone());
                                 let js_datauri = retrieve_asset(
-                                    &src_full_url.unwrap(),
+                                    &src_full_url,
                                     true,
                                     "application/javascript",
                                     opt_user_agent,
-                                );
+                                ).unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
-                                attr.value.push_slice(js_datauri.unwrap().as_str());
+                                attr.value.push_slice(js_datauri.as_str());
                             }
                         }
                     }
                 }
-                NodeMatch::Form => {
+                "form" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "action" {
                             // Do not touch action props which are set to a URL
@@ -262,23 +270,25 @@ pub fn walk_and_embed_assets(
                                 continue;
                             }
 
-                            let href_full_url = resolve_url(&url, &attr.value.to_string());
+                            let href_full_url: String = resolve_url(&url, &attr.value.to_string())
+                                .unwrap_or(EMPTY_STRING.clone());
                             attr.value.clear();
-                            attr.value.push_slice(href_full_url.unwrap().as_str());
+                            attr.value.push_slice(href_full_url.as_str());
                         }
                     }
                 }
-                NodeMatch::IFrame => {
+                "iframe" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "src" {
-                            let src_full_url = resolve_url(&url, &attr.value.to_string()).unwrap();
+                            let src_full_url: String = resolve_url(&url, &attr.value.to_string())
+                                .unwrap_or(EMPTY_STRING.clone());
                             let iframe_data = retrieve_asset(
                                 &src_full_url,
                                 false,
                                 "text/html",
                                 opt_user_agent,
-                            );
-                            let dom = html_to_dom(&iframe_data.unwrap());
+                            ).unwrap_or(EMPTY_STRING.clone());
+                            let dom = html_to_dom(&iframe_data);
                             walk_and_embed_assets(
                                 &src_full_url,
                                 &dom.document,
@@ -294,7 +304,7 @@ pub fn walk_and_embed_assets(
                         }
                     }
                 }
-                NodeMatch::Other => {}
+                _ => {}
             }
 
             if opt_no_js {
@@ -317,7 +327,6 @@ pub fn walk_and_embed_assets(
                 );
             }
         }
-
         NodeData::ProcessingInstruction { .. } => unreachable!()
     }
 }
@@ -338,10 +347,7 @@ pub fn print_dom(handle: &Handle) {
 }
 
 fn is_icon(attr_value: &str) -> bool {
-    attr_value == "icon"
-        || attr_value == "shortcut icon"
-        || attr_value == "mask-icon"
-        || attr_value == "apple-touch-icon"
+    ICON_VALUES.is_match(&attr_value.to_lowercase())
 }
 
 #[cfg(test)]

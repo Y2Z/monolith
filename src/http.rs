@@ -9,10 +9,10 @@ lazy_static! {
     static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
 }
 
-pub fn is_data_url(url: &str) -> Result<bool, String> {
+pub fn is_data_url(url: &str) -> Result<bool, ParseError> {
     match Url::parse(url) {
         Ok(parsed_url) => Ok(parsed_url.scheme() == "data"),
-        Err(err) => Err(format!("{}", err)),
+        Err(err) => Err(err),
     }
 }
 
@@ -42,13 +42,11 @@ pub fn retrieve_asset(
     } else {
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
-            .build()
-            .unwrap();
+            .build()?;
         let mut response = client
             .get(url)
             .header(USER_AGENT, opt_user_agent)
-            .send()
-            .unwrap();
+            .send()?;
         let final_url = response.url().as_str();
 
         if url == final_url {
