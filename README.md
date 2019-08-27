@@ -23,6 +23,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 ### Options
  - `-i`: Remove images
  - `-j`: Exclude JavaScript
+ - `-k`: Accept invalid X.509 (TLS) certificates
  - `-s`: Silent mode
  - `-u`: Specify custom User-Agent
 

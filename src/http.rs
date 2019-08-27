@@ -36,13 +36,15 @@ pub fn retrieve_asset(
     as_dataurl: bool,
     as_mime: &str,
     opt_user_agent: &str,
-    opt_silent: bool
+    opt_silent: bool,
+    opt_insecure: bool,
 ) -> Result<String, reqwest::Error> {
     if is_data_url(&url).unwrap() {
         Ok(url.to_string())
     } else {
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
+            .danger_accept_invalid_certs(opt_insecure)
             .build()?;
         let mut response = client
             .get(url)
