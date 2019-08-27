@@ -6,7 +6,7 @@ use clap::{App, Arg};
 use monolith::html::{html_to_dom, print_dom, walk_and_embed_assets};
 use monolith::http::{is_valid_url, retrieve_asset};
 
-static DEFAULT_USER_AGENT: &str =
+const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0";
 
 fn main() {

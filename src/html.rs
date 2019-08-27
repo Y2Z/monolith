@@ -8,16 +8,16 @@ use std::default::Default;
 use std::io;
 use utils::data_to_dataurl;
 
+const ICON_VALUES: [&str; 4] = ["icon", "shortcut icon", "mask-icon ", "apple-touch-icon"];
+
 lazy_static! {
     static ref EMPTY_STRING: String = String::new();
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
-    static ref ICON_VALUES: Regex = Regex::new(
-        r"^icon|shortcut icon|mask-icon|apple-touch-icon$"
-    ).unwrap();
 }
 
-const TRANSPARENT_PIXEL: &str = "data:image/png;base64,\
-iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+const TRANSPARENT_PIXEL: &str =
+    "data:image/png;base64,\
+     iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 const JS_DOM_EVENT_ATTRS: [&str; 21] = [
     // Input
@@ -47,19 +47,19 @@ const JS_DOM_EVENT_ATTRS: [&str; 21] = [
     "onresize",
 ];
 
-fn get_parent_node_name(node: &Handle) -> String {
+fn get_parent_node_name(node: &Handle) -> Option<String> {
     let parent = node.parent.take().clone();
     let parent_node = parent.and_then(|node| node.upgrade()).unwrap();
 
-    match &parent_node.data {
-        NodeData::Document => { EMPTY_STRING.clone() }
-        NodeData::Doctype { .. } => { EMPTY_STRING.clone() }
-        NodeData::Text { .. } => { EMPTY_STRING.clone() }
-        NodeData::Comment { .. } => { EMPTY_STRING.clone() }
-        NodeData::Element { ref name, attrs: _, .. } => {
-            name.local.as_ref().to_string()
-        }
-        NodeData::ProcessingInstruction { .. } => unreachable!()
+    match parent_node.data {
+        NodeData::Document => None,
+        NodeData::Doctype { .. } => None,
+        NodeData::Text { .. } => None,
+        NodeData::Comment { .. } => None,
+        NodeData::Element {
+            ref name, attrs: _, ..
+        } => Some(name.local.as_ref().to_string()),
+        NodeData::ProcessingInstruction { .. } => unreachable!(),
     }
 }
 
@@ -76,7 +76,8 @@ pub fn walk_and_embed_assets(
             // Dig deeper
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(
-                    &url, child,
+                    &url,
+                    child,
                     opt_no_js,
                     opt_no_images,
                     opt_user_agent,
@@ -122,18 +123,17 @@ pub fn walk_and_embed_assets(
                                     attr.value.clear();
                                     attr.value.push_slice(TRANSPARENT_PIXEL);
                                 } else {
-                                    let href_full_url: String = resolve_url(
-                                            &url,
-                                            &attr.value.to_string()
-                                        )
-                                        .unwrap_or(EMPTY_STRING.clone());
+                                    let href_full_url: String =
+                                        resolve_url(&url, &attr.value.to_string())
+                                            .unwrap_or(EMPTY_STRING.clone());
                                     let favicon_datauri = retrieve_asset(
                                         &href_full_url,
                                         true,
                                         "",
                                         opt_user_agent,
                                         opt_silent,
-                                    ).unwrap_or(EMPTY_STRING.clone());
+                                    )
+                                    .unwrap_or(EMPTY_STRING.clone());
                                     attr.value.clear();
                                     attr.value.push_slice(favicon_datauri.as_str());
                                 }
@@ -142,18 +142,17 @@ pub fn walk_and_embed_assets(
                     } else if link_type == "stylesheet" {
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "href" {
-                                let href_full_url: String = resolve_url(
-                                        &url,
-                                        &attr.value.to_string(),
-                                    )
-                                    .unwrap_or(EMPTY_STRING.clone());
+                                let href_full_url: String =
+                                    resolve_url(&url, &attr.value.to_string())
+                                        .unwrap_or(EMPTY_STRING.clone());
                                 let css_datauri = retrieve_asset(
                                     &href_full_url,
                                     true,
                                     "text/css",
                                     opt_user_agent,
                                     opt_silent,
-                                ).unwrap_or(EMPTY_STRING.clone());
+                                )
+                                .unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(css_datauri.as_str());
                             }
@@ -161,11 +160,9 @@ pub fn walk_and_embed_assets(
                     } else {
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "href" {
-                                let href_full_url: String = resolve_url(
-                                        &url,
-                                        &attr.value.to_string(),
-                                    )
-                                    .unwrap_or(EMPTY_STRING.clone());
+                                let href_full_url: String =
+                                    resolve_url(&url, &attr.value.to_string())
+                                        .unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(&href_full_url.as_str());
                             }
@@ -179,18 +176,17 @@ pub fn walk_and_embed_assets(
                                 attr.value.clear();
                                 attr.value.push_slice(TRANSPARENT_PIXEL);
                             } else {
-                                let src_full_url: String = resolve_url(
-                                        &url,
-                                        &attr.value.to_string(),
-                                    )
-                                    .unwrap_or(EMPTY_STRING.clone());
+                                let src_full_url: String =
+                                    resolve_url(&url, &attr.value.to_string())
+                                        .unwrap_or(EMPTY_STRING.clone());
                                 let img_datauri = retrieve_asset(
                                     &src_full_url,
                                     true,
                                     "",
                                     opt_user_agent,
                                     opt_silent,
-                                ).unwrap_or(EMPTY_STRING.clone());
+                                )
+                                .unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(img_datauri.as_str());
                             }
@@ -200,25 +196,26 @@ pub fn walk_and_embed_assets(
                 "source" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "srcset" {
-                            if get_parent_node_name(&node) == "picture" {
-                                if opt_no_images {
-                                    attr.value.clear();
-                                    attr.value.push_slice(TRANSPARENT_PIXEL);
-                                } else {
-                                    let srcset_full_url: String = resolve_url(
-                                            &url,
-                                            &attr.value.to_string(),
+                            if let Some(n) = get_parent_node_name(&node) {
+                                if n == "picture" {
+                                    if opt_no_images {
+                                        attr.value.clear();
+                                        attr.value.push_slice(TRANSPARENT_PIXEL);
+                                    } else {
+                                        let srcset_full_url: String =
+                                            resolve_url(&url, &attr.value.to_string())
+                                                .unwrap_or(EMPTY_STRING.clone());
+                                        let source_datauri = retrieve_asset(
+                                            &srcset_full_url,
+                                            true,
+                                            "",
+                                            opt_user_agent,
+                                            opt_silent,
                                         )
                                         .unwrap_or(EMPTY_STRING.clone());
-                                    let source_datauri = retrieve_asset(
-                                        &srcset_full_url,
-                                        true,
-                                        "",
-                                        opt_user_agent,
-                                        opt_silent,
-                                    ).unwrap_or(EMPTY_STRING.clone());
-                                    attr.value.clear();
-                                    attr.value.push_slice(source_datauri.as_str());
+                                        attr.value.clear();
+                                        attr.value.push_slice(source_datauri.as_str());
+                                    }
                                 }
                             }
                         }
@@ -251,18 +248,17 @@ pub fn walk_and_embed_assets(
                     } else {
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "src" {
-                                let src_full_url: String = resolve_url(
-                                        &url,
-                                        &attr.value.to_string(),
-                                    )
-                                    .unwrap_or(EMPTY_STRING.clone());
+                                let src_full_url: String =
+                                    resolve_url(&url, &attr.value.to_string())
+                                        .unwrap_or(EMPTY_STRING.clone());
                                 let js_datauri = retrieve_asset(
                                     &src_full_url,
                                     true,
                                     "application/javascript",
                                     opt_user_agent,
                                     opt_silent,
-                                ).unwrap_or(EMPTY_STRING.clone());
+                                )
+                                .unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(js_datauri.as_str());
                             }
@@ -295,7 +291,8 @@ pub fn walk_and_embed_assets(
                                 "text/html",
                                 opt_user_agent,
                                 opt_silent,
-                            ).unwrap_or(EMPTY_STRING.clone());
+                            )
+                            .unwrap_or(EMPTY_STRING.clone());
                             let dom = html_to_dom(&iframe_data);
                             walk_and_embed_assets(
                                 &src_full_url,
@@ -337,7 +334,7 @@ pub fn walk_and_embed_assets(
                 );
             }
         }
-        NodeData::ProcessingInstruction { .. } => unreachable!()
+        NodeData::ProcessingInstruction { .. } => unreachable!(),
     }
 }
 
@@ -357,7 +354,7 @@ pub fn print_dom(handle: &Handle) {
 }
 
 fn is_icon(attr_value: &str) -> bool {
-    ICON_VALUES.is_match(&attr_value.to_lowercase())
+    ICON_VALUES.contains(&attr_value)
 }
 
 #[cfg(test)]
@@ -372,7 +369,10 @@ mod tests {
 
     #[test]
     fn test_has_protocol() {
-        assert_eq!(has_protocol("mailto:somebody@somewhere.com?subject=hello"), true);
+        assert_eq!(
+            has_protocol("mailto:somebody@somewhere.com?subject=hello"),
+            true
+        );
         assert_eq!(has_protocol("tel:5551234567"), true);
         assert_eq!(has_protocol("ftp:user:password@some-ftp-server.com"), true);
         assert_eq!(has_protocol("javascript:void(0)"), true);
@@ -382,6 +382,9 @@ mod tests {
         assert_eq!(has_protocol("some-hostname.com/some-file.html"), false);
         assert_eq!(has_protocol("/some-file.html"), false);
         assert_eq!(has_protocol(""), false);
-        assert_eq!(has_protocol("MAILTO:somebody@somewhere.com?subject=hello"), true);
+        assert_eq!(
+            has_protocol("MAILTO:somebody@somewhere.com?subject=hello"),
+            true
+        );
     }
 }
