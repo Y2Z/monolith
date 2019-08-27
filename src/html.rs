@@ -70,18 +70,20 @@ pub fn walk_and_embed_assets(
     opt_no_images: bool,
     opt_user_agent: &str,
     opt_silent: bool,
+    opt_insecure: bool,
 ) {
     match node.data {
         NodeData::Document => {
             // Dig deeper
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(
-                    &url, child,
-                    opt_no_js,
-                    opt_no_images,
-                    opt_user_agent,
-                    opt_silent,
-                );
+                        &url, child,
+                        opt_no_js,
+                        opt_no_images,
+                        opt_user_agent,
+                        opt_silent,
+                        opt_insecure,
+                    );
             }
         }
         NodeData::Doctype { .. } => {}
@@ -128,12 +130,14 @@ pub fn walk_and_embed_assets(
                                         )
                                         .unwrap_or(EMPTY_STRING.clone());
                                     let favicon_datauri = retrieve_asset(
-                                        &href_full_url,
-                                        true,
-                                        "",
-                                        opt_user_agent,
-                                        opt_silent,
-                                    ).unwrap_or(EMPTY_STRING.clone());
+                                            &href_full_url,
+                                            true,
+                                            "",
+                                            opt_user_agent,
+                                            opt_silent,
+                                            opt_insecure,
+                                        )
+                                        .unwrap_or(EMPTY_STRING.clone());
                                     attr.value.clear();
                                     attr.value.push_slice(favicon_datauri.as_str());
                                 }
@@ -148,12 +152,14 @@ pub fn walk_and_embed_assets(
                                     )
                                     .unwrap_or(EMPTY_STRING.clone());
                                 let css_datauri = retrieve_asset(
-                                    &href_full_url,
-                                    true,
-                                    "text/css",
-                                    opt_user_agent,
-                                    opt_silent,
-                                ).unwrap_or(EMPTY_STRING.clone());
+                                        &href_full_url,
+                                        true,
+                                        "text/css",
+                                        opt_user_agent,
+                                        opt_silent,
+                                        opt_insecure,
+                                    )
+                                    .unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(css_datauri.as_str());
                             }
@@ -185,12 +191,14 @@ pub fn walk_and_embed_assets(
                                     )
                                     .unwrap_or(EMPTY_STRING.clone());
                                 let img_datauri = retrieve_asset(
-                                    &src_full_url,
-                                    true,
-                                    "",
-                                    opt_user_agent,
-                                    opt_silent,
-                                ).unwrap_or(EMPTY_STRING.clone());
+                                        &src_full_url,
+                                        true,
+                                        "",
+                                        opt_user_agent,
+                                        opt_silent,
+                                        opt_insecure,
+                                    )
+                                    .unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(img_datauri.as_str());
                             }
@@ -211,12 +219,14 @@ pub fn walk_and_embed_assets(
                                         )
                                         .unwrap_or(EMPTY_STRING.clone());
                                     let source_datauri = retrieve_asset(
-                                        &srcset_full_url,
-                                        true,
-                                        "",
-                                        opt_user_agent,
-                                        opt_silent,
-                                    ).unwrap_or(EMPTY_STRING.clone());
+                                            &srcset_full_url,
+                                            true,
+                                            "",
+                                            opt_user_agent,
+                                            opt_silent,
+                                            opt_insecure,
+                                        )
+                                        .unwrap_or(EMPTY_STRING.clone());
                                     attr.value.clear();
                                     attr.value.push_slice(source_datauri.as_str());
                                 }
@@ -257,12 +267,14 @@ pub fn walk_and_embed_assets(
                                     )
                                     .unwrap_or(EMPTY_STRING.clone());
                                 let js_datauri = retrieve_asset(
-                                    &src_full_url,
-                                    true,
-                                    "application/javascript",
-                                    opt_user_agent,
-                                    opt_silent,
-                                ).unwrap_or(EMPTY_STRING.clone());
+                                        &src_full_url,
+                                        true,
+                                        "application/javascript",
+                                        opt_user_agent,
+                                        opt_silent,
+                                        opt_insecure,
+                                    )
+                                    .unwrap_or(EMPTY_STRING.clone());
                                 attr.value.clear();
                                 attr.value.push_slice(js_datauri.as_str());
                             }
@@ -290,21 +302,24 @@ pub fn walk_and_embed_assets(
                             let src_full_url: String = resolve_url(&url, &attr.value.to_string())
                                 .unwrap_or(EMPTY_STRING.clone());
                             let iframe_data = retrieve_asset(
-                                &src_full_url,
-                                false,
-                                "text/html",
-                                opt_user_agent,
-                                opt_silent,
-                            ).unwrap_or(EMPTY_STRING.clone());
+                                    &src_full_url,
+                                    false,
+                                    "text/html",
+                                    opt_user_agent,
+                                    opt_silent,
+                                    opt_insecure,
+                                )
+                                .unwrap_or(EMPTY_STRING.clone());
                             let dom = html_to_dom(&iframe_data);
                             walk_and_embed_assets(
-                                &src_full_url,
-                                &dom.document,
-                                opt_no_js,
-                                opt_no_images,
-                                opt_user_agent,
-                                opt_silent,
-                            );
+                                    &src_full_url,
+                                    &dom.document,
+                                    opt_no_js,
+                                    opt_no_images,
+                                    opt_user_agent,
+                                    opt_silent,
+                                    opt_insecure,
+                                );
                             let mut buf: Vec<u8> = Vec::new();
                             serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
                             let iframe_datauri = data_to_dataurl("text/html", &buf);
@@ -328,13 +343,14 @@ pub fn walk_and_embed_assets(
             // Dig deeper
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(
-                    &url,
-                    child,
-                    opt_no_js,
-                    opt_no_images,
-                    opt_user_agent,
-                    opt_silent,
-                );
+                        &url,
+                        child,
+                        opt_no_js,
+                        opt_no_images,
+                        opt_user_agent,
+                        opt_silent,
+                        opt_insecure,
+                    );
             }
         }
         NodeData::ProcessingInstruction { .. } => unreachable!()
