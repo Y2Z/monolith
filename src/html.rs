@@ -287,7 +287,14 @@ pub fn walk_and_embed_assets(
                 "iframe" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "src" {
-                            let src_full_url: String = resolve_url(&url, &attr.value.to_string())
+                            let value = attr.value.to_string();
+                            // Ignore iframes with empty source (they cause infinite loops)
+                            if value == EMPTY_STRING.clone() {
+                                continue;
+                            }
+
+
+                            let src_full_url: String = resolve_url(&url, &value)
                                 .unwrap_or(EMPTY_STRING.clone());
                             let iframe_data = retrieve_asset(
                                 &src_full_url,
