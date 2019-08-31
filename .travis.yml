@@ -11,6 +11,7 @@ rust:
     - stable
     - beta 
     - nightly
+    - 1.35.0
 
 script:
     - cargo build --verbose
