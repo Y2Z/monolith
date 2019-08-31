@@ -390,7 +390,10 @@ mod tests {
     #[test]
     fn test_is_icon() {
         assert_eq!(is_icon("icon"), true);
+        assert_eq!(is_icon("Shortcut Icon"), true);
+        assert_eq!(is_icon("ICON"), true);
         assert_eq!(is_icon("stylesheet"), false);
+        assert_eq!(is_icon(""), false);
     }
 
     #[test]
@@ -406,5 +409,123 @@ mod tests {
         assert_eq!(has_protocol("/some-file.html"), false);
         assert_eq!(has_protocol(""), false);
         assert_eq!(has_protocol("MAILTO:somebody@somewhere.com?subject=hello"), true);
+    }
+
+    #[test]
+    fn test_get_parent_node_name() {
+        let html = "<!doctype html><html><HEAD></HEAD><body><div><P></P></div></body></html>";
+        let dom = html_to_dom(&html);
+        let mut count = 0;
+
+        fn test_walk(node: &Handle, i: &mut i8) {
+            *i += 1;
+
+            match &node.data {
+                NodeData::Document => {
+                    for child in node.children.borrow().iter() {
+                        test_walk(child, &mut *i);
+                    }
+                }
+                NodeData::Doctype { .. } => (),
+                NodeData::Text { .. } => (),
+                NodeData::Comment { .. } => (),
+                NodeData::Element { ref name, attrs: _, .. } => {
+                    let node_name = name.local.as_ref().to_string();
+                    let parent_node_name = get_parent_node_name(node);
+                    if node_name == "head" || node_name == "body" {
+                        assert_eq!(parent_node_name, "html");
+                    } else if node_name == "div" {
+                        assert_eq!(parent_node_name, "body");
+                    } else if node_name == "p" {
+                        assert_eq!(parent_node_name, "div");
+                    }
+
+                    println!("{}", node_name);
+
+                    for child in node.children.borrow().iter() {
+                        test_walk(child, &mut *i);
+                    }
+                }
+                NodeData::ProcessingInstruction { .. } => unreachable!()
+            };
+        }
+
+        test_walk(&dom.document, &mut count);
+
+        assert_eq!(count, 7);
+    }
+
+    #[test]
+    fn test_walk_and_embed_assets() {
+        let html = "<div><P></P></div>";
+        let dom = html_to_dom(&html);
+        let url = "http://localhost";
+
+        walk_and_embed_assets(&url, &dom.document, true, true, "", true, true);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "<html><head></head><body><div><p></p></div></body></html>"
+        );
+    }
+
+    #[test]
+    fn test_walk_and_embed_assets_iframe() {
+        let html = "<div><P></P><iframe src=\"\"></iframe></div>";
+        let dom = html_to_dom(&html);
+        let url = "http://localhost";
+
+        walk_and_embed_assets(&url, &dom.document, true, true, "", true, true);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "<html><head></head><body><div><p></p><iframe src=\"\"></iframe></div></body></html>"
+        );
+    }
+
+    #[test]
+    fn test_walk_and_embed_assets_img() {
+        let html = "<div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
+        let dom = html_to_dom(&html);
+        let url = "http://localhost";
+
+        walk_and_embed_assets(&url, &dom.document, true, true, "", true, true);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "<html><head></head><body><div>\
+             <img src=\"data:image/png;base64,\
+             iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0\
+             lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=\">\
+             </div></body></html>"
+        );
+    }
+
+    #[test]
+    fn test_walk_and_embed_assets_js() {
+        let html = "<div><script src=\"http://localhost/assets/some.js\"></script>\
+                    <script>alert(1)</script></div>";
+        let dom = html_to_dom(&html);
+        let url = "http://localhost";
+
+        walk_and_embed_assets(&url, &dom.document, true, true, "", true, true);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "<html><head></head><body><div><script src=\"\"></script>\
+             <script></script></div></body></html>"
+        );
     }
 }
