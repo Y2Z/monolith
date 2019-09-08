@@ -91,6 +91,7 @@ mod tests {
     fn test_is_valid_url() {
         assert!(is_valid_url("https://www.rust-lang.org/"));
         assert!(is_valid_url("http://kernel.org"));
+        assert!(!is_valid_url("//kernel.org"));
         assert!(!is_valid_url("./index.html"));
         assert!(!is_valid_url("some-local-page.htm"));
         assert!(!is_valid_url("ftp://1.2.3.4/www/index.html"));
