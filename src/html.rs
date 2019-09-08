@@ -12,7 +12,7 @@ lazy_static! {
     static ref EMPTY_STRING: String = String::new();
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
     static ref ICON_VALUES: Regex = Regex::new(
-        r"^icon|shortcut icon|mask-icon|apple-touch-icon$"
+        r"^icon|shortcut icon|mask-icon|apple-touch-icon|fluid-icon$"
     ).unwrap();
 }
 
@@ -181,13 +181,20 @@ pub fn walk_and_embed_assets(
                 "img" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "src" {
+                            let value = attr.value.to_string();
+
+                            // Ignore images with empty source (they're hopelessly broken)
+                            if value == EMPTY_STRING.clone() {
+                                continue;
+                            }
+
                             if opt_no_images {
                                 attr.value.clear();
                                 attr.value.push_slice(TRANSPARENT_PIXEL);
                             } else {
                                 let src_full_url: String = resolve_url(
                                         &url,
-                                        &attr.value.to_string(),
+                                        &value,
                                     )
                                     .unwrap_or(EMPTY_STRING.clone());
                                 let img_datauri = retrieve_asset(
@@ -284,7 +291,7 @@ pub fn walk_and_embed_assets(
                 "form" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "action" {
-                            // Do not touch action props which are set to a URL
+                            // Don't modify action that's already a full URL
                             if is_valid_url(&attr.value) {
                                 continue;
                             }
@@ -300,11 +307,11 @@ pub fn walk_and_embed_assets(
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "src" {
                             let value = attr.value.to_string();
+
                             // Ignore iframes with empty source (they cause infinite loops)
                             if value == EMPTY_STRING.clone() {
                                 continue;
                             }
-
 
                             let src_full_url: String = resolve_url(&url, &value)
                                 .unwrap_or(EMPTY_STRING.clone());
@@ -392,6 +399,8 @@ mod tests {
         assert_eq!(is_icon("icon"), true);
         assert_eq!(is_icon("Shortcut Icon"), true);
         assert_eq!(is_icon("ICON"), true);
+        assert_eq!(is_icon("mask-icon"), true);
+        assert_eq!(is_icon("fluid-icon"), true);
         assert_eq!(is_icon("stylesheet"), false);
         assert_eq!(is_icon(""), false);
     }
