@@ -21,6 +21,7 @@ fn main() {
                 .index(1)
                 .help("URL to download"),
         )
+        // .args_from_usage("-a, --include-audio 'Embed audio sources'")
         .args_from_usage("-c, --no-css 'Ignore styles'")
         .args_from_usage("-f, --no-frames 'Exclude iframes'")
         .args_from_usage("-i, --no-images 'Remove images'")
@@ -29,6 +30,7 @@ fn main() {
         .args_from_usage("-k, --insecure 'Accept invalid X.509 (TLS) certificates'")
         .args_from_usage("-s, --silent 'Suppress verbosity'")
         .args_from_usage("-u, --user-agent=[Iceweasel] 'Custom User-Agent string'")
+        // .args_from_usage("-v, --include-video 'Embed video sources'")
         .get_matches();
 
     // Process the command

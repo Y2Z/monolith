@@ -175,7 +175,7 @@ pub fn walk_and_embed_assets(
                         if &attr.name.local == "src" {
                             let value = attr.value.to_string();
 
-                            // Ignore images with empty source (they're hopelessly broken)
+                            // Ignore images with empty source
                             if value == EMPTY_STRING.clone() {
                                 continue;
                             }
@@ -203,7 +203,14 @@ pub fn walk_and_embed_assets(
                 }
                 "source" => {
                     for attr in attrs_mut.iter_mut() {
-                        if &attr.name.local == "srcset" {
+                        let attr_name: &str = &attr.name.local;
+
+                        if attr_name == "src" {
+                            let src_full_url: String = resolve_url(&url, &attr.value.to_string())
+                                .unwrap_or(attr.value.to_string());
+                            attr.value.clear();
+                            attr.value.push_slice(src_full_url.as_str());
+                        } else if attr_name == "srcset" {
                             if get_node_name(&get_parent_node(&node)) == "picture" {
                                 if opt_no_images {
                                     attr.value.clear();
@@ -341,6 +348,36 @@ pub fn walk_and_embed_assets(
                                 let iframe_datauri = data_to_dataurl("text/html", &buf);
                                 attr.value.clear();
                                 attr.value.push_slice(iframe_datauri.as_str());
+                            }
+                        }
+                    }
+                }
+                "video" => {
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "poster" {
+                            let video_poster = attr.value.to_string();
+
+                            // Ignore posters with empty source
+                            if video_poster == EMPTY_STRING.clone() {
+                                continue;
+                            }
+
+                            if opt_no_images {
+                                attr.value.clear();
+                            } else {
+                                let poster_full_url: String = resolve_url(&url, &video_poster)
+                                    .unwrap_or(EMPTY_STRING.clone());
+                                let img_datauri = retrieve_asset(
+                                    &poster_full_url,
+                                    true,
+                                    "",
+                                    opt_user_agent,
+                                    opt_silent,
+                                    opt_insecure,
+                                )
+                                .unwrap_or(poster_full_url);
+                                attr.value.clear();
+                                attr.value.push_slice(img_datauri.as_str());
                             }
                         }
                     }
