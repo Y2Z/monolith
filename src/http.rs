@@ -1,6 +1,6 @@
 use regex::Regex;
-use reqwest::Client;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
+use reqwest::Client;
 use std::time::Duration;
 use url::{ParseError, Url};
 use utils::data_to_dataurl;
@@ -46,10 +46,7 @@ pub fn retrieve_asset(
             .timeout(Duration::from_secs(10))
             .danger_accept_invalid_certs(opt_insecure)
             .build()?;
-        let mut response = client
-            .get(url)
-            .header(USER_AGENT, opt_user_agent)
-            .send()?;
+        let mut response = client.get(url).header(USER_AGENT, opt_user_agent).send()?;
         let final_url = response.url().as_str();
 
         if !opt_silent {
@@ -102,19 +99,13 @@ mod tests {
 
     #[test]
     fn test_resolve_url() -> Result<(), ParseError> {
-        let resolved_url = resolve_url(
-            "https://www.kernel.org",
-            "../category/signatures.html",
-        )?;
+        let resolved_url = resolve_url("https://www.kernel.org", "../category/signatures.html")?;
         assert_eq!(
             resolved_url.as_str(),
             "https://www.kernel.org/category/signatures.html"
         );
 
-        let resolved_url = resolve_url(
-            "https://www.kernel.org",
-            "category/signatures.html",
-        )?;
+        let resolved_url = resolve_url("https://www.kernel.org", "category/signatures.html")?;
         assert_eq!(
             resolved_url.as_str(),
             "https://www.kernel.org/category/signatures.html"
