@@ -114,6 +114,7 @@ install:
   - if defined MINGW_PATH set PATH=%PATH%;%MINGW_PATH%
   - rustc -vV
   - cargo -vV
+  - rustup component add rustfmt
 
 ## Build Script ##
 
@@ -125,4 +126,5 @@ build: false
 #directly or perform other testing commands. Rust will automatically be placed in the PATH
 # environment variable.
 test_script:
-- cargo test --verbose %cargoflags%
+  - cargo test --verbose %cargoflags%
+  - cargo fmt --all -- --check

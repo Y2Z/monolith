@@ -2,7 +2,7 @@ extern crate base64;
 
 use self::base64::encode;
 
-static MAGIC: [[&[u8]; 2]; 19]  = [
+static MAGIC: [[&[u8]; 2]; 19] = [
     // Image
     [b"GIF87a", b"image/gif"],
     [b"GIF89a", b"image/gif"],
@@ -39,7 +39,7 @@ pub fn data_to_dataurl(mime: &str, data: &[u8]) -> String {
 fn detect_mimetype(data: &[u8]) -> String {
     let mut re = String::new();
 
-    for item in MAGIC.iter()  {
+    for item in MAGIC.iter() {
         if data.starts_with(item[0]) {
             re = String::from_utf8(item[1].to_vec()).unwrap();
             break;

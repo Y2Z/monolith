@@ -1,5 +1,6 @@
 [![Travis CI Build Status](https://travis-ci.org/Y2Z/monolith.svg?branch=master)](https://travis-ci.org/Y2Z/monolith)
-[![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/j1v1d96sw952b1ch?svg=true)](https://ci.appveyor.com/project/vflyson/monolith)
+[![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/ae7soyjih8jg2bv7/branch/master?svg=true)](https://ci.appveyor.com/project/snshn/monolith/branch/master)
+
 
 # monolith
 
@@ -21,7 +22,10 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ monolith https://lyrics.github.io/db/p/portishead/dummy/roads/ > portishead-roads-lyrics.html
 
 ### Options
+ - `-c`: Ignore styles
+ - `-f`: Exclude iframes
  - `-i`: Remove images
+ - `-I`: Isolate document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-s`: Silent mode
