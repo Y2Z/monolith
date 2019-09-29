@@ -5,60 +5,42 @@ use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::{format_tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
-use http::{is_valid_url, resolve_url, retrieve_asset};
+use http::retrieve_asset;
+use js::attr_is_event_handler;
 use regex::Regex;
 use std::default::Default;
-use utils::data_to_dataurl;
+use utils::{data_to_dataurl, is_valid_url, resolve_url, url_has_protocol};
 
 lazy_static! {
     static ref EMPTY_STRING: String = String::new();
-    static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
-    static ref ICON_VALUES: Regex =
-        Regex::new(r"^icon|shortcut icon|mask-icon|apple-touch-icon|fluid-icon$").unwrap();
 }
+
+const ICON_VALUES: [&str; 5] = [
+    "icon",
+    "shortcut icon",
+    "mask-icon",
+    "apple-touch-icon",
+    "fluid-icon",
+];
 
 const TRANSPARENT_PIXEL: &str =
     "data:image/png;base64,\
      iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
-const JS_DOM_EVENT_ATTRS: [&str; 21] = [
-    // Input
-    "onfocus",
-    "onblur",
-    "onselect",
-    "onchange",
-    "onsubmit",
-    "onreset",
-    "onkeydown",
-    "onkeypress",
-    "onkeyup",
-    // Mouse
-    "onmouseover",
-    "onmouseout",
-    "onmousedown",
-    "onmouseup",
-    "onmousemove",
-    // Click
-    "onclick",
-    "ondblclick",
-    // Load
-    "onload",
-    "onunload",
-    "onabort",
-    "onerror",
-    "onresize",
-];
-
-fn get_parent_node(node: &Handle) -> Handle {
+pub fn get_parent_node(node: &Handle) -> Handle {
     let parent = node.parent.take().clone();
     parent.and_then(|node| node.upgrade()).unwrap()
 }
 
-fn get_node_name(node: &Handle) -> String {
+pub fn get_node_name(node: &Handle) -> String {
     match &node.data {
         NodeData::Element { ref name, .. } => name.local.as_ref().to_string(),
         _ => EMPTY_STRING.clone(),
     }
+}
+
+pub fn is_icon(attr_value: &str) -> bool {
+    ICON_VALUES.contains(&&*attr_value.to_lowercase())
 }
 
 pub fn walk_and_embed_assets(
@@ -239,7 +221,7 @@ pub fn walk_and_embed_assets(
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             // Don't touch email links or hrefs which begin with a hash sign
-                            if attr.value.starts_with('#') || has_protocol(&attr.value) {
+                            if attr.value.starts_with('#') || url_has_protocol(&attr.value) {
                                 continue;
                             }
 
@@ -282,73 +264,68 @@ pub fn walk_and_embed_assets(
                 }
                 "style" => {
                     if opt_no_css {
-                        // Empty  inner content of STYLE tags
+                        // Empty inner content of STYLE tags
                         node.children.borrow_mut().clear();
                     }
                 }
                 "form" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "action" {
-                            // Don't modify action that's already a full URL
-                            if is_valid_url(&attr.value) {
-                                continue;
+                            // Modify action to be a full URL
+                            if !is_valid_url(&attr.value) {
+                                let href_full_url: String =
+                                    resolve_url(&url, &attr.value.to_string())
+                                        .unwrap_or(EMPTY_STRING.clone());
+                                attr.value.clear();
+                                attr.value.push_slice(href_full_url.as_str());
                             }
-
-                            let href_full_url: String = resolve_url(&url, &attr.value.to_string())
-                                .unwrap_or(EMPTY_STRING.clone());
-                            attr.value.clear();
-                            attr.value.push_slice(href_full_url.as_str());
                         }
                     }
                 }
                 "iframe" => {
-                    if opt_no_frames {
-                        // Empty the src attribute
-                        for attr in attrs_mut.iter_mut() {
-                            if &attr.name.local == "src" {
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "src" {
+                            if opt_no_frames {
+                                // Empty the src attribute
                                 attr.value.clear();
+                                continue;
                             }
-                        }
-                    } else {
-                        for attr in attrs_mut.iter_mut() {
-                            if &attr.name.local == "src" {
-                                let iframe_src = attr.value.to_string();
 
-                                // Ignore iframes with empty source (they cause infinite loops)
-                                if iframe_src == EMPTY_STRING.clone() {
-                                    continue;
-                                }
+                            let iframe_src: String = attr.value.to_string();
 
-                                let src_full_url: String =
-                                    resolve_url(&url, &iframe_src).unwrap_or(EMPTY_STRING.clone());
-                                let iframe_data = retrieve_asset(
-                                    &src_full_url,
-                                    false,
-                                    "text/html",
-                                    opt_user_agent,
-                                    opt_silent,
-                                    opt_insecure,
-                                )
-                                .unwrap_or(EMPTY_STRING.clone());
-                                let dom = html_to_dom(&iframe_data);
-                                walk_and_embed_assets(
-                                    &src_full_url,
-                                    &dom.document,
-                                    opt_no_css,
-                                    opt_no_js,
-                                    opt_no_images,
-                                    opt_user_agent,
-                                    opt_silent,
-                                    opt_insecure,
-                                    opt_no_frames,
-                                );
-                                let mut buf: Vec<u8> = Vec::new();
-                                serialize(&mut buf, &dom.document, SerializeOpts::default())
-                                    .unwrap();
-                                let iframe_datauri = data_to_dataurl("text/html", &buf);
-                                attr.value.clear();
-                                attr.value.push_slice(iframe_datauri.as_str());
+                            // Ignore iframes with empty source (they cause infinite loops)
+                            if iframe_src == EMPTY_STRING.clone() {
+                                continue;
                             }
+
+                            let src_full_url: String =
+                                resolve_url(&url, &iframe_src).unwrap_or(EMPTY_STRING.clone());
+                            let iframe_data = retrieve_asset(
+                                &src_full_url,
+                                false,
+                                "text/html",
+                                opt_user_agent,
+                                opt_silent,
+                                opt_insecure,
+                            )
+                            .unwrap_or(EMPTY_STRING.clone());
+                            let dom = html_to_dom(&iframe_data);
+                            walk_and_embed_assets(
+                                &src_full_url,
+                                &dom.document,
+                                opt_no_css,
+                                opt_no_js,
+                                opt_no_images,
+                                opt_user_agent,
+                                opt_silent,
+                                opt_insecure,
+                                opt_no_frames,
+                            );
+                            let mut buf: Vec<u8> = Vec::new();
+                            serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+                            let iframe_datauri = data_to_dataurl("text/html", &buf);
+                            attr.value.clear();
+                            attr.value.push_slice(iframe_datauri.as_str());
                         }
                     }
                 }
@@ -357,7 +334,7 @@ pub fn walk_and_embed_assets(
                         if &attr.name.local == "poster" {
                             let video_poster = attr.value.to_string();
 
-                            // Ignore posters with empty source
+                            // Skip posters with empty source
                             if video_poster == EMPTY_STRING.clone() {
                                 continue;
                             }
@@ -387,19 +364,29 @@ pub fn walk_and_embed_assets(
 
             if opt_no_css {
                 // Get rid of style attributes
-                for attr in attrs_mut.iter_mut() {
+                let mut style_attr_indexes = Vec::new();
+                for (i, attr) in attrs_mut.iter_mut().enumerate() {
                     if attr.name.local.to_lowercase() == "style" {
-                        attr.value.clear();
+                        style_attr_indexes.push(i);
                     }
+                }
+                style_attr_indexes.reverse();
+                for attr_index in style_attr_indexes {
+                    attrs_mut.remove(attr_index);
                 }
             }
 
             if opt_no_js {
                 // Get rid of JS event attributes
-                for attr in attrs_mut.iter_mut() {
-                    if JS_DOM_EVENT_ATTRS.contains(&attr.name.local.to_lowercase().as_str()) {
-                        attr.value.clear();
+                let mut js_attr_indexes = Vec::new();
+                for (i, attr) in attrs_mut.iter_mut().enumerate() {
+                    if attr_is_event_handler(&attr.name.local) {
+                        js_attr_indexes.push(i);
                     }
+                }
+                js_attr_indexes.reverse();
+                for attr_index in js_attr_indexes {
+                    attrs_mut.remove(attr_index);
                 }
             }
 
@@ -425,10 +412,6 @@ pub fn walk_and_embed_assets(
             //       by browsers other than IE [5, 9]
         }
     }
-}
-
-fn has_protocol(url: &str) -> bool {
-    HAS_PROTOCOL.is_match(&url.to_lowercase())
 }
 
 pub fn html_to_dom(data: &str) -> html5ever::rcdom::RcDom {
@@ -472,44 +455,45 @@ pub fn stringify_document(
         let doc = dom.get_document();
         let html = get_child_node_by_name(&doc, "html");
         let head = get_child_node_by_name(&html, "head");
-        {
-            let mut content_attr = EMPTY_STRING.clone();
-            if opt_isolate {
-                content_attr += "default-src 'unsafe-inline' data:;"
-            }
-            if opt_no_css {
-                content_attr += "style-src 'none';"
-            }
-            if opt_no_frames {
-                content_attr += "frame-src 'none';child-src 'none';"
-            }
-            if opt_no_js {
-                content_attr += "script-src 'none';"
-            }
-            if opt_no_images {
-                content_attr += "img-src data:;"
-            }
-            let meta = dom.create_element(
-                QualName::new(None, ns!(), local_name!("meta")),
-                vec![
-                    Attribute {
-                        name: QualName::new(None, ns!(), local_name!("http-equiv")),
-                        value: format_tendril!("Content-Security-Policy"),
-                    },
-                    Attribute {
-                        name: QualName::new(None, ns!(), local_name!("content")),
-                        value: format_tendril!("{}", content_attr),
-                    },
-                ],
-                Default::default(),
-            );
-            head.children.borrow_mut().reverse();
-            head.children.borrow_mut().push(meta.clone());
-            head.children.borrow_mut().reverse();
-            // Note: the CSP meta-tag has to be prepended, never appended,
-            //       since there already may be one defined in the document,
-            //       and browsers don't allow re-defining them (for obvious reasons)
+        let mut content_attr = EMPTY_STRING.clone();
+        if opt_isolate {
+            content_attr += " default-src 'unsafe-inline' data:;";
         }
+        if opt_no_css {
+            content_attr += " style-src 'none';";
+        }
+        if opt_no_frames {
+            content_attr += " frame-src 'none';child-src 'none';";
+        }
+        if opt_no_js {
+            content_attr += " script-src 'none';";
+        }
+        if opt_no_images {
+            content_attr += " img-src data:;";
+        }
+        content_attr = content_attr.trim().to_string();
+
+        let meta = dom.create_element(
+            QualName::new(None, ns!(), local_name!("meta")),
+            vec![
+                Attribute {
+                    name: QualName::new(None, ns!(), local_name!("http-equiv")),
+                    value: format_tendril!("Content-Security-Policy"),
+                },
+                Attribute {
+                    name: QualName::new(None, ns!(), local_name!("content")),
+                    value: format_tendril!("{}", content_attr),
+                },
+            ],
+            Default::default(),
+        );
+        head.children.borrow_mut().reverse();
+        head.children.borrow_mut().push(meta.clone());
+        head.children.borrow_mut().reverse();
+        // Note: the CSP meta-tag has to be prepended, never appended,
+        //       since there already may be one defined in the document,
+        //       and browsers don't allow re-defining them (for obvious reasons)
+
         serialize(&mut buf, &doc, SerializeOpts::default())
             .expect("unable to serialize DOM into buffer");
         result = String::from_utf8(buf).unwrap();
@@ -518,430 +502,4 @@ pub fn stringify_document(
     }
 
     result
-}
-
-fn is_icon(attr_value: &str) -> bool {
-    ICON_VALUES.is_match(&attr_value.to_lowercase())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_icon() {
-        assert_eq!(is_icon("icon"), true);
-        assert_eq!(is_icon("Shortcut Icon"), true);
-        assert_eq!(is_icon("ICON"), true);
-        assert_eq!(is_icon("mask-icon"), true);
-        assert_eq!(is_icon("fluid-icon"), true);
-        assert_eq!(is_icon("stylesheet"), false);
-        assert_eq!(is_icon(""), false);
-    }
-
-    #[test]
-    fn test_has_protocol() {
-        assert_eq!(
-            has_protocol("mailto:somebody@somewhere.com?subject=hello"),
-            true
-        );
-        assert_eq!(has_protocol("tel:5551234567"), true);
-        assert_eq!(has_protocol("ftp:user:password@some-ftp-server.com"), true);
-        assert_eq!(has_protocol("javascript:void(0)"), true);
-        assert_eq!(has_protocol("http://news.ycombinator.com"), true);
-        assert_eq!(has_protocol("https://github.com"), true);
-        assert_eq!(has_protocol("//some-hostname.com/some-file.html"), false);
-        assert_eq!(has_protocol("some-hostname.com/some-file.html"), false);
-        assert_eq!(has_protocol("/some-file.html"), false);
-        assert_eq!(has_protocol(""), false);
-        assert_eq!(
-            has_protocol("MAILTO:somebody@somewhere.com?subject=hello"),
-            true
-        );
-    }
-
-    #[test]
-    fn test_get_parent_node_name() {
-        let html = "<!doctype html><html><HEAD></HEAD><body><div><P></P></div></body></html>";
-        let dom = html_to_dom(&html);
-        let mut count = 0;
-
-        fn test_walk(node: &Handle, i: &mut i8) {
-            *i += 1;
-
-            match &node.data {
-                NodeData::Document => {
-                    for child in node.children.borrow().iter() {
-                        test_walk(child, &mut *i);
-                    }
-                }
-                NodeData::Doctype { .. } => (),
-                NodeData::Text { .. } => (),
-                NodeData::Comment { .. } => (),
-                NodeData::Element { ref name, .. } => {
-                    let node_name = name.local.as_ref().to_string();
-                    let parent_node_name = get_node_name(&get_parent_node(node));
-                    if node_name == "head" || node_name == "body" {
-                        assert_eq!(parent_node_name, "html");
-                    } else if node_name == "div" {
-                        assert_eq!(parent_node_name, "body");
-                    } else if node_name == "p" {
-                        assert_eq!(parent_node_name, "div");
-                    }
-
-                    println!("{}", node_name);
-
-                    for child in node.children.borrow().iter() {
-                        test_walk(child, &mut *i);
-                    }
-                }
-                NodeData::ProcessingInstruction { .. } => unreachable!(),
-            };
-        }
-
-        test_walk(&dom.document, &mut count);
-
-        assert_eq!(count, 7);
-    }
-
-    #[test]
-    fn test_walk_and_embed_assets() {
-        let html = "<div><P></P></div>";
-        let dom = html_to_dom(&html);
-        let url = "http://localhost";
-
-        let opt_no_css: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
-        let opt_insecure = false;
-
-        walk_and_embed_assets(
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_js,
-            opt_no_images,
-            "",
-            opt_silent,
-            opt_insecure,
-            opt_no_frames,
-        );
-
-        let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-
-        assert_eq!(
-            buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head></head><body><div><p></p></div></body></html>"
-        );
-    }
-
-    #[test]
-    fn test_walk_and_embed_assets_no_recursive_iframe() {
-        let html = "<div><P></P><iframe src=\"\"></iframe></div>";
-        let dom = html_to_dom(&html);
-        let url = "http://localhost";
-
-        let opt_no_css: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
-        let opt_insecure = false;
-
-        walk_and_embed_assets(
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_js,
-            opt_no_images,
-            "",
-            opt_silent,
-            opt_insecure,
-            opt_no_frames,
-        );
-
-        let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-
-        assert_eq!(
-            buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head></head><body><div><p></p><iframe src=\"\"></iframe></div></body></html>"
-        );
-    }
-
-    #[test]
-    fn test_walk_and_embed_assets_no_css() {
-        let html = "<link rel=\"stylesheet\" href=\"main.css\">\
-                    <style>html{background-color: #000;}</style>\
-                    <div style=\"display: none;\"></div>";
-        let dom = html_to_dom(&html);
-        let url = "http://localhost";
-
-        let opt_no_css: bool = true;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
-        let opt_insecure = false;
-
-        walk_and_embed_assets(
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_js,
-            opt_no_images,
-            "",
-            opt_silent,
-            opt_insecure,
-            opt_no_frames,
-        );
-
-        let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-
-        assert_eq!(
-            buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head><link rel=\"stylesheet\" href=\"\"><style></style></head>\
-             <body><div style=\"\"></div></body></html>"
-        );
-    }
-
-    #[test]
-    fn test_walk_and_embed_assets_no_images() {
-        let html = "<link rel=\"icon\" href=\"favicon.ico\">\
-                    <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
-        let dom = html_to_dom(&html);
-        let url = "http://localhost";
-
-        let opt_no_css: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = true;
-        let opt_silent = true;
-        let opt_insecure = false;
-
-        walk_and_embed_assets(
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_js,
-            opt_no_images,
-            "",
-            opt_silent,
-            opt_insecure,
-            opt_no_frames,
-        );
-
-        let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-
-        assert_eq!(
-            buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head><link rel=\"icon\" href=\"\"></head><body><div>\
-             <img src=\"data:image/png;base64,\
-             iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0\
-             lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=\">\
-             </div></body></html>"
-        );
-    }
-
-    #[test]
-    fn test_walk_and_embed_assets_no_frames() {
-        let html = "<iframe src=\"http://trackbook.com\"></iframe>";
-        let dom = html_to_dom(&html);
-        let url = "http://localhost";
-
-        let opt_no_css: bool = false;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
-        let opt_insecure = false;
-
-        walk_and_embed_assets(
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_js,
-            opt_no_images,
-            "",
-            opt_silent,
-            opt_insecure,
-            opt_no_frames,
-        );
-
-        let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-
-        assert_eq!(
-            buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head></head><body><iframe src=\"\"></iframe></body></html>"
-        );
-    }
-
-    #[test]
-    fn test_walk_and_embed_assets_no_js() {
-        let html =
-            "<div onClick=\"void(0)\"><script src=\"http://localhost/assets/some.js\"></script>\
-             <script>alert(1)</script></div>";
-        let dom = html_to_dom(&html);
-        let url = "http://localhost";
-
-        let opt_no_css: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = true;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
-        let opt_insecure = false;
-
-        walk_and_embed_assets(
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_js,
-            opt_no_images,
-            "",
-            opt_silent,
-            opt_insecure,
-            opt_no_frames,
-        );
-
-        let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-
-        assert_eq!(
-            buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head></head><body><div onclick=\"\"><script src=\"\"></script>\
-             <script></script></div></body></html>"
-        );
-    }
-
-    #[test]
-    fn test_stringify_document() {
-        let html = "<div><script src=\"some.js\"></script></div>";
-        let dom = html_to_dom(&html);
-
-        let opt_no_css: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_isolate: bool = false;
-
-        assert_eq!(
-            stringify_document(
-                &dom.document,
-                opt_no_css,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
-            ),
-            "<html><head></head><body><div><script src=\"some.js\"></script></div></body></html>"
-        );
-    }
-
-    #[test]
-    fn test_stringify_document_isolate() {
-        let html = "<title>Isolated document</title><link rel=\"something\"/>\
-                    <div><script src=\"some.js\"></script></div>";
-        let dom = html_to_dom(&html);
-
-        let opt_no_css: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_isolate: bool = true;
-
-        assert_eq!(
-            stringify_document(
-                &dom.document,
-                opt_no_css,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
-            ),
-            "<html>\
-             <head>\
-             <meta \
-             http-equiv=\"Content-Security-Policy\" \
-             content=\"default-src 'unsafe-inline' data:;\"></meta>\
-             <title>Isolated document</title>\
-             <link rel=\"something\">\
-             </head>\
-             <body><div><script src=\"some.js\"></script></div></body>\
-             </html>"
-        );
-    }
-
-    #[test]
-    fn test_stringify_document_no_css() {
-        let html = "<!doctype html>\
-                    <title>Unstyled document</title>\
-                    <link rel=\"stylesheet\" href=\"main.css\"/>\
-                    <div style=\"display: none;\"></div>";
-        let dom = html_to_dom(&html);
-
-        let opt_no_css: bool = true;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_isolate: bool = false;
-
-        assert_eq!(
-            stringify_document(
-                &dom.document,
-                opt_no_css,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
-            ),
-            "<!DOCTYPE html>\
-             <html>\
-             <head>\
-             <meta http-equiv=\"Content-Security-Policy\" content=\"style-src 'none';\"></meta>\
-             <title>Unstyled document</title>\
-             <link rel=\"stylesheet\" href=\"main.css\">\
-             </head>\
-             <body><div style=\"display: none;\"></div></body>\
-             </html>"
-        );
-    }
-
-    #[test]
-    fn test_stringify_document_no_frames() {
-        let html = "<!doctype html><title>Frameless document</title><link rel=\"something\"/>\
-                    <div><script src=\"some.js\"></script></div>";
-        let dom = html_to_dom(&html);
-
-        let opt_no_css: bool = false;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_isolate: bool = false;
-
-        assert_eq!(
-            stringify_document(
-                &dom.document,
-                opt_no_css,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
-            ),
-            "<!DOCTYPE html>\
-             <html>\
-             <head>\
-             <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none';child-src 'none';\"></meta>\
-             <title>Frameless document</title>\
-             <link rel=\"something\">\
-             </head>\
-             <body><div><script src=\"some.js\"></script></div></body>\
-             </html>"
-        );
-    }
 }
