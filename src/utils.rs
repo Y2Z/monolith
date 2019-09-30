@@ -1,6 +1,13 @@
 extern crate base64;
 
 use self::base64::encode;
+use regex::Regex;
+use url::{ParseError, Url};
+
+lazy_static! {
+    static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
+    static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
+}
 
 static MAGIC: [[&[u8]; 2]; 19] = [
     // Image
@@ -36,7 +43,7 @@ pub fn data_to_dataurl(mime: &str, data: &[u8]) -> String {
     format!("data:{};base64,{}", mimetype, encode(data))
 }
 
-fn detect_mimetype(data: &[u8]) -> String {
+pub fn detect_mimetype(data: &[u8]) -> String {
     let mut re = String::new();
 
     for item in MAGIC.iter() {
@@ -49,44 +56,27 @@ fn detect_mimetype(data: &[u8]) -> String {
     re
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub fn url_has_protocol(url: &str) -> bool {
+    HAS_PROTOCOL.is_match(&url.to_lowercase())
+}
 
-    #[test]
-    fn test_data_to_dataurl() {
-        let mime = "application/javascript";
-        let data = "var word = 'hello';\nalert(word);\n";
-        let datauri = data_to_dataurl(mime, data.as_bytes());
-        assert_eq!(
-            &datauri,
-            "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
-        );
+pub fn is_data_url(url: &str) -> Result<bool, ParseError> {
+    match Url::parse(url) {
+        Ok(parsed_url) => Ok(parsed_url.scheme() == "data"),
+        Err(err) => Err(err),
     }
+}
 
-    #[test]
-    fn test_detect_mimetype() {
-        // Image
-        assert_eq!(detect_mimetype(b"GIF87a"), "image/gif");
-        assert_eq!(detect_mimetype(b"GIF89a"), "image/gif");
-        assert_eq!(detect_mimetype(b"\xFF\xD8\xFF"), "image/jpeg");
-        assert_eq!(detect_mimetype(b"\x89PNG\x0D\x0A\x1A\x0A"), "image/png");
-        assert_eq!(detect_mimetype(b"<?xml "), "image/svg+xml");
-        assert_eq!(detect_mimetype(b"<svg "), "image/svg+xml");
-        assert_eq!(detect_mimetype(b"RIFF....WEBPVP8 "), "image/webp");
-        assert_eq!(detect_mimetype(b"\x00\x00\x01\x00"), "image/x-icon");
-        // Audio
-        assert_eq!(detect_mimetype(b"ID3"), "audio/mpeg");
-        assert_eq!(detect_mimetype(b"\xFF\x0E"), "audio/mpeg");
-        assert_eq!(detect_mimetype(b"\xFF\x0F"), "audio/mpeg");
-        assert_eq!(detect_mimetype(b"OggS"), "audio/ogg");
-        assert_eq!(detect_mimetype(b"RIFF....WAVEfmt "), "audio/wav");
-        assert_eq!(detect_mimetype(b"fLaC"), "audio/x-flac");
-        // Video
-        assert_eq!(detect_mimetype(b"RIFF....AVI LIST"), "video/avi");
-        assert_eq!(detect_mimetype(b"....ftyp"), "video/mp4");
-        assert_eq!(detect_mimetype(b"\x00\x00\x01\x0B"), "video/mpeg");
-        assert_eq!(detect_mimetype(b"....moov"), "video/quicktime");
-        assert_eq!(detect_mimetype(b"\x1A\x45\xDF\xA3"), "video/webm");
-    }
+pub fn is_valid_url(path: &str) -> bool {
+    REGEX_URL.is_match(path)
+}
+
+pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
+    let result = if is_valid_url(to) {
+        to.to_string()
+    } else {
+        Url::parse(from)?.join(to)?.to_string()
+    };
+
+    Ok(result)
 }

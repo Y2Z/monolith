@@ -1,35 +1,7 @@
-use regex::Regex;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
 use reqwest::Client;
 use std::time::Duration;
-use url::{ParseError, Url};
-use utils::data_to_dataurl;
-
-lazy_static! {
-    static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
-}
-
-pub fn is_data_url(url: &str) -> Result<bool, ParseError> {
-    match Url::parse(url) {
-        Ok(parsed_url) => Ok(parsed_url.scheme() == "data"),
-        Err(err) => Err(err),
-    }
-}
-
-pub fn is_valid_url(path: &str) -> bool {
-    REGEX_URL.is_match(path)
-}
-
-pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
-    let result = if is_valid_url(to) {
-        // (anything, http://site.com/css/main.css)
-        to.to_string()
-    } else {
-        Url::parse(from)?.join(to)?.to_string()
-    };
-
-    Ok(result)
-}
+use utils::{data_to_dataurl, is_data_url};
 
 pub fn retrieve_asset(
     url: &str,
@@ -77,95 +49,5 @@ pub fn retrieve_asset(
         } else {
             Ok(response.text().unwrap())
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_valid_url() {
-        assert!(is_valid_url("https://www.rust-lang.org/"));
-        assert!(is_valid_url("http://kernel.org"));
-        assert!(!is_valid_url("//kernel.org"));
-        assert!(!is_valid_url("./index.html"));
-        assert!(!is_valid_url("some-local-page.htm"));
-        assert!(!is_valid_url("ftp://1.2.3.4/www/index.html"));
-        assert!(!is_valid_url(
-            "data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h"
-        ));
-    }
-
-    #[test]
-    fn test_resolve_url() -> Result<(), ParseError> {
-        let resolved_url = resolve_url("https://www.kernel.org", "../category/signatures.html")?;
-        assert_eq!(
-            resolved_url.as_str(),
-            "https://www.kernel.org/category/signatures.html"
-        );
-
-        let resolved_url = resolve_url("https://www.kernel.org", "category/signatures.html")?;
-        assert_eq!(
-            resolved_url.as_str(),
-            "https://www.kernel.org/category/signatures.html"
-        );
-
-        let resolved_url = resolve_url(
-            "saved_page.htm",
-            "https://www.kernel.org/category/signatures.html",
-        )?;
-        assert_eq!(
-            resolved_url.as_str(),
-            "https://www.kernel.org/category/signatures.html"
-        );
-
-        let resolved_url = resolve_url(
-            "https://www.kernel.org",
-            "//www.kernel.org/theme/images/logos/tux.png",
-        )?;
-        assert_eq!(
-            resolved_url.as_str(),
-            "https://www.kernel.org/theme/images/logos/tux.png"
-        );
-
-        let resolved_url = resolve_url(
-            "https://www.kernel.org",
-            "//another-host.org/theme/images/logos/tux.png",
-        )?;
-        assert_eq!(
-            resolved_url.as_str(),
-            "https://another-host.org/theme/images/logos/tux.png"
-        );
-
-        let resolved_url = resolve_url(
-            "https://www.kernel.org/category/signatures.html",
-            "/theme/images/logos/tux.png",
-        )?;
-        assert_eq!(
-            resolved_url.as_str(),
-            "https://www.kernel.org/theme/images/logos/tux.png"
-        );
-
-        let resolved_url = resolve_url(
-            "https://www.w3schools.com/html/html_iframe.asp",
-            "default.asp",
-        )?;
-        assert_eq!(
-            resolved_url.as_str(),
-            "https://www.w3schools.com/html/default.asp"
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_is_data_url() {
-        assert!(
-            is_data_url("data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h")
-                .unwrap_or(false)
-        );
-        assert!(!is_data_url("https://kernel.org").unwrap_or(false));
-        assert!(!is_data_url("//kernel.org").unwrap_or(false));
     }
 }
