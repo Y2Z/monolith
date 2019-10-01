@@ -6,26 +6,25 @@ use utils::{data_to_dataurl, is_data_url};
 pub fn retrieve_asset(
     url: &str,
     as_dataurl: bool,
-    as_mime: &str,
+    mime: &str,
     opt_user_agent: &str,
     opt_silent: bool,
     opt_insecure: bool,
-) -> Result<String, reqwest::Error> {
+) -> Result<(String, String), reqwest::Error> {
     if is_data_url(&url).unwrap() {
-        Ok(url.to_string())
+        Ok((url.to_string(), url.to_string()))
     } else {
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
             .danger_accept_invalid_certs(opt_insecure)
             .build()?;
         let mut response = client.get(url).header(USER_AGENT, opt_user_agent).send()?;
-        let final_url = response.url().as_str();
 
         if !opt_silent {
-            if url == final_url {
+            if url == response.url().as_str() {
                 eprintln!("[ {} ]", &url);
             } else {
-                eprintln!("[ {} -> {} ]", &url, &final_url);
+                eprintln!("[ {} -> {} ]", &url, &response.url().as_str());
             }
         }
 
@@ -35,19 +34,22 @@ pub fn retrieve_asset(
             response.copy_to(&mut data)?;
 
             // Attempt to obtain MIME type by reading the Content-Type header
-            let mimetype = if as_mime == "" {
+            let mimetype = if mime == "" {
                 response
                     .headers()
                     .get(CONTENT_TYPE)
                     .and_then(|header| header.to_str().ok())
-                    .unwrap_or(&as_mime)
+                    .unwrap_or(&mime)
             } else {
-                as_mime
+                mime
             };
 
-            Ok(data_to_dataurl(&mimetype, &data))
+            Ok((
+                data_to_dataurl(&mimetype, &data),
+                response.url().to_string(),
+            ))
         } else {
-            Ok(response.text().unwrap())
+            Ok((response.text().unwrap(), response.url().to_string()))
         }
     }
 }
