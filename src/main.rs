@@ -46,7 +46,7 @@ fn main() {
     let opt_user_agent: &str = command.value_of("user-agent").unwrap_or(DEFAULT_USER_AGENT);
 
     if is_valid_url(arg_target) {
-        let data = retrieve_asset(
+        let (data, final_url) = retrieve_asset(
             &arg_target,
             false,
             "",
@@ -58,7 +58,7 @@ fn main() {
         let dom = html_to_dom(&data);
 
         walk_and_embed_assets(
-            &arg_target,
+            &final_url,
             &dom.document,
             opt_no_css,
             opt_no_js,

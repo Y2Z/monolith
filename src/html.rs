@@ -7,7 +7,6 @@ use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
-use regex::Regex;
 use std::default::Default;
 use utils::{data_to_dataurl, is_valid_url, resolve_url, url_has_protocol};
 
@@ -103,7 +102,7 @@ pub fn walk_and_embed_assets(
                                     let href_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
-                                    let favicon_datauri = retrieve_asset(
+                                    let (favicon_dataurl, _) = retrieve_asset(
                                         &href_full_url,
                                         true,
                                         "",
@@ -111,9 +110,9 @@ pub fn walk_and_embed_assets(
                                         opt_silent,
                                         opt_insecure,
                                     )
-                                    .unwrap_or(EMPTY_STRING.clone());
+                                    .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                     attr.value.clear();
-                                    attr.value.push_slice(favicon_datauri.as_str());
+                                    attr.value.push_slice(favicon_dataurl.as_str());
                                 }
                             }
                         }
@@ -126,7 +125,7 @@ pub fn walk_and_embed_assets(
                                     let href_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
-                                    let css_datauri = retrieve_asset(
+                                    let (css_dataurl, _) = retrieve_asset(
                                         &href_full_url,
                                         true,
                                         "text/css",
@@ -134,9 +133,9 @@ pub fn walk_and_embed_assets(
                                         opt_silent,
                                         opt_insecure,
                                     )
-                                    .unwrap_or(EMPTY_STRING.clone());
+                                    .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                     attr.value.clear();
-                                    attr.value.push_slice(css_datauri.as_str());
+                                    attr.value.push_slice(css_dataurl.as_str());
                                 }
                             }
                         }
@@ -168,7 +167,7 @@ pub fn walk_and_embed_assets(
                             } else {
                                 let src_full_url: String =
                                     resolve_url(&url, &value).unwrap_or(EMPTY_STRING.clone());
-                                let img_datauri = retrieve_asset(
+                                let (img_dataurl, _) = retrieve_asset(
                                     &src_full_url,
                                     true,
                                     "",
@@ -176,9 +175,9 @@ pub fn walk_and_embed_assets(
                                     opt_silent,
                                     opt_insecure,
                                 )
-                                .unwrap_or(EMPTY_STRING.clone());
+                                .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                 attr.value.clear();
-                                attr.value.push_slice(img_datauri.as_str());
+                                attr.value.push_slice(img_dataurl.as_str());
                             }
                         }
                     }
@@ -201,7 +200,7 @@ pub fn walk_and_embed_assets(
                                     let srcset_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
-                                    let source_datauri = retrieve_asset(
+                                    let (source_dataurl, _) = retrieve_asset(
                                         &srcset_full_url,
                                         true,
                                         "",
@@ -209,9 +208,9 @@ pub fn walk_and_embed_assets(
                                         opt_silent,
                                         opt_insecure,
                                     )
-                                    .unwrap_or(EMPTY_STRING.clone());
+                                    .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                     attr.value.clear();
-                                    attr.value.push_slice(source_datauri.as_str());
+                                    attr.value.push_slice(source_dataurl.as_str());
                                 }
                             }
                         }
@@ -247,7 +246,7 @@ pub fn walk_and_embed_assets(
                                 let src_full_url: String =
                                     resolve_url(&url, &attr.value.to_string())
                                         .unwrap_or(EMPTY_STRING.clone());
-                                let js_datauri = retrieve_asset(
+                                let (js_dataurl, _) = retrieve_asset(
                                     &src_full_url,
                                     true,
                                     "application/javascript",
@@ -255,9 +254,9 @@ pub fn walk_and_embed_assets(
                                     opt_silent,
                                     opt_insecure,
                                 )
-                                .unwrap_or(EMPTY_STRING.clone());
+                                .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                 attr.value.clear();
-                                attr.value.push_slice(js_datauri.as_str());
+                                attr.value.push_slice(js_dataurl.as_str());
                             }
                         }
                     }
@@ -300,7 +299,7 @@ pub fn walk_and_embed_assets(
 
                             let src_full_url: String =
                                 resolve_url(&url, &iframe_src).unwrap_or(EMPTY_STRING.clone());
-                            let iframe_data = retrieve_asset(
+                            let (iframe_data, iframe_final_url) = retrieve_asset(
                                 &src_full_url,
                                 false,
                                 "text/html",
@@ -308,10 +307,10 @@ pub fn walk_and_embed_assets(
                                 opt_silent,
                                 opt_insecure,
                             )
-                            .unwrap_or(EMPTY_STRING.clone());
+                            .unwrap_or((EMPTY_STRING.clone(), src_full_url));
                             let dom = html_to_dom(&iframe_data);
                             walk_and_embed_assets(
-                                &src_full_url,
+                                &iframe_final_url,
                                 &dom.document,
                                 opt_no_css,
                                 opt_no_js,
@@ -323,9 +322,9 @@ pub fn walk_and_embed_assets(
                             );
                             let mut buf: Vec<u8> = Vec::new();
                             serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-                            let iframe_datauri = data_to_dataurl("text/html", &buf);
+                            let iframe_dataurl = data_to_dataurl("text/html", &buf);
                             attr.value.clear();
-                            attr.value.push_slice(iframe_datauri.as_str());
+                            attr.value.push_slice(iframe_dataurl.as_str());
                         }
                     }
                 }
@@ -344,7 +343,7 @@ pub fn walk_and_embed_assets(
                             } else {
                                 let poster_full_url: String = resolve_url(&url, &video_poster)
                                     .unwrap_or(EMPTY_STRING.clone());
-                                let img_datauri = retrieve_asset(
+                                let (poster_dataurl, _) = retrieve_asset(
                                     &poster_full_url,
                                     true,
                                     "",
@@ -352,9 +351,9 @@ pub fn walk_and_embed_assets(
                                     opt_silent,
                                     opt_insecure,
                                 )
-                                .unwrap_or(poster_full_url);
+                                .unwrap_or((poster_full_url, EMPTY_STRING.clone()));
                                 attr.value.clear();
-                                attr.value.push_slice(img_datauri.as_str());
+                                attr.value.push_slice(poster_dataurl.as_str());
                             }
                         }
                     }
