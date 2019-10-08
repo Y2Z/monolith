@@ -31,6 +31,9 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
  - `-s`: Silent mode
  - `-u`: Specify custom User-Agent
 
+### Related Projects
+ - `Pagesaver`: https://github.com/distributed-mind/pagesaver
+
 ### License
 The Unlicense
 
