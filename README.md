@@ -1,8 +1,15 @@
 [![Travis CI Build Status](https://travis-ci.org/Y2Z/monolith.svg?branch=master)](https://travis-ci.org/Y2Z/monolith)
 [![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/ae7soyjih8jg2bv7/branch/master?svg=true)](https://ci.appveyor.com/project/snshn/monolith/branch/master)
 
-
-# monolith
+```
+ ___     ___________    __________      ___________________    ___
+|   \   /           \  |          |    |                   |  |   |
+|    \_/     __      \_|    __    |    |    ___     ___    |__|   |
+|           |  |           |  |   |    |   |   |   |   |          |
+|           |__|    _      |__|   |____|   |   |   |   |    __    |
+|   |\_/|          | \                     |   |   |   |   |  |   |
+|___|   |__________|  \____________________|   |___|   |___|  |___|
+```
 
 A data hoarder's dream come true: bundle any web page into a single HTML file.  
 You can finally replace that gazillion of open tabs with a gazillion of .html files stored somewhere on your precious little drive.
@@ -33,6 +40,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 ### Related Projects
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
+ - `SingleFile`: https://github.com/gildas-lormeau/SingleFile
 
 ### License
 The Unlicense
