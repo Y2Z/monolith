@@ -9,7 +9,7 @@ lazy_static! {
     static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
 }
 
-static MAGIC: [[&[u8]; 2]; 19] = [
+const MAGIC: [[&[u8]; 2]; 19] = [
     // Image
     [b"GIF87a", b"image/gif"],
     [b"GIF89a", b"image/gif"],
@@ -35,7 +35,7 @@ static MAGIC: [[&[u8]; 2]; 19] = [
 ];
 
 pub fn data_to_dataurl(mime: &str, data: &[u8]) -> String {
-    let mimetype = if mime == "" {
+    let mimetype = if mime.is_empty() {
         detect_mimetype(data)
     } else {
         mime.to_string()
@@ -44,39 +44,34 @@ pub fn data_to_dataurl(mime: &str, data: &[u8]) -> String {
 }
 
 pub fn detect_mimetype(data: &[u8]) -> String {
-    let mut re = String::new();
-
     for item in MAGIC.iter() {
         if data.starts_with(item[0]) {
-            re = String::from_utf8(item[1].to_vec()).unwrap();
-            break;
+            return String::from_utf8(item[1].to_vec()).unwrap();
         }
     }
-
-    re
+    "".to_owned()
 }
 
-pub fn url_has_protocol(url: &str) -> bool {
-    HAS_PROTOCOL.is_match(&url.to_lowercase())
+pub fn url_has_protocol<T: AsRef<str>>(url: T) -> bool {
+    HAS_PROTOCOL.is_match(url.as_ref().to_lowercase().as_str())
 }
 
-pub fn is_data_url(url: &str) -> Result<bool, ParseError> {
-    match Url::parse(url) {
-        Ok(parsed_url) => Ok(parsed_url.scheme() == "data"),
-        Err(err) => Err(err),
-    }
+pub fn is_data_url<T: AsRef<str>>(url: T) -> Result<bool, ParseError> {
+    Url::parse(url.as_ref()).and_then(|u| Ok(u.scheme() == "data"))
 }
 
-pub fn is_valid_url(path: &str) -> bool {
-    REGEX_URL.is_match(path)
+pub fn is_valid_url<T: AsRef<str>>(path: T) -> bool {
+    REGEX_URL.is_match(path.as_ref())
 }
 
-pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
-    let result = if is_valid_url(to) {
-        to.to_string()
+pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<String, ParseError> {
+    let result = if is_valid_url(to.as_ref()) {
+        to.as_ref().to_string()
     } else {
-        Url::parse(from)?.join(to)?.to_string()
+        Url::parse(from.as_ref())?
+            .join(to.as_ref())?
+            .as_ref()
+            .to_string()
     };
-
     Ok(result)
 }
