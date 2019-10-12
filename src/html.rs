@@ -8,7 +8,7 @@ use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
 use std::default::Default;
-use utils::{data_to_dataurl, is_valid_url, resolve_url, url_has_protocol, resolve_css_imports};
+use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
 
 lazy_static! {
     static ref EMPTY_STRING: String = String::new();

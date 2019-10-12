@@ -45,11 +45,22 @@ pub fn retrieve_asset(
             };
 
             Ok((
-                if response.status() != 200 { "".to_string() } else { data_to_dataurl(&mimetype, &data) },
+                if response.status() != 200 {
+                    "".to_string()
+                } else {
+                    data_to_dataurl(&mimetype, &data)
+                },
                 response.url().to_string(),
             ))
         } else {
-            Ok((if response.status() != 200 { "".to_string() } else {  response.text().unwrap() }, response.url().to_string()))
+            Ok((
+                if response.status() != 200 {
+                    "".to_string()
+                } else {
+                    response.text().unwrap()
+                },
+                response.url().to_string(),
+            ))
         }
     }
 }
