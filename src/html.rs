@@ -195,9 +195,9 @@ pub fn walk_and_embed_assets(
                                 attr.value.clear();
                                 attr.value.push_slice(TRANSPARENT_PIXEL);
                             } else {
-                                let splitted_src_set:Vec<&str> = value.split(' ').collect();
-                                let src_full_url: String =
-                                    resolve_url(&url, &splitted_src_set[0]).unwrap_or(EMPTY_STRING.clone());
+                                let splitted_src_set: Vec<&str> = value.split(' ').collect();
+                                let src_full_url: String = resolve_url(&url, &splitted_src_set[0])
+                                    .unwrap_or(EMPTY_STRING.clone());
                                 let (img_dataurl, _) = retrieve_asset(
                                     &src_full_url,
                                     true,
