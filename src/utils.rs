@@ -2,11 +2,13 @@ extern crate base64;
 
 use self::base64::encode;
 use regex::Regex;
+use http::retrieve_asset;
 use url::{ParseError, Url};
 
 lazy_static! {
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
     static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
+    static ref EMPTY_STRING: String = String::new();
 }
 
 static MAGIC: [[&[u8]; 2]; 19] = [
@@ -79,4 +81,32 @@ pub fn resolve_url(from: &str, to: &str) -> Result<String, ParseError> {
     };
 
     Ok(result)
+}
+
+pub fn resolve_css_imports(css_string: &str, href: &str, opt_user_agent: &str, opt_silent: bool, opt_insecure: bool) -> Result<String, String> {
+    let mut resolved_css = String::from(css_string);
+    let re = Regex::new(r###"url\((?:(?:https?|ftp)://)?"?[\w/\-?=%.]+\.[\w/\-?=%.]+"?\)"###).unwrap();
+    
+    for link in re.captures_iter(&css_string) {
+        let target_link = if link[0].chars().nth(4) == Some('"') { &link[0][5..link[0].len()-2] } else {&link[0][4..link[0].len()-1]};
+        let embedded_url = String::from([href, "/../", &target_link.to_string()].concat());
+        
+        let (css_dataurl, _) = retrieve_asset(
+            &embedded_url,
+            true, // true
+            "",
+            opt_user_agent,
+            opt_silent,
+            opt_insecure,
+        )
+        .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+        
+        let replacement = &["\"",  &css_dataurl.replace("\"",&["\\", "\""].concat()).to_string(), "\""].concat();
+        let t = resolved_css.replace(&link[0][4..link[0].len() - 1], &replacement).to_string();
+        resolved_css = t.clone();
+    }
+
+    let encoded_css = data_to_dataurl("text/css", resolved_css.as_bytes());
+
+    Ok(encoded_css.to_string())
 }

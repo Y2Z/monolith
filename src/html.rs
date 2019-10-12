@@ -8,7 +8,7 @@ use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
 use std::default::Default;
-use utils::{data_to_dataurl, is_valid_url, resolve_url, url_has_protocol};
+use utils::{data_to_dataurl, is_valid_url, resolve_url, url_has_protocol, resolve_css_imports};
 
 lazy_static! {
     static ref EMPTY_STRING: String = String::new();
@@ -127,7 +127,7 @@ pub fn walk_and_embed_assets(
                                             .unwrap_or(EMPTY_STRING.clone());
                                     let (css_dataurl, _) = retrieve_asset(
                                         &href_full_url,
-                                        true,
+                                        false,
                                         "text/css",
                                         opt_user_agent,
                                         opt_silent,
@@ -135,7 +135,17 @@ pub fn walk_and_embed_assets(
                                     )
                                     .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                     attr.value.clear();
-                                    attr.value.push_slice(css_dataurl.as_str());
+
+                                    let css_resolved = resolve_css_imports(
+                                        &css_dataurl,
+                                        &href_full_url,
+                                        opt_user_agent,
+                                        opt_silent,
+                                        opt_insecure,
+                                    )
+                                    .unwrap_or(css_dataurl);
+
+                                    attr.value.push_slice(css_resolved.as_str());
                                 }
                             }
                         }
