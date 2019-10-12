@@ -181,6 +181,37 @@ pub fn walk_and_embed_assets(
                             }
                         }
                     }
+
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "srcset" {
+                            let value = attr.value.to_string();
+
+                            // Ignore images with empty source
+                            if value == EMPTY_STRING.clone() {
+                                continue;
+                            }
+
+                            if opt_no_images {
+                                attr.value.clear();
+                                attr.value.push_slice(TRANSPARENT_PIXEL);
+                            } else {
+                                let splitted_src_set:Vec<&str> = value.split(' ').collect();
+                                let src_full_url: String =
+                                    resolve_url(&url, &splitted_src_set[0]).unwrap_or(EMPTY_STRING.clone());
+                                let (img_dataurl, _) = retrieve_asset(
+                                    &src_full_url,
+                                    true,
+                                    "",
+                                    opt_user_agent,
+                                    opt_silent,
+                                    opt_insecure,
+                                )
+                                .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+                                attr.value.clear();
+                                attr.value.push_slice(img_dataurl.as_str());
+                            }
+                        }
+                    }
                 }
                 "source" => {
                     for attr in attrs_mut.iter_mut() {
