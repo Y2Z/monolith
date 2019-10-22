@@ -7,6 +7,7 @@ use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
+use std::collections::HashMap;
 use std::default::Default;
 use utils::{data_to_dataurl, is_valid_url, resolve_url, url_has_protocol};
 
@@ -43,6 +44,7 @@ pub fn is_icon(attr_value: &str) -> bool {
 }
 
 pub fn walk_and_embed_assets(
+    cache: &mut HashMap<String, String>,
     url: &str,
     node: &Handle,
     opt_no_css: bool,
@@ -58,6 +60,7 @@ pub fn walk_and_embed_assets(
             // Dig deeper
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(
+                    cache,
                     &url,
                     child,
                     opt_no_css,
@@ -103,6 +106,7 @@ pub fn walk_and_embed_assets(
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
                                     let (favicon_dataurl, _) = retrieve_asset(
+                                        cache,
                                         &href_full_url,
                                         true,
                                         "",
@@ -126,6 +130,7 @@ pub fn walk_and_embed_assets(
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
                                     let (css_dataurl, _) = retrieve_asset(
+                                        cache,
                                         &href_full_url,
                                         true,
                                         "text/css",
@@ -168,6 +173,7 @@ pub fn walk_and_embed_assets(
                                 let src_full_url: String =
                                     resolve_url(&url, &value).unwrap_or(EMPTY_STRING.clone());
                                 let (img_dataurl, _) = retrieve_asset(
+                                    cache,
                                     &src_full_url,
                                     true,
                                     "",
@@ -201,6 +207,7 @@ pub fn walk_and_embed_assets(
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
                                     let (source_dataurl, _) = retrieve_asset(
+                                        cache,
                                         &srcset_full_url,
                                         true,
                                         "",
@@ -247,6 +254,7 @@ pub fn walk_and_embed_assets(
                                     resolve_url(&url, &attr.value.to_string())
                                         .unwrap_or(EMPTY_STRING.clone());
                                 let (js_dataurl, _) = retrieve_asset(
+                                    cache,
                                     &src_full_url,
                                     true,
                                     "application/javascript",
@@ -300,6 +308,7 @@ pub fn walk_and_embed_assets(
                             let src_full_url: String =
                                 resolve_url(&url, &iframe_src).unwrap_or(EMPTY_STRING.clone());
                             let (iframe_data, iframe_final_url) = retrieve_asset(
+                                cache,
                                 &src_full_url,
                                 false,
                                 "text/html",
@@ -310,6 +319,7 @@ pub fn walk_and_embed_assets(
                             .unwrap_or((EMPTY_STRING.clone(), src_full_url));
                             let dom = html_to_dom(&iframe_data);
                             walk_and_embed_assets(
+                                cache,
                                 &iframe_final_url,
                                 &dom.document,
                                 opt_no_css,
@@ -344,6 +354,7 @@ pub fn walk_and_embed_assets(
                                 let poster_full_url: String = resolve_url(&url, &video_poster)
                                     .unwrap_or(EMPTY_STRING.clone());
                                 let (poster_dataurl, _) = retrieve_asset(
+                                    cache,
                                     &poster_full_url,
                                     true,
                                     "",
@@ -392,6 +403,7 @@ pub fn walk_and_embed_assets(
             // Dig deeper
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(
+                    cache,
                     &url,
                     child,
                     opt_no_css,
