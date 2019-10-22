@@ -14,11 +14,13 @@ pub fn retrieve_asset(
     opt_insecure: bool,
 ) -> Result<(String, String), reqwest::Error> {
     if is_data_url(&url).unwrap() {
-        eprintln!("is data URL [ {} ]", &url);
         Ok((url.to_string(), url.to_string()))
     } else {
         if cache.contains_key(&url.to_string()) {
             // url is in cache
+            if !opt_silent {
+                eprintln!("[ {} ] (from cache)", &url);
+            }
             let data = cache.get(&url.to_string()).unwrap();
             Ok((data.to_string(), url.to_string()))
         } else {
