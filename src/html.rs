@@ -142,8 +142,7 @@ pub fn walk_and_embed_assets(
                                         opt_user_agent,
                                         opt_silent,
                                         opt_insecure,
-                                    )
-                                    .unwrap_or(css_dataurl);
+                                    );
 
                                     attr.value.push_slice(css_resolved.as_str());
                                 }

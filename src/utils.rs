@@ -89,12 +89,12 @@ pub fn resolve_css_imports(
     opt_user_agent: &str,
     opt_silent: bool,
     opt_insecure: bool,
-) -> Result<String, String> {
+) -> String {
     let mut resolved_css = String::from(css_string);
-    let re = Regex::new(r###"url\("?([^"]+)"?\)"###).unwrap();
+    let re = Regex::new(r###"(?P<import>@import )?url\((?P<to_repl>"?(?P<url>[^"]+)"?)\)"###).unwrap();
 
     for link in re.captures_iter(&css_string) {
-        let target_link = dbg!(link.get(1).unwrap().as_str());
+        let target_link = link.name("url").unwrap().as_str();
 
         // Generate absolute URL for content
         let embedded_url = match resolve_url(href, target_link) {
@@ -102,31 +102,47 @@ pub fn resolve_css_imports(
             Err(_) => continue, // Malformed URL
         };
 
-        let (css_dataurl, _) = retrieve_asset(
-            &embedded_url,
-            true, // true
-            "",
-            opt_user_agent,
-            opt_silent,
-            opt_insecure,
-        )
-        .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+        // Download the asset.  If it's more CSS, resolve that too
+        let content = match link.name("import") {
 
-        let replacement = &[
-            "\"",
-            &css_dataurl
-                .replace("\"", &["\\", "\""].concat())
-                .to_string(),
-            "\"",
-        ]
-        .concat();
+            // The link is an @import link
+            Some(_) => retrieve_asset(
+                        &embedded_url,
+                        false,      // Formating as data URL will be done later
+                        "text/css", // Expect CSS
+                        opt_user_agent,
+                        opt_silent,
+                        opt_insecure,
+                    )
+                    .map(|(content, _)| resolve_css_imports(
+                        &content,
+                        &embedded_url,
+                        opt_user_agent,
+                        opt_silent,
+                        opt_insecure,
+                    )),
+
+            // The link is some other, non-@import link
+            None => retrieve_asset(
+                        &embedded_url,
+                        true, // Format as data URL
+                        "",   // Unknown MIME type
+                        opt_user_agent,
+                        opt_silent,
+                        opt_insecure,
+                    ).map(|(a, _)| a),
+
+        }.unwrap_or_else(|_| EMPTY_STRING.clone());
+
+        let replacement = format!("\"{}\"", &content);
+
         let t = resolved_css
-            .replace(&link[0][4..link[0].len() - 1], &replacement)
+            .replace(link.name("to_repl").unwrap().as_str(), &replacement)
             .to_string();
         resolved_css = t.clone();
     }
 
     let encoded_css = data_to_dataurl("text/css", resolved_css.as_bytes());
 
-    Ok(encoded_css.to_string())
+    encoded_css.to_string()
 }
