@@ -91,16 +91,16 @@ pub fn resolve_css_imports(
     opt_insecure: bool,
 ) -> Result<String, String> {
     let mut resolved_css = String::from(css_string);
-    let re =
-        Regex::new(r###"url\((?:(?:https?|ftp)://)?"?[\w/\-?=%.]+\.[\w/\-?=%.]+"?\)"###).unwrap();
+    let re = Regex::new(r###"url\("?([^"]+)"?\)"###).unwrap();
 
     for link in re.captures_iter(&css_string) {
-        let target_link = if link[0].chars().nth(4) == Some('"') {
-            &link[0][5..link[0].len() - 2]
-        } else {
-            &link[0][4..link[0].len() - 1]
+        let target_link = dbg!(link.get(1).unwrap().as_str());
+
+        // Generate absolute URL for content
+        let embedded_url = match resolve_url(href, target_link) {
+            Ok(url) => url,
+            Err(_) => continue, // Malformed URL
         };
-        let embedded_url = String::from([href, "/../", &target_link.to_string()].concat());
 
         let (css_dataurl, _) = retrieve_asset(
             &embedded_url,
