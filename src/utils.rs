@@ -12,7 +12,6 @@ use std::{
 lazy_static! {
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
     static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
-    static ref EMPTY_STRING: String = String::new();
 }
 
 const MAGIC: [[&[u8]; 2]; 19] = [
