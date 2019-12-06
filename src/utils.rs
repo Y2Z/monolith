@@ -147,8 +147,10 @@ pub fn resolve_css_imports(
 
         let replacement = format!("\"{}\"", &content);
         let dest = link.name("to_repl").unwrap();
+        let offset = resolved_css.len() - css_string.len();
+        let target_range = (dest.start() + offset)..(dest.end() + offset);
 
-        resolved_css.replace_range(dest.start()..dest.end(), &replacement);
+        resolved_css.replace_range(target_range, &replacement);
     }
 
     if as_dataurl {
