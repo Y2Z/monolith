@@ -413,6 +413,7 @@ pub fn walk_and_embed_assets(
                 _ => {}
             }
 
+            // Process style attributes
             if opt_no_css {
                 // Get rid of style attributes
                 let mut style_attr_indexes = Vec::new();
@@ -424,6 +425,28 @@ pub fn walk_and_embed_assets(
                 style_attr_indexes.reverse();
                 for attr_index in style_attr_indexes {
                     attrs_mut.remove(attr_index);
+                }
+            } else {
+                // Otherwise, parse any links found in the attributes
+                for attribute in attrs_mut
+                    .iter_mut()
+                    .filter(|a| a.name.local.as_ref().eq_ignore_ascii_case("style"))
+                {
+                    let replacement = resolve_css_imports(
+                        cache,
+                        attribute.value.as_ref(),
+                        false,
+                        &url,
+                        opt_no_images,
+                        opt_user_agent,
+                        opt_silent,
+                        opt_insecure,
+                    );
+                    attribute.value.clear();
+                    attribute
+                        .value
+                        .write_str(&replacement)
+                        .expect("Failed to update DOM");
                 }
             }
 
