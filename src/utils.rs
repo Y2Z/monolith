@@ -6,8 +6,37 @@ use regex::Regex;
 use std::collections::HashMap;
 use url::{ParseError, Url};
 
+/// This monster of a regex is used to match any kind of URL found in a CSS
+/// stylesheet.
+///
+/// There's roughly three different categories that a found url could fit into:
+///    - Font       [found after a src: property in an @font-family rule]
+///    - Stylesheet [denoted by an @import before the url
+///    - Image      [covers all other uses of the url() function]
+///
+/// This regex aims to extract the following information:
+///    - What type of URL is it (font/image/css)
+///    - Where is the part that needs to be replaced (incl any wrapping quotes)
+///    - What is the URL (excl any wrapping quotes)
+///
+/// For understandablility, the regex can be broken down into two parts:
+///
+/// `(?:(?P<import>@import)|(?P<font>src\s*:)\s+)?`
+/// This matches the precursor to a font or css url, and fills in a match under
+/// either `<import>` (if it's a css url) or `<font>` (if it's a font).
+/// Determining whether or not it's an image can be done by the negation of both
+/// of these.  Either zero or one of these can match.
+///
+/// `url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)`
+/// This matches the actual URL part of the url, and must always match.  It also
+/// sets `<to_repl>` and `<url>` which correspond to everything within
+/// `url(...)` and a usable URL, respectively.
+///
+/// Note, however, that this does not perform any validation of the found URL.
+/// Malformed CSS could lead to an invalid URL being present.  It is therefor
+/// recomended that the URL is manually validated.
 const CSS_URL_REGEX_STR: &str =
-    r###"(?P<import>@import )?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
+    r###"(?:(?P<import>@import)|(?P<font>src\s*:)\s+)?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
 
 lazy_static! {
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
@@ -87,6 +116,7 @@ pub fn resolve_css_imports(
     css_string: &str,
     as_dataurl: bool,
     href: &str,
+    opt_no_images: bool,
     opt_user_agent: &str,
     opt_silent: bool,
     opt_insecure: bool,
@@ -96,6 +126,11 @@ pub fn resolve_css_imports(
     for link in REGEX_CSS_URL.captures_iter(&css_string) {
         let target_link = link.name("url").unwrap().as_str();
 
+        // Determine the type of link
+        let is_stylesheet = link.name("stylesheet").is_some();
+        let is_font = link.name("font").is_some();
+        let is_image = !is_stylesheet && !is_font;
+
         // Generate absolute URL for content
         let embedded_url = match resolve_url(href, target_link) {
             Ok(url) => url,
@@ -103,9 +138,9 @@ pub fn resolve_css_imports(
         };
 
         // Download the asset.  If it's more CSS, resolve that too
-        let content = match link.name("import") {
+        let content = if is_stylesheet {
             // The link is an @import link
-            Some(_) => retrieve_asset(
+            retrieve_asset(
                 cache,
                 &embedded_url,
                 false,      // Formating as data URL will be done later
@@ -120,14 +155,15 @@ pub fn resolve_css_imports(
                     &content,
                     true, //NOW, convert to data URL
                     &embedded_url,
+                    opt_no_images,
                     opt_user_agent,
                     opt_silent,
                     opt_insecure,
                 )
-            }),
-
+            })
+        } else if (is_image && !opt_no_images) || is_font {
             // The link is some other, non-@import link
-            None => retrieve_asset(
+            retrieve_asset(
                 cache,
                 &embedded_url,
                 true, // Format as data URL
@@ -136,7 +172,12 @@ pub fn resolve_css_imports(
                 opt_silent,
                 opt_insecure,
             )
-            .map(|(a, _)| a),
+            .map(|(a, _)| a)
+        } else {
+            // If it's a datatype that has been opt_no'd out of, replace with
+            // absolute URL
+
+            Ok(embedded_url.clone())
         }
         .unwrap_or_else(|e| {
             eprintln!("Warning: {}", e,);
