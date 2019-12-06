@@ -7,6 +7,7 @@ use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
+use std::fmt::Write as OtherWrite;
 use std::io::{stderr, Write};
 use std::collections::HashMap;
 use std::default::Default;
@@ -144,6 +145,7 @@ pub fn walk_and_embed_assets(
                                         Ok((css_data, _)) => resolve_css_imports(
                                             cache,
                                             &css_data,
+                                            true,
                                             &href_full_url,
                                             opt_user_agent,
                                             opt_silent,
@@ -297,6 +299,27 @@ pub fn walk_and_embed_assets(
                     if opt_no_css {
                         // Empty inner content of STYLE tags
                         node.children.borrow_mut().clear();
+                    } else {
+                        for node in node.children.borrow_mut().iter_mut() {
+                            match node.data {
+                                NodeData::Text {ref contents} => {
+                                    let mut tendril = contents.borrow_mut();
+                                    let replacement = resolve_css_imports(
+                                        cache,
+                                        dbg!(tendril.as_ref()),
+                                        false,
+                                        &url,
+                                        opt_user_agent,
+                                        opt_silent,
+                                        opt_insecure,
+                                    );
+                                    tendril.clear();
+                                    tendril.write_str(&replacement)
+                                        .expect("Failed to update DOM");
+                                },
+                                _ => (),
+                            }
+                        }
                     }
                 }
                 "form" => {

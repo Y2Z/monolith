@@ -85,6 +85,7 @@ pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<Strin
 pub fn resolve_css_imports(
     cache: &mut HashMap<String, String>,
     css_string: &str,
+    as_dataurl: bool,
     href: &str,
     opt_user_agent: &str,
     opt_silent: bool,
@@ -118,6 +119,7 @@ pub fn resolve_css_imports(
                     .map(|(content, _)| resolve_css_imports(
                         cache,
                         &content,
+                        true, //NOW, convert to data URL
                         &embedded_url,
                         opt_user_agent,
                         opt_silent,
@@ -154,7 +156,9 @@ pub fn resolve_css_imports(
         resolved_css = t.clone();
     }
 
-    let encoded_css = data_to_dataurl("text/css", resolved_css.as_bytes());
-
-    encoded_css.to_string()
+    if as_dataurl {
+        data_to_dataurl("text/css", resolved_css.as_bytes())
+    } else {
+        resolved_css
+    }
 }
