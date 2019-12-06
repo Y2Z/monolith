@@ -8,7 +8,6 @@ use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
 use std::fmt::Write as OtherWrite;
-use std::io::{stderr, Write};
 use std::collections::HashMap;
 use std::default::Default;
 use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
@@ -154,11 +153,10 @@ pub fn walk_and_embed_assets(
 
                                         // If a network error occured, warn
                                         Err(e) => {
-                                            writeln!(
-                                                stderr(),
+                                            eprintln!(
                                                 "Warning: {}",
                                                 e,
-                                            ).unwrap();
+                                            );
 
                                             //If failed to resolve, replace with absolute URL
                                             href_full_url
@@ -301,23 +299,20 @@ pub fn walk_and_embed_assets(
                         node.children.borrow_mut().clear();
                     } else {
                         for node in node.children.borrow_mut().iter_mut() {
-                            match node.data {
-                                NodeData::Text {ref contents} => {
-                                    let mut tendril = contents.borrow_mut();
-                                    let replacement = resolve_css_imports(
-                                        cache,
-                                        dbg!(tendril.as_ref()),
-                                        false,
-                                        &url,
-                                        opt_user_agent,
-                                        opt_silent,
-                                        opt_insecure,
-                                    );
-                                    tendril.clear();
-                                    tendril.write_str(&replacement)
-                                        .expect("Failed to update DOM");
-                                },
-                                _ => (),
+                            if let NodeData::Text{ref contents} = node.data {
+                                let mut tendril = contents.borrow_mut();
+                                let replacement = resolve_css_imports(
+                                    cache,
+                                    dbg!(tendril.as_ref()),
+                                    false,
+                                    &url,
+                                    opt_user_agent,
+                                    opt_silent,
+                                    opt_insecure,
+                                );
+                                tendril.clear();
+                                tendril.write_str(&replacement)
+                                    .expect("Failed to update DOM");
                             }
                         }
                     }

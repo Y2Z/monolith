@@ -4,10 +4,7 @@ use self::base64::encode;
 use http::retrieve_asset;
 use regex::Regex;
 use url::{ParseError, Url};
-use std::{
-    io::{stderr, Write},
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
 lazy_static! {
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
@@ -137,11 +134,10 @@ pub fn resolve_css_imports(
                     ).map(|(a, _)| a),
 
         }.unwrap_or_else(|e| {
-            writeln!(
-                stderr(),
+            eprintln!(
                 "Warning: {}",
                 e,
-            ).unwrap();
+            );
 
             //If failed to resolve, replace with absolute URL
             embedded_url
