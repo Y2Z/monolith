@@ -7,6 +7,7 @@ use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
+use std::io::{stderr, Write};
 use std::collections::HashMap;
 use std::default::Default;
 use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
@@ -129,7 +130,7 @@ pub fn walk_and_embed_assets(
                                     let href_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
-                                    let (css, _) = retrieve_asset(
+                                    let replacement_text = match retrieve_asset(
                                         cache,
                                         &href_full_url,
                                         false,
@@ -137,20 +138,33 @@ pub fn walk_and_embed_assets(
                                         opt_user_agent,
                                         opt_silent,
                                         opt_insecure,
-                                    )
-                                    .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+                                    ) {
+
+                                        // On successful retrieval, traverse CSS
+                                        Ok((css_data, _)) => resolve_css_imports(
+                                            cache,
+                                            &css_data,
+                                            &href_full_url,
+                                            opt_user_agent,
+                                            opt_silent,
+                                            opt_insecure,
+                                        ),
+
+                                        // If a network error occured, warn
+                                        Err(e) => {
+                                            writeln!(
+                                                stderr(),
+                                                "Warning: {}",
+                                                e,
+                                            ).unwrap();
+
+                                            //If failed to resolve, replace with absolute URL
+                                            href_full_url
+                                        },
+                                    };
+
                                     attr.value.clear();
-
-                                    let css_resolved = resolve_css_imports(
-                                        cache,
-                                        &css,
-                                        &href_full_url,
-                                        opt_user_agent,
-                                        opt_silent,
-                                        opt_insecure,
-                                    );
-
-                                    attr.value.push_slice(css_resolved.as_str());
+                                    attr.value.push_slice(&replacement_text);
                                 }
                             }
                         }
