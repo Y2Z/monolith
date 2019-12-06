@@ -6,9 +6,13 @@ use regex::Regex;
 use std::collections::HashMap;
 use url::{ParseError, Url};
 
+const CSS_URL_REGEX_STR: &str =
+    r###"(?P<import>@import )?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
+
 lazy_static! {
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
     static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
+    static ref REGEX_CSS_URL: Regex = Regex::new(CSS_URL_REGEX_STR).unwrap();
 }
 
 const MAGIC: [[&[u8]; 2]; 19] = [
@@ -88,10 +92,8 @@ pub fn resolve_css_imports(
     opt_insecure: bool,
 ) -> String {
     let mut resolved_css = String::from(css_string);
-    let re =
-        Regex::new(r###"(?P<import>@import )?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###).unwrap();
 
-    for link in re.captures_iter(&css_string) {
+    for link in REGEX_CSS_URL.captures_iter(&css_string) {
         let target_link = link.name("url").unwrap().as_str();
 
         // Generate absolute URL for content
