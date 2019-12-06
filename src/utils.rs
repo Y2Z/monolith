@@ -144,11 +144,9 @@ pub fn resolve_css_imports(
         });
 
         let replacement = format!("\"{}\"", &content);
+        let dest = link.name("to_repl").unwrap();
 
-        let t = resolved_css
-            .replace(link.name("to_repl").unwrap().as_str(), &replacement)
-            .to_string();
-        resolved_css = t.clone();
+        resolved_css.replace_range(dest.start()..dest.end(), &replacement);
     }
 
     if as_dataurl {
