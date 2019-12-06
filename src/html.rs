@@ -299,7 +299,7 @@ pub fn walk_and_embed_assets(
                                 let mut tendril = contents.borrow_mut();
                                 let replacement = resolve_css_imports(
                                     cache,
-                                    dbg!(tendril.as_ref()),
+                                    tendril.as_ref(),
                                     false,
                                     &url,
                                     opt_user_agent,
