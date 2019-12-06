@@ -35,8 +35,7 @@ use url::{ParseError, Url};
 /// Note, however, that this does not perform any validation of the found URL.
 /// Malformed CSS could lead to an invalid URL being present.  It is therefor
 /// recomended that the URL is manually validated.
-const CSS_URL_REGEX_STR: &str =
-    r###"(?:(?:(?P<stylesheet>@import)|(?P<font>src\s*:))\s+)?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
+const CSS_URL_REGEX_STR: &str = r###"(?:(?:(?P<stylesheet>@import)|(?P<font>src\s*:))\s+)?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
 
 lazy_static! {
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
