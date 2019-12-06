@@ -7,9 +7,9 @@ use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
-use std::fmt::Write as OtherWrite;
 use std::collections::HashMap;
 use std::default::Default;
+use std::fmt::Write as OtherWrite;
 use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
 
 lazy_static! {
@@ -139,7 +139,6 @@ pub fn walk_and_embed_assets(
                                         opt_silent,
                                         opt_insecure,
                                     ) {
-
                                         // On successful retrieval, traverse CSS
                                         Ok((css_data, _)) => resolve_css_imports(
                                             cache,
@@ -153,14 +152,11 @@ pub fn walk_and_embed_assets(
 
                                         // If a network error occured, warn
                                         Err(e) => {
-                                            eprintln!(
-                                                "Warning: {}",
-                                                e,
-                                            );
+                                            eprintln!("Warning: {}", e,);
 
                                             //If failed to resolve, replace with absolute URL
                                             href_full_url
-                                        },
+                                        }
                                     };
 
                                     attr.value.clear();
@@ -299,7 +295,7 @@ pub fn walk_and_embed_assets(
                         node.children.borrow_mut().clear();
                     } else {
                         for node in node.children.borrow_mut().iter_mut() {
-                            if let NodeData::Text{ref contents} = node.data {
+                            if let NodeData::Text { ref contents } = node.data {
                                 let mut tendril = contents.borrow_mut();
                                 let replacement = resolve_css_imports(
                                     cache,
@@ -311,7 +307,8 @@ pub fn walk_and_embed_assets(
                                     opt_insecure,
                                 );
                                 tendril.clear();
-                                tendril.write_str(&replacement)
+                                tendril
+                                    .write_str(&replacement)
                                     .expect("Failed to update DOM");
                             }
                         }

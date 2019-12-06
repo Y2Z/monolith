@@ -3,8 +3,8 @@ extern crate base64;
 use self::base64::encode;
 use http::retrieve_asset;
 use regex::Regex;
-use url::{ParseError, Url};
 use std::collections::HashMap;
+use url::{ParseError, Url};
 
 lazy_static! {
     static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
@@ -88,7 +88,8 @@ pub fn resolve_css_imports(
     opt_insecure: bool,
 ) -> String {
     let mut resolved_css = String::from(css_string);
-    let re = Regex::new(r###"(?P<import>@import )?url\((?P<to_repl>"?(?P<url>[^"]+)"?)\)"###).unwrap();
+    let re =
+        Regex::new(r###"(?P<import>@import )?url\((?P<to_repl>"?(?P<url>[^"]+)"?)\)"###).unwrap();
 
     for link in re.captures_iter(&css_string) {
         let target_link = link.name("url").unwrap().as_str();
@@ -101,43 +102,42 @@ pub fn resolve_css_imports(
 
         // Download the asset.  If it's more CSS, resolve that too
         let content = match link.name("import") {
-
             // The link is an @import link
             Some(_) => retrieve_asset(
-                        cache,
-                        &embedded_url,
-                        false,      // Formating as data URL will be done later
-                        "text/css", // Expect CSS
-                        opt_user_agent,
-                        opt_silent,
-                        opt_insecure,
-                    )
-                    .map(|(content, _)| resolve_css_imports(
-                        cache,
-                        &content,
-                        true, //NOW, convert to data URL
-                        &embedded_url,
-                        opt_user_agent,
-                        opt_silent,
-                        opt_insecure,
-                    )),
+                cache,
+                &embedded_url,
+                false,      // Formating as data URL will be done later
+                "text/css", // Expect CSS
+                opt_user_agent,
+                opt_silent,
+                opt_insecure,
+            )
+            .map(|(content, _)| {
+                resolve_css_imports(
+                    cache,
+                    &content,
+                    true, //NOW, convert to data URL
+                    &embedded_url,
+                    opt_user_agent,
+                    opt_silent,
+                    opt_insecure,
+                )
+            }),
 
             // The link is some other, non-@import link
             None => retrieve_asset(
-                        cache,
-                        &embedded_url,
-                        true, // Format as data URL
-                        "",   // Unknown MIME type
-                        opt_user_agent,
-                        opt_silent,
-                        opt_insecure,
-                    ).map(|(a, _)| a),
-
-        }.unwrap_or_else(|e| {
-            eprintln!(
-                "Warning: {}",
-                e,
-            );
+                cache,
+                &embedded_url,
+                true, // Format as data URL
+                "",   // Unknown MIME type
+                opt_user_agent,
+                opt_silent,
+                opt_insecure,
+            )
+            .map(|(a, _)| a),
+        }
+        .unwrap_or_else(|e| {
+            eprintln!("Warning: {}", e,);
 
             //If failed to resolve, replace with absolute URL
             embedded_url
