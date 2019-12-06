@@ -9,13 +9,13 @@ os:
 
 rust:
     - stable
-    - beta 
+    - beta
     - nightly
 
 before_script:
     - rustup component add rustfmt
 
 script:
-    - cargo build --verbose
-    - cargo test --verbose
+    - cargo build --locked --verbose
+    - cargo test --locked --verbose
     - cargo fmt --all -- --check

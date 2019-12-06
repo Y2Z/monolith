@@ -3,6 +3,7 @@ use crate::html::{
 };
 use html5ever::rcdom::{Handle, NodeData};
 use html5ever::serialize::{serialize, SerializeOpts};
+use std::collections::HashMap;
 
 #[test]
 fn test_is_icon() {
@@ -58,6 +59,8 @@ fn test_get_parent_node_name() {
 
 #[test]
 fn test_walk_and_embed_assets() {
+    let cache = &mut HashMap::new();
+
     let html = "<div><P></P></div>";
     let dom = html_to_dom(&html);
     let url = "http://localhost";
@@ -70,6 +73,7 @@ fn test_walk_and_embed_assets() {
     let opt_insecure = false;
 
     walk_and_embed_assets(
+        cache,
         &url,
         &dom.document,
         opt_no_css,
@@ -95,6 +99,7 @@ fn test_walk_and_embed_assets_ensure_no_recursive_iframe() {
     let html = "<div><P></P><iframe src=\"\"></iframe></div>";
     let dom = html_to_dom(&html);
     let url = "http://localhost";
+    let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
     let opt_no_frames: bool = false;
@@ -104,6 +109,7 @@ fn test_walk_and_embed_assets_ensure_no_recursive_iframe() {
     let opt_insecure = false;
 
     walk_and_embed_assets(
+        cache,
         &url,
         &dom.document,
         opt_no_css,
@@ -131,6 +137,7 @@ fn test_walk_and_embed_assets_no_css() {
                 <div style=\"display: none;\"></div>";
     let dom = html_to_dom(&html);
     let url = "http://localhost";
+    let cache = &mut HashMap::new();
 
     let opt_no_css: bool = true;
     let opt_no_frames: bool = false;
@@ -140,6 +147,7 @@ fn test_walk_and_embed_assets_no_css() {
     let opt_insecure = false;
 
     walk_and_embed_assets(
+        cache,
         &url,
         &dom.document,
         opt_no_css,
@@ -174,6 +182,7 @@ fn test_walk_and_embed_assets_no_images() {
                 <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
     let dom = html_to_dom(&html);
     let url = "http://localhost";
+    let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
     let opt_no_frames: bool = false;
@@ -183,6 +192,7 @@ fn test_walk_and_embed_assets_no_images() {
     let opt_insecure = false;
 
     walk_and_embed_assets(
+        cache,
         &url,
         &dom.document,
         opt_no_css,
@@ -219,6 +229,7 @@ fn test_walk_and_embed_assets_no_frames() {
     let html = "<iframe src=\"http://trackbook.com\"></iframe>";
     let dom = html_to_dom(&html);
     let url = "http://localhost";
+    let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
     let opt_no_frames: bool = true;
@@ -228,6 +239,7 @@ fn test_walk_and_embed_assets_no_frames() {
     let opt_insecure = false;
 
     walk_and_embed_assets(
+        cache,
         &url,
         &dom.document,
         opt_no_css,
@@ -256,6 +268,7 @@ fn test_walk_and_embed_assets_no_js() {
                 </div>";
     let dom = html_to_dom(&html);
     let url = "http://localhost";
+    let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
     let opt_no_frames: bool = false;
@@ -265,6 +278,7 @@ fn test_walk_and_embed_assets_no_js() {
     let opt_insecure = false;
 
     walk_and_embed_assets(
+        cache,
         &url,
         &dom.document,
         opt_no_css,

@@ -3,13 +3,13 @@
 all: test build
 
 build:
-	@cargo build
+	@cargo build --locked
 
 install:
-	@cargo install --force --path .
+	@cargo install --force --locked --path .
 
 test:
-	@cargo test
+	@cargo test --locked
 	@cargo fmt --all -- --check
 
 lint:
