@@ -89,7 +89,7 @@ pub fn resolve_css_imports(
 ) -> String {
     let mut resolved_css = String::from(css_string);
     let re =
-        Regex::new(r###"(?P<import>@import )?url\((?P<to_repl>"?(?P<url>[^"]+)"?)\)"###).unwrap();
+        Regex::new(r###"(?P<import>@import )?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###).unwrap();
 
     for link in re.captures_iter(&css_string) {
         let target_link = link.name("url").unwrap().as_str();
