@@ -129,7 +129,7 @@ pub fn walk_and_embed_assets(
                                     let href_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
-                                    let (css_dataurl, _) = retrieve_asset(
+                                    let (css, _) = retrieve_asset(
                                         cache,
                                         &href_full_url,
                                         false,
@@ -143,7 +143,7 @@ pub fn walk_and_embed_assets(
 
                                     let css_resolved = resolve_css_imports(
                                         cache,
-                                        &css_dataurl,
+                                        &css,
                                         &href_full_url,
                                         opt_user_agent,
                                         opt_silent,
