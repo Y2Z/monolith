@@ -158,7 +158,7 @@ pub fn walk_and_embed_assets(
                 }
                 "img" => {
                     for attr in attrs_mut.iter_mut() {
-                        if &attr.name.local == "src" {
+                        if &attr.name.local == "src" || &attr.name.local == "data-src" {
                             let value = attr.value.to_string();
 
                             // Ignore images with empty source
