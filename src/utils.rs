@@ -6,10 +6,10 @@ use regex::Regex;
 use std::collections::HashMap;
 use url::{ParseError, Url};
 
-/// This monster of a regex is used to match any kind of URL found in a CSS
-/// stylesheet.
+/// This monster of a regex is used to match any kind of URL found in CSS.
 ///
-/// There's roughly three different categories that a found url could fit into:
+/// There  are roughly three different categories that a found URL could fit
+/// into:
 ///    - Font       [found after a src: property in an @font-family rule]
 ///    - Stylesheet [denoted by an @import before the url
 ///    - Image      [covers all other uses of the url() function]
@@ -19,22 +19,22 @@ use url::{ParseError, Url};
 ///    - Where is the part that needs to be replaced (incl any wrapping quotes)
 ///    - What is the URL (excl any wrapping quotes)
 ///
-/// For understandablility, the regex can be broken down into two parts:
+/// Essentially, the regex can be broken down into two parts:
 ///
 /// `(?:(?P<import>@import)|(?P<font>src\s*:)\s+)?`
-/// This matches the precursor to a font or css url, and fills in a match under
-/// either `<import>` (if it's a css url) or `<font>` (if it's a font).
+/// This matches the precursor to a font or CSS URL, and fills in a match under
+/// either `<import>` (if it's a CSS URL) or `<font>` (if it's a font).
 /// Determining whether or not it's an image can be done by the negation of both
-/// of these.  Either zero or one of these can match.
+/// of these. Either zero or one of these can match.
 ///
 /// `url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)`
-/// This matches the actual URL part of the url, and must always match.  It also
+/// This matches the actual URL part of the url(), and must always match. It also
 /// sets `<to_repl>` and `<url>` which correspond to everything within
 /// `url(...)` and a usable URL, respectively.
 ///
 /// Note, however, that this does not perform any validation of the found URL.
-/// Malformed CSS could lead to an invalid URL being present.  It is therefor
-/// recomended that the URL is manually validated.
+/// Malformed CSS could lead to an invalid URL being present. It is therefore
+/// recomended that the URL gets manually validated.
 const CSS_URL_REGEX_STR: &str = r###"(?:(?:(?P<stylesheet>@import)|(?P<font>src\s*:))\s+)?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
 
 lazy_static! {
@@ -136,7 +136,7 @@ pub fn resolve_css_imports(
             Err(_) => continue, // Malformed URL
         };
 
-        // Download the asset.  If it's more CSS, resolve that too
+        // Download the asset. If it's more CSS, resolve that too
         let content = if is_stylesheet {
             // The link is an @import link
             retrieve_asset(
@@ -152,7 +152,7 @@ pub fn resolve_css_imports(
                 resolve_css_imports(
                     cache,
                     &content,
-                    true, //NOW, convert to data URL
+                    true, // Finally, convert to a dataurl
                     &embedded_url,
                     opt_no_images,
                     opt_user_agent,
@@ -179,9 +179,9 @@ pub fn resolve_css_imports(
             Ok(embedded_url.clone())
         }
         .unwrap_or_else(|e| {
-            eprintln!("Warning: {}", e,);
+            eprintln!("Warning: {}", e);
 
-            //If failed to resolve, replace with absolute URL
+            // If failed to resolve, replace with absolute URL
             embedded_url
         });
 

@@ -9,7 +9,6 @@ use http::retrieve_asset;
 use js::attr_is_event_handler;
 use std::collections::HashMap;
 use std::default::Default;
-use std::fmt::Write as OtherWrite;
 use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
 
 lazy_static! {
@@ -155,7 +154,7 @@ pub fn walk_and_embed_assets(
                                         Err(e) => {
                                             eprintln!("Warning: {}", e,);
 
-                                            //If failed to resolve, replace with absolute URL
+                                            // If failed to resolve, replace with absolute URL
                                             href_full_url
                                         }
                                     };
@@ -309,9 +308,7 @@ pub fn walk_and_embed_assets(
                                     opt_insecure,
                                 );
                                 tendril.clear();
-                                tendril
-                                    .write_str(&replacement)
-                                    .expect("Failed to update DOM");
+                                tendril.push_slice(&replacement);
                             }
                         }
                     }
@@ -443,10 +440,7 @@ pub fn walk_and_embed_assets(
                         opt_insecure,
                     );
                     attribute.value.clear();
-                    attribute
-                        .value
-                        .write_str(&replacement)
-                        .expect("Failed to update DOM");
+                    attribute.value.push_slice(&replacement);
                 }
             }
 
