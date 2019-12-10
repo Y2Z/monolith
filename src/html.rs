@@ -9,7 +9,7 @@ use http::retrieve_asset;
 use js::attr_is_event_handler;
 use std::collections::HashMap;
 use std::default::Default;
-use utils::{data_to_dataurl, is_valid_url, resolve_url, url_has_protocol};
+use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
 
 lazy_static! {
     static ref EMPTY_STRING: String = String::new();
@@ -129,18 +129,38 @@ pub fn walk_and_embed_assets(
                                     let href_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
                                             .unwrap_or(EMPTY_STRING.clone());
-                                    let (css_dataurl, _) = retrieve_asset(
+                                    let replacement_text = match retrieve_asset(
                                         cache,
                                         &href_full_url,
-                                        true,
+                                        false,
                                         "text/css",
                                         opt_user_agent,
                                         opt_silent,
                                         opt_insecure,
-                                    )
-                                    .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+                                    ) {
+                                        // On successful retrieval, traverse CSS
+                                        Ok((css_data, _)) => resolve_css_imports(
+                                            cache,
+                                            &css_data,
+                                            true,
+                                            &href_full_url,
+                                            opt_no_images,
+                                            opt_user_agent,
+                                            opt_silent,
+                                            opt_insecure,
+                                        ),
+
+                                        // If a network error occured, warn
+                                        Err(e) => {
+                                            eprintln!("Warning: {}", e,);
+
+                                            // If failed to resolve, replace with absolute URL
+                                            href_full_url
+                                        }
+                                    };
+
                                     attr.value.clear();
-                                    attr.value.push_slice(css_dataurl.as_str());
+                                    attr.value.push_slice(&replacement_text);
                                 }
                             }
                         }
@@ -273,6 +293,24 @@ pub fn walk_and_embed_assets(
                     if opt_no_css {
                         // Empty inner content of STYLE tags
                         node.children.borrow_mut().clear();
+                    } else {
+                        for node in node.children.borrow_mut().iter_mut() {
+                            if let NodeData::Text { ref contents } = node.data {
+                                let mut tendril = contents.borrow_mut();
+                                let replacement = resolve_css_imports(
+                                    cache,
+                                    tendril.as_ref(),
+                                    false,
+                                    &url,
+                                    opt_no_images,
+                                    opt_user_agent,
+                                    opt_silent,
+                                    opt_insecure,
+                                );
+                                tendril.clear();
+                                tendril.push_slice(&replacement);
+                            }
+                        }
                     }
                 }
                 "form" => {
@@ -372,6 +410,7 @@ pub fn walk_and_embed_assets(
                 _ => {}
             }
 
+            // Process style attributes
             if opt_no_css {
                 // Get rid of style attributes
                 let mut style_attr_indexes = Vec::new();
@@ -383,6 +422,25 @@ pub fn walk_and_embed_assets(
                 style_attr_indexes.reverse();
                 for attr_index in style_attr_indexes {
                     attrs_mut.remove(attr_index);
+                }
+            } else {
+                // Otherwise, parse any links found in the attributes
+                for attribute in attrs_mut
+                    .iter_mut()
+                    .filter(|a| a.name.local.as_ref().eq_ignore_ascii_case("style"))
+                {
+                    let replacement = resolve_css_imports(
+                        cache,
+                        attribute.value.as_ref(),
+                        false,
+                        &url,
+                        opt_no_images,
+                        opt_user_agent,
+                        opt_silent,
+                        opt_insecure,
+                    );
+                    attribute.value.clear();
+                    attribute.value.push_slice(&replacement);
                 }
             }
 
