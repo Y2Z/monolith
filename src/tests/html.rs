@@ -70,18 +70,18 @@ fn test_walk_and_embed_assets() {
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
     let opt_silent = true;
-    let opt_insecure = false;
+
+    let client = reqwest::Client::new();
 
     walk_and_embed_assets(
         cache,
+        &client,
         &url,
         &dom.document,
         opt_no_css,
         opt_no_js,
         opt_no_images,
-        "",
         opt_silent,
-        opt_insecure,
         opt_no_frames,
     );
 
@@ -106,18 +106,18 @@ fn test_walk_and_embed_assets_ensure_no_recursive_iframe() {
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
     let opt_silent = true;
-    let opt_insecure = false;
+
+    let client = reqwest::Client::new();
 
     walk_and_embed_assets(
         cache,
+        &client,
         &url,
         &dom.document,
         opt_no_css,
         opt_no_js,
         opt_no_images,
-        "",
         opt_silent,
-        opt_insecure,
         opt_no_frames,
     );
 
@@ -144,18 +144,17 @@ fn test_walk_and_embed_assets_no_css() {
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
     let opt_silent = true;
-    let opt_insecure = false;
+    let client = reqwest::Client::new();
 
     walk_and_embed_assets(
         cache,
+        &client,
         &url,
         &dom.document,
         opt_no_css,
         opt_no_js,
         opt_no_images,
-        "",
         opt_silent,
-        opt_insecure,
         opt_no_frames,
     );
 
@@ -189,18 +188,18 @@ fn test_walk_and_embed_assets_no_images() {
     let opt_no_js: bool = false;
     let opt_no_images: bool = true;
     let opt_silent = true;
-    let opt_insecure = false;
+
+    let client = reqwest::Client::new();
 
     walk_and_embed_assets(
         cache,
+        &client,
         &url,
         &dom.document,
         opt_no_css,
         opt_no_js,
         opt_no_images,
-        "",
         opt_silent,
-        opt_insecure,
         opt_no_frames,
     );
 
@@ -236,18 +235,17 @@ fn test_walk_and_embed_assets_no_frames() {
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
     let opt_silent = true;
-    let opt_insecure = false;
+    let client = reqwest::Client::new();
 
     walk_and_embed_assets(
         cache,
+        &client,
         &url,
         &dom.document,
         opt_no_css,
         opt_no_js,
         opt_no_images,
-        "",
         opt_silent,
-        opt_insecure,
         opt_no_frames,
     );
 
@@ -275,18 +273,18 @@ fn test_walk_and_embed_assets_no_js() {
     let opt_no_js: bool = true;
     let opt_no_images: bool = false;
     let opt_silent = true;
-    let opt_insecure = false;
+
+    let client = reqwest::Client::new();
 
     walk_and_embed_assets(
         cache,
+        &client,
         &url,
         &dom.document,
         opt_no_css,
         opt_no_js,
         opt_no_images,
-        "",
         opt_silent,
-        opt_insecure,
         opt_no_frames,
     );
 
