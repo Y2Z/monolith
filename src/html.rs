@@ -2,7 +2,7 @@ use html5ever::interface::QualName;
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
 use html5ever::serialize::{serialize, SerializeOpts};
-use html5ever::tendril::{format_tendril, TendrilSink};
+use html5ever::tendril::{format_tendril, Tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
@@ -157,35 +157,50 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "img" => {
-                    for attr in attrs_mut.iter_mut() {
-                        if &attr.name.local == "src" || &attr.name.local == "data-src" {
-                            let value = attr.value.to_string();
-
-                            // Ignore images with empty source
-                            if value == EMPTY_STRING.clone() {
-                                continue;
-                            }
-
-                            if opt_no_images {
-                                attr.value.clear();
-                                attr.value.push_slice(TRANSPARENT_PIXEL);
-                            } else {
-                                let src_full_url: String =
-                                    resolve_url(&url, &value).unwrap_or(EMPTY_STRING.clone());
-                                let (img_dataurl, _) = retrieve_asset(
-                                    cache,
-                                    &src_full_url,
-                                    true,
-                                    "",
-                                    opt_user_agent,
-                                    opt_silent,
-                                    opt_insecure,
-                                )
-                                .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
-                                attr.value.clear();
-                                attr.value.push_slice(img_dataurl.as_str());
-                            }
+                    // Find source tags
+                    let mut found_src: Option<Attribute> = None;
+                    let mut found_datasrc: Option<Attribute> = None;
+                    let mut i = 0;
+                    while i < attrs_mut.len() {
+                        let name = attrs_mut[i].name.local.as_ref();
+                        if name.eq_ignore_ascii_case("src") {
+                            found_src = Some(attrs_mut.remove(i));
+                        } else if name.eq_ignore_ascii_case("data-src") {
+                            found_datasrc = Some(attrs_mut.remove(i));
+                        } else {
+                            i += 1;
                         }
+                    }
+
+                    // If images are disabled, clear both sources
+                    if opt_no_images {
+                        attrs_mut.push(Attribute {
+                            name: QualName::new(None, ns!(), local_name!("src")),
+                            value: Tendril::from_slice(TRANSPARENT_PIXEL),
+                        });
+                    } else if let Some((dataurl, _)) = (&found_datasrc)
+                        .into_iter()
+                        .chain(&found_src) // Give dataurl priority
+                        .map(|attr| &attr.value)
+                        .filter(|src| !src.is_empty()) // Ignore empty srcs
+                        .next()
+                        .and_then(|src| resolve_url(&url, src).ok()) //Make absolute
+                        .and_then(|abs_src| // Download and convert to dataurl
+                            retrieve_asset(
+                                cache,
+                                &abs_src,
+                                true,
+                                "",
+                                opt_user_agent,
+                                opt_silent,
+                                opt_insecure,
+                            ).ok())
+                    {
+                        // Add the new dataurl src attribute
+                        attrs_mut.push(Attribute {
+                            name: QualName::new(None, ns!(), local_name!("src")),
+                            value: Tendril::from_slice(dataurl.as_ref()),
+                        });
                     }
                 }
                 "source" => {
