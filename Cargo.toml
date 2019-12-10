@@ -1,10 +1,11 @@
 [package]
 name = "monolith"
-version = "2.0.23"
+version = "2.1.0"
 authors = [
     "Sunshine <sunshine@uberspace.net>",
     "Mahdi Robatipoor <mahdi.robatipoor@gmail.com>",
     "Emmanuel Delaborde <th3rac25@gmail.com>",
+    "Emi Simpson <emi@alchemi.dev>",
 ]
 description = "CLI tool for saving web pages as a single HTML file"
 
