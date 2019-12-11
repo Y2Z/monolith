@@ -11,10 +11,6 @@ use std::collections::HashMap;
 use std::default::Default;
 use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
 
-lazy_static! {
-    static ref EMPTY_STRING: String = String::new();
-}
-
 const ICON_VALUES: [&str; 5] = [
     "icon",
     "shortcut icon",
@@ -35,7 +31,7 @@ pub fn get_parent_node(node: &Handle) -> Handle {
 pub fn get_node_name(node: &Handle) -> String {
     match &node.data {
         NodeData::Element { ref name, .. } => name.local.as_ref().to_string(),
-        _ => EMPTY_STRING.clone(),
+        _ => str!(),
     }
 }
 
@@ -104,7 +100,7 @@ pub fn walk_and_embed_assets(
                                 } else {
                                     let href_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
-                                            .unwrap_or(EMPTY_STRING.clone());
+                                            .unwrap_or(str!());
                                     let (favicon_dataurl, _) = retrieve_asset(
                                         cache,
                                         &href_full_url,
@@ -114,7 +110,7 @@ pub fn walk_and_embed_assets(
                                         opt_silent,
                                         opt_insecure,
                                     )
-                                    .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+                                    .unwrap_or((str!(), str!()));
                                     attr.value.clear();
                                     attr.value.push_slice(favicon_dataurl.as_str());
                                 }
@@ -128,7 +124,7 @@ pub fn walk_and_embed_assets(
                                 } else {
                                     let href_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
-                                            .unwrap_or(EMPTY_STRING.clone());
+                                            .unwrap_or(str!());
                                     let replacement_text = match retrieve_asset(
                                         cache,
                                         &href_full_url,
@@ -168,8 +164,7 @@ pub fn walk_and_embed_assets(
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "href" {
                                 let href_full_url: String =
-                                    resolve_url(&url, &attr.value.to_string())
-                                        .unwrap_or(EMPTY_STRING.clone());
+                                    resolve_url(&url, &attr.value.to_string()).unwrap_or(str!());
                                 attr.value.clear();
                                 attr.value.push_slice(&href_full_url.as_str());
                             }
@@ -182,7 +177,7 @@ pub fn walk_and_embed_assets(
                             let value = attr.value.to_string();
 
                             // Ignore images with empty source
-                            if value == EMPTY_STRING.clone() {
+                            if value == str!() {
                                 continue;
                             }
 
@@ -191,7 +186,7 @@ pub fn walk_and_embed_assets(
                                 attr.value.push_slice(TRANSPARENT_PIXEL);
                             } else {
                                 let src_full_url: String =
-                                    resolve_url(&url, &value).unwrap_or(EMPTY_STRING.clone());
+                                    resolve_url(&url, &value).unwrap_or(str!());
                                 let (img_dataurl, _) = retrieve_asset(
                                     cache,
                                     &src_full_url,
@@ -201,7 +196,7 @@ pub fn walk_and_embed_assets(
                                     opt_silent,
                                     opt_insecure,
                                 )
-                                .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+                                .unwrap_or((str!(), str!()));
                                 attr.value.clear();
                                 attr.value.push_slice(img_dataurl.as_str());
                             }
@@ -225,7 +220,7 @@ pub fn walk_and_embed_assets(
                                 } else {
                                     let srcset_full_url: String =
                                         resolve_url(&url, &attr.value.to_string())
-                                            .unwrap_or(EMPTY_STRING.clone());
+                                            .unwrap_or(str!());
                                     let (source_dataurl, _) = retrieve_asset(
                                         cache,
                                         &srcset_full_url,
@@ -235,7 +230,7 @@ pub fn walk_and_embed_assets(
                                         opt_silent,
                                         opt_insecure,
                                     )
-                                    .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+                                    .unwrap_or((str!(), str!()));
                                     attr.value.clear();
                                     attr.value.push_slice(source_dataurl.as_str());
                                 }
@@ -251,8 +246,8 @@ pub fn walk_and_embed_assets(
                                 continue;
                             }
 
-                            let href_full_url: String = resolve_url(&url, &attr.value.to_string())
-                                .unwrap_or(EMPTY_STRING.clone());
+                            let href_full_url: String =
+                                resolve_url(&url, &attr.value.to_string()).unwrap_or(str!());
                             attr.value.clear();
                             attr.value.push_slice(href_full_url.as_str());
                         }
@@ -271,8 +266,7 @@ pub fn walk_and_embed_assets(
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "src" {
                                 let src_full_url: String =
-                                    resolve_url(&url, &attr.value.to_string())
-                                        .unwrap_or(EMPTY_STRING.clone());
+                                    resolve_url(&url, &attr.value.to_string()).unwrap_or(str!());
                                 let (js_dataurl, _) = retrieve_asset(
                                     cache,
                                     &src_full_url,
@@ -282,7 +276,7 @@ pub fn walk_and_embed_assets(
                                     opt_silent,
                                     opt_insecure,
                                 )
-                                .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
+                                .unwrap_or((str!(), str!()));
                                 attr.value.clear();
                                 attr.value.push_slice(js_dataurl.as_str());
                             }
@@ -319,8 +313,7 @@ pub fn walk_and_embed_assets(
                             // Modify action to be a full URL
                             if !is_valid_url(&attr.value) {
                                 let href_full_url: String =
-                                    resolve_url(&url, &attr.value.to_string())
-                                        .unwrap_or(EMPTY_STRING.clone());
+                                    resolve_url(&url, &attr.value.to_string()).unwrap_or(str!());
                                 attr.value.clear();
                                 attr.value.push_slice(href_full_url.as_str());
                             }
@@ -339,12 +332,12 @@ pub fn walk_and_embed_assets(
                             let iframe_src: String = attr.value.to_string();
 
                             // Ignore iframes with empty source (they cause infinite loops)
-                            if iframe_src == EMPTY_STRING.clone() {
+                            if iframe_src == str!() {
                                 continue;
                             }
 
                             let src_full_url: String =
-                                resolve_url(&url, &iframe_src).unwrap_or(EMPTY_STRING.clone());
+                                resolve_url(&url, &iframe_src).unwrap_or(str!());
                             let (iframe_data, iframe_final_url) = retrieve_asset(
                                 cache,
                                 &src_full_url,
@@ -354,7 +347,7 @@ pub fn walk_and_embed_assets(
                                 opt_silent,
                                 opt_insecure,
                             )
-                            .unwrap_or((EMPTY_STRING.clone(), src_full_url));
+                            .unwrap_or((str!(), src_full_url));
                             let dom = html_to_dom(&iframe_data);
                             walk_and_embed_assets(
                                 cache,
@@ -382,15 +375,15 @@ pub fn walk_and_embed_assets(
                             let video_poster = attr.value.to_string();
 
                             // Skip posters with empty source
-                            if video_poster == EMPTY_STRING.clone() {
+                            if video_poster == str!() {
                                 continue;
                             }
 
                             if opt_no_images {
                                 attr.value.clear();
                             } else {
-                                let poster_full_url: String = resolve_url(&url, &video_poster)
-                                    .unwrap_or(EMPTY_STRING.clone());
+                                let poster_full_url: String =
+                                    resolve_url(&url, &video_poster).unwrap_or(str!());
                                 let (poster_dataurl, _) = retrieve_asset(
                                     cache,
                                     &poster_full_url,
@@ -400,7 +393,7 @@ pub fn walk_and_embed_assets(
                                     opt_silent,
                                     opt_insecure,
                                 )
-                                .unwrap_or((poster_full_url, EMPTY_STRING.clone()));
+                                .unwrap_or((poster_full_url, str!()));
                                 attr.value.clear();
                                 attr.value.push_slice(poster_dataurl.as_str());
                             }
@@ -524,7 +517,7 @@ pub fn stringify_document(
         let doc = dom.get_document();
         let html = get_child_node_by_name(&doc, "html");
         let head = get_child_node_by_name(&html, "head");
-        let mut content_attr = EMPTY_STRING.clone();
+        let mut content_attr = str!();
         if opt_isolate {
             content_attr += " default-src 'unsafe-inline' data:;";
         }
