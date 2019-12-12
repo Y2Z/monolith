@@ -1,5 +1,6 @@
 use crate::utils::{
-    data_to_dataurl, detect_mimetype, is_data_url, is_valid_url, resolve_url, url_has_protocol,
+    clean_url, data_to_dataurl, detect_mimetype, is_data_url, is_valid_url, resolve_url,
+    url_has_protocol,
 };
 use url::ParseError;
 
@@ -157,4 +158,20 @@ fn test_is_data_url() {
     assert!(!is_data_url("https://kernel.org").unwrap_or(false));
     assert!(!is_data_url("//kernel.org").unwrap_or(false));
     assert!(!is_data_url("").unwrap_or(false));
+}
+
+#[test]
+fn test_clean_url() {
+    assert_eq!(
+        clean_url("https://somewhere.com/font.eot#iefix"),
+        "https://somewhere.com/font.eot"
+    );
+    assert_eq!(
+        clean_url("https://somewhere.com/font.eot#"),
+        "https://somewhere.com/font.eot"
+    );
+    assert_eq!(
+        clean_url("https://somewhere.com/font.eot?#"),
+        "https://somewhere.com/font.eot"
+    );
 }
