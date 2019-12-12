@@ -38,12 +38,6 @@ use url::{ParseError, Url};
 /// recomended that the URL gets manually validated.
 const CSS_URL_REGEX_STR: &str = r###"(?:(?:(?P<stylesheet>@import)|(?P<font>src\s*:))\s+)?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
 
-lazy_static! {
-    static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
-    static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
-    static ref REGEX_CSS_URL: Regex = Regex::new(CSS_URL_REGEX_STR).unwrap();
-}
-
 const MAGIC: [[&[u8]; 2]; 19] = [
     // Image
     [b"GIF87a", b"image/gif"],
@@ -88,7 +82,8 @@ pub fn detect_mimetype(data: &[u8]) -> String {
 }
 
 pub fn url_has_protocol<T: AsRef<str>>(url: T) -> bool {
-    HAS_PROTOCOL.is_match(url.as_ref().to_lowercase().as_str())
+    let regex: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
+    regex.is_match(url.as_ref().to_lowercase().as_str())
 }
 
 pub fn is_data_url<T: AsRef<str>>(url: T) -> Result<bool, ParseError> {
@@ -96,7 +91,8 @@ pub fn is_data_url<T: AsRef<str>>(url: T) -> Result<bool, ParseError> {
 }
 
 pub fn is_valid_url<T: AsRef<str>>(path: T) -> bool {
-    REGEX_URL.is_match(path.as_ref())
+    let regex: Regex = Regex::new(r"^https?://").unwrap();
+    regex.is_match(path.as_ref())
 }
 
 pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<String, ParseError> {
@@ -120,9 +116,10 @@ pub fn resolve_css_imports(
     opt_no_images: bool,
     opt_silent: bool,
 ) -> String {
+    let regex: Regex = Regex::new(CSS_URL_REGEX_STR).unwrap();
     let mut resolved_css = String::from(css_string);
 
-    for link in REGEX_CSS_URL.captures_iter(&css_string) {
+    for link in regex.captures_iter(&css_string) {
         let target_link = link.name("url").unwrap().as_str();
 
         // Determine the type of link
