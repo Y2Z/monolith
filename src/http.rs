@@ -17,7 +17,7 @@ pub fn retrieve_asset(
         if cache.contains_key(&url.to_string()) {
             // url is in cache
             if !opt_silent {
-                eprintln!("[ {} ] (from cache)", &url);
+                eprintln!("{} (from cache)", &url);
             }
             let data = cache.get(&url.to_string()).unwrap();
             Ok((data.to_string(), url.to_string()))
@@ -27,9 +27,9 @@ pub fn retrieve_asset(
 
             if !opt_silent {
                 if url == response.url().as_str() {
-                    eprintln!("[ {} ]", &url);
+                    eprintln!("{}", &url);
                 } else {
-                    eprintln!("[ {} -> {} ]", &url, &response.url().as_str());
+                    eprintln!("{} -> {}", &url, &response.url().as_str());
                 }
             }
 
