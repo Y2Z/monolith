@@ -7,6 +7,7 @@ use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
 use http::retrieve_asset;
 use js::attr_is_event_handler;
+use reqwest::Client;
 use std::collections::HashMap;
 use std::default::Default;
 use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
@@ -45,14 +46,13 @@ pub fn is_icon(attr_value: &str) -> bool {
 
 pub fn walk_and_embed_assets(
     cache: &mut HashMap<String, String>,
+    client: &Client,
     url: &str,
     node: &Handle,
     opt_no_css: bool,
     opt_no_js: bool,
     opt_no_images: bool,
-    opt_user_agent: &str,
     opt_silent: bool,
-    opt_insecure: bool,
     opt_no_frames: bool,
 ) {
     match node.data {
@@ -61,14 +61,13 @@ pub fn walk_and_embed_assets(
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(
                     cache,
+                    client,
                     &url,
                     child,
                     opt_no_css,
                     opt_no_js,
                     opt_no_images,
-                    opt_user_agent,
                     opt_silent,
-                    opt_insecure,
                     opt_no_frames,
                 );
             }
@@ -107,12 +106,11 @@ pub fn walk_and_embed_assets(
                                             .unwrap_or(EMPTY_STRING.clone());
                                     let (favicon_dataurl, _) = retrieve_asset(
                                         cache,
+                                        client,
                                         &href_full_url,
                                         true,
                                         "",
-                                        opt_user_agent,
                                         opt_silent,
-                                        opt_insecure,
                                     )
                                     .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                     attr.value.clear();
@@ -131,23 +129,21 @@ pub fn walk_and_embed_assets(
                                             .unwrap_or(EMPTY_STRING.clone());
                                     let replacement_text = match retrieve_asset(
                                         cache,
+                                        client,
                                         &href_full_url,
                                         false,
                                         "text/css",
-                                        opt_user_agent,
                                         opt_silent,
-                                        opt_insecure,
                                     ) {
                                         // On successful retrieval, traverse CSS
                                         Ok((css_data, _)) => resolve_css_imports(
                                             cache,
+                                            client,
                                             &css_data,
                                             true,
                                             &href_full_url,
                                             opt_no_images,
-                                            opt_user_agent,
                                             opt_silent,
-                                            opt_insecure,
                                         ),
 
                                         // If a network error occured, warn
@@ -194,12 +190,11 @@ pub fn walk_and_embed_assets(
                                     resolve_url(&url, &value).unwrap_or(EMPTY_STRING.clone());
                                 let (img_dataurl, _) = retrieve_asset(
                                     cache,
+                                    client,
                                     &src_full_url,
                                     true,
                                     "",
-                                    opt_user_agent,
                                     opt_silent,
-                                    opt_insecure,
                                 )
                                 .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                 attr.value.clear();
@@ -228,12 +223,11 @@ pub fn walk_and_embed_assets(
                                             .unwrap_or(EMPTY_STRING.clone());
                                     let (source_dataurl, _) = retrieve_asset(
                                         cache,
+                                        client,
                                         &srcset_full_url,
                                         true,
                                         "",
-                                        opt_user_agent,
                                         opt_silent,
-                                        opt_insecure,
                                     )
                                     .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                     attr.value.clear();
@@ -275,12 +269,11 @@ pub fn walk_and_embed_assets(
                                         .unwrap_or(EMPTY_STRING.clone());
                                 let (js_dataurl, _) = retrieve_asset(
                                     cache,
+                                    client,
                                     &src_full_url,
                                     true,
                                     "application/javascript",
-                                    opt_user_agent,
                                     opt_silent,
-                                    opt_insecure,
                                 )
                                 .unwrap_or((EMPTY_STRING.clone(), EMPTY_STRING.clone()));
                                 attr.value.clear();
@@ -299,13 +292,12 @@ pub fn walk_and_embed_assets(
                                 let mut tendril = contents.borrow_mut();
                                 let replacement = resolve_css_imports(
                                     cache,
+                                    client,
                                     tendril.as_ref(),
                                     false,
                                     &url,
                                     opt_no_images,
-                                    opt_user_agent,
                                     opt_silent,
-                                    opt_insecure,
                                 );
                                 tendril.clear();
                                 tendril.push_slice(&replacement);
@@ -347,25 +339,23 @@ pub fn walk_and_embed_assets(
                                 resolve_url(&url, &iframe_src).unwrap_or(EMPTY_STRING.clone());
                             let (iframe_data, iframe_final_url) = retrieve_asset(
                                 cache,
+                                client,
                                 &src_full_url,
                                 false,
                                 "text/html",
-                                opt_user_agent,
                                 opt_silent,
-                                opt_insecure,
                             )
                             .unwrap_or((EMPTY_STRING.clone(), src_full_url));
                             let dom = html_to_dom(&iframe_data);
                             walk_and_embed_assets(
                                 cache,
+                                client,
                                 &iframe_final_url,
                                 &dom.document,
                                 opt_no_css,
                                 opt_no_js,
                                 opt_no_images,
-                                opt_user_agent,
                                 opt_silent,
-                                opt_insecure,
                                 opt_no_frames,
                             );
                             let mut buf: Vec<u8> = Vec::new();
@@ -393,12 +383,11 @@ pub fn walk_and_embed_assets(
                                     .unwrap_or(EMPTY_STRING.clone());
                                 let (poster_dataurl, _) = retrieve_asset(
                                     cache,
+                                    client,
                                     &poster_full_url,
                                     true,
                                     "",
-                                    opt_user_agent,
                                     opt_silent,
-                                    opt_insecure,
                                 )
                                 .unwrap_or((poster_full_url, EMPTY_STRING.clone()));
                                 attr.value.clear();
@@ -431,13 +420,12 @@ pub fn walk_and_embed_assets(
                 {
                     let replacement = resolve_css_imports(
                         cache,
+                        client,
                         attribute.value.as_ref(),
                         false,
                         &url,
                         opt_no_images,
-                        opt_user_agent,
                         opt_silent,
-                        opt_insecure,
                     );
                     attribute.value.clear();
                     attribute.value.push_slice(&replacement);
@@ -462,14 +450,13 @@ pub fn walk_and_embed_assets(
             for child in node.children.borrow().iter() {
                 walk_and_embed_assets(
                     cache,
+                    client,
                     &url,
                     child,
                     opt_no_css,
                     opt_no_js,
                     opt_no_images,
-                    opt_user_agent,
                     opt_silent,
-                    opt_insecure,
                     opt_no_frames,
                 );
             }

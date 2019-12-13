@@ -3,6 +3,7 @@ extern crate base64;
 use self::base64::encode;
 use http::retrieve_asset;
 use regex::Regex;
+use reqwest::Client;
 use std::collections::HashMap;
 use url::{ParseError, Url};
 
@@ -112,13 +113,12 @@ pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<Strin
 
 pub fn resolve_css_imports(
     cache: &mut HashMap<String, String>,
+    client: &Client,
     css_string: &str,
     as_dataurl: bool,
     href: &str,
     opt_no_images: bool,
-    opt_user_agent: &str,
     opt_silent: bool,
-    opt_insecure: bool,
 ) -> String {
     let mut resolved_css = String::from(css_string);
 
@@ -141,35 +141,32 @@ pub fn resolve_css_imports(
             // The link is an @import link
             retrieve_asset(
                 cache,
+                client,
                 &embedded_url,
                 false,      // Formating as data URL will be done later
                 "text/css", // Expect CSS
-                opt_user_agent,
                 opt_silent,
-                opt_insecure,
             )
             .map(|(content, _)| {
                 resolve_css_imports(
                     cache,
+                    client,
                     &content,
                     true, // Finally, convert to a dataurl
                     &embedded_url,
                     opt_no_images,
-                    opt_user_agent,
                     opt_silent,
-                    opt_insecure,
                 )
             })
         } else if (is_image && !opt_no_images) || is_font {
             // The link is some other, non-@import link
             retrieve_asset(
                 cache,
+                client,
                 &embedded_url,
                 true, // Format as data URL
                 "",   // Unknown MIME type
-                opt_user_agent,
                 opt_silent,
-                opt_insecure,
             )
             .map(|(a, _)| a)
         } else {

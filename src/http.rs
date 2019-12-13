@@ -1,17 +1,15 @@
-use reqwest::header::{CONTENT_TYPE, USER_AGENT};
+use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
 use std::collections::HashMap;
-use std::time::Duration;
 use utils::{data_to_dataurl, is_data_url};
 
 pub fn retrieve_asset(
     cache: &mut HashMap<String, String>,
+    client: &Client,
     url: &str,
     as_dataurl: bool,
     mime: &str,
-    opt_user_agent: &str,
     opt_silent: bool,
-    opt_insecure: bool,
 ) -> Result<(String, String), reqwest::Error> {
     if is_data_url(&url).unwrap() {
         Ok((url.to_string(), url.to_string()))
@@ -25,11 +23,7 @@ pub fn retrieve_asset(
             Ok((data.to_string(), url.to_string()))
         } else {
             // url not in cache, we request it
-            let client = Client::builder()
-                .timeout(Duration::from_secs(10))
-                .danger_accept_invalid_certs(opt_insecure)
-                .build()?;
-            let mut response = client.get(url).header(USER_AGENT, opt_user_agent).send()?;
+            let mut response = client.get(url).send()?;
 
             if !opt_silent {
                 if url == response.url().as_str() {
