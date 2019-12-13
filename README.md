@@ -18,17 +18,20 @@ Unlike the conventional "Save page as", `monolith` not only saves the target doc
 
 If compared to saving websites with `wget -mpk`, this tool embeds all assets as data URLs and therefore lets browsers render the saved page exactly the way it was on the Internet, even when no network connection is available.
 
-<!-- `This program works both on remote and local targets. -->
+## Installation
 
-### Installation
+### From source
     $ git clone https://github.com/Y2Z/monolith.git
     $ cd monolith
     $ cargo install --path .
 
-### Usage
+### On macOS (via Homebrew)
+    $ brew install monolith
+
+## Usage
     $ monolith https://lyrics.github.io/db/p/portishead/dummy/roads/ > portishead-roads-lyrics.html
 
-### Options
+## Options
  - `-c`: Ignore styles
  - `-f`: Exclude iframes
  - `-i`: Remove images
@@ -38,11 +41,11 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
  - `-s`: Silent mode
  - `-u`: Specify custom User-Agent
 
-### Related Projects
+## Related projects
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
  - `SingleFile`: https://github.com/gildas-lormeau/SingleFile
 
-### License
+## License
 The Unlicense
 
 <!-- Microtext -->
