@@ -4,23 +4,24 @@ cache: cargo
 sudo: false
 
 os:
-    - linux
-    - osx
+  - linux
+  - osx
 
 rust:
-    - stable
-    - beta
-    - nightly
+  - stable
+  - beta
+  - nightly
 
 before_script:
-    - rustup component add rustfmt
+  - rustup component add rustfmt
 
 script:
-   - cargo build --all --locked --verbose
-   - cargo test --all --locked --verbose
-   - cargo fmt --all -- --check
+  - cargo build --all --locked --verbose
+  - cargo test --all --locked --verbose
+  - cargo fmt --all -- --check
 
 jobs:
   allow_failures:
+    - rust: beta
     - rust: nightly
   fast_finish: true

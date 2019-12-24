@@ -1,7 +1,7 @@
 use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
 use std::collections::HashMap;
-use utils::{data_to_dataurl, is_data_url};
+use utils::{clean_url, data_to_dataurl, is_data_url};
 
 pub fn retrieve_asset(
     cache: &mut HashMap<String, String>,
@@ -11,15 +11,17 @@ pub fn retrieve_asset(
     mime: &str,
     opt_silent: bool,
 ) -> Result<(String, String), reqwest::Error> {
+    let cache_key = clean_url(&url);
+
     if is_data_url(&url).unwrap() {
         Ok((url.to_string(), url.to_string()))
     } else {
-        if cache.contains_key(&url.to_string()) {
+        if cache.contains_key(&cache_key) {
             // url is in cache
             if !opt_silent {
                 eprintln!("{} (from cache)", &url);
             }
-            let data = cache.get(&url.to_string()).unwrap();
+            let data = cache.get(&cache_key).unwrap();
             Ok((data.to_string(), url.to_string()))
         } else {
             // url not in cache, we request it
@@ -32,6 +34,8 @@ pub fn retrieve_asset(
                     eprintln!("{} -> {}", &url, &response.url().as_str());
                 }
             }
+
+            let new_cache_key = clean_url(response.url().to_string());
 
             if as_dataurl {
                 // Convert response into a byte array
@@ -50,12 +54,12 @@ pub fn retrieve_asset(
                 };
                 let dataurl = data_to_dataurl(&mimetype, &data);
                 // insert in cache
-                cache.insert(response.url().to_string(), dataurl.to_string());
+                cache.insert(new_cache_key, dataurl.to_string());
                 Ok((dataurl, response.url().to_string()))
             } else {
                 let content = response.text().unwrap();
                 // insert in cache
-                cache.insert(response.url().to_string(), content.clone());
+                cache.insert(new_cache_key, content.clone());
                 Ok((content, response.url().to_string()))
             }
         }

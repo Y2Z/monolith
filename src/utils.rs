@@ -196,3 +196,14 @@ pub fn resolve_css_imports(
         resolved_css
     }
 }
+
+pub fn clean_url<T: AsRef<str>>(url: T) -> String {
+    let mut result = Url::parse(url.as_ref()).unwrap();
+    // Clear fragment
+    result.set_fragment(None);
+    // Get rid of stray question mark
+    if result.query() == Some("") {
+        result.set_query(None);
+    }
+    result.to_string()
+}
