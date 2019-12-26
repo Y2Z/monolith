@@ -79,6 +79,17 @@ pub fn walk_and_embed_assets(
                 "link" => {
                     let mut link_type: &str = "";
 
+                    // Remove integrity attributes
+                    let mut i = 0;
+                    while i < attrs_mut.len() {
+                        let attr_name = attrs_mut[i].name.local.as_ref();
+                        if attr_name.eq_ignore_ascii_case("integrity") {
+                            attrs_mut.remove(i);
+                        } else {
+                            i += 1;
+                        }
+                    }
+
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "rel" {
                             if is_icon(&attr.value.to_string()) {
@@ -263,6 +274,17 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "script" => {
+                    // Remove integrity attributes
+                    let mut i = 0;
+                    while i < attrs_mut.len() {
+                        let attr_name = attrs_mut[i].name.local.as_ref();
+                        if attr_name.eq_ignore_ascii_case("integrity") {
+                            attrs_mut.remove(i);
+                        } else {
+                            i += 1;
+                        }
+                    }
+
                     if opt_no_js {
                         // Empty src and inner content of SCRIPT tags
                         for attr in attrs_mut.iter_mut() {

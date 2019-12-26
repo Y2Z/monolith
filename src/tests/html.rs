@@ -299,6 +299,45 @@ fn test_walk_and_embed_assets_no_js() {
 }
 
 #[test]
+fn test_walk_and_embed_with_no_integrity() {
+    let html = "<title>No integrity</title>\
+                <link integrity=\"sha384-...\" rel=\"something\"/>\
+                <script integrity=\"sha384-...\" src=\"some.js\"></script>";
+    let dom = html_to_dom(&html);
+    let url = "http://localhost";
+    let cache = &mut HashMap::new();
+    let client = reqwest::Client::new();
+    let opt_no_css: bool = true;
+    let opt_no_frames: bool = true;
+    let opt_no_js: bool = true;
+    let opt_no_images: bool = true;
+    let opt_silent = true;
+
+    walk_and_embed_assets(
+        cache,
+        &client,
+        &url,
+        &dom.document,
+        opt_no_css,
+        opt_no_js,
+        opt_no_images,
+        opt_silent,
+        opt_no_frames,
+    );
+
+    let mut buf: Vec<u8> = Vec::new();
+    serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+    assert_eq!(
+        buf.iter().map(|&c| c as char).collect::<String>(),
+        "<html>\
+         <head><title>No integrity</title><link rel=\"something\"><script src=\"\"></script></head>\
+         <body></body>\
+         </html>"
+    );
+}
+
+#[test]
 fn test_stringify_document() {
     let html = "<div><script src=\"some.js\"></script></div>";
     let dom = html_to_dom(&html);
