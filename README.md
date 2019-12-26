@@ -29,7 +29,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ brew install monolith
 
 ## Usage
-    $ monolith https://lyrics.github.io/db/p/portishead/dummy/roads/ > portishead-roads-lyrics.html
+    $ monolith https://lyrics.github.io/db/p/portishead/dummy/roads/ -o portishead-roads-lyrics.html
 
 ## Options
  - `-c`: Ignore styles
@@ -38,6 +38,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
  - `-I`: Isolate document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
+ - `-o`: Write output to file
  - `-s`: Silent mode
  - `-u`: Specify custom User-Agent
 
