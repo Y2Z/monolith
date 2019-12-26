@@ -29,6 +29,9 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ snap install monolith
 
 #### From source
+
+    Dependency: `libssl-dev`
+
     $ git clone https://github.com/Y2Z/monolith.git
     $ cd monolith
     $ make install
