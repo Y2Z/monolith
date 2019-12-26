@@ -9,6 +9,7 @@ pub struct AppArgs {
     pub no_js: bool,
     pub insecure: bool,
     pub isolate: bool,
+    pub output: String,
     pub silent: bool,
     pub user_agent: String,
 }
@@ -36,6 +37,7 @@ impl AppArgs {
             .args_from_usage("-I, --isolate 'Cut off from the Internet'")
             .args_from_usage("-j, --no-js 'Exclude JavaScript'")
             .args_from_usage("-k, --insecure 'Accept invalid X.509 (TLS) certificates'")
+            .args_from_usage("-o, --output=[document.html] 'Write output to <file>'")
             .args_from_usage("-s, --silent 'Suppress verbosity'")
             .args_from_usage("-u, --user-agent=[Iceweasel] 'Custom User-Agent string'")
             // .args_from_usage("-v, --include-video 'Embed video sources'")
@@ -53,6 +55,7 @@ impl AppArgs {
         app_args.insecure = app.is_present("insecure");
         app_args.isolate = app.is_present("isolate");
         app_args.silent = app.is_present("silent");
+        app_args.output = app.value_of("output").unwrap_or("").to_string();
         app_args.user_agent = app
             .value_of("user-agent")
             .unwrap_or_else(|| DEFAULT_USER_AGENT)
