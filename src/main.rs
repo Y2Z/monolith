@@ -1,12 +1,10 @@
 #[macro_use]
 extern crate clap;
-extern crate monolith;
-extern crate reqwest;
 
 mod args;
 mod macros;
 
-use args::AppArgs;
+use crate::args::AppArgs;
 use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
 use monolith::http::retrieve_asset;
 use monolith::utils::is_valid_url;
