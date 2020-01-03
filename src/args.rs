@@ -58,7 +58,7 @@ impl AppArgs {
         app_args.output = app.value_of("output").unwrap_or("").to_string();
         app_args.user_agent = app
             .value_of("user-agent")
-            .unwrap_or_else(|| DEFAULT_USER_AGENT)
+            .unwrap_or(DEFAULT_USER_AGENT)
             .to_string();
         app_args
     }
