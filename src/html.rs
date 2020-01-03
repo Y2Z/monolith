@@ -155,7 +155,7 @@ pub fn walk_and_embed_assets(
 
                                         // If a network error occured, warn
                                         Err(e) => {
-                                            eprintln!("Warning: {}", e,);
+                                            eprintln!("Warning: {}", e);
 
                                             // If failed to resolve, replace with absolute URL
                                             href_full_url
@@ -515,9 +515,7 @@ fn get_child_node_by_name(handle: &Handle, node_name: &str) -> Handle {
     });
     match matching_children {
         Some(node) => node.clone(),
-        _ => {
-            return handle.clone();
-        }
+        _ => handle.clone(),
     }
 }
 
