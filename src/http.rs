@@ -1,7 +1,7 @@
+use crate::utils::{clean_url, data_to_dataurl, is_data_url};
 use reqwest::header::CONTENT_TYPE;
 use reqwest::Client;
 use std::collections::HashMap;
-use utils::{clean_url, data_to_dataurl, is_data_url};
 
 pub fn retrieve_asset(
     cache: &mut HashMap<String, String>,

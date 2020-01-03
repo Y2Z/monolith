@@ -1,7 +1,5 @@
-extern crate base64;
-
-use self::base64::encode;
-use http::retrieve_asset;
+use crate::http::retrieve_asset;
+use base64::encode;
 use regex::Regex;
 use reqwest::Client;
 use std::collections::HashMap;

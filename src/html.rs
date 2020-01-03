@@ -1,3 +1,8 @@
+use crate::http::retrieve_asset;
+use crate::js::attr_is_event_handler;
+use crate::utils::{
+    data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol,
+};
 use html5ever::interface::QualName;
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
@@ -5,12 +10,9 @@ use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::{format_tendril, Tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
-use http::retrieve_asset;
-use js::attr_is_event_handler;
 use reqwest::Client;
 use std::collections::HashMap;
 use std::default::Default;
-use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
 
 const ICON_VALUES: [&str; 5] = [
     "icon",
