@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::default::Default;
 use utils::{data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol};
 
-const ICON_VALUES: [&str; 5] = [
+const ICON_VALUES: &[&str] = &[
     "icon",
     "shortcut icon",
     "mask-icon",
@@ -37,7 +37,10 @@ pub fn get_node_name(node: &Handle) -> String {
 }
 
 pub fn is_icon(attr_value: &str) -> bool {
-    ICON_VALUES.contains(&&*attr_value.to_lowercase())
+    ICON_VALUES
+        .iter()
+        .find(|a| attr_value.eq_ignore_ascii_case(a))
+        .is_some()
 }
 
 pub fn walk_and_embed_assets(
