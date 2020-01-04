@@ -230,7 +230,7 @@ pub fn walk_and_embed_assets(
                         let attr_name: &str = &attr.name.local;
 
                         if attr_name == "src" {
-                            let src_full_url: String = resolve_url(&url, attr.value.as_ref())
+                            let src_full_url = resolve_url(&url, attr.value.as_ref())
                                 .unwrap_or_else(|_| attr.value.to_string());
                             attr.value.clear();
                             attr.value.push_slice(src_full_url.as_str());
@@ -240,7 +240,7 @@ pub fn walk_and_embed_assets(
                                     attr.value.clear();
                                     attr.value.push_slice(TRANSPARENT_PIXEL);
                                 } else {
-                                    let srcset_full_url: String =
+                                    let srcset_full_url =
                                         resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
                                     let (source_dataurl, _) = retrieve_asset(
                                         cache,
@@ -266,7 +266,7 @@ pub fn walk_and_embed_assets(
                                 continue;
                             }
 
-                            let href_full_url: String =
+                            let href_full_url =
                                 resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
                             attr.value.clear();
                             attr.value.push_slice(href_full_url.as_str());
@@ -530,7 +530,7 @@ pub fn stringify_document(
     serialize(&mut buf, handle, SerializeOpts::default())
         .expect("unable to serialize DOM into buffer");
 
-    let mut result: String = String::from_utf8(buf).unwrap();
+    let mut result = String::from_utf8(buf).unwrap();
 
     if opt_isolate || opt_no_css || opt_no_frames || opt_no_js || opt_no_images {
         let mut buf: Vec<u8> = Vec::new();
