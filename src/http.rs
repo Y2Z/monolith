@@ -28,14 +28,15 @@ pub fn retrieve_asset(
             let mut response = client.get(url).send()?;
 
             if !opt_silent {
-                if url == response.url().as_str() {
+                let res_url = response.url().as_str();
+                if url == res_url {
                     eprintln!("{}", &url);
                 } else {
-                    eprintln!("{} -> {}", &url, &response.url().as_str());
+                    eprintln!("{} -> {}", &url, res_url);
                 }
             }
 
-            let new_cache_key = clean_url(response.url().to_string());
+            let new_cache_key = clean_url(response.url());
 
             if as_dataurl {
                 // Convert response into a byte array
@@ -54,7 +55,7 @@ pub fn retrieve_asset(
                 };
                 let dataurl = data_to_dataurl(&mimetype, &data);
                 // insert in cache
-                cache.insert(new_cache_key, dataurl.to_string());
+                cache.insert(new_cache_key, dataurl.clone());
                 Ok((dataurl, response.url().to_string()))
             } else {
                 let content = response.text().unwrap();

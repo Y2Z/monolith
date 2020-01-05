@@ -33,7 +33,8 @@ fn test_get_parent_node_name() {
             }
             NodeData::Element { ref name, .. } => {
                 let node_name = name.local.as_ref().to_string();
-                let parent_node_name = get_node_name(&get_parent_node(node));
+                let parent = get_parent_node(node);
+                let parent_node_name = get_node_name(&parent);
                 if node_name == "head" || node_name == "body" {
                     assert_eq!(parent_node_name, "html");
                 } else if node_name == "div" {

@@ -1,4 +1,4 @@
-const JS_DOM_EVENT_ATTRS: [&str; 21] = [
+const JS_DOM_EVENT_ATTRS: &[&str] = &[
     // Input
     "onfocus",
     "onblur",
@@ -28,5 +28,8 @@ const JS_DOM_EVENT_ATTRS: [&str; 21] = [
 
 // Returns true if DOM attribute name matches a native JavaScript event handler
 pub fn attr_is_event_handler(attr_name: &str) -> bool {
-    JS_DOM_EVENT_ATTRS.contains(&attr_name.to_lowercase().as_str())
+    JS_DOM_EVENT_ATTRS
+        .iter()
+        .find(|a| attr_name.eq_ignore_ascii_case(a))
+        .is_some()
 }
