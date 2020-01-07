@@ -18,10 +18,12 @@ before_script:
 script:
   - cargo build --all --locked --verbose
   - cargo test --all --locked --verbose
-  - cargo fmt --all -- --check
+  - |
+    if [[ "$TRAVIS_RUST_VERSION" == "stable" ]]; then
+      cargo fmt --all -- --check
+    fi
 
 jobs:
   allow_failures:
-    - rust: beta
     - rust: nightly
   fast_finish: true

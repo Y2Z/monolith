@@ -94,8 +94,8 @@ environment:
 # or test failure in the matching channels/targets from failing the entire build.
 matrix:
   allow_failures:
-    - channel: beta
     - channel: nightly
+    - channel: beta
 
 # If you only care about stable channel build failures, uncomment the following line:
     #- channel: beta
@@ -128,4 +128,3 @@ build: false
 # environment variable.
 test_script:
   - cargo test --verbose %cargoflags%
-  - cargo fmt --all -- --check
