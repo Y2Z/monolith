@@ -3,6 +3,7 @@ use crate::html::{
 };
 use html5ever::rcdom::{Handle, NodeData};
 use html5ever::serialize::{serialize, SerializeOpts};
+use reqwest::blocking::Client;
 use std::collections::HashMap;
 
 #[test]
@@ -72,7 +73,7 @@ fn test_walk_and_embed_assets() {
     let opt_no_images: bool = false;
     let opt_silent = true;
 
-    let client = reqwest::Client::new();
+    let client = Client::new();
 
     walk_and_embed_assets(
         cache,
@@ -108,7 +109,7 @@ fn test_walk_and_embed_assets_ensure_no_recursive_iframe() {
     let opt_no_images: bool = false;
     let opt_silent = true;
 
-    let client = reqwest::Client::new();
+    let client = Client::new();
 
     walk_and_embed_assets(
         cache,
@@ -145,7 +146,7 @@ fn test_walk_and_embed_assets_no_css() {
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
     let opt_silent = true;
-    let client = reqwest::Client::new();
+    let client = Client::new();
 
     walk_and_embed_assets(
         cache,
@@ -190,7 +191,7 @@ fn test_walk_and_embed_assets_no_images() {
     let opt_no_images: bool = true;
     let opt_silent = true;
 
-    let client = reqwest::Client::new();
+    let client = Client::new();
 
     walk_and_embed_assets(
         cache,
@@ -236,7 +237,7 @@ fn test_walk_and_embed_assets_no_frames() {
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
     let opt_silent = true;
-    let client = reqwest::Client::new();
+    let client = Client::new();
 
     walk_and_embed_assets(
         cache,
@@ -275,7 +276,7 @@ fn test_walk_and_embed_assets_no_js() {
     let opt_no_images: bool = false;
     let opt_silent = true;
 
-    let client = reqwest::Client::new();
+    let client = Client::new();
 
     walk_and_embed_assets(
         cache,
@@ -307,7 +308,7 @@ fn test_walk_and_embed_with_no_integrity() {
     let dom = html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
-    let client = reqwest::Client::new();
+    let client = Client::new();
     let opt_no_css: bool = true;
     let opt_no_frames: bool = true;
     let opt_no_js: bool = true;
