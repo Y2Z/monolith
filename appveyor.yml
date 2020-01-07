@@ -128,4 +128,3 @@ build: false
 # environment variable.
 test_script:
   - cargo test --verbose %cargoflags%
-  - cargo fmt --all -- --check
