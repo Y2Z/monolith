@@ -71,6 +71,7 @@ fn main() {
             app_args.silent,
         )
         .unwrap();
+        let downloaded_time = time::now();
         let dom = html_to_dom(&data);
 
         walk_and_embed_assets(
@@ -85,13 +86,24 @@ fn main() {
             app_args.no_frames,
         );
 
-        let html: String = stringify_document(
+        let mut html: String = stringify_document(
             &dom.document,
             app_args.no_css,
             app_args.no_frames,
             app_args.no_js,
             app_args.no_images,
             app_args.isolate,
+        );
+
+        html.insert_str(
+            0,
+            &format!(
+                "<!--- Downloaded from {} on {}using {} v{} -->\n",
+                &final_url,
+                downloaded_time.to_local().rfc822(),
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+            ),
         );
 
         if app_args.output == str!() {
