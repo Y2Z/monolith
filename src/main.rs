@@ -8,6 +8,7 @@ use crate::args::AppArgs;
 use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
 use monolith::http::retrieve_asset;
 use monolith::utils::is_valid_url;
+use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use std::collections::HashMap;
 use std::fs::{remove_file, File};
@@ -53,7 +54,7 @@ fn main() {
                 return;
             }
         };
-        let client = reqwest::Client::builder()
+        let client = Client::builder()
             .timeout(Duration::from_secs(10))
             .danger_accept_invalid_certs(app_args.insecure)
             .default_headers(header_map)

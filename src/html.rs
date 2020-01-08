@@ -10,7 +10,7 @@ use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::{format_tendril, Tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
-use reqwest::Client;
+use reqwest::blocking::Client;
 use std::collections::HashMap;
 use std::default::Default;
 
