@@ -95,16 +95,18 @@ fn main() {
             app_args.isolate,
         );
 
-        html.insert_str(
-            0,
-            &format!(
-                "<!--- Downloaded from {} on {}using {} v{} -->\n",
-                &final_url,
-                downloaded_time.to_local().rfc822(),
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION"),
-            ),
-        );
+        if !app_args.no_context {
+            html.insert_str(
+                0,
+                &format!(
+                    "<!--- Downloaded from {} on {}using {} v{} -->\n",
+                    &final_url,
+                    downloaded_time.rfc822(),
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION"),
+                ),
+            );
+        }
 
         if app_args.output == str!() {
             println!("{}", html);

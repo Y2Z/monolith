@@ -12,6 +12,7 @@ pub struct AppArgs {
     pub output: String,
     pub silent: bool,
     pub user_agent: String,
+    pub no_context: bool,
 }
 
 const DEFAULT_USER_AGENT: &str =
@@ -31,6 +32,7 @@ impl AppArgs {
                     .help("URL to download"),
             )
             // .args_from_usage("-a, --include-audio 'Embed audio sources'")
+            .args_from_usage("-C, --no-context 'Exclude time and original URL in output'")
             .args_from_usage("-c, --no-css 'Ignore styles'")
             .args_from_usage("-f, --no-frames 'Exclude iframes'")
             .args_from_usage("-i, --no-images 'Remove images'")
@@ -48,6 +50,7 @@ impl AppArgs {
             .value_of("url")
             .expect("please set target url")
             .to_string();
+        app_args.no_context = app.is_present("no-context");
         app_args.no_css = app.is_present("no-css");
         app_args.no_frames = app.is_present("no-frames");
         app_args.no_images = app.is_present("no-images");
