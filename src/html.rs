@@ -82,8 +82,6 @@ pub fn walk_and_embed_assets(
 
             match name.local.as_ref() {
                 "link" => {
-                    let mut link_type: &str = "";
-
                     // Remove integrity attributes
                     let mut i = 0;
                     while i < attrs_mut.len() {
@@ -95,88 +93,102 @@ pub fn walk_and_embed_assets(
                         }
                     }
 
+                    enum LinkType {
+                        Icon,
+                        Stylesheet,
+                        Preload,
+                        DnsPrefetch,
+                        Unknown,
+                    }
+
+                    let mut link_type = LinkType::Unknown;
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "rel" {
                             if is_icon(attr.value.as_ref()) {
-                                link_type = "icon";
+                                link_type = LinkType::Icon;
                                 break;
                             } else if attr.value.as_ref() == "stylesheet" {
-                                link_type = "stylesheet";
+                                link_type = LinkType::Stylesheet;
                                 break;
                             }
                         }
                     }
+                    let link_type = link_type;
 
-                    if link_type == "icon" {
-                        for attr in attrs_mut.iter_mut() {
-                            if &attr.name.local == "href" {
-                                if opt_no_images {
-                                    attr.value.clear();
-                                } else {
-                                    let href_full_url =
-                                        resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
-                                    let (favicon_dataurl, _) = retrieve_asset(
-                                        cache,
-                                        client,
-                                        &href_full_url,
-                                        true,
-                                        "",
-                                        opt_silent,
-                                    )
-                                    .unwrap_or_default();
-                                    attr.value.clear();
-                                    attr.value.push_slice(favicon_dataurl.as_str());
-                                }
-                            }
-                        }
-                    } else if link_type == "stylesheet" {
-                        for attr in attrs_mut.iter_mut() {
-                            if &attr.name.local == "href" {
-                                if opt_no_css {
-                                    attr.value.clear();
-                                } else {
-                                    let href_full_url =
-                                        resolve_url(&url, &attr.value.as_ref()).unwrap_or_default();
-                                    let replacement_text = match retrieve_asset(
-                                        cache,
-                                        client,
-                                        &href_full_url,
-                                        false,
-                                        "text/css",
-                                        opt_silent,
-                                    ) {
-                                        // On successful retrieval, traverse CSS
-                                        Ok((css_data, _)) => resolve_css_imports(
+                    match link_type {
+                        LinkType::Icon => {
+                            for attr in attrs_mut.iter_mut() {
+                                if &attr.name.local == "href" {
+                                    if opt_no_images {
+                                        attr.value.clear();
+                                    } else {
+                                        let href_full_url = resolve_url(&url, attr.value.as_ref())
+                                            .unwrap_or_default();
+                                        let (favicon_dataurl, _) = retrieve_asset(
                                             cache,
                                             client,
-                                            &css_data,
-                                            true,
                                             &href_full_url,
-                                            opt_no_images,
+                                            true,
+                                            "",
                                             opt_silent,
-                                        ),
-
-                                        // If a network error occured, warn
-                                        Err(e) => {
-                                            eprintln!("Warning: {}", e);
-
-                                            // If failed to resolve, replace with absolute URL
-                                            href_full_url
-                                        }
-                                    };
-
-                                    attr.value.clear();
-                                    attr.value.push_slice(&replacement_text);
+                                        )
+                                        .unwrap_or_default();
+                                        attr.value.clear();
+                                        attr.value.push_slice(favicon_dataurl.as_str());
+                                    }
                                 }
                             }
                         }
-                    } else {
-                        for attr in attrs_mut.iter_mut() {
-                            if &attr.name.local == "href" {
-                                let href_full_url =
-                                    resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
-                                attr.value.clear();
-                                attr.value.push_slice(&href_full_url.as_str());
+                        LinkType::Stylesheet => {
+                            for attr in attrs_mut.iter_mut() {
+                                if &attr.name.local == "href" {
+                                    if opt_no_css {
+                                        attr.value.clear();
+                                    } else {
+                                        let href_full_url = resolve_url(&url, &attr.value.as_ref())
+                                            .unwrap_or_default();
+                                        let replacement_text = match retrieve_asset(
+                                            cache,
+                                            client,
+                                            &href_full_url,
+                                            false,
+                                            "text/css",
+                                            opt_silent,
+                                        ) {
+                                            // On successful retrieval, traverse CSS
+                                            Ok((css_data, _)) => resolve_css_imports(
+                                                cache,
+                                                client,
+                                                &css_data,
+                                                true,
+                                                &href_full_url,
+                                                opt_no_images,
+                                                opt_silent,
+                                            ),
+
+                                            // If a network error occured, warn
+                                            Err(e) => {
+                                                eprintln!("Warning: {}", e);
+
+                                                // If failed to resolve, replace with absolute URL
+                                                href_full_url
+                                            }
+                                        };
+
+                                        attr.value.clear();
+                                        attr.value.push_slice(&replacement_text);
+                                    }
+                                }
+                            }
+                        }
+                        LinkType::Unknown => {
+                            for attr in attrs_mut.iter_mut() {
+                                if &attr.name.local == "href" {
+                                    let href_full_url =
+                                        resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
+                                    attr.value.clear();
+                                    attr.value.push_slice(&href_full_url.as_str());
+                                }
                             }
                         }
                     }
