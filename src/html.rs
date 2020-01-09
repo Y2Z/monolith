@@ -104,11 +104,18 @@ pub fn walk_and_embed_assets(
                     let mut link_type = LinkType::Unknown;
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "rel" {
-                            if is_icon(attr.value.as_ref()) {
+                            let value = attr.value.as_ref();
+                            if is_icon(value) {
                                 link_type = LinkType::Icon;
                                 break;
-                            } else if attr.value.as_ref() == "stylesheet" {
+                            } else if value == "stylesheet" {
                                 link_type = LinkType::Stylesheet;
+                                break;
+                            } else if value == "preload" {
+                                link_type = LinkType::Preload;
+                                break;
+                            } else if value == "dns-prefetch" {
+                                link_type = LinkType::DnsPrefetch;
                                 break;
                             }
                         }
@@ -179,6 +186,14 @@ pub fn walk_and_embed_assets(
                                         attr.value.push_slice(&replacement_text);
                                     }
                                 }
+                            }
+                        }
+                        LinkType::Preload | LinkType::DnsPrefetch => {
+                            // Since all resources are embedded as data URL, preloading and prefetching are unnecessary.
+                            if let Some(attr) =
+                                attrs_mut.iter_mut().find(|a| &a.name.local == "href")
+                            {
+                                attr.value.clear();
                             }
                         }
                         LinkType::Unknown => {
