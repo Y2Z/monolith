@@ -108,13 +108,13 @@ pub fn walk_and_embed_assets(
                             if is_icon(value) {
                                 link_type = LinkType::Icon;
                                 break;
-                            } else if value == "stylesheet" {
+                            } else if value.eq_ignore_ascii_case("stylesheet") {
                                 link_type = LinkType::Stylesheet;
                                 break;
-                            } else if value == "preload" {
+                            } else if value.eq_ignore_ascii_case("preload") {
                                 link_type = LinkType::Preload;
                                 break;
-                            } else if value == "dns-prefetch" {
+                            } else if value.eq_ignore_ascii_case("dns-prefetch") {
                                 link_type = LinkType::DnsPrefetch;
                                 break;
                             }
