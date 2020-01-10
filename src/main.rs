@@ -72,7 +72,7 @@ fn main() {
             app_args.silent,
         )
         .unwrap();
-        let downloaded_time = time::now();
+        let downloaded_time = time::now_utc();
         let dom = html_to_dom(&data);
 
         walk_and_embed_assets(
@@ -106,9 +106,9 @@ fn main() {
             html.insert_str(
                 0,
                 &format!(
-                    "<!--- Downloaded from {} on {}using {} v{} -->\n",
+                    "<!--- Downloaded from {} on {} using {} v{} -->\n",
                     &clean_url,
-                    downloaded_time.rfc822(),
+                    downloaded_time.rfc3339(),
                     env!("CARGO_PKG_NAME"),
                     env!("CARGO_PKG_VERSION"),
                 ),
