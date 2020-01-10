@@ -104,7 +104,7 @@ pub fn walk_and_embed_assets(
                     let mut link_type = LinkType::Unknown;
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "rel" {
-                            let value = attr.value.as_ref();
+                            let value = attr.value.trim();
                             if is_icon(value) {
                                 link_type = LinkType::Icon;
                                 break;
@@ -233,7 +233,7 @@ pub fn walk_and_embed_assets(
                     } else if let Some((dataurl, _)) = (&found_datasrc)
                         .into_iter()
                         .chain(&found_src) // Give dataurl priority
-                        .map(|attr| &attr.value)
+                        .map(|attr| attr.value.trim())
                         .filter(|src| !src.is_empty()) // Ignore empty srcs
                         .next()
                         .and_then(|src| resolve_url(&url, src).ok()) // Make absolute
@@ -259,7 +259,7 @@ pub fn walk_and_embed_assets(
                         let attr_name: &str = &attr.name.local;
 
                         if attr_name == "src" {
-                            let src_full_url = resolve_url(&url, attr.value.as_ref())
+                            let src_full_url = resolve_url(&url, attr.value.trim())
                                 .unwrap_or_else(|_| attr.value.to_string());
                             attr.value.clear();
                             attr.value.push_slice(src_full_url.as_str());
@@ -270,7 +270,7 @@ pub fn walk_and_embed_assets(
                                     attr.value.push_slice(TRANSPARENT_PIXEL);
                                 } else {
                                     let srcset_full_url =
-                                        resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
+                                        resolve_url(&url, attr.value.trim()).unwrap_or_default();
                                     let (source_dataurl, _) = retrieve_asset(
                                         cache,
                                         client,
@@ -290,13 +290,13 @@ pub fn walk_and_embed_assets(
                 "a" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
+                            let attr_value = attr.value.trim();
                             // Don't touch email links or hrefs which begin with a hash sign
-                            if attr.value.starts_with('#') || url_has_protocol(&attr.value) {
+                            if attr_value.starts_with('#') || url_has_protocol(attr_value) {
                                 continue;
                             }
 
-                            let href_full_url =
-                                resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
+                            let href_full_url = resolve_url(&url, attr_value).unwrap_or_default();
                             attr.value.clear();
                             attr.value.push_slice(href_full_url.as_str());
                         }
@@ -326,7 +326,7 @@ pub fn walk_and_embed_assets(
                         for attr in attrs_mut.iter_mut() {
                             if &attr.name.local == "src" {
                                 let src_full_url =
-                                    resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
+                                    resolve_url(&url, attr.value.trim()).unwrap_or_default();
                                 let (js_dataurl, _) = retrieve_asset(
                                     cache,
                                     client,
@@ -368,10 +368,11 @@ pub fn walk_and_embed_assets(
                 "form" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "action" {
+                            let attr_value = attr.value.trim();
                             // Modify action to be a full URL
-                            if !is_valid_url(&attr.value) {
+                            if !is_valid_url(attr_value) {
                                 let href_full_url =
-                                    resolve_url(&url, attr.value.as_ref()).unwrap_or_default();
+                                    resolve_url(&url, attr_value).unwrap_or_default();
                                 attr.value.clear();
                                 attr.value.push_slice(href_full_url.as_str());
                             }
@@ -387,7 +388,7 @@ pub fn walk_and_embed_assets(
                                 continue;
                             }
 
-                            let iframe_src = attr.value.as_ref();
+                            let iframe_src = attr.value.trim();
 
                             // Ignore iframes with empty source (they cause infinite loops)
                             if iframe_src.is_empty() {
@@ -427,7 +428,7 @@ pub fn walk_and_embed_assets(
                 "video" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "poster" {
-                            let video_poster = attr.value.as_ref();
+                            let video_poster = attr.value.trim();
 
                             // Skip posters with empty source
                             if video_poster.is_empty() {
