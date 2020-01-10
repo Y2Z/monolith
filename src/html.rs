@@ -230,8 +230,8 @@ pub fn walk_and_embed_assets(
                             name: QualName::new(None, ns!(), local_name!("src")),
                             value: Tendril::from_slice(TRANSPARENT_PIXEL),
                         });
-                    } else if let Some((dataurl, _)) = (&found_datasrc)
-                        .into_iter()
+                    } else if let Some((dataurl, _)) = found_datasrc
+                        .iter()
                         .chain(&found_src) // Give dataurl priority
                         .map(|attr| attr.value.trim())
                         .filter(|src| !src.is_empty()) // Ignore empty srcs
