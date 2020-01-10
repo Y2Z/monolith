@@ -10,6 +10,7 @@ use monolith::http::retrieve_asset;
 use monolith::utils::is_valid_url;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::Url;
 use std::collections::HashMap;
 use std::fs::{remove_file, File};
 use std::io::{Error, Write};
@@ -96,11 +97,17 @@ fn main() {
         );
 
         if !app_args.no_context {
+            // Safe to unwrap: We just put this through an HTTP request
+            let mut clean_url = Url::parse(&final_url).unwrap();
+            clean_url.set_fragment(None);
+            // Safe to unwrap: must have a protocol and thus base 'cause we just used it.
+            clean_url.set_password(None).unwrap();
+            clean_url.set_username("").unwrap();
             html.insert_str(
                 0,
                 &format!(
                     "<!--- Downloaded from {} on {}using {} v{} -->\n",
-                    &final_url,
+                    &clean_url,
                     downloaded_time.rfc822(),
                     env!("CARGO_PKG_NAME"),
                     env!("CARGO_PKG_VERSION"),
