@@ -189,7 +189,7 @@ pub fn walk_and_embed_assets(
                             }
                         }
                         LinkType::Preload | LinkType::DnsPrefetch => {
-                            // Since all resources are embedded as data URL, preloading and prefetching are unnecessary.
+                            // Since all resources are embedded as data URL, preloading and prefetching are unnecessary
                             if let Some(attr) =
                                 attrs_mut.iter_mut().find(|a| &a.name.local == "href")
                             {
