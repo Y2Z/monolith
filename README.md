@@ -25,8 +25,11 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ cd monolith
     $ cargo install --path .
 
-### On macOS (via Homebrew)
+### With Homebrew (on macOS and GNU/Linux)
     $ brew install monolith
+
+### Using Snapcraft (on GNU/Linux)
+    $ snap install monolith
 
 ## Usage
     $ monolith https://lyrics.github.io/db/p/portishead/dummy/roads/ -o portishead-roads-lyrics.html
