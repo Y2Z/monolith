@@ -59,15 +59,19 @@ fn create_http_client(args: &AppArgs) -> Result<Client, reqwest::Error> {
         .default_headers(header_map);
 
     if let Ok(var) = env::var("https_proxy").or_else(|_| env::var("HTTPS_PROXY")) {
-        let proxy = Proxy::https(&var)
-            .expect("Could not set HTTPS proxy. Please check $https_proxy env var");
-        builder = builder.proxy(proxy);
+        if !var.is_empty() {
+            let proxy = Proxy::https(&var)
+                .expect("Could not set HTTPS proxy. Please check $https_proxy env var");
+            builder = builder.proxy(proxy);
+        }
     }
 
     if let Ok(var) = env::var("http_proxy").or_else(|_| env::var("HTTP_PROXY")) {
-        let proxy =
-            Proxy::http(&var).expect("Could not set HTTP proxy. Please check $http_proxy env var");
-        builder = builder.proxy(proxy);
+        if !var.is_empty() {
+            let proxy = Proxy::http(&var)
+                .expect("Could not set HTTP proxy. Please check $http_proxy env var");
+            builder = builder.proxy(proxy);
+        }
     }
 
     builder.build()
