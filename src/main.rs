@@ -10,7 +10,9 @@ use monolith::http::retrieve_asset;
 use monolith::utils::is_valid_url;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::Proxy;
 use std::collections::HashMap;
+use std::env;
 use std::fs::File;
 use std::io::{self, Error, Write};
 use std::process;
@@ -44,6 +46,33 @@ impl Output {
     }
 }
 
+fn create_http_client(args: &AppArgs) -> Result<Client, reqwest::Error> {
+    let mut header_map = HeaderMap::new();
+    header_map.insert(
+        USER_AGENT,
+        HeaderValue::from_str(&args.user_agent).expect("Invalid User-Agent header specified"),
+    );
+
+    let mut builder = Client::builder()
+        .timeout(Duration::from_secs(10))
+        .danger_accept_invalid_certs(args.insecure)
+        .default_headers(header_map);
+
+    if let Ok(var) = env::var("https_proxy").or_else(|_| env::var("HTTPS_PROXY")) {
+        let proxy = Proxy::https(&var)
+            .expect("Could not set HTTPS proxy. Please check $https_proxy env var");
+        builder = builder.proxy(proxy);
+    }
+
+    if let Ok(var) = env::var("http_proxy").or_else(|_| env::var("HTTP_PROXY")) {
+        let proxy =
+            Proxy::http(&var).expect("Could not set HTTP proxy. Please check $http_proxy env var");
+        builder = builder.proxy(proxy);
+    }
+
+    builder.build()
+}
+
 fn main() {
     let app_args = AppArgs::get();
 
@@ -56,21 +85,8 @@ fn main() {
     }
 
     let mut output = Output::new(&app_args.output).expect("Could not prepare output");
-
-    // Initialize client
     let mut cache = HashMap::new();
-    let mut header_map = HeaderMap::new();
-    header_map.insert(
-        USER_AGENT,
-        HeaderValue::from_str(&app_args.user_agent).expect("Invalid User-Agent header specified"),
-    );
-
-    let client = Client::builder()
-        .timeout(Duration::from_secs(10))
-        .danger_accept_invalid_certs(app_args.insecure)
-        .default_headers(header_map)
-        .build()
-        .expect("Failed to initialize HTTP client");
+    let client = create_http_client(&app_args).expect("Failed to initialize HTTP client");
 
     // Retrieve root document
     let (data, final_url) = retrieve_asset(
