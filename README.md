@@ -11,8 +11,7 @@
 |___|   |__________|  \____________________|   |___|   |___|  |___|
 ```
 
-A data hoarder's dream come true: bundle any web page into a single HTML file.  
-You can finally replace that gazillion of open tabs with a gazillion of .html files stored somewhere on your precious little drive.
+A data hoarder's dream come true: bundle any web page into a single HTML file. You can finally replace that gazillion of open tabs with a gazillion of .html files stored somewhere on your precious little drive.
 
 Unlike the conventional "Save page as", `monolith` not only saves the target document, it embeds CSS, image, and JavaScript assets **all at once**, producing a single HTML5 document that is a joy to store and share.
 
@@ -32,7 +31,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ snap install monolith
 
 ## Usage
-    $ monolith https://lyrics.github.io/db/p/portishead/dummy/roads/ -o portishead-roads-lyrics.html
+    $ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
 
 ## Options
  - `-c`: Ignore styles
@@ -48,8 +47,13 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 ## HTTPS and HTTP proxies
 Please set `https_proxy`, `http_proxy` and `no_proxy` environment variables.
 
+## Contributing
+Please open an issue if something is wrong, that helps make this project better.
+
 ## Related projects
+ - `Monolith Chrome Extension`: https://github.com/rhysd/monolith-of-web
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
+ - `Personal WayBack Machine`: https://github.com/popey/pwbm
  - `SingleFile`: https://github.com/gildas-lormeau/SingleFile
 
 ## License
