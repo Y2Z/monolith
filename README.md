@@ -46,7 +46,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
  - `-u`: Specify custom User-Agent
 
 ## HTTPS and HTTP proxies
-Please set `https_proxy` and `http_proxy` environment variables.
+Please set `https_proxy`, `http_proxy` and `no_proxy` environment variables.
 
 ## Related projects
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
