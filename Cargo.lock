@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "monolith"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
