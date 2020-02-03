@@ -65,8 +65,13 @@ fn main() {
         HeaderValue::from_str(&app_args.user_agent).expect("Invalid User-Agent header specified"),
     );
 
+    let timeout: u64 = if app_args.timeout > 0 {
+        app_args.timeout
+    } else {
+        std::u64::MAX / 4
+    };
     let client = Client::builder()
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(timeout))
         .danger_accept_invalid_certs(app_args.insecure)
         .default_headers(header_map)
         .build()

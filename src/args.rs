@@ -11,9 +11,11 @@ pub struct AppArgs {
     pub isolate: bool,
     pub output: String,
     pub silent: bool,
+    pub timeout: u64,
     pub user_agent: String,
 }
 
+const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0";
 
@@ -39,6 +41,7 @@ impl AppArgs {
             .args_from_usage("-k, --insecure 'Accept invalid X.509 (TLS) certificates'")
             .args_from_usage("-o, --output=[document.html] 'Write output to <file>'")
             .args_from_usage("-s, --silent 'Suppress verbosity'")
+            .args_from_usage("-t, --timeout=[60] 'Specify custom timeout for network requests'")
             .args_from_usage("-u, --user-agent=[Iceweasel] 'Custom User-Agent string'")
             // .args_from_usage("-v, --include-video 'Embed video sources'")
             .get_matches();
@@ -55,6 +58,11 @@ impl AppArgs {
         app_args.insecure = app.is_present("insecure");
         app_args.isolate = app.is_present("isolate");
         app_args.silent = app.is_present("silent");
+        app_args.timeout = app
+            .value_of("timeout")
+            .unwrap_or(&DEFAULT_NETWORK_TIMEOUT.to_string())
+            .parse::<u64>()
+            .unwrap();
         app_args.output = app.value_of("output").unwrap_or("").to_string();
         app_args.user_agent = app
             .value_of("user-agent")
