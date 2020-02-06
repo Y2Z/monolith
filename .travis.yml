@@ -3,6 +3,10 @@ cache: cargo
 
 sudo: false
 
+arch:
+  - amd64
+  - arm64
+
 os:
   - linux
   - osx
@@ -27,3 +31,8 @@ jobs:
   allow_failures:
     - rust: nightly
   fast_finish: true
+
+notifications:
+  email:
+    on_success: never
+    on_failure: never
