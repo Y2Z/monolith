@@ -22,8 +22,7 @@ const ICON_VALUES: &[&str] = &[
     "fluid-icon",
 ];
 
-const TRANSPARENT_PIXEL: &str =
-    "data:image/png;base64,\
+const TRANSPARENT_PIXEL: &str = "data:image/png;base64,\
      iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
 pub fn get_parent_node(node: &Handle) -> Handle {
@@ -291,6 +290,14 @@ pub fn walk_and_embed_assets(
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             let attr_value = attr.value.trim();
+
+                            if opt_no_js && attr_value.starts_with("javascript:") {
+                                attr.value.clear();
+                                // Replace with empty JS call to preserve original behavior
+                                attr.value.push_slice("javascript:;");
+                                continue;
+                            }
+
                             // Don't touch email links or hrefs which begin with a hash sign
                             if attr_value.starts_with('#') || url_has_protocol(attr_value) {
                                 continue;
