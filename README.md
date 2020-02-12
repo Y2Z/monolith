@@ -42,7 +42,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-o`: Write output to file
  - `-s`: Silent mode
- - `-t`: Set custom network request timeout (in seconds)
+ - `-t`: Set custom network request timeout
  - `-u`: Specify custom User-Agent
 
 ## HTTPS and HTTP proxies
