@@ -1,14 +1,14 @@
 use crate::utils::{
-    clean_url, data_to_dataurl, detect_mimetype, is_data_url, is_valid_url, resolve_url,
+    clean_url, data_to_data_url, detect_mimetype, is_data_url, is_valid_url, resolve_url,
     url_has_protocol,
 };
 use url::ParseError;
 
 #[test]
-fn test_data_to_dataurl() {
+fn test_data_to_data_url() {
     let mime = "application/javascript";
     let data = "var word = 'hello';\nalert(word);\n";
-    let datauri = data_to_dataurl(mime, data.as_bytes());
+    let datauri = data_to_data_url(mime, data.as_bytes());
     assert_eq!(
         &datauri,
         "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"

@@ -67,7 +67,7 @@ const MAGIC: [[&[u8]; 2]; 19] = [
     [b"\x1A\x45\xDF\xA3", b"video/webm"],
 ];
 
-pub fn data_to_dataurl(mime: &str, data: &[u8]) -> String {
+pub fn data_to_data_url(mime: &str, data: &[u8]) -> String {
     let mimetype = if mime.is_empty() {
         detect_mimetype(data)
     } else {
@@ -113,7 +113,7 @@ pub fn resolve_css_imports(
     cache: &mut HashMap<String, String>,
     client: &Client,
     css_string: &str,
-    as_dataurl: bool,
+    as_data_url: bool,
     href: &str,
     opt_no_images: bool,
     opt_silent: bool,
@@ -150,7 +150,7 @@ pub fn resolve_css_imports(
                     cache,
                     client,
                     &content,
-                    true, // Finally, convert to a dataurl
+                    true, // Finally, convert to a data URL
                     &embedded_url,
                     opt_no_images,
                     opt_silent,
@@ -188,8 +188,8 @@ pub fn resolve_css_imports(
         resolved_css.replace_range(target_range, &replacement);
     }
 
-    if as_dataurl {
-        data_to_dataurl("text/css", resolved_css.as_bytes())
+    if as_data_url {
+        data_to_data_url("text/css", resolved_css.as_bytes())
     } else {
         resolved_css
     }
