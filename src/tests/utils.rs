@@ -1,5 +1,5 @@
 use crate::utils::{
-    clean_url, data_to_data_url, detect_mimetype, is_data_url, is_valid_url, resolve_url,
+    clean_url, data_to_data_url, detect_mimetype, is_data_url, is_http_url, resolve_url,
     url_has_protocol,
 };
 use url::ParseError;
@@ -71,16 +71,16 @@ fn test_url_has_protocol() {
 }
 
 #[test]
-fn test_is_valid_url() {
+fn test_is_http_url() {
     // succeeding
-    assert!(is_valid_url("https://www.rust-lang.org/"));
-    assert!(is_valid_url("http://kernel.org"));
+    assert!(is_http_url("https://www.rust-lang.org/"));
+    assert!(is_http_url("http://kernel.org"));
     // failing
-    assert!(!is_valid_url("//kernel.org"));
-    assert!(!is_valid_url("./index.html"));
-    assert!(!is_valid_url("some-local-page.htm"));
-    assert!(!is_valid_url("ftp://1.2.3.4/www/index.html"));
-    assert!(!is_valid_url(
+    assert!(!is_http_url("//kernel.org"));
+    assert!(!is_http_url("./index.html"));
+    assert!(!is_http_url("some-local-page.htm"));
+    assert!(!is_http_url("ftp://1.2.3.4/www/index.html"));
+    assert!(!is_http_url(
         "data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h"
     ));
 }

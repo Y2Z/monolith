@@ -93,12 +93,12 @@ pub fn is_data_url<T: AsRef<str>>(url: T) -> Result<bool, ParseError> {
     Url::parse(url.as_ref()).and_then(|u| Ok(u.scheme() == "data"))
 }
 
-pub fn is_valid_url<T: AsRef<str>>(path: T) -> bool {
+pub fn is_http_url<T: AsRef<str>>(path: T) -> bool {
     REGEX_URL.is_match(path.as_ref())
 }
 
 pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<String, ParseError> {
-    let result = if is_valid_url(to.as_ref()) {
+    let result = if is_http_url(to.as_ref()) {
         to.as_ref().to_string()
     } else {
         Url::parse(from.as_ref())?

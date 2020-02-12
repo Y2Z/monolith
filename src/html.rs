@@ -1,7 +1,7 @@
 use crate::http::retrieve_asset;
 use crate::js::attr_is_event_handler;
 use crate::utils::{
-    data_to_data_url, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol,
+    data_to_data_url, is_http_url, resolve_css_imports, resolve_url, url_has_protocol,
 };
 use html5ever::interface::QualName;
 use html5ever::parse_document;
@@ -377,7 +377,7 @@ pub fn walk_and_embed_assets(
                         if &attr.name.local == "action" {
                             let attr_value = attr.value.trim();
                             // Modify action to be a full URL
-                            if !is_valid_url(attr_value) {
+                            if !is_http_url(attr_value) {
                                 let href_full_url =
                                     resolve_url(&url, attr_value).unwrap_or_default();
                                 attr.value.clear();

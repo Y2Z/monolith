@@ -7,7 +7,7 @@ mod macros;
 use crate::args::AppArgs;
 use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
 use monolith::http::retrieve_asset;
-use monolith::utils::is_valid_url;
+use monolith::utils::is_http_url;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use std::collections::HashMap;
@@ -47,7 +47,7 @@ impl Output {
 fn main() {
     let app_args = AppArgs::get();
 
-    if !is_valid_url(app_args.url_target.as_str()) {
+    if !is_http_url(app_args.url_target.as_str()) {
         eprintln!(
             "Only HTTP and HTTPS URLs are allowed but got: {}",
             &app_args.url_target
