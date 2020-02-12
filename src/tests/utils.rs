@@ -43,7 +43,7 @@ fn test_detect_mimetype() {
 
 #[test]
 fn test_url_has_protocol() {
-    // succeeding
+    // passing
     assert_eq!(
         url_has_protocol("mailto:somebody@somewhere.com?subject=hello"),
         true
@@ -72,7 +72,7 @@ fn test_url_has_protocol() {
 
 #[test]
 fn test_is_http_url() {
-    // succeeding
+    // passing
     assert!(is_http_url("https://www.rust-lang.org/"));
     assert!(is_http_url("http://kernel.org"));
     // failing
@@ -149,7 +149,7 @@ fn test_resolve_url() -> Result<(), ParseError> {
 
 #[test]
 fn test_is_data_url() {
-    // succeeding
+    // passing
     assert!(
         is_data_url("data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h")
             .unwrap_or(false)
