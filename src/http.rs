@@ -13,7 +13,7 @@ pub fn retrieve_asset(
 ) -> Result<(String, String), reqwest::Error> {
     let cache_key = clean_url(&url);
 
-    if is_data_url(&url).unwrap() {
+    if is_data_url(&url) {
         Ok((url.to_string(), url.to_string()))
     } else {
         if cache.contains_key(&cache_key) {

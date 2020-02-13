@@ -1,5 +1,5 @@
 use crate::http::retrieve_asset;
-use base64::encode;
+use base64::{decode, encode};
 use regex::Regex;
 use reqwest::blocking::Client;
 use std::collections::HashMap;
@@ -37,8 +37,6 @@ use url::{ParseError, Url};
 const CSS_URL_REGEX_STR: &str = r###"(?:(?:(?P<stylesheet>@import)|(?P<font>src\s*:))\s+)?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
 
 lazy_static! {
-    static ref HAS_PROTOCOL: Regex = Regex::new(r"^[a-z0-9]+:").unwrap();
-    static ref REGEX_URL: Regex = Regex::new(r"^https?://").unwrap();
     static ref REGEX_CSS_URL: Regex = Regex::new(CSS_URL_REGEX_STR).unwrap();
 }
 
@@ -82,19 +80,25 @@ pub fn detect_mimetype(data: &[u8]) -> String {
             return String::from_utf8(item[1].to_vec()).unwrap();
         }
     }
-    "".to_owned()
+    str!()
 }
 
 pub fn url_has_protocol<T: AsRef<str>>(url: T) -> bool {
-    HAS_PROTOCOL.is_match(url.as_ref().to_lowercase().as_str())
+    Url::parse(url.as_ref())
+        .and_then(|u| Ok(u.scheme().len() > 0))
+        .unwrap_or(false)
 }
 
-pub fn is_data_url<T: AsRef<str>>(url: T) -> Result<bool, ParseError> {
-    Url::parse(url.as_ref()).and_then(|u| Ok(u.scheme() == "data"))
+pub fn is_data_url<T: AsRef<str>>(url: T) -> bool {
+    Url::parse(url.as_ref())
+        .and_then(|u| Ok(u.scheme() == "data"))
+        .unwrap_or(false)
 }
 
-pub fn is_http_url<T: AsRef<str>>(path: T) -> bool {
-    REGEX_URL.is_match(path.as_ref())
+pub fn is_http_url<T: AsRef<str>>(url: T) -> bool {
+    Url::parse(url.as_ref())
+        .and_then(|u| Ok(u.scheme() == "http" || u.scheme() == "https"))
+        .unwrap_or(false)
 }
 
 pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<String, ParseError> {
@@ -204,4 +208,34 @@ pub fn clean_url<T: AsRef<str>>(url: T) -> String {
         result.set_query(None);
     }
     result.to_string()
+}
+
+pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
+    let parsed_url = Url::parse(url.as_ref()).unwrap_or(Url::parse("http://[::1]").unwrap());
+    let mut data: String = parsed_url.path().to_string();
+
+    if data.to_lowercase().starts_with("text/html") {
+        data = data.chars().skip(9).collect();
+
+        if data.starts_with(";") {
+            // Encoding specified, find out which one
+            data = data.chars().skip(1).collect();
+
+            if data.to_lowercase().starts_with("base64,") {
+                data = data.chars().skip(7).collect();
+                String::from_utf8(decode(&data).unwrap_or(vec![])).unwrap_or(str!())
+            } else if data.to_lowercase().starts_with("utf8,") {
+                data.chars().skip(5).collect()
+            } else {
+                str!()
+            }
+        } else if data.starts_with(",") {
+            // Plaintext, no encoding specified
+            data.chars().skip(1).collect()
+        } else {
+            str!()
+        }
+    } else {
+        str!()
+    }
 }
