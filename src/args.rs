@@ -21,7 +21,7 @@ const DEFAULT_USER_AGENT: &str =
 
 impl AppArgs {
     pub fn get() -> AppArgs {
-        let app = App::new("monolith")
+        let app = App::new(env!("CARGO_PKG_NAME"))
             .version(crate_version!())
             .author(crate_authors!("\n"))
             .about(crate_description!())

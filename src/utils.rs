@@ -3,7 +3,7 @@ use base64::{decode, encode};
 use regex::Regex;
 use reqwest::blocking::Client;
 use std::collections::HashMap;
-use url::{ParseError, Url};
+use url::{form_urlencoded, ParseError, Url};
 
 /// This monster of a regex is used to match any kind of URL found in CSS.
 ///
@@ -212,28 +212,56 @@ pub fn clean_url<T: AsRef<str>>(url: T) -> String {
 
 pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
     let parsed_url = Url::parse(url.as_ref()).unwrap_or(Url::parse("http://[::1]").unwrap());
-    let mut data: String = parsed_url.path().to_string();
+    let path: String = parsed_url.path().to_string();
+    let comma_loc: usize = path.find(',').unwrap_or(path.len());
 
-    if data.to_lowercase().starts_with("text/html") {
-        data = data.chars().skip(9).collect();
+    if comma_loc == path.len() {
+        return str!();
+    }
 
-        if data.starts_with(";") {
-            // Encoding specified, find out which one
-            data = data.chars().skip(1).collect();
+    let meta_data: String = path.chars().take(comma_loc).collect();
+    let raw_data: String = path.chars().skip(comma_loc + 1).collect();
 
-            if data.to_lowercase().starts_with("base64,") {
-                data = data.chars().skip(7).collect();
-                String::from_utf8(decode(&data).unwrap_or(vec![])).unwrap_or(str!())
-            } else if data.to_lowercase().starts_with("utf8,") {
-                data.chars().skip(5).collect()
-            } else {
-                str!()
+    let data: String = form_urlencoded::parse(raw_data.as_bytes())
+        .map(|(key, val)| {
+            [
+                key.to_string(),
+                if val.to_string().len() == 0 {
+                    str!()
+                } else {
+                    str!('=')
+                },
+                val.to_string(),
+            ]
+            .concat()
+        })
+        .collect();
+
+    let meta_data_items: Vec<&str> = meta_data.split(';').collect();
+    let mut mime_type: &str = "";
+    let mut encoding: &str = "";
+
+    let mut i: i8 = 0;
+    for item in &meta_data_items {
+        if i == 0 {
+            if item.eq_ignore_ascii_case("text/html") {
+                mime_type = item;
+                continue;
             }
-        } else if data.starts_with(",") {
-            // Plaintext, no encoding specified
-            data.chars().skip(1).collect()
+        }
+
+        if item.eq_ignore_ascii_case("base64") || item.eq_ignore_ascii_case("utf8") {
+            encoding = item;
+        }
+
+        i = i + 1;
+    }
+
+    if mime_type.eq_ignore_ascii_case("text/html") {
+        if encoding.eq_ignore_ascii_case("base64") {
+            String::from_utf8(decode(&data).unwrap_or(vec![])).unwrap_or(str!())
         } else {
-            str!()
+            data
         }
     } else {
         str!()

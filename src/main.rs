@@ -52,7 +52,7 @@ fn main() {
 
     if !is_http_url(target_url) && !is_data_url(target_url) {
         eprintln!(
-            "Only HTTP(S) or data URLs are allowed but got: {}",
+            "Only HTTP(S) or data URLs are supported but got: {}",
             &target_url
         );
         process::exit(1);
@@ -85,11 +85,18 @@ fn main() {
         let (data, final_url) =
             retrieve_asset(&mut cache, &client, target_url, false, "", app_args.silent)
                 .expect("Could not retrieve assets in HTML");
-        dom = html_to_dom(&data);
         base_url = final_url;
+        dom = html_to_dom(&data);
     } else if is_data_url(target_url) {
-        base_url = target_url.to_string();
-        dom = html_to_dom(&data_url_to_text(target_url));
+        let text: String = data_url_to_text(target_url);
+
+        if text.len() == 0 {
+            eprintln!("Unsupported data URL input");
+            process::exit(1);
+        }
+
+        base_url = str!();
+        dom = html_to_dom(&text);
     } else {
         process::exit(1);
     }

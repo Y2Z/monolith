@@ -23,3 +23,6 @@ url = "2.1.1"
 version = "0.10.*"
 default-features = false
 features = ["default-tls", "blocking", "gzip"]
+
+[dev-dependencies]
+assert_cmd = "0.12.0"

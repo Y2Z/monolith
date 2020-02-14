@@ -52,11 +52,11 @@ environment:
   # Nightly 64-bit MSVC
     - channel: nightly
       target: x86_64-pc-windows-msvc
-      #cargoflags: --features "unstable"
+      cargoflags: --features "unstable"
   # Nightly 32-bit MSVC
     - channel: nightly
       target: i686-pc-windows-msvc
-      #cargoflags: --features "unstable"
+      cargoflags: --features "unstable"
 
 ### GNU Toolchains ###
 
@@ -80,12 +80,12 @@ environment:
     - channel: nightly
       target: x86_64-pc-windows-gnu
       MINGW_PATH: 'C:\mingw-w64\x86_64-6.3.0-posix-seh-rt_v5-rev1\mingw64\bin'
-      #cargoflags: --features "unstable"
+      cargoflags: --features "unstable"
   # Nightly 32-bit GNU
     - channel: nightly
       target: i686-pc-windows-gnu
       MINGW_PATH: 'C:\MinGW\bin'
-      #cargoflags: --features "unstable"
+      cargoflags: --features "unstable"
 
 ### Allowed failures ###
 
@@ -124,7 +124,8 @@ install:
 build: false
 
 # Uses 'cargo test' to run tests and build. Alternatively, the project may call compiled programs
-#directly or perform other testing commands. Rust will automatically be placed in the PATH
+# directly or perform other testing commands. Rust will automatically be placed in the PATH
 # environment variable.
 test_script:
-  - cargo test --verbose %cargoflags%
+  - cargo build --all --locked --verbose %cargoflags%
+  - cargo test --all --locked --verbose %cargoflags%
