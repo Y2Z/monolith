@@ -22,7 +22,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 ### From source
     $ git clone https://github.com/Y2Z/monolith.git
     $ cd monolith
-    $ cargo install --path .
+    $ make install
 
 ### With Homebrew (on macOS and GNU/Linux)
     $ brew install monolith
@@ -55,7 +55,6 @@ Please open an issue if something is wrong, that helps make this project better.
  - `Monolith Chrome Extension`: https://github.com/rhysd/monolith-of-web
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
  - `Personal WayBack Machine`: https://github.com/popey/pwbm
- - `SingleFile`: https://github.com/gildas-lormeau/SingleFile
 
 ## License
 The Unlicense
