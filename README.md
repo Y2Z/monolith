@@ -37,13 +37,13 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
  - `-c`: Ignore styles
  - `-f`: Exclude iframes
  - `-i`: Remove images
- - `-I`: Isolate document
+ - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-o`: Write output to file
  - `-s`: Silent mode
  - `-t`: Set custom network request timeout
- - `-u`: Specify custom User-Agent
+ - `-u`: Provide own User-Agent
 
 ## HTTPS and HTTP proxies
 Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.

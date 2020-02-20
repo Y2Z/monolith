@@ -17,7 +17,7 @@ pub struct AppArgs {
 
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &str =
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0";
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
 
 impl AppArgs {
     pub fn get() -> AppArgs {
@@ -32,18 +32,18 @@ impl AppArgs {
                     .index(1)
                     .help("URL to download"),
             )
-            // .args_from_usage("-a, --include-audio 'Embed audio sources'")
-            .args_from_usage("-c, --no-css 'Ignore styles'")
-            .args_from_usage("-f, --no-frames 'Exclude iframes'")
-            .args_from_usage("-i, --no-images 'Remove images'")
-            .args_from_usage("-I, --isolate 'Cut off from the Internet'")
-            .args_from_usage("-j, --no-js 'Exclude JavaScript'")
-            .args_from_usage("-k, --insecure 'Accept invalid X.509 (TLS) certificates'")
-            .args_from_usage("-o, --output=[document.html] 'Write output to <file>'")
-            .args_from_usage("-s, --silent 'Suppress verbosity'")
-            .args_from_usage("-t, --timeout=[60] 'Specify custom timeout for network requests'")
-            .args_from_usage("-u, --user-agent=[Iceweasel] 'Custom User-Agent string'")
-            // .args_from_usage("-v, --include-video 'Embed video sources'")
+            // .args_from_usage("-a, --include-audio 'Removes audio sources'")
+            .args_from_usage("-c, --no-css 'Removes CSS'")
+            .args_from_usage("-f, --no-frames 'Removes iframes'")
+            .args_from_usage("-i, --no-images 'Removes images'")
+            .args_from_usage("-I, --isolate 'Cuts off document from the Internet'")
+            .args_from_usage("-j, --no-js 'Removes JavaScript'")
+            .args_from_usage("-k, --insecure 'Allows invalid X.509 (TLS) certificates'")
+            .args_from_usage("-o, --output=[document.html] 'Writes output to <file>'")
+            .args_from_usage("-s, --silent 'Suppresses verbosity'")
+            .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
+            .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
+            // .args_from_usage("-v, --include-video 'Removes video sources'")
             .get_matches();
         let mut app_args = AppArgs::default();
         // Process the command
