@@ -503,7 +503,7 @@ fn test_stringify_document_isolate_no_frames_no_js_no_css_no_images() {
         "<!DOCTYPE html>\
             <html>\
                 <head>\
-                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src \'unsafe-inline\' data:; style-src \'none\'; frame-src \'none\';child-src \'none\'; script-src \'none\'; img-src data:;\"></meta>\
+                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; frame-src 'none';child-src 'none'; script-src 'none'; img-src data:;\"></meta>\
                     <title>no-frame no-css no-js no-image isolated document</title>\
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                     <link rel=\"stylesheet\" href=\"some.css\">\

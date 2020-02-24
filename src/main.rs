@@ -7,7 +7,7 @@ mod macros;
 use crate::args::AppArgs;
 use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
 use monolith::http::retrieve_asset;
-use monolith::utils::is_valid_url;
+use monolith::utils::{data_url_to_text, is_data_url, is_http_url};
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use std::collections::HashMap;
@@ -46,11 +46,14 @@ impl Output {
 
 fn main() {
     let app_args = AppArgs::get();
+    let target_url: &str = app_args.url_target.as_str();
+    let base_url;
+    let dom;
 
-    if !is_valid_url(app_args.url_target.as_str()) {
+    if !is_http_url(target_url) && !is_data_url(target_url) {
         eprintln!(
-            "Only HTTP and HTTPS URLs are allowed but got: {}",
-            &app_args.url_target
+            "Only HTTP(S) or data URLs are supported but got: {}",
+            &target_url
         );
         process::exit(1);
     }
@@ -78,21 +81,30 @@ fn main() {
         .expect("Failed to initialize HTTP client");
 
     // Retrieve root document
-    let (data, final_url) = retrieve_asset(
-        &mut cache,
-        &client,
-        app_args.url_target.as_str(),
-        false,
-        "",
-        app_args.silent,
-    )
-    .expect("Could not retrieve assets in HTML");
-    let dom = html_to_dom(&data);
+    if is_http_url(target_url) {
+        let (data, final_url) =
+            retrieve_asset(&mut cache, &client, target_url, false, "", app_args.silent)
+                .expect("Could not retrieve assets in HTML");
+        base_url = final_url;
+        dom = html_to_dom(&data);
+    } else if is_data_url(target_url) {
+        let text: String = data_url_to_text(target_url);
+
+        if text.len() == 0 {
+            eprintln!("Unsupported data URL input");
+            process::exit(1);
+        }
+
+        base_url = str!();
+        dom = html_to_dom(&text);
+    } else {
+        process::exit(1);
+    }
 
     walk_and_embed_assets(
         &mut cache,
         &client,
-        &final_url,
+        &base_url,
         &dom.document,
         app_args.no_css,
         app_args.no_js,

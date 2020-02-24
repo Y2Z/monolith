@@ -1,7 +1,7 @@
 use crate::http::retrieve_asset;
 use crate::js::attr_is_event_handler;
 use crate::utils::{
-    data_to_dataurl, is_valid_url, resolve_css_imports, resolve_url, url_has_protocol,
+    data_to_data_url, is_http_url, resolve_css_imports, resolve_url, url_has_protocol,
 };
 use html5ever::interface::QualName;
 use html5ever::parse_document;
@@ -130,7 +130,7 @@ pub fn walk_and_embed_assets(
                                     } else {
                                         let href_full_url = resolve_url(&url, attr.value.as_ref())
                                             .unwrap_or_default();
-                                        let (favicon_dataurl, _) = retrieve_asset(
+                                        let (favicon_data_url, _) = retrieve_asset(
                                             cache,
                                             client,
                                             &href_full_url,
@@ -140,7 +140,7 @@ pub fn walk_and_embed_assets(
                                         )
                                         .unwrap_or_default();
                                         attr.value.clear();
-                                        attr.value.push_slice(favicon_dataurl.as_str());
+                                        attr.value.push_slice(favicon_data_url.as_str());
                                     }
                                 }
                             }
@@ -229,14 +229,14 @@ pub fn walk_and_embed_assets(
                             name: QualName::new(None, ns!(), local_name!("src")),
                             value: Tendril::from_slice(TRANSPARENT_PIXEL),
                         });
-                    } else if let Some((dataurl, _)) = found_datasrc
+                    } else if let Some((data_url, _)) = found_datasrc
                         .iter()
-                        .chain(&found_src) // Give dataurl priority
+                        .chain(&found_src) // Give data_url priority
                         .map(|attr| attr.value.trim())
                         .filter(|src| !src.is_empty()) // Ignore empty srcs
                         .next()
                         .and_then(|src| resolve_url(&url, src).ok()) // Make absolute
-                        .and_then(|abs_src| // Download and convert to dataurl
+                        .and_then(|abs_src| // Download and convert to data_url
                             retrieve_asset(
                                 cache,
                                 client,
@@ -246,10 +246,10 @@ pub fn walk_and_embed_assets(
                                 opt_silent,
                             ).ok())
                     {
-                        // Add the new dataurl src attribute
+                        // Add the new data_url src attribute
                         attrs_mut.push(Attribute {
                             name: QualName::new(None, ns!(), local_name!("src")),
-                            value: Tendril::from_slice(dataurl.as_ref()),
+                            value: Tendril::from_slice(data_url.as_ref()),
                         });
                     }
                 }
@@ -270,7 +270,7 @@ pub fn walk_and_embed_assets(
                                 } else {
                                     let srcset_full_url =
                                         resolve_url(&url, attr.value.trim()).unwrap_or_default();
-                                    let (source_dataurl, _) = retrieve_asset(
+                                    let (source_data_url, _) = retrieve_asset(
                                         cache,
                                         client,
                                         &srcset_full_url,
@@ -280,7 +280,7 @@ pub fn walk_and_embed_assets(
                                     )
                                     .unwrap_or((str!(), str!()));
                                     attr.value.clear();
-                                    attr.value.push_slice(source_dataurl.as_str());
+                                    attr.value.push_slice(source_data_url.as_str());
                                 }
                             }
                         }
@@ -334,7 +334,7 @@ pub fn walk_and_embed_assets(
                             if &attr.name.local == "src" {
                                 let src_full_url =
                                     resolve_url(&url, attr.value.trim()).unwrap_or_default();
-                                let (js_dataurl, _) = retrieve_asset(
+                                let (js_data_url, _) = retrieve_asset(
                                     cache,
                                     client,
                                     &src_full_url,
@@ -344,7 +344,7 @@ pub fn walk_and_embed_assets(
                                 )
                                 .unwrap_or((str!(), str!()));
                                 attr.value.clear();
-                                attr.value.push_slice(js_dataurl.as_str());
+                                attr.value.push_slice(js_data_url.as_str());
                             }
                         }
                     }
@@ -377,7 +377,7 @@ pub fn walk_and_embed_assets(
                         if &attr.name.local == "action" {
                             let attr_value = attr.value.trim();
                             // Modify action to be a full URL
-                            if !is_valid_url(attr_value) {
+                            if !is_http_url(attr_value) {
                                 let href_full_url =
                                     resolve_url(&url, attr_value).unwrap_or_default();
                                 attr.value.clear();
@@ -426,9 +426,9 @@ pub fn walk_and_embed_assets(
                             );
                             let mut buf: Vec<u8> = Vec::new();
                             serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-                            let iframe_dataurl = data_to_dataurl("text/html", &buf);
+                            let iframe_data_url = data_to_data_url("text/html", &buf);
                             attr.value.clear();
-                            attr.value.push_slice(iframe_dataurl.as_str());
+                            attr.value.push_slice(iframe_data_url.as_str());
                         }
                     }
                 }
@@ -447,7 +447,7 @@ pub fn walk_and_embed_assets(
                             } else {
                                 let poster_full_url =
                                     resolve_url(&url, video_poster).unwrap_or_default();
-                                let (poster_dataurl, _) = retrieve_asset(
+                                let (poster_data_url, _) = retrieve_asset(
                                     cache,
                                     client,
                                     &poster_full_url,
@@ -457,7 +457,7 @@ pub fn walk_and_embed_assets(
                                 )
                                 .unwrap_or((poster_full_url, str!()));
                                 attr.value.clear();
-                                attr.value.push_slice(poster_dataurl.as_str());
+                                attr.value.push_slice(poster_data_url.as_str());
                             }
                         }
                     }

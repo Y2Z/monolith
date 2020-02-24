@@ -1,14 +1,14 @@
 use crate::utils::{
-    clean_url, data_to_dataurl, detect_mimetype, is_data_url, is_valid_url, resolve_url,
-    url_has_protocol,
+    clean_url, data_to_data_url, data_url_to_text, detect_mimetype, is_data_url, is_http_url,
+    resolve_url, url_has_protocol,
 };
 use url::ParseError;
 
 #[test]
-fn test_data_to_dataurl() {
+fn test_data_to_data_url() {
     let mime = "application/javascript";
     let data = "var word = 'hello';\nalert(word);\n";
-    let datauri = data_to_dataurl(mime, data.as_bytes());
+    let datauri = data_to_data_url(mime, data.as_bytes());
     assert_eq!(
         &datauri,
         "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
@@ -43,7 +43,7 @@ fn test_detect_mimetype() {
 
 #[test]
 fn test_url_has_protocol() {
-    // succeeding
+    // passing
     assert_eq!(
         url_has_protocol("mailto:somebody@somewhere.com?subject=hello"),
         true
@@ -71,16 +71,16 @@ fn test_url_has_protocol() {
 }
 
 #[test]
-fn test_is_valid_url() {
-    // succeeding
-    assert!(is_valid_url("https://www.rust-lang.org/"));
-    assert!(is_valid_url("http://kernel.org"));
+fn test_is_http_url() {
+    // passing
+    assert!(is_http_url("https://www.rust-lang.org/"));
+    assert!(is_http_url("http://kernel.org"));
     // failing
-    assert!(!is_valid_url("//kernel.org"));
-    assert!(!is_valid_url("./index.html"));
-    assert!(!is_valid_url("some-local-page.htm"));
-    assert!(!is_valid_url("ftp://1.2.3.4/www/index.html"));
-    assert!(!is_valid_url(
+    assert!(!is_http_url("//kernel.org"));
+    assert!(!is_http_url("./index.html"));
+    assert!(!is_http_url("some-local-page.htm"));
+    assert!(!is_http_url("ftp://1.2.3.4/www/index.html"));
+    assert!(!is_http_url(
         "data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h"
     ));
 }
@@ -144,20 +144,35 @@ fn test_resolve_url() -> Result<(), ParseError> {
         "https://www.w3schools.com/html/default.asp"
     );
 
+    let resolved_url = resolve_url(
+        "data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h",
+        "https://www.kernel.org/category/signatures.html",
+    )?;
+    assert_eq!(
+        resolved_url.as_str(),
+        "https://www.kernel.org/category/signatures.html"
+    );
+
+    let resolved_url = resolve_url(
+        "data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h",
+        "//www.w3schools.com/html/html_iframe.asp",
+    )
+    .unwrap_or(str!());
+    assert_eq!(resolved_url.as_str(), "");
+
     Ok(())
 }
 
 #[test]
 fn test_is_data_url() {
-    // succeeding
-    assert!(
-        is_data_url("data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h")
-            .unwrap_or(false)
-    );
+    // passing
+    assert!(is_data_url(
+        "data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h"
+    ));
     // failing
-    assert!(!is_data_url("https://kernel.org").unwrap_or(false));
-    assert!(!is_data_url("//kernel.org").unwrap_or(false));
-    assert!(!is_data_url("").unwrap_or(false));
+    assert!(!is_data_url("https://kernel.org"));
+    assert!(!is_data_url("//kernel.org"));
+    assert!(!is_data_url(""));
 }
 
 #[test]
@@ -173,5 +188,27 @@ fn test_clean_url() {
     assert_eq!(
         clean_url("https://somewhere.com/font.eot?#"),
         "https://somewhere.com/font.eot"
+    );
+}
+
+#[test]
+fn test_data_url_to_text() {
+    assert_eq!(
+        data_url_to_text("data:text/html;base64,V29yayBleHBhbmRzIHNvIGFzIHRvIGZpbGwgdGhlIHRpbWUgYXZhaWxhYmxlIGZvciBpdHMgY29tcGxldGlvbg=="),
+        "Work expands so as to fill the time available for its completion"
+    );
+
+    assert_eq!(
+        data_url_to_text(
+            "data:text/html;utf8,Work expands so as to fill the time available for its completion"
+        ),
+        "Work expands so as to fill the time available for its completion"
+    );
+
+    assert_eq!(
+        data_url_to_text(
+            "data:text/html,Work expands so as to fill the time available for its completion"
+        ),
+        "Work expands so as to fill the time available for its completion"
     );
 }

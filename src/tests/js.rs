@@ -2,7 +2,7 @@ use crate::js::attr_is_event_handler;
 
 #[test]
 fn test_attr_is_event_handler() {
-    // succeeding
+    // passing
     assert!(attr_is_event_handler("onBlur"));
     assert!(attr_is_event_handler("onclick"));
     assert!(attr_is_event_handler("onClick"));
