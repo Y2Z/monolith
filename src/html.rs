@@ -386,7 +386,7 @@ pub fn walk_and_embed_assets(
                         }
                     }
                 }
-                "iframe" => {
+                "frame" | "iframe" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "src" {
                             if opt_no_frames {
@@ -395,15 +395,15 @@ pub fn walk_and_embed_assets(
                                 continue;
                             }
 
-                            let iframe_src = attr.value.trim();
+                            let frame_src = attr.value.trim();
 
-                            // Ignore iframes with empty source (they cause infinite loops)
-                            if iframe_src.is_empty() {
+                            // Ignore (i)frames with empty source — they cause infinite loops
+                            if frame_src.is_empty() {
                                 continue;
                             }
 
-                            let src_full_url = resolve_url(&url, iframe_src).unwrap_or_default();
-                            let (iframe_data, iframe_final_url) = retrieve_asset(
+                            let src_full_url = resolve_url(&url, frame_src).unwrap_or_default();
+                            let (frame_data, frame_final_url) = retrieve_asset(
                                 cache,
                                 client,
                                 &src_full_url,
@@ -412,11 +412,11 @@ pub fn walk_and_embed_assets(
                                 opt_silent,
                             )
                             .unwrap_or((str!(), src_full_url));
-                            let dom = html_to_dom(&iframe_data);
+                            let dom = html_to_dom(&frame_data);
                             walk_and_embed_assets(
                                 cache,
                                 client,
-                                &iframe_final_url,
+                                &frame_final_url,
                                 &dom.document,
                                 opt_no_css,
                                 opt_no_js,

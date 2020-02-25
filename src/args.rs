@@ -34,7 +34,7 @@ impl AppArgs {
             )
             // .args_from_usage("-a, --include-audio 'Removes audio sources'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
-            .args_from_usage("-f, --no-frames 'Removes iframes'")
+            .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
             .args_from_usage("-i, --no-images 'Removes images'")
             .args_from_usage("-I, --isolate 'Cuts off document from the Internet'")
             .args_from_usage("-j, --no-js 'Removes JavaScript'")

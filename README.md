@@ -35,7 +35,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 ## Options
  - `-c`: Ignore styles
- - `-f`: Exclude iframes
+ - `-f`: Exclude frames and iframes
  - `-i`: Remove images
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
