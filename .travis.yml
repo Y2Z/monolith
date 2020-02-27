@@ -6,6 +6,7 @@ sudo: false
 os:
   - linux
   - osx
+  - windows
 
 rust:
   - stable
