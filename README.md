@@ -20,18 +20,18 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 ## Installation
 
-### From source
+#### From source
     $ git clone https://github.com/Y2Z/monolith.git
     $ cd monolith
     $ make install
 
-### With Homebrew (on macOS and GNU/Linux)
+#### With Homebrew (on macOS and GNU/Linux)
     $ brew install monolith
 
-### Using Snapcraft (on GNU/Linux)
+#### Using Snapcraft (on GNU/Linux)
     $ snap install monolith
 
-### Via Docker
+#### Via Docker
 The guide can be found [here](https://github.com/Y2Z/monolith/wiki/Using-containers)
 
 
