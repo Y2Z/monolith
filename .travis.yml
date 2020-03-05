@@ -1,30 +1,37 @@
 language: rust
 cache: cargo
 
-sudo: false
-
 os:
-  - linux
-  - osx
-  - windows
+- linux
+- osx
+- windows
 
 rust:
-  - stable
-  - beta
-  - nightly
+- stable
+- beta
+- nightly
+
+services:
+- docker
 
 before_script:
-  - rustup component add rustfmt
+- rustup component add rustfmt
 
 script:
-  - cargo build --all --locked --verbose
-  - cargo test --all --locked --verbose
-  - |
-    if [[ "$TRAVIS_RUST_VERSION" == "stable" ]]; then
-      cargo fmt --all -- --check
-    fi
+- cargo build --all --locked --verbose
+- cargo test --all --locked --verbose
+- |
+  if [[ "$TRAVIS_RUST_VERSION" == "stable" ]]; then
+    cargo fmt --all -- --check
+  fi
+
+after_success: |
+  if [ "${TRAVIS_OS_NAME}" == linux ] && [ "${TRAVIS_RUST_VERSION}" == stable ]; then
+    docker build -t monolith .
+    docker run monolith monolith -V
+  fi
 
 jobs:
   allow_failures:
-    - rust: nightly
+  - rust: nightly
   fast_finish: true

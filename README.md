@@ -17,6 +17,7 @@ Unlike the conventional "Save page as", `monolith` not only saves the target doc
 
 If compared to saving websites with `wget -mpk`, this tool embeds all assets as data URLs and therefore lets browsers render the saved page exactly the way it was on the Internet, even when no network connection is available.
 
+
 ## Installation
 
 ### From source
@@ -30,8 +31,13 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 ### Using Snapcraft (on GNU/Linux)
     $ snap install monolith
 
+### Via Docker
+The guide can be found [here](https://github.com/Y2Z/monolith/wiki/Using-containers)
+
+
 ## Usage
     $ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
+
 
 ## Options
  - `-c`: Ignore styles
@@ -45,19 +51,24 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
  - `-t`: Set custom network request timeout
  - `-u`: Provide own User-Agent
 
+
 ## HTTPS and HTTP proxies
 Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
 
+
 ## Contributing
 Please open an issue if something is wrong, that helps make this project better.
+
 
 ## Related projects
  - `Monolith Chrome Extension`: https://github.com/rhysd/monolith-of-web
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
  - `Personal WayBack Machine`: https://github.com/popey/pwbm
 
+
 ## License
 The Unlicense
+
 
 <!-- Microtext -->
 <sub>Keep in mind that `monolith` is not aware of your browser's session</sub>
