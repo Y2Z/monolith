@@ -207,16 +207,54 @@ pub fn walk_and_embed_assets(
                         }
                     }
                 }
+                "body" => {
+                    // Find and remove background attribute(s), keep reference to the last one
+                    let mut found_background: Option<Attribute> = None;
+                    let mut i = 0;
+                    while i < attrs_mut.len() {
+                        let attr_name = attrs_mut[i].name.local.as_ref();
+                        if attr_name.eq_ignore_ascii_case("background") {
+                            found_background = Some(attrs_mut.remove(i));
+                        } else {
+                            i += 1;
+                        }
+                    }
+
+                    if !opt_no_images {
+                        if let Some((data_url, _)) = found_background
+                            .iter()
+                            .map(|attr| attr.value.trim())
+                            .filter(|background| !background.is_empty()) // Skip if empty
+                            .next()
+                            .and_then(|background| resolve_url(&url, background).ok()) // Make absolute
+                            .and_then(|abs_src| // Download and convert to data_url
+                                retrieve_asset(
+                                    cache,
+                                    client,
+                                    &abs_src,
+                                    true,
+                                    "",
+                                    opt_silent,
+                                ).ok())
+                        {
+                            // Add new data_url background attribute
+                            attrs_mut.push(Attribute {
+                                name: QualName::new(None, ns!(), local_name!("background")),
+                                value: Tendril::from_slice(data_url.as_ref()),
+                            });
+                        }
+                    }
+                }
                 "img" => {
-                    // Find source tags
+                    // Find source attribute(s)
                     let mut found_src: Option<Attribute> = None;
                     let mut found_datasrc: Option<Attribute> = None;
                     let mut i = 0;
                     while i < attrs_mut.len() {
-                        let name = attrs_mut[i].name.local.as_ref();
-                        if name.eq_ignore_ascii_case("src") {
+                        let attr_name = attrs_mut[i].name.local.as_ref();
+                        if attr_name.eq_ignore_ascii_case("src") {
                             found_src = Some(attrs_mut.remove(i));
-                        } else if name.eq_ignore_ascii_case("data-src") {
+                        } else if attr_name.eq_ignore_ascii_case("data-src") {
                             found_datasrc = Some(attrs_mut.remove(i));
                         } else {
                             i += 1;
@@ -233,7 +271,7 @@ pub fn walk_and_embed_assets(
                         .iter()
                         .chain(&found_src) // Give data_url priority
                         .map(|attr| attr.value.trim())
-                        .filter(|src| !src.is_empty()) // Ignore empty srcs
+                        .filter(|src| !src.is_empty()) // Skip if empty
                         .next()
                         .and_then(|src| resolve_url(&url, src).ok()) // Make absolute
                         .and_then(|abs_src| // Download and convert to data_url
@@ -246,7 +284,7 @@ pub fn walk_and_embed_assets(
                                 opt_silent,
                             ).ok())
                     {
-                        // Add the new data_url src attribute
+                        // Add new data_url src attribute
                         attrs_mut.push(Attribute {
                             name: QualName::new(None, ns!(), local_name!("src")),
                             value: Tendril::from_slice(data_url.as_ref()),

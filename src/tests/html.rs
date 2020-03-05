@@ -262,6 +262,42 @@ fn test_walk_and_embed_assets_no_images() {
 }
 
 #[test]
+fn walk_and_embed_assets_no_body_background_images() {
+    let html = "<body background=\"no/such/image.png\" background=\"no/such/image2.png\"></body>";
+    let dom = html_to_dom(&html);
+    let url = "http://localhost";
+    let cache = &mut HashMap::new();
+
+    let opt_no_css: bool = false;
+    let opt_no_frames: bool = false;
+    let opt_no_js: bool = false;
+    let opt_no_images: bool = true;
+    let opt_silent = true;
+
+    let client = Client::new();
+
+    walk_and_embed_assets(
+        cache,
+        &client,
+        &url,
+        &dom.document,
+        opt_no_css,
+        opt_no_js,
+        opt_no_images,
+        opt_silent,
+        opt_no_frames,
+    );
+
+    let mut buf: Vec<u8> = Vec::new();
+    serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+    assert_eq!(
+        buf.iter().map(|&c| c as char).collect::<String>(),
+        "<html><head></head><body></body></html>"
+    );
+}
+
+#[test]
 fn test_walk_and_embed_assets_no_frames() {
     let html = "<frameset><frame src=\"http://trackbook.com\"></frameset>";
     let dom = html_to_dom(&html);
