@@ -6,19 +6,20 @@ mod macros;
 
 use crate::args::AppArgs;
 use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
-use monolith::http::retrieve_asset;
-use monolith::utils::{data_url_to_text, is_data_url, is_http_url};
+use monolith::utils::{data_url_to_text, is_data_url, is_file_url, is_http_url, retrieve_asset};
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use std::collections::HashMap;
-use std::fs::File;
+use std::env;
+use std::fs;
 use std::io::{self, Error, Write};
+use std::path::Path;
 use std::process;
 use std::time::Duration;
 
 enum Output {
     Stdout(io::Stdout),
-    File(File),
+    File(fs::File),
 }
 
 impl Output {
@@ -26,7 +27,7 @@ impl Output {
         if file_path.is_empty() {
             Ok(Output::Stdout(io::stdout()))
         } else {
-            Ok(Output::File(File::create(file_path)?))
+            Ok(Output::File(fs::File::create(file_path)?))
         }
     }
 
@@ -46,16 +47,34 @@ impl Output {
 
 fn main() {
     let app_args = AppArgs::get();
-    let target_url: &str = app_args.url_target.as_str();
+    let mut original_target: String = app_args.url_target.clone();
+    let target_url: &str;
     let base_url;
     let dom;
 
-    if !is_http_url(target_url) && !is_data_url(target_url) {
-        eprintln!(
-            "Only HTTP(S) or data URLs are supported but got: {}",
-            &target_url
-        );
+    // Pre-process the input
+    let cwd = env::current_dir().unwrap();
+    let path = Path::new(original_target.as_str());
+    if original_target.clone().len() == 0 {
+        eprintln!("No target specified");
         process::exit(1);
+    } else if is_http_url(original_target.clone()) || is_data_url(original_target.clone()) {
+        target_url = original_target.as_str();
+    } else if original_target.starts_with('/') {
+        original_target.insert_str(0, "file://");
+        target_url = original_target.as_str();
+    } else if path.exists() {
+        if !path.is_file() {
+            eprintln!("Local target is not a file: {}", original_target);
+            process::exit(1);
+        }
+        original_target.insert_str(0, "file://");
+        original_target.insert_str(7, cwd.to_str().unwrap());
+        original_target.insert_str(7 + cwd.to_str().unwrap().len(), "/");
+        target_url = original_target.as_str();
+    } else {
+        original_target.insert_str(0, "http://");
+        target_url = original_target.as_str();
     }
 
     let mut output = Output::new(&app_args.output).expect("Could not prepare output");
@@ -81,21 +100,26 @@ fn main() {
         .expect("Failed to initialize HTTP client");
 
     // Retrieve root document
-    if is_http_url(target_url) {
-        let (data, final_url) =
-            retrieve_asset(&mut cache, &client, target_url, false, "", app_args.silent)
-                .expect("Could not retrieve assets in HTML");
+    if is_file_url(target_url) || is_http_url(target_url) {
+        let (data, final_url) = retrieve_asset(
+            &mut cache,
+            &client,
+            target_url,
+            target_url,
+            false,
+            "",
+            app_args.silent,
+        )
+        .expect("Could not retrieve target document");
         base_url = final_url;
         dom = html_to_dom(&data);
     } else if is_data_url(target_url) {
         let text: String = data_url_to_text(target_url);
-
         if text.len() == 0 {
             eprintln!("Unsupported data URL input");
             process::exit(1);
         }
-
-        base_url = str!();
+        base_url = str!(target_url);
         dom = html_to_dom(&text);
     } else {
         process::exit(1);

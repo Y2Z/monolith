@@ -5,7 +5,6 @@ extern crate lazy_static;
 mod macros;
 
 pub mod html;
-pub mod http;
 pub mod js;
 pub mod utils;
 

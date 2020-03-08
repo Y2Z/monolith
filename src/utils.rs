@@ -1,8 +1,10 @@
-use crate::http::retrieve_asset;
-use base64::{decode, encode};
+use base64;
 use regex::Regex;
 use reqwest::blocking::Client;
+use reqwest::header::CONTENT_TYPE;
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 use url::{form_urlencoded, ParseError, Url};
 
 /// This monster of a regex is used to match any kind of URL found in CSS.
@@ -71,7 +73,7 @@ pub fn data_to_data_url(mime: &str, data: &[u8]) -> String {
     } else {
         mime.to_string()
     };
-    format!("data:{};base64,{}", mimetype, encode(data))
+    format!("data:{};base64,{}", mimetype, base64::encode(data))
 }
 
 pub fn detect_mimetype(data: &[u8]) -> String {
@@ -92,6 +94,12 @@ pub fn url_has_protocol<T: AsRef<str>>(url: T) -> bool {
 pub fn is_data_url<T: AsRef<str>>(url: T) -> bool {
     Url::parse(url.as_ref())
         .and_then(|u| Ok(u.scheme() == "data"))
+        .unwrap_or(false)
+}
+
+pub fn is_file_url<T: AsRef<str>>(url: T) -> bool {
+    Url::parse(url.as_ref())
+        .and_then(|u| Ok(u.scheme() == "file"))
         .unwrap_or(false)
 }
 
@@ -118,6 +126,7 @@ pub fn resolve_css_imports(
     client: &Client,
     css_string: &str,
     as_data_url: bool,
+    parent_url: &str,
     href: &str,
     opt_no_images: bool,
     opt_silent: bool,
@@ -127,12 +136,12 @@ pub fn resolve_css_imports(
     for link in REGEX_CSS_URL.captures_iter(&css_string) {
         let target_link = link.name("url").unwrap().as_str();
 
-        // Determine the type of link
+        // Determine linked asset type
         let is_stylesheet = link.name("stylesheet").is_some();
         let is_font = link.name("font").is_some();
         let is_image = !is_stylesheet && !is_font;
 
-        // Generate absolute URL for content
+        // Generate absolute URL for the content
         let embedded_url = match resolve_url(href, target_link) {
             Ok(url) => url,
             Err(_) => continue, // Malformed URL
@@ -144,6 +153,7 @@ pub fn resolve_css_imports(
             retrieve_asset(
                 cache,
                 client,
+                &parent_url,
                 &embedded_url,
                 false,      // Formating as data URL will be done later
                 "text/css", // Expect CSS
@@ -155,6 +165,7 @@ pub fn resolve_css_imports(
                     client,
                     &content,
                     true, // Finally, convert to a data URL
+                    &parent_url,
                     &embedded_url,
                     opt_no_images,
                     opt_silent,
@@ -165,6 +176,7 @@ pub fn resolve_css_imports(
             retrieve_asset(
                 cache,
                 client,
+                &parent_url,
                 &embedded_url,
                 true, // Format as data URL
                 "",   // Unknown MIME type
@@ -186,10 +198,11 @@ pub fn resolve_css_imports(
 
         let replacement = format!("\"{}\"", &content);
         let dest = link.name("to_repl").unwrap();
-        let offset = resolved_css.len() - css_string.len();
-        let target_range = (dest.start() + offset)..(dest.end() + offset);
-
-        resolved_css.replace_range(target_range, &replacement);
+        if resolved_css.len() > css_string.len() {
+            let offset = resolved_css.len() - css_string.len();
+            let target_range = (dest.start() + offset)..(dest.end() + offset);
+            resolved_css.replace_range(target_range, &replacement);
+        }
     }
 
     if as_data_url {
@@ -222,20 +235,7 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
     let meta_data: String = path.chars().take(comma_loc).collect();
     let raw_data: String = path.chars().skip(comma_loc + 1).collect();
 
-    let data: String = form_urlencoded::parse(raw_data.as_bytes())
-        .map(|(key, val)| {
-            [
-                key.to_string(),
-                if val.to_string().len() == 0 {
-                    str!()
-                } else {
-                    str!('=')
-                },
-                val.to_string(),
-            ]
-            .concat()
-        })
-        .collect();
+    let data: String = decode_url(raw_data);
 
     let meta_data_items: Vec<&str> = meta_data.split(';').collect();
     let mut mime_type: &str = "";
@@ -259,11 +259,122 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
 
     if mime_type.eq_ignore_ascii_case("text/html") {
         if encoding.eq_ignore_ascii_case("base64") {
-            String::from_utf8(decode(&data).unwrap_or(vec![])).unwrap_or(str!())
+            String::from_utf8(base64::decode(&data).unwrap_or(vec![])).unwrap_or(str!())
         } else {
             data
         }
     } else {
         str!()
+    }
+}
+
+pub fn decode_url(input: String) -> String {
+    form_urlencoded::parse(input.as_bytes())
+        .map(|(key, val)| {
+            [
+                key.to_string(),
+                if val.to_string().len() == 0 {
+                    str!()
+                } else {
+                    str!('=')
+                },
+                val.to_string(),
+            ]
+            .concat()
+        })
+        .collect()
+}
+
+pub fn retrieve_asset(
+    cache: &mut HashMap<String, String>,
+    client: &Client,
+    parent_url: &str,
+    url: &str,
+    as_data_url: bool,
+    mime: &str,
+    opt_silent: bool,
+) -> Result<(String, String), reqwest::Error> {
+    if url.len() == 0 {
+        return Ok((str!(), str!()));
+    }
+
+    let cache_key = clean_url(&url);
+
+    if is_data_url(&url) {
+        Ok((url.to_string(), url.to_string()))
+    } else if is_file_url(&url) {
+        // Check if parent_url is also file:///
+        // (if not then we don't download/embed the asset)
+        if !is_file_url(&parent_url) {
+            return Ok((str!(), str!()));
+        }
+
+        let cutoff = if cfg!(windows) { 8 } else { 7 };
+        let fs_file_path: String = decode_url(url.to_string()[cutoff..].to_string());
+        let path = Path::new(&fs_file_path);
+        if path.exists() {
+            if !opt_silent {
+                eprintln!("{}", &url);
+            }
+
+            if as_data_url {
+                let data_url: String = data_to_data_url(&mime, &fs::read(&fs_file_path).unwrap());
+                Ok((data_url, url.to_string()))
+            } else {
+                let data: String = fs::read_to_string(&fs_file_path).expect(url);
+                Ok((data, url.to_string()))
+            }
+        } else {
+            Ok((str!(), url.to_string()))
+        }
+    } else {
+        if cache.contains_key(&cache_key) {
+            // url is in cache
+            if !opt_silent {
+                eprintln!("{} (from cache)", &url);
+            }
+            let data = cache.get(&cache_key).unwrap();
+            Ok((data.to_string(), url.to_string()))
+        } else {
+            // url not in cache, we request it
+            let mut response = client.get(url).send()?;
+            let res_url = response.url().to_string();
+
+            if !opt_silent {
+                if url == res_url {
+                    eprintln!("{}", &url);
+                } else {
+                    eprintln!("{} -> {}", &url, &res_url);
+                }
+            }
+
+            let new_cache_key = clean_url(&res_url);
+
+            if as_data_url {
+                // Convert response into a byte array
+                let mut data: Vec<u8> = vec![];
+                response.copy_to(&mut data)?;
+
+                // Attempt to obtain MIME type by reading the Content-Type header
+                let mimetype = if mime == "" {
+                    response
+                        .headers()
+                        .get(CONTENT_TYPE)
+                        .and_then(|header| header.to_str().ok())
+                        .unwrap_or(&mime)
+                } else {
+                    mime
+                };
+                let data_url = data_to_data_url(&mimetype, &data);
+                // insert in cache
+                cache.insert(new_cache_key, data_url.clone());
+                Ok((data_url, res_url))
+            } else {
+                let content = response.text().unwrap();
+                // insert in cache
+                cache.insert(new_cache_key, content.clone());
+                Ok((content, res_url))
+            }
+        }
     }
 }

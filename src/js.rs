@@ -1,7 +1,7 @@
 const JS_DOM_EVENT_ATTRS: &[&str] = &[
-    // From WHATWG HTML spec 8.1.5.2 'Event handlers on elements, Document objects, and Window objects':
+    // From WHATWG HTML spec 8.1.5.2 "Event handlers on elements, Document objects, and Window objects":
     //   https://html.spec.whatwg.org/#event-handlers-on-elements,-document-objects,-and-window-objects
-    //   https://html.spec.whatwg.org/#attributes-3 (table 'List of event handler content attributes')
+    //   https://html.spec.whatwg.org/#attributes-3 (table "List of event handler content attributes")
 
     // Global event handlers
     "onabort",
