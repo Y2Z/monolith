@@ -1,7 +1,7 @@
-use crate::http::retrieve_asset;
 use crate::js::attr_is_event_handler;
 use crate::utils::{
-    data_to_data_url, is_http_url, resolve_css_imports, resolve_url, url_has_protocol,
+    data_to_data_url, is_http_url, resolve_css_imports, resolve_url, retrieve_asset,
+    url_has_protocol,
 };
 use html5ever::interface::QualName;
 use html5ever::parse_document;
@@ -133,6 +133,7 @@ pub fn walk_and_embed_assets(
                                         let (favicon_data_url, _) = retrieve_asset(
                                             cache,
                                             client,
+                                            &url,
                                             &href_full_url,
                                             true,
                                             "",
@@ -156,6 +157,7 @@ pub fn walk_and_embed_assets(
                                         let replacement_text = match retrieve_asset(
                                             cache,
                                             client,
+                                            &url,
                                             &href_full_url,
                                             false,
                                             "text/css",
@@ -167,6 +169,7 @@ pub fn walk_and_embed_assets(
                                                 client,
                                                 &css_data,
                                                 true,
+                                                &url,
                                                 &href_full_url,
                                                 opt_no_images,
                                                 opt_silent,
@@ -231,6 +234,7 @@ pub fn walk_and_embed_assets(
                                 retrieve_asset(
                                     cache,
                                     client,
+                                    &url,
                                     &abs_src,
                                     true,
                                     "",
@@ -278,6 +282,7 @@ pub fn walk_and_embed_assets(
                             retrieve_asset(
                                 cache,
                                 client,
+                                &url,
                                 &abs_src,
                                 true,
                                 "",
@@ -311,6 +316,7 @@ pub fn walk_and_embed_assets(
                                     let (source_data_url, _) = retrieve_asset(
                                         cache,
                                         client,
+                                        &url,
                                         &srcset_full_url,
                                         true,
                                         "",
@@ -375,6 +381,7 @@ pub fn walk_and_embed_assets(
                                 let (js_data_url, _) = retrieve_asset(
                                     cache,
                                     client,
+                                    &url,
                                     &src_full_url,
                                     true,
                                     "application/javascript",
@@ -400,6 +407,7 @@ pub fn walk_and_embed_assets(
                                     client,
                                     tendril.as_ref(),
                                     false,
+                                    &url,
                                     &url,
                                     opt_no_images,
                                     opt_silent,
@@ -444,6 +452,7 @@ pub fn walk_and_embed_assets(
                             let (frame_data, frame_final_url) = retrieve_asset(
                                 cache,
                                 client,
+                                &url,
                                 &src_full_url,
                                 false,
                                 "text/html",
@@ -488,6 +497,7 @@ pub fn walk_and_embed_assets(
                                 let (poster_data_url, _) = retrieve_asset(
                                     cache,
                                     client,
+                                    &url,
                                     &poster_full_url,
                                     true,
                                     "",
@@ -527,6 +537,7 @@ pub fn walk_and_embed_assets(
                         client,
                         attribute.value.as_ref(),
                         false,
+                        &url,
                         &url,
                         opt_no_images,
                         opt_silent,
