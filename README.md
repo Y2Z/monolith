@@ -33,7 +33,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ snap install monolith
 
 #### Via Docker
-The guide can be found [here](https://github.com/Y2Z/monolith/wiki/Using-containers)
+The guide can be found [here](docs/containers.md)
 
 ---------------------------------------------------
 
