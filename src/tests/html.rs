@@ -1,26 +1,24 @@
-use crate::html::{
-    get_node_name, get_parent_node, html_to_dom, is_icon, stringify_document, walk_and_embed_assets,
-};
+use crate::html;
 use html5ever::rcdom::{Handle, NodeData};
 use html5ever::serialize::{serialize, SerializeOpts};
 use reqwest::blocking::Client;
 use std::collections::HashMap;
 
 #[test]
-fn test_is_icon() {
-    assert_eq!(is_icon("icon"), true);
-    assert_eq!(is_icon("Shortcut Icon"), true);
-    assert_eq!(is_icon("ICON"), true);
-    assert_eq!(is_icon("mask-icon"), true);
-    assert_eq!(is_icon("fluid-icon"), true);
-    assert_eq!(is_icon("stylesheet"), false);
-    assert_eq!(is_icon(""), false);
+fn is_icon() {
+    assert_eq!(html::is_icon("icon"), true);
+    assert_eq!(html::is_icon("Shortcut Icon"), true);
+    assert_eq!(html::is_icon("ICON"), true);
+    assert_eq!(html::is_icon("mask-icon"), true);
+    assert_eq!(html::is_icon("fluid-icon"), true);
+    assert_eq!(html::is_icon("stylesheet"), false);
+    assert_eq!(html::is_icon(""), false);
 }
 
 #[test]
-fn test_get_parent_node_name() {
+fn get_parent_node_get_node_name() {
     let html = "<!doctype html><html><HEAD></HEAD><body><div><P></P></div></body></html>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let mut count = 0;
 
     fn test_walk(node: &Handle, i: &mut i8) {
@@ -34,8 +32,8 @@ fn test_get_parent_node_name() {
             }
             NodeData::Element { ref name, .. } => {
                 let node_name = name.local.as_ref().to_string();
-                let parent = get_parent_node(node);
-                let parent_node_name = get_node_name(&parent);
+                let parent = html::get_parent_node(node);
+                let parent_node_name = html::get_node_name(&parent);
                 if node_name == "head" || node_name == "body" {
                     assert_eq!(parent_node_name, "html");
                 } else if node_name == "div" {
@@ -60,11 +58,11 @@ fn test_get_parent_node_name() {
 }
 
 #[test]
-fn test_walk_and_embed_assets() {
+fn walk_and_embed_assets() {
     let cache = &mut HashMap::new();
 
     let html = "<div><P></P></div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
 
     let opt_no_css: bool = false;
@@ -75,7 +73,7 @@ fn test_walk_and_embed_assets() {
 
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -97,9 +95,9 @@ fn test_walk_and_embed_assets() {
 }
 
 #[test]
-fn test_walk_and_embed_assets_ensure_no_recursive_iframe() {
+fn walk_and_embed_assets_ensure_no_recursive_iframe() {
     let html = "<div><P></P><iframe src=\"\"></iframe></div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
 
@@ -111,7 +109,7 @@ fn test_walk_and_embed_assets_ensure_no_recursive_iframe() {
 
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -133,9 +131,9 @@ fn test_walk_and_embed_assets_ensure_no_recursive_iframe() {
 }
 
 #[test]
-fn test_walk_and_embed_assets_ensure_no_recursive_frame() {
+fn walk_and_embed_assets_ensure_no_recursive_frame() {
     let html = "<frameset><frame src=\"\"></frameset>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
 
@@ -147,7 +145,7 @@ fn test_walk_and_embed_assets_ensure_no_recursive_frame() {
 
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -169,11 +167,11 @@ fn test_walk_and_embed_assets_ensure_no_recursive_frame() {
 }
 
 #[test]
-fn test_walk_and_embed_assets_no_css() {
+fn walk_and_embed_assets_no_css() {
     let html = "<link rel=\"stylesheet\" href=\"main.css\">\
                 <style>html{background-color: #000;}</style>\
                 <div style=\"display: none;\"></div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
 
@@ -184,7 +182,7 @@ fn test_walk_and_embed_assets_no_css() {
     let opt_silent = true;
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -214,10 +212,10 @@ fn test_walk_and_embed_assets_no_css() {
 }
 
 #[test]
-fn test_walk_and_embed_assets_no_images() {
+fn walk_and_embed_assets_no_images() {
     let html = "<link rel=\"icon\" href=\"favicon.ico\">\
                 <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
 
@@ -229,7 +227,7 @@ fn test_walk_and_embed_assets_no_images() {
 
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -264,7 +262,7 @@ fn test_walk_and_embed_assets_no_images() {
 #[test]
 fn walk_and_embed_assets_no_body_background_images() {
     let html = "<body background=\"no/such/image.png\" background=\"no/such/image2.png\"></body>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
 
@@ -276,7 +274,7 @@ fn walk_and_embed_assets_no_body_background_images() {
 
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -298,9 +296,9 @@ fn walk_and_embed_assets_no_body_background_images() {
 }
 
 #[test]
-fn test_walk_and_embed_assets_no_frames() {
+fn walk_and_embed_assets_no_frames() {
     let html = "<frameset><frame src=\"http://trackbook.com\"></frameset>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
 
@@ -311,7 +309,7 @@ fn test_walk_and_embed_assets_no_frames() {
     let opt_silent = true;
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -333,9 +331,9 @@ fn test_walk_and_embed_assets_no_frames() {
 }
 
 #[test]
-fn test_walk_and_embed_assets_no_iframes() {
+fn walk_and_embed_assets_no_iframes() {
     let html = "<iframe src=\"http://trackbook.com\"></iframe>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
 
@@ -346,7 +344,7 @@ fn test_walk_and_embed_assets_no_iframes() {
     let opt_silent = true;
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -368,12 +366,12 @@ fn test_walk_and_embed_assets_no_iframes() {
 }
 
 #[test]
-fn test_walk_and_embed_assets_no_js() {
+fn walk_and_embed_assets_no_js() {
     let html = "<div onClick=\"void(0)\">\
                 <script src=\"http://localhost/assets/some.js\"></script>\
                 <script>alert(1)</script>\
                 </div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
 
@@ -385,7 +383,7 @@ fn test_walk_and_embed_assets_no_js() {
 
     let client = Client::new();
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -408,11 +406,11 @@ fn test_walk_and_embed_assets_no_js() {
 }
 
 #[test]
-fn test_walk_and_embed_with_no_integrity() {
+fn walk_and_embed_with_no_integrity() {
     let html = "<title>No integrity</title>\
                 <link integrity=\"sha384-...\" rel=\"something\"/>\
                 <script integrity=\"sha384-...\" src=\"some.js\"></script>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
     let url = "http://localhost";
     let cache = &mut HashMap::new();
     let client = Client::new();
@@ -422,7 +420,7 @@ fn test_walk_and_embed_with_no_integrity() {
     let opt_no_images: bool = true;
     let opt_silent = true;
 
-    walk_and_embed_assets(
+    html::walk_and_embed_assets(
         cache,
         &client,
         &url,
@@ -447,9 +445,9 @@ fn test_walk_and_embed_with_no_integrity() {
 }
 
 #[test]
-fn test_stringify_document() {
+fn stringify_document() {
     let html = "<div><script src=\"some.js\"></script></div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
 
     let opt_no_css: bool = false;
     let opt_no_frames: bool = false;
@@ -458,7 +456,7 @@ fn test_stringify_document() {
     let opt_isolate: bool = false;
 
     assert_eq!(
-        stringify_document(
+        html::stringify_document(
             &dom.document,
             opt_no_css,
             opt_no_frames,
@@ -471,12 +469,12 @@ fn test_stringify_document() {
 }
 
 #[test]
-fn test_stringify_document_isolate() {
+fn stringify_document_isolate() {
     let html = "<title>Isolated document</title>\
                 <link rel=\"something\" href=\"some.css\" />\
                 <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                 <div><script src=\"some.js\"></script></div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
 
     let opt_no_css: bool = false;
     let opt_no_frames: bool = false;
@@ -485,7 +483,7 @@ fn test_stringify_document_isolate() {
     let opt_isolate: bool = true;
 
     assert_eq!(
-        stringify_document(
+        html::stringify_document(
             &dom.document,
             opt_no_css,
             opt_no_frames,
@@ -510,12 +508,12 @@ fn test_stringify_document_isolate() {
 }
 
 #[test]
-fn test_stringify_document_no_css() {
+fn stringify_document_no_css() {
     let html = "<!doctype html>\
                 <title>Unstyled document</title>\
                 <link rel=\"stylesheet\" href=\"main.css\"/>\
                 <div style=\"display: none;\"></div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
 
     let opt_no_css: bool = true;
     let opt_no_frames: bool = false;
@@ -524,7 +522,7 @@ fn test_stringify_document_no_css() {
     let opt_isolate: bool = false;
 
     assert_eq!(
-        stringify_document(
+        html::stringify_document(
             &dom.document,
             opt_no_css,
             opt_no_frames,
@@ -545,12 +543,12 @@ fn test_stringify_document_no_css() {
 }
 
 #[test]
-fn test_stringify_document_no_frames() {
+fn stringify_document_no_frames() {
     let html = "<!doctype html>\
                 <title>Frameless document</title>\
                 <link rel=\"something\"/>\
                 <div><script src=\"some.js\"></script></div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
 
     let opt_no_css: bool = false;
     let opt_no_frames: bool = true;
@@ -559,7 +557,7 @@ fn test_stringify_document_no_frames() {
     let opt_isolate: bool = false;
 
     assert_eq!(
-        stringify_document(
+        html::stringify_document(
             &dom.document,
             opt_no_css,
             opt_no_frames,
@@ -580,7 +578,7 @@ fn test_stringify_document_no_frames() {
 }
 
 #[test]
-fn test_stringify_document_isolate_no_frames_no_js_no_css_no_images() {
+fn stringify_document_isolate_no_frames_no_js_no_css_no_images() {
     let html = "<!doctype html>\
                 <title>no-frame no-css no-js no-image isolated document</title>\
                 <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
@@ -590,7 +588,7 @@ fn test_stringify_document_isolate_no_frames_no_js_no_css_no_images() {
                 <img style=\"width: 100%;\" src=\"some.png\" />\
                 <iframe src=\"some.html\"></iframe>\
                 </div>";
-    let dom = html_to_dom(&html);
+    let dom = html::html_to_dom(&html);
 
     let opt_isolate: bool = true;
     let opt_no_css: bool = true;
@@ -599,7 +597,7 @@ fn test_stringify_document_isolate_no_frames_no_js_no_css_no_images() {
     let opt_no_images: bool = true;
 
     assert_eq!(
-        stringify_document(
+        html::stringify_document(
             &dom.document,
             opt_no_css,
             opt_no_frames,

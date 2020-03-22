@@ -290,7 +290,6 @@ fn local_file_target_input_absolute_target_path() -> Result<(), Box<dyn std::err
     );
 
     // STDERR should contain only the target file
-    let cwd = env::current_dir().unwrap();
     assert_eq!(
         std::str::from_utf8(&out.stderr).unwrap(),
         format!(

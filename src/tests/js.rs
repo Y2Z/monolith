@@ -1,12 +1,13 @@
 use crate::js::attr_is_event_handler;
 
 #[test]
-fn test_attr_is_event_handler() {
-    // passing
+fn attr_is_event_handler() {
+    // Passing
     assert!(attr_is_event_handler("onBlur"));
     assert!(attr_is_event_handler("onclick"));
     assert!(attr_is_event_handler("onClick"));
-    // failing
+
+    // Failing
     assert!(!attr_is_event_handler("href"));
     assert!(!attr_is_event_handler(""));
     assert!(!attr_is_event_handler("class"));
