@@ -11,8 +11,8 @@ rust:
 - beta
 - nightly
 
-services:
-- docker
+git:
+  autocrlf: false # don't mangle LF into CRLF on windows
 
 before_script:
 - rustup component add rustfmt
