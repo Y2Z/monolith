@@ -2,8 +2,15 @@ use assert_cmd::prelude::*;
 use std::env;
 use std::process::Command;
 
+//  ██████╗  █████╗ ███████╗███████╗██╗███╗   ██╗ ██████╗
+//  ██╔══██╗██╔══██╗██╔════╝██╔════╝██║████╗  ██║██╔════╝
+//  ██████╔╝███████║███████╗███████╗██║██╔██╗ ██║██║  ███╗
+//  ██╔═══╝ ██╔══██║╚════██║╚════██║██║██║╚██╗██║██║   ██║
+//  ██║     ██║  ██║███████║███████║██║██║ ╚████║╚██████╔╝
+//  ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝
+
 #[test]
-fn print_version() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_print_version() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd.arg("-V").output().unwrap();
 
@@ -23,7 +30,7 @@ fn print_version() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn bad_input_empty_target() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_bad_input_empty_target() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd.arg("").output().unwrap();
 
@@ -43,7 +50,7 @@ fn bad_input_empty_target() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn bad_input_data_url() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_bad_input_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd.arg("data:,Hello%2C%20World!").output().unwrap();
 
@@ -63,7 +70,7 @@ fn bad_input_data_url() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn isolate_data_url() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_isolate_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
         .arg("-I")
@@ -89,7 +96,7 @@ fn isolate_data_url() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn remove_css_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_remove_css_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
         .arg("-c")
@@ -116,7 +123,7 @@ fn remove_css_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn remove_frames_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_remove_frames_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
         .arg("-f")
@@ -142,7 +149,7 @@ fn remove_frames_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn remove_images_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_remove_images_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
         .arg("-i")
@@ -174,7 +181,7 @@ Hi\
 }
 
 #[test]
-fn remove_js_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_remove_js_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
         .arg("-j")
@@ -203,7 +210,7 @@ fn remove_js_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let cwd_normalized: String =
         str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
@@ -251,7 +258,8 @@ fn local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn local_file_target_input_absolute_target_path() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_local_file_target_input_absolute_target_path() -> Result<(), Box<dyn std::error::Error>>
+{
     let cwd = env::current_dir().unwrap();
     let cwd_normalized: String =
         str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
@@ -306,7 +314,7 @@ fn local_file_target_input_absolute_target_path() -> Result<(), Box<dyn std::err
 }
 
 #[test]
-fn local_file_url_target_input() -> Result<(), Box<dyn std::error::Error>> {
+fn passing_local_file_url_target_input() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let cwd = env::current_dir().unwrap();
     let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
@@ -369,8 +377,8 @@ fn local_file_url_target_input() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn security_disallow_local_assets_within_data_url_targets() -> Result<(), Box<dyn std::error::Error>>
-{
+fn passing_security_disallow_local_assets_within_data_url_targets(
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
         .arg("data:text/html,%3Cscript%20src=\"src/tests/data/local-script.js\"%3E%3C/script%3E")
