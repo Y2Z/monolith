@@ -68,15 +68,15 @@ const MAGIC: [[&[u8]; 2]; 19] = [
 ];
 
 pub fn data_to_data_url(mime: &str, data: &[u8]) -> String {
-    let mimetype = if mime.is_empty() {
-        detect_mimetype(data)
+    let media_type = if mime.is_empty() {
+        detect_media_type(data)
     } else {
         mime.to_string()
     };
-    format!("data:{};base64,{}", mimetype, base64::encode(data))
+    format!("data:{};base64,{}", media_type, base64::encode(data))
 }
 
-pub fn detect_mimetype(data: &[u8]) -> String {
+pub fn detect_media_type(data: &[u8]) -> String {
     for item in MAGIC.iter() {
         if data.starts_with(item[0]) {
             return String::from_utf8(item[1].to_vec()).unwrap();
@@ -356,7 +356,7 @@ pub fn retrieve_asset(
                 response.copy_to(&mut data)?;
 
                 // Attempt to obtain MIME type by reading the Content-Type header
-                let mimetype = if mime == "" {
+                let media_type = if mime == "" {
                     response
                         .headers()
                         .get(CONTENT_TYPE)
@@ -365,7 +365,7 @@ pub fn retrieve_asset(
                 } else {
                     mime
                 };
-                let data_url = data_to_data_url(&mimetype, &data);
+                let data_url = data_to_data_url(&media_type, &data);
                 // Add to cache
                 cache.insert(new_cache_key, data_url.clone());
                 Ok((data_url, res_url))
