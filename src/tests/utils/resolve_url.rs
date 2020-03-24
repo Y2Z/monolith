@@ -112,6 +112,21 @@ fn passing_from_data_url_to_https() -> Result<(), ParseError> {
 }
 
 #[test]
+fn passing_from_data_url_to_data_url() -> Result<(), ParseError> {
+    let resolved_url = utils::resolve_url(
+        "data:text/html;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h",
+        "data:text/html;base64,PGEgaHJlZj0iaW5kZXguaHRtbCI+SG9tZTwvYT4K",
+    )?;
+
+    assert_eq!(
+        resolved_url.as_str(),
+        "data:text/html;base64,PGEgaHJlZj0iaW5kZXguaHRtbCI+SG9tZTwvYT4K"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn passing_from_file_url_to_relative_path() -> Result<(), ParseError> {
     let resolved_url = utils::resolve_url(
         "file:///home/user/Websites/my-website/index.html",

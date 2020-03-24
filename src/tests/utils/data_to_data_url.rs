@@ -11,7 +11,7 @@ use crate::utils;
 fn passing_encode_string_with_specific_media_type() {
     let mime = "application/javascript";
     let data = "var word = 'hello';\nalert(word);\n";
-    let data_url = utils::data_to_data_url(mime, data.as_bytes());
+    let data_url = utils::data_to_data_url(mime, data.as_bytes(), "");
 
     assert_eq!(
         &data_url,

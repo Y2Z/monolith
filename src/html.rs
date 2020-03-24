@@ -473,7 +473,7 @@ pub fn walk_and_embed_assets(
                             );
                             let mut buf: Vec<u8> = Vec::new();
                             serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-                            let iframe_data_url = data_to_data_url("text/html", &buf);
+                            let iframe_data_url = data_to_data_url("text/html", &buf, "");
                             attr.value.clear();
                             attr.value.push_slice(iframe_data_url.as_str());
                         }
