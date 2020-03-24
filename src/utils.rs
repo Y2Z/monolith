@@ -42,13 +42,12 @@ lazy_static! {
     static ref REGEX_CSS_URL: Regex = Regex::new(CSS_URL_REGEX_STR).unwrap();
 }
 
-const MAGIC: [[&[u8]; 2]; 19] = [
+const MAGIC: [[&[u8]; 2]; 18] = [
     // Image
     [b"GIF87a", b"image/gif"],
     [b"GIF89a", b"image/gif"],
     [b"\xFF\xD8\xFF", b"image/jpeg"],
     [b"\x89PNG\x0D\x0A\x1A\x0A", b"image/png"],
-    [b"<?xml ", b"image/svg+xml"],
     [b"<svg ", b"image/svg+xml"],
     [b"RIFF....WEBPVP8 ", b"image/webp"],
     [b"\x00\x00\x01\x00", b"image/x-icon"],
@@ -67,21 +66,26 @@ const MAGIC: [[&[u8]; 2]; 19] = [
     [b"\x1A\x45\xDF\xA3", b"video/webm"],
 ];
 
-pub fn data_to_data_url(mime: &str, data: &[u8]) -> String {
-    let media_type = if mime.is_empty() {
-        detect_media_type(data)
+pub fn data_to_data_url(media_type: &str, data: &[u8], url: &str) -> String {
+    let media_type = if media_type.is_empty() {
+        detect_media_type(data, &url)
     } else {
-        mime.to_string()
+        media_type.to_string()
     };
     format!("data:{};base64,{}", media_type, base64::encode(data))
 }
 
-pub fn detect_media_type(data: &[u8]) -> String {
+pub fn detect_media_type(data: &[u8], url: &str) -> String {
     for item in MAGIC.iter() {
         if data.starts_with(item[0]) {
             return String::from_utf8(item[1].to_vec()).unwrap();
         }
     }
+
+    if url.to_lowercase().ends_with(".svg") {
+        return str!("image/svg+xml");
+    }
+
     str!()
 }
 
@@ -179,7 +183,7 @@ pub fn resolve_css_imports(
                 &parent_url,
                 &embedded_url,
                 true, // Format as data URL
-                "",   // Unknown MIME type
+                "",   // Unknown media type
                 opt_silent,
             )
             .map(|(a, _)| a)
@@ -206,7 +210,7 @@ pub fn resolve_css_imports(
     }
 
     if as_data_url {
-        data_to_data_url("text/css", resolved_css.as_bytes())
+        data_to_data_url("text/css", resolved_css.as_bytes(), "")
     } else {
         resolved_css
     }
@@ -214,8 +218,10 @@ pub fn resolve_css_imports(
 
 pub fn clean_url<T: AsRef<str>>(url: T) -> String {
     let mut result = Url::parse(url.as_ref()).unwrap();
+
     // Clear fragment
     result.set_fragment(None);
+
     // Get rid of stray question mark
     if result.query() == Some("") {
         result.set_query(None);
@@ -238,14 +244,14 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
     let data: String = decode_url(raw_data);
 
     let meta_data_items: Vec<&str> = meta_data.split(';').collect();
-    let mut mime_type: &str = "";
+    let mut media_type: &str = "";
     let mut encoding: &str = "";
 
     let mut i: i8 = 0;
     for item in &meta_data_items {
         if i == 0 {
             if item.eq_ignore_ascii_case("text/html") {
-                mime_type = item;
+                media_type = item;
                 continue;
             }
         }
@@ -257,7 +263,7 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
         i = i + 1;
     }
 
-    if mime_type.eq_ignore_ascii_case("text/html") {
+    if media_type.eq_ignore_ascii_case("text/html") {
         if encoding.eq_ignore_ascii_case("base64") {
             String::from_utf8(base64::decode(&data).unwrap_or(vec![])).unwrap_or(str!())
         } else {
@@ -291,7 +297,7 @@ pub fn retrieve_asset(
     parent_url: &str,
     url: &str,
     as_data_url: bool,
-    mime: &str,
+    media_type: &str,
     opt_silent: bool,
 ) -> Result<(String, String), reqwest::Error> {
     if url.len() == 0 {
@@ -318,7 +324,11 @@ pub fn retrieve_asset(
             }
 
             if as_data_url {
-                let data_url: String = data_to_data_url(&mime, &fs::read(&fs_file_path).unwrap());
+                let data_url: String = data_to_data_url(
+                    &media_type,
+                    &fs::read(&fs_file_path).unwrap(),
+                    &fs_file_path,
+                );
                 Ok((data_url, url.to_string()))
             } else {
                 let data: String = fs::read_to_string(&fs_file_path).expect(url);
@@ -355,17 +365,17 @@ pub fn retrieve_asset(
                 let mut data: Vec<u8> = vec![];
                 response.copy_to(&mut data)?;
 
-                // Attempt to obtain MIME type by reading the Content-Type header
-                let media_type = if mime == "" {
+                // Attempt to obtain media type by reading the Content-Type header
+                let media_type = if media_type == "" {
                     response
                         .headers()
                         .get(CONTENT_TYPE)
                         .and_then(|header| header.to_str().ok())
-                        .unwrap_or(&mime)
+                        .unwrap_or(&media_type)
                 } else {
-                    mime
+                    media_type
                 };
-                let data_url = data_to_data_url(&media_type, &data);
+                let data_url = data_to_data_url(&media_type, &data, url);
                 // Add to cache
                 cache.insert(new_cache_key, data_url.clone());
                 Ok((data_url, res_url))
