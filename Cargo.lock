@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "monolith"
-version = "2.1.2"
+version = "2.2.0"
 dependencies = [
  "assert_cmd 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "base64 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
