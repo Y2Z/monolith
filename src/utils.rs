@@ -1,46 +1,10 @@
 use base64;
-use regex::Regex;
 use reqwest::blocking::Client;
 use reqwest::header::CONTENT_TYPE;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use url::{form_urlencoded, ParseError, Url};
-
-/// This monster of a regex is used to match any kind of URL found in CSS.
-///
-/// There  are roughly three different categories that a found URL could fit
-/// into:
-///    - Font       [found after a src: property in an @font-family rule]
-///    - Stylesheet [denoted by an @import before the url
-///    - Image      [covers all other uses of the url() function]
-///
-/// This regex aims to extract the following information:
-///    - What type of URL is it (font/image/css)
-///    - Where is the part that needs to be replaced (incl any wrapping quotes)
-///    - What is the URL (excl any wrapping quotes)
-///
-/// Essentially, the regex can be broken down into two parts:
-///
-/// `(?:(?P<import>@import)|(?P<font>src\s*:)\s+)?`
-/// This matches the precursor to a font or CSS URL, and fills in a match under
-/// either `<import>` (if it's a CSS URL) or `<font>` (if it's a font).
-/// Determining whether or not it's an image can be done by the negation of both
-/// of these. Either zero or one of these can match.
-///
-/// `url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)`
-/// This matches the actual URL part of the url(), and must always match. It also
-/// sets `<to_repl>` and `<url>` which correspond to everything within
-/// `url(...)` and a usable URL, respectively.
-///
-/// Note, however, that this does not perform any validation of the found URL.
-/// Malformed CSS could lead to an invalid URL being present. It is therefore
-/// recomended that the URL gets manually validated.
-const CSS_URL_REGEX_STR: &str = r###"(?:(?:(?P<stylesheet>@import)|(?P<font>src\s*:))\s+)?url\((?P<to_repl>['"]?(?P<url>[^"'\)]+)['"]?)\)"###;
-
-lazy_static! {
-    static ref REGEX_CSS_URL: Regex = Regex::new(CSS_URL_REGEX_STR).unwrap();
-}
 
 const MAGIC: [[&[u8]; 2]; 18] = [
     // Image
@@ -66,13 +30,24 @@ const MAGIC: [[&[u8]; 2]; 18] = [
     [b"\x1A\x45\xDF\xA3", b"video/webm"],
 ];
 
-pub fn data_to_data_url(media_type: &str, data: &[u8], url: &str) -> String {
-    let media_type = if media_type.is_empty() {
+pub fn data_to_data_url(media_type: &str, data: &[u8], url: &str, fragment: &str) -> String {
+    let media_type: String = if media_type.is_empty() {
         detect_media_type(data, &url)
     } else {
         media_type.to_string()
     };
-    format!("data:{};base64,{}", media_type, base64::encode(data))
+    let hash: String = if fragment != "" {
+        format!("#{}", fragment)
+    } else {
+        str!()
+    };
+
+    format!(
+        "data:{};base64,{}{}",
+        media_type,
+        base64::encode(data),
+        hash
+    )
 }
 
 pub fn detect_media_type(data: &[u8], url: &str) -> String {
@@ -125,94 +100,11 @@ pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<Strin
     Ok(result)
 }
 
-pub fn resolve_css_imports(
-    cache: &mut HashMap<String, String>,
-    client: &Client,
-    css_string: &str,
-    as_data_url: bool,
-    parent_url: &str,
-    href: &str,
-    opt_no_images: bool,
-    opt_silent: bool,
-) -> String {
-    let mut resolved_css = String::from(css_string);
-
-    for link in REGEX_CSS_URL.captures_iter(&css_string) {
-        let target_link = link.name("url").unwrap().as_str();
-
-        // Determine linked asset type
-        let is_stylesheet = link.name("stylesheet").is_some();
-        let is_font = link.name("font").is_some();
-        let is_image = !is_stylesheet && !is_font;
-
-        // Generate absolute URL for the content
-        let embedded_url = match resolve_url(href, target_link) {
-            Ok(url) => url,
-            Err(_) => continue, // Malformed URL
-        };
-
-        // Download the asset. If it's more CSS, resolve that too
-        let content = if is_stylesheet {
-            // The link is an @import link
-            retrieve_asset(
-                cache,
-                client,
-                &parent_url,
-                &embedded_url,
-                false,      // Formatting as data URL will be done later
-                "text/css", // Expect CSS
-                opt_silent,
-            )
-            .map(|(content, _)| {
-                resolve_css_imports(
-                    cache,
-                    client,
-                    &content,
-                    true, // Finally, convert to a data URL
-                    &parent_url,
-                    &embedded_url,
-                    opt_no_images,
-                    opt_silent,
-                )
-            })
-        } else if (is_image && !opt_no_images) || is_font {
-            // The link is some other, non-@import link
-            retrieve_asset(
-                cache,
-                client,
-                &parent_url,
-                &embedded_url,
-                true, // Format as data URL
-                "",   // Unknown media type
-                opt_silent,
-            )
-            .map(|(a, _)| a)
-        } else {
-            // If it's a datatype that has been opt_no'd out of, replace with
-            // absolute URL
-
-            Ok(embedded_url.clone())
-        }
-        .unwrap_or_else(|e| {
-            eprintln!("Warning: {}", e);
-
-            // If failed to resolve, replace with absolute URL
-            embedded_url
-        });
-
-        let replacement = format!("\"{}\"", &content);
-        let dest = link.name("to_repl").unwrap();
-        if resolved_css.len() > css_string.len() {
-            let offset = resolved_css.len() - css_string.len();
-            let target_range = (dest.start() + offset)..(dest.end() + offset);
-            resolved_css.replace_range(target_range, &replacement);
-        }
-    }
-
-    if as_data_url {
-        data_to_data_url("text/css", resolved_css.as_bytes(), "")
+pub fn get_url_fragment<T: AsRef<str>>(url: T) -> String {
+    if Url::parse(url.as_ref()).unwrap().fragment() == None {
+        str!()
     } else {
-        resolved_css
+        str!(Url::parse(url.as_ref()).unwrap().fragment().unwrap())
     }
 }
 
@@ -291,6 +183,26 @@ pub fn decode_url(input: String) -> String {
         .collect()
 }
 
+pub fn file_url_to_fs_path(url: &str) -> String {
+    if !is_file_url(url) {
+        return str!();
+    }
+
+    let cutoff_l = if cfg!(windows) { 8 } else { 7 };
+    let mut fs_file_path: String = decode_url(url.to_string()[cutoff_l..].to_string());
+    let url_fragment = get_url_fragment(url);
+    if url_fragment != "" {
+        let max_len = fs_file_path.len() - 1 - url_fragment.len();
+        fs_file_path = fs_file_path[0..max_len].to_string();
+    }
+
+    if cfg!(windows) {
+        fs_file_path = fs_file_path.replace("/", "\\");
+    }
+
+    fs_file_path
+}
+
 pub fn retrieve_asset(
     cache: &mut HashMap<String, String>,
     client: &Client,
@@ -310,14 +222,14 @@ pub fn retrieve_asset(
         Ok((url.to_string(), url.to_string()))
     } else if is_file_url(&url) {
         // Check if parent_url is also file:///
-        // (if not then we don't download/embed the asset)
+        // (if not, then we don't embed the asset)
         if !is_file_url(&parent_url) {
             return Ok((str!(), str!()));
         }
 
-        let cutoff = if cfg!(windows) { 8 } else { 7 };
-        let fs_file_path: String = decode_url(url.to_string()[cutoff..].to_string());
+        let fs_file_path: String = file_url_to_fs_path(url);
         let path = Path::new(&fs_file_path);
+        let url_fragment = get_url_fragment(url);
         if path.exists() {
             if !opt_silent {
                 eprintln!("{}", &url);
@@ -328,6 +240,7 @@ pub fn retrieve_asset(
                     &media_type,
                     &fs::read(&fs_file_path).unwrap(),
                     &fs_file_path,
+                    &url_fragment,
                 );
                 Ok((data_url, url.to_string()))
             } else {
@@ -375,7 +288,8 @@ pub fn retrieve_asset(
                 } else {
                     media_type
                 };
-                let data_url = data_to_data_url(&media_type, &data, url);
+                let url_fragment = get_url_fragment(url);
+                let data_url = data_to_data_url(&media_type, &data, url, &url_fragment);
                 // Add to cache
                 cache.insert(new_cache_key, data_url.clone());
                 Ok((data_url, res_url))

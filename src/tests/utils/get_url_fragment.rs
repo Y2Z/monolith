@@ -8,21 +8,16 @@ use crate::utils;
 //  ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝
 
 #[test]
-fn passing_encode_string_with_specific_media_type() {
-    let mime = "application/javascript";
-    let data = "var word = 'hello';\nalert(word);\n";
-    let data_url = utils::data_to_data_url(mime, data.as_bytes(), "", "");
-
+fn passing_data_url() {
     assert_eq!(
-        &data_url,
-        "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
+        utils::get_url_fragment(
+            "data:image/svg+xml;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h#test"
+        ),
+        "test"
     );
 }
 
 #[test]
-fn passing_encode_append_fragment() {
-    let data = "<svg></svg>\n";
-    let data_url = utils::data_to_data_url("text/css", data.as_bytes(), "", "fragment");
-
-    assert_eq!(&data_url, "data:text/css;base64,PHN2Zz48L3N2Zz4K#fragment");
+fn passing_https_empty() {
+    assert_eq!(utils::get_url_fragment("https://kernel.org#"), "");
 }
