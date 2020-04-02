@@ -1,6 +1,8 @@
 use assert_cmd::prelude::*;
 use std::env;
+use std::io::Write;
 use std::process::Command;
+use tempfile::NamedTempFile;
 
 //  ██████╗  █████╗ ███████╗███████╗██╗███╗   ██╗ ██████╗
 //  ██╔══██╗██╔══██╗██╔════╝██╔════╝██║████╗  ██║██╔════╝
@@ -316,21 +318,22 @@ fn passing_local_file_target_input_absolute_target_path() -> Result<(), Box<dyn 
 #[test]
 fn passing_local_file_url_target_input() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-    let cwd = env::current_dir().unwrap();
+    let cwd_normalized: String =
+        str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
     let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
     let out = cmd
         .arg("-cji")
         .arg(if cfg!(windows) {
             format!(
-                "{file}{cwd}\\src\\tests\\data\\local-file.html",
+                "{file}{cwd}/src/tests/data/local-file.html",
                 file = file_url_protocol,
-                cwd = cwd.to_str().unwrap(),
+                cwd = cwd_normalized,
             )
         } else {
             format!(
                 "{file}{cwd}/src/tests/data/local-file.html",
                 file = file_url_protocol,
-                cwd = cwd.to_str().unwrap(),
+                cwd = cwd_normalized,
             )
         })
         .output()
@@ -357,15 +360,15 @@ fn passing_local_file_url_target_input() -> Result<(), Box<dyn std::error::Error
         std::str::from_utf8(&out.stderr).unwrap(),
         if cfg!(windows) {
             format!(
-                "{file}{cwd}\\src\\tests\\data\\local-file.html\n",
+                "{file}{cwd}/src/tests/data/local-file.html\n",
                 file = file_url_protocol,
-                cwd = cwd.to_str().unwrap(),
+                cwd = cwd_normalized,
             )
         } else {
             format!(
                 "{file}{cwd}/src/tests/data/local-file.html\n",
                 file = file_url_protocol,
-                cwd = cwd.to_str().unwrap(),
+                cwd = cwd_normalized,
             )
         }
     );
@@ -393,6 +396,103 @@ fn passing_security_disallow_local_assets_within_data_url_targets(
 
     // STDERR should be empty
     assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
+
+    // The exit code should be 0
+    out.assert().code(0);
+
+    Ok(())
+}
+
+#[test]
+fn passing_embed_file_url_local_asset_within_style_attribute(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let file_url_prefix: &str = if cfg!(windows) { "file:///" } else { "file://" };
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    let mut file_svg = NamedTempFile::new()?;
+    writeln!(file_svg, "<svg version=\"1.1\" baseProfile=\"full\" width=\"300\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">\
+<rect width=\"100%\" height=\"100%\" fill=\"red\" />\
+<circle cx=\"150\" cy=\"100\" r=\"80\" fill=\"green\" />\
+<text x=\"150\" y=\"125\" font-size=\"60\" text-anchor=\"middle\" fill=\"white\">SVG</text>\
+</svg>\n")?;
+    let mut file_html = NamedTempFile::new()?;
+    writeln!(
+        file_html,
+        "<div style='background-image: url(\"{file}{path}\")'></div>\n",
+        file = file_url_prefix,
+        path = str!(file_svg.path().to_str().unwrap()).replace("\\", "/"),
+    )?;
+    let out = cmd.arg(file_html.path()).output().unwrap();
+
+    // STDOUT should contain HTML with date URL for background-image in it
+    assert_eq!(
+        std::str::from_utf8(&out.stdout).unwrap(),
+        "<html><head></head><body><div style=\"background-image: url('data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJyZWQiIC8+PGNpcmNsZSBjeD0iMTUwIiBjeT0iMTAwIiByPSI4MCIgZmlsbD0iZ3JlZW4iIC8+PHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+PC9zdmc+Cgo=')\"></div>\n\n</body></html>\n"
+    );
+
+    // STDERR should list temporary files that got retrieved
+    assert_eq!(
+        std::str::from_utf8(&out.stderr).unwrap(),
+        format!(
+            "\
+{file}{html_path}\n\
+{file}{svg_path}\n\
+",
+            file = file_url_prefix,
+            html_path = str!(file_html.path().to_str().unwrap()).replace("\\", "/"),
+            svg_path = str!(file_svg.path().to_str().unwrap()).replace("\\", "/"),
+        )
+    );
+
+    // The exit code should be 0
+    out.assert().code(0);
+
+    Ok(())
+}
+
+#[test]
+fn passing_css_import_string() -> Result<(), Box<dyn std::error::Error>> {
+    let file_url_prefix: &str = if cfg!(windows) { "file:///" } else { "file://" };
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    let mut file_css = NamedTempFile::new()?;
+    writeln!(file_css, "body{{background-color:#000;color:#fff}}")?;
+    let mut file_html = NamedTempFile::new()?;
+    writeln!(
+        file_html,
+        "<style>\n\
+@charset 'UTF-8';\n\
+\n\
+@import '{file}{css_path}';\n\
+\n\
+@import url({file}{css_path});\n\
+\n\
+@import url('{file}{css_path}')\n\
+</style>\n",
+        file = file_url_prefix,
+        css_path = str!(file_css.path().to_str().unwrap()).replace("\\", "/"),
+    )?;
+    let out = cmd.arg(file_html.path()).output().unwrap();
+
+    // STDOUT should contain embedded CSS url()'s
+    assert_eq!(
+        std::str::from_utf8(&out.stdout).unwrap(),
+        "<html><head><style>\n@charset 'UTF-8';\n\n@import 'data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K';\n\n@import url('data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K');\n\n@import url('data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K')\n</style>\n\n</head><body></body></html>\n"
+    );
+
+    // STDERR should list temporary files that got retrieved
+    assert_eq!(
+        std::str::from_utf8(&out.stderr).unwrap(),
+        format!(
+            "\
+{file}{html_path}\n\
+{file}{css_path}\n\
+{file}{css_path}\n\
+{file}{css_path}\n\
+",
+            file = file_url_prefix,
+            html_path = str!(file_html.path().to_str().unwrap()).replace("\\", "/"),
+            css_path = str!(file_css.path().to_str().unwrap()).replace("\\", "/"),
+        )
+    );
 
     // The exit code should be 0
     out.assert().code(0);

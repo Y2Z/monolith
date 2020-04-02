@@ -1,10 +1,3 @@
-#[macro_use]
-extern crate clap;
-
-mod args;
-mod macros;
-
-use crate::args::AppArgs;
 use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
 use monolith::utils::{data_url_to_text, is_data_url, is_file_url, is_http_url, retrieve_asset};
 use reqwest::blocking::Client;
@@ -16,6 +9,13 @@ use std::io::{self, Error, Write};
 use std::path::Path;
 use std::process;
 use std::time::Duration;
+
+mod args;
+mod macros;
+
+#[macro_use]
+extern crate clap;
+use crate::args::AppArgs;
 
 enum Output {
     Stdout(io::Stdout),
@@ -47,7 +47,7 @@ impl Output {
 
 fn main() {
     let app_args = AppArgs::get();
-    let mut original_target: String = app_args.url_target.clone();
+    let original_target: &str = &app_args.url_target;
     let target_url: &str;
     let base_url;
     let dom;
@@ -55,33 +55,34 @@ fn main() {
     // Pre-process the input
     let cwd_normalized: String =
         str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
-    let path = Path::new(original_target.as_str());
+    let path = Path::new(original_target);
+    let mut target: String = str!(original_target.clone()).replace("\\", "/");
     let path_is_relative: bool = path.is_relative();
-    if original_target.clone().len() == 0 {
+
+    if target.clone().len() == 0 {
         eprintln!("No target specified");
         process::exit(1);
-    } else if is_http_url(original_target.clone()) || is_data_url(original_target.clone()) {
-        target_url = original_target.as_str();
-    } else if is_file_url(original_target.clone()) {
-        target_url = original_target.as_str();
+    } else if is_http_url(target.clone()) || is_data_url(target.clone()) {
+        target_url = target.as_str();
+    } else if is_file_url(target.clone()) {
+        target_url = target.as_str();
     } else if path.exists() {
         if !path.is_file() {
             eprintln!("Local target is not a file: {}", original_target);
             process::exit(1);
         }
-        original_target.insert_str(0, if cfg!(windows) { "file:///" } else { "file://" });
-        original_target = original_target.replace("\\", "/");
+        target.insert_str(0, if cfg!(windows) { "file:///" } else { "file://" });
         if path_is_relative {
-            original_target.insert_str(if cfg!(windows) { 8 } else { 7 }, &cwd_normalized);
-            original_target.insert_str(
+            target.insert_str(if cfg!(windows) { 8 } else { 7 }, &cwd_normalized);
+            target.insert_str(
                 if cfg!(windows) { 8 } else { 7 } + &cwd_normalized.len(),
                 "/",
             );
         }
-        target_url = original_target.as_str();
+        target_url = target.as_str();
     } else {
-        original_target.insert_str(0, "http://");
-        target_url = original_target.as_str();
+        target.insert_str(0, "http://");
+        target_url = target.as_str();
     }
 
     let mut output = Output::new(&app_args.output).expect("Could not prepare output");

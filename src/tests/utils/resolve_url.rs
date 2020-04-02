@@ -1,5 +1,6 @@
-use crate::utils;
 use url::ParseError;
+
+use crate::utils;
 
 //  ██████╗  █████╗ ███████╗███████╗██╗███╗   ██╗ ██████╗
 //  ██╔══██╗██╔══██╗██╔════╝██╔════╝██║████╗  ██║██╔════╝
@@ -167,6 +168,42 @@ fn passing_from_data_url_to_file_url() -> Result<(), ParseError> {
     .unwrap_or(str!());
 
     assert_eq!(resolved_url.as_str(), "file:///etc/passwd");
+
+    Ok(())
+}
+
+#[test]
+fn passing_preserve_fragment() -> Result<(), ParseError> {
+    let resolved_url = utils::resolve_url(
+        "http://doesnt-matter.local/",
+        "css/fonts/fontmarvelous.svg#fontmarvelous",
+    )
+    .unwrap_or(str!());
+
+    assert_eq!(
+        resolved_url.as_str(),
+        "http://doesnt-matter.local/css/fonts/fontmarvelous.svg#fontmarvelous"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn passing_resolve_from_file_url_to_file_url() -> Result<(), ParseError> {
+    let resolved_url = if cfg!(windows) {
+        utils::resolve_url("file:///c:/index.html", "file:///c:/image.png").unwrap_or(str!())
+    } else {
+        utils::resolve_url("file:///tmp/index.html", "file:///tmp/image.png").unwrap_or(str!())
+    };
+
+    assert_eq!(
+        resolved_url.as_str(),
+        if cfg!(windows) {
+            "file:///c:/image.png"
+        } else {
+            "file:///tmp/image.png"
+        }
+    );
 
     Ok(())
 }

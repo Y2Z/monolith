@@ -1,4 +1,4 @@
-use crate::utils;
+use crate::css;
 
 //  ██████╗  █████╗ ███████╗███████╗██╗███╗   ██╗ ██████╗
 //  ██╔══██╗██╔══██╗██╔════╝██╔════╝██║████╗  ██║██╔════╝
@@ -8,21 +8,43 @@ use crate::utils;
 //  ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝
 
 #[test]
-fn passing_encode_string_with_specific_media_type() {
-    let mime = "application/javascript";
-    let data = "var word = 'hello';\nalert(word);\n";
-    let data_url = utils::data_to_data_url(mime, data.as_bytes(), "", "");
+fn passing_empty_input_single_quotes() {
+    assert_eq!(css::enquote(str!(""), false), "''");
+}
 
+#[test]
+fn passing_empty_input_double_quotes() {
+    assert_eq!(css::enquote(str!(""), true), "\"\"");
+}
+
+#[test]
+fn passing_apostrophes_single_quotes() {
     assert_eq!(
-        &data_url,
-        "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
+        css::enquote(str!("It's a lovely day, don't you think?"), false),
+        "'It\\'s a lovely day, don\\'t you think?'"
     );
 }
 
 #[test]
-fn passing_encode_append_fragment() {
-    let data = "<svg></svg>\n";
-    let data_url = utils::data_to_data_url("text/css", data.as_bytes(), "", "fragment");
+fn passing_apostrophes_double_quotes() {
+    assert_eq!(
+        css::enquote(str!("It's a lovely day, don't you think?"), true),
+        "\"It's a lovely day, don't you think?\""
+    );
+}
 
-    assert_eq!(&data_url, "data:text/css;base64,PHN2Zz48L3N2Zz4K#fragment");
+#[test]
+fn passing_feet_and_inches_single_quotes() {
+    assert_eq!(
+        css::enquote(str!("5'2\", 6'5\""), false),
+        "'5\\'2\", 6\\'5\"'"
+    );
+}
+
+#[test]
+fn passing_feet_and_inches_double_quotes() {
+    assert_eq!(
+        css::enquote(str!("5'2\", 6'5\""), true),
+        "\"5'2\\\", 6'5\\\"\""
+    );
 }

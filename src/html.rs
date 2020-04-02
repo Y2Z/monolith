@@ -1,8 +1,6 @@
+use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
-use crate::utils::{
-    data_to_data_url, is_http_url, resolve_css_imports, resolve_url, retrieve_asset,
-    url_has_protocol,
-};
+use crate::utils::{data_to_data_url, is_http_url, resolve_url, retrieve_asset, url_has_protocol};
 use html5ever::interface::QualName;
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
@@ -164,16 +162,22 @@ pub fn walk_and_embed_assets(
                                             opt_silent,
                                         ) {
                                             // On successful retrieval, traverse CSS
-                                            Ok((css_data, _)) => resolve_css_imports(
-                                                cache,
-                                                client,
-                                                &css_data,
-                                                true,
-                                                &url,
-                                                &href_full_url,
-                                                opt_no_images,
-                                                opt_silent,
-                                            ),
+                                            Ok((css_data, final_url)) => {
+                                                let x: String = embed_css(
+                                                    cache,
+                                                    client,
+                                                    &final_url,
+                                                    &css_data,
+                                                    opt_no_images,
+                                                    opt_silent,
+                                                );
+                                                data_to_data_url(
+                                                    "text/css",
+                                                    x.as_bytes(),
+                                                    &final_url,
+                                                    "",
+                                                )
+                                            }
 
                                             // If a network error occured, warn
                                             Err(e) => {
@@ -402,13 +406,11 @@ pub fn walk_and_embed_assets(
                         for node in node.children.borrow_mut().iter_mut() {
                             if let NodeData::Text { ref contents } = node.data {
                                 let mut tendril = contents.borrow_mut();
-                                let replacement = resolve_css_imports(
+                                let replacement = embed_css(
                                     cache,
                                     client,
+                                    &url,
                                     tendril.as_ref(),
-                                    false,
-                                    &url,
-                                    &url,
                                     opt_no_images,
                                     opt_silent,
                                 );
@@ -473,7 +475,7 @@ pub fn walk_and_embed_assets(
                             );
                             let mut buf: Vec<u8> = Vec::new();
                             serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
-                            let iframe_data_url = data_to_data_url("text/html", &buf, "");
+                            let iframe_data_url = data_to_data_url("text/html", &buf, "", "");
                             attr.value.clear();
                             attr.value.push_slice(iframe_data_url.as_str());
                         }
@@ -518,7 +520,7 @@ pub fn walk_and_embed_assets(
                 // Get rid of style attributes
                 let mut style_attr_indexes = Vec::new();
                 for (i, attr) in attrs_mut.iter_mut().enumerate() {
-                    if attr.name.local.to_lowercase() == "style" {
+                    if attr.name.local.as_ref().eq_ignore_ascii_case("style") {
                         style_attr_indexes.push(i);
                     }
                 }
@@ -532,16 +534,15 @@ pub fn walk_and_embed_assets(
                     .iter_mut()
                     .filter(|a| a.name.local.as_ref().eq_ignore_ascii_case("style"))
                 {
-                    let replacement = resolve_css_imports(
+                    let replacement = embed_css(
                         cache,
                         client,
+                        &url,
                         attribute.value.as_ref(),
-                        false,
-                        &url,
-                        &url,
                         opt_no_images,
                         opt_silent,
                     );
+                    // let replacement = str!();
                     attribute.value.clear();
                     attribute.value.push_slice(&replacement);
                 }

@@ -18,6 +18,9 @@ fn passing_decode_unicode_characters() {
 }
 
 #[test]
-fn passing_decode_whitespaces() {
-    assert_eq!(utils::decode_url(str!("%20 %20")), "   ");
+fn passing_decode_file_url() {
+    assert_eq!(
+        utils::decode_url(str!("file:///tmp/space%20here/test%231.html")),
+        "file:///tmp/space here/test#1.html"
+    );
 }
