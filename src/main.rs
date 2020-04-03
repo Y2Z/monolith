@@ -47,7 +47,7 @@ impl Output {
 
 fn main() {
     let app_args = AppArgs::get();
-    let original_target: &str = &app_args.url_target;
+    let original_target: &str = &app_args.target;
     let target_url: &str;
     let base_url;
     let dom;

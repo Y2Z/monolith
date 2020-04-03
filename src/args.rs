@@ -2,7 +2,7 @@ use clap::{App, Arg};
 
 #[derive(Default)]
 pub struct AppArgs {
-    pub url_target: String,
+    pub target: String,
     pub no_css: bool,
     pub no_frames: bool,
     pub no_images: bool,
@@ -26,11 +26,11 @@ impl AppArgs {
             .author(crate_authors!("\n"))
             .about(crate_description!())
             .arg(
-                Arg::with_name("url")
+                Arg::with_name("target")
                     .required(true)
                     .takes_value(true)
                     .index(1)
-                    .help("URL to download"),
+                    .help("URL or file path"),
             )
             // .args_from_usage("-a, --include-audio 'Removes audio sources'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
@@ -47,9 +47,9 @@ impl AppArgs {
             .get_matches();
         let mut app_args = AppArgs::default();
         // Process the command
-        app_args.url_target = app
-            .value_of("url")
-            .expect("please set target url")
+        app_args.target = app
+            .value_of("target")
+            .expect("please set target")
             .to_string();
         app_args.no_css = app.is_present("no-css");
         app_args.no_frames = app.is_present("no-frames");
