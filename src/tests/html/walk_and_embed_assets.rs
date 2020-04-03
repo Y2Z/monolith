@@ -197,18 +197,19 @@ fn passing_no_images() {
 
     assert_eq!(
         buf.iter().map(|&c| c as char).collect::<String>(),
-        "<html>\
+        format!(
+            "<html>\
          <head>\
          <link rel=\"icon\" href=\"\">\
          </head>\
          <body>\
          <div>\
-         <img src=\"data:image/png;base64,\
-         iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0\
-         lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=\">\
+         <img src=\"{empty_image}\">\
          </div>\
          </body>\
-         </html>"
+         </html>",
+            empty_image = empty_image!()
+        )
     );
 }
 

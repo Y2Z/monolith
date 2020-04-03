@@ -18,9 +18,6 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     "mask-image",
 ];
 
-const TRANSPARENT_PIXEL: &str = "data:image/png;base64,\
-     iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-
 pub fn is_image_url_prop(prop_name: &str) -> bool {
     CSS_PROPS_WITH_IMAGE_URLS
         .iter()
@@ -185,7 +182,7 @@ pub fn process_css<'a>(
                         }
 
                         if opt_no_images && is_image_url_prop(curr_prop.as_str()) {
-                            result.push_str(enquote(str!(TRANSPARENT_PIXEL), false).as_str());
+                            result.push_str(enquote(str!(empty_image!()), false).as_str());
                         } else {
                             let resolved_url = resolve_url(&parent_url, value).unwrap_or_default();
                             let (data_url, _final_url) = retrieve_asset(
@@ -294,7 +291,7 @@ pub fn process_css<'a>(
                     );
                 } else {
                     if opt_no_images && is_image_url_prop(curr_prop.as_str()) {
-                        result.push_str(enquote(str!(TRANSPARENT_PIXEL), false).as_str());
+                        result.push_str(enquote(str!(empty_image!()), false).as_str());
                     } else {
                         let full_url = resolve_url(&parent_url, value).unwrap_or_default();
                         let (data_url, _final_url) = retrieve_asset(
