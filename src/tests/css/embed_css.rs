@@ -40,13 +40,16 @@ height: calc(100vh - 10pt)";
             true,
             true,
         ),
-        "/* border: none;*/\
-background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='); \
-list-style: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');\
+        format!(
+            "/* border: none;*/\
+background-image: url('{empty_image}'); \
+list-style: url('{empty_image}');\
 width:99.998%; \
 margin-top: -20px; \
 line-height: -1; \
-height: calc(100vh - 10pt)"
+height: calc(100vh - 10pt)",
+            empty_image = empty_image!()
+        )
     );
 }
 
@@ -64,21 +67,17 @@ line-height: -1; \
 height: calc(100vh - 10pt)";
 
     assert_eq!(
-        css::embed_css(
-            cache,
-            &client,
-            "",
-            &STYLE,
-            true,
-            true,
-        ),
-        "/* border: none;*/\
-background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='); \
-list-style: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');\
+        css::embed_css(cache, &client, "", &STYLE, true, true,),
+        format!(
+            "/* border: none;*/\
+background-image: url('{empty_image}'); \
+list-style: url('{empty_image}');\
 width:99.998%; \
 margin-top: -20px; \
 line-height: -1; \
-height: calc(100vh - 10pt)"
+height: calc(100vh - 10pt)",
+            empty_image = empty_image!()
+        )
     );
 }
 

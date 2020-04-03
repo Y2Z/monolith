@@ -20,9 +20,6 @@ const ICON_VALUES: &[&str] = &[
     "fluid-icon",
 ];
 
-const TRANSPARENT_PIXEL: &str = "data:image/png;base64,\
-     iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-
 pub fn get_parent_node(node: &Handle) -> Handle {
     let parent = node.parent.take().clone();
     parent.and_then(|node| node.upgrade()).unwrap()
@@ -270,7 +267,7 @@ pub fn walk_and_embed_assets(
                     if opt_no_images {
                         attrs_mut.push(Attribute {
                             name: QualName::new(None, ns!(), local_name!("src")),
-                            value: Tendril::from_slice(TRANSPARENT_PIXEL),
+                            value: Tendril::from_slice(empty_image!()),
                         });
                     } else if let Some((data_url, _)) = found_datasrc
                         .iter()
@@ -297,6 +294,58 @@ pub fn walk_and_embed_assets(
                         });
                     }
                 }
+                "input" => {
+                    let mut is_image: bool = false;
+                    for attr in attrs_mut.iter_mut() {
+                        let attr_name: &str = &attr.name.local;
+                        if attr_name == "type" {
+                            is_image = attr.value.to_string().eq_ignore_ascii_case("image");
+                        }
+                    }
+
+                    if is_image {
+                        let mut found_src: Option<Attribute> = None;
+                        let mut i = 0;
+                        while i < attrs_mut.len() {
+                            let attr_name = attrs_mut[i].name.local.as_ref();
+                            if attr_name.eq_ignore_ascii_case("src") {
+                                found_src = Some(attrs_mut.remove(i));
+                            } else {
+                                i += 1;
+                            }
+                        }
+
+                        // If images are disabled, clear both sources
+                        if opt_no_images {
+                            attrs_mut.push(Attribute {
+                                name: QualName::new(None, ns!(), local_name!("src")),
+                                value: Tendril::from_slice(empty_image!()),
+                            });
+                        } else if let Some((data_url, _)) = found_src
+                            .iter()
+                            .map(|attr| attr.value.trim())
+                            .filter(|src| !src.is_empty()) // Skip if empty
+                            .next()
+                            .and_then(|src| resolve_url(&url, src).ok()) // Make absolute
+                            .and_then(|abs_src| // Download and convert to data_url
+                                retrieve_asset(
+                                    cache,
+                                    client,
+                                    &url,
+                                    &abs_src,
+                                    true,
+                                    "",
+                                    opt_silent,
+                                ).ok())
+                        {
+                            // Add new data_url src attribute
+                            attrs_mut.push(Attribute {
+                                name: QualName::new(None, ns!(), local_name!("src")),
+                                value: Tendril::from_slice(data_url.as_ref()),
+                            });
+                        }
+                    }
+                }
                 "source" => {
                     for attr in attrs_mut.iter_mut() {
                         let attr_name: &str = &attr.name.local;
@@ -310,7 +359,7 @@ pub fn walk_and_embed_assets(
                             if get_node_name(&get_parent_node(&node)) == Some("picture") {
                                 if opt_no_images {
                                     attr.value.clear();
-                                    attr.value.push_slice(TRANSPARENT_PIXEL);
+                                    attr.value.push_slice(empty_image!());
                                 } else {
                                     let srcset_full_url =
                                         resolve_url(&url, attr.value.trim()).unwrap_or_default();

@@ -162,15 +162,18 @@ fn passing_remove_images_from_data_url() -> Result<(), Box<dyn std::error::Error
     // STDOUT should contain HTML with no images
     assert_eq!(
         std::str::from_utf8(&out.stdout).unwrap(),
-        "<html>\
+        format!(
+            "<html>\
 <head>\
 <meta http-equiv=\"Content-Security-Policy\" content=\"img-src data:;\"></meta>\
 </head>\
 <body>\
-<img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=\">\
+<img src=\"{empty_image}\">\
 Hi\
 </body>\
-</html>\n"
+</html>\n",
+            empty_image = empty_image!()
+        )
     );
 
     // STDERR should be empty
@@ -229,7 +232,8 @@ fn passing_local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
     // STDOUT should contain HTML from the local file
     assert_eq!(
         std::str::from_utf8(&out.stdout).unwrap(),
-        "<!DOCTYPE html><html lang=\"en\"><head>\n  \
+        "\
+<!DOCTYPE html><html lang=\"en\"><head>\n  \
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  \
 <title>Local HTML file</title>\n  \
 <link href=\"data:text/css;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNmZmY7Cn0K\" rel=\"stylesheet\" type=\"text/css\">\n  \
@@ -238,16 +242,19 @@ fn passing_local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
 <a href=\"file://local-file.html/\">Tricky href</a>\n  \
 <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
 <script src=\"data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==\"></script>\n\n\n\n\
-</body></html>\n"
+</body></html>\n\
+"
     );
 
     // STDERR should contain list of retrieved file URLs
     assert_eq!(
         std::str::from_utf8(&out.stderr).unwrap(),
         format!(
-            "{file}{cwd}/src/tests/data/local-file.html\n\
+            "\
+{file}{cwd}/src/tests/data/local-file.html\n\
 {file}{cwd}/src/tests/data/local-style.css\n\
-{file}{cwd}/src/tests/data/local-script.js\n",
+{file}{cwd}/src/tests/data/local-script.js\n\
+",
             file = file_url_protocol,
             cwd = cwd_normalized
         )
@@ -286,17 +293,22 @@ fn passing_local_file_target_input_absolute_target_path() -> Result<(), Box<dyn 
     // STDOUT should contain HTML from the local file
     assert_eq!(
         std::str::from_utf8(&out.stdout).unwrap(),
-        "<!DOCTYPE html><html lang=\"en\"><head>\
+        format!(
+            "\
+<!DOCTYPE html><html lang=\"en\"><head>\
 <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; script-src 'none'; img-src data:;\"></meta>\n  \
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  \
 <title>Local HTML file</title>\n  \
 <link href=\"\" rel=\"stylesheet\" type=\"text/css\">\n  \
 <link href=\"\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
-<img alt=\"\" src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=\">\n  \
+<img alt=\"\" src=\"{empty_image}\">\n  \
 <a href=\"file://local-file.html/\">Tricky href</a>\n  \
 <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
 <script src=\"\"></script>\n\n\n\n\
-</body></html>\n"
+</body></html>\n\
+",
+            empty_image = empty_image!()
+        )
     );
 
     // STDERR should contain only the target file
@@ -342,17 +354,22 @@ fn passing_local_file_url_target_input() -> Result<(), Box<dyn std::error::Error
     // STDOUT should contain HTML from the local file
     assert_eq!(
         std::str::from_utf8(&out.stdout).unwrap(),
-        "<!DOCTYPE html><html lang=\"en\"><head>\
+        format!(
+            "\
+<!DOCTYPE html><html lang=\"en\"><head>\
 <meta http-equiv=\"Content-Security-Policy\" content=\"style-src 'none'; script-src 'none'; img-src data:;\"></meta>\n  \
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  \
 <title>Local HTML file</title>\n  \
 <link href=\"\" rel=\"stylesheet\" type=\"text/css\">\n  \
 <link href=\"\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
-<img alt=\"\" src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=\">\n  \
+<img alt=\"\" src=\"{empty_image}\">\n  \
 <a href=\"file://local-file.html/\">Tricky href</a>\n  \
 <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
 <script src=\"\"></script>\n\n\n\n\
-</body></html>\n"
+</body></html>\n\
+",
+            empty_image = empty_image!()
+        )
     );
 
     // STDERR should contain list of retrieved file URLs
@@ -458,7 +475,8 @@ fn passing_css_import_string() -> Result<(), Box<dyn std::error::Error>> {
     let mut file_html = NamedTempFile::new()?;
     writeln!(
         file_html,
-        "<style>\n\
+        "\
+<style>\n\
 @charset 'UTF-8';\n\
 \n\
 @import '{file}{css_path}';\n\
@@ -466,7 +484,8 @@ fn passing_css_import_string() -> Result<(), Box<dyn std::error::Error>> {
 @import url({file}{css_path});\n\
 \n\
 @import url('{file}{css_path}')\n\
-</style>\n",
+</style>\n\
+",
         file = file_url_prefix,
         css_path = str!(file_css.path().to_str().unwrap()).replace("\\", "/"),
     )?;
