@@ -28,11 +28,11 @@ fn get_node_name() {
                 let parent = html::get_parent_node(node);
                 let parent_node_name = html::get_node_name(&parent);
                 if node_name == "head" || node_name == "body" {
-                    assert_eq!(parent_node_name, "html");
+                    assert_eq!(parent_node_name, Some("html"));
                 } else if node_name == "div" {
-                    assert_eq!(parent_node_name, "body");
+                    assert_eq!(parent_node_name, Some("body"));
                 } else if node_name == "p" {
-                    assert_eq!(parent_node_name, "div");
+                    assert_eq!(parent_node_name, Some("div"));
                 }
 
                 for child in node.children.borrow().iter() {

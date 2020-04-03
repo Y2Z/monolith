@@ -28,18 +28,15 @@ pub fn get_parent_node(node: &Handle) -> Handle {
     parent.and_then(|node| node.upgrade()).unwrap()
 }
 
-pub fn get_node_name(node: &Handle) -> &'_ str {
+pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
     match &node.data {
-        NodeData::Element { ref name, .. } => name.local.as_ref(),
-        _ => "",
+        NodeData::Element { ref name, .. } => Some(name.local.as_ref()),
+        _ => None,
     }
 }
 
 pub fn is_icon(attr_value: &str) -> bool {
-    ICON_VALUES
-        .iter()
-        .find(|a| attr_value.eq_ignore_ascii_case(a))
-        .is_some()
+    ICON_VALUES.contains(&attr_value.to_lowercase().as_str())
 }
 
 pub fn walk_and_embed_assets(
@@ -310,7 +307,7 @@ pub fn walk_and_embed_assets(
                             attr.value.clear();
                             attr.value.push_slice(src_full_url.as_str());
                         } else if attr_name == "srcset" {
-                            if get_node_name(&get_parent_node(&node)) == "picture" {
+                            if get_node_name(&get_parent_node(&node)) == Some("picture") {
                                 if opt_no_images {
                                     attr.value.clear();
                                     attr.value.push_slice(TRANSPARENT_PIXEL);
