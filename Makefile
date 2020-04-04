@@ -1,21 +1,25 @@
-#!/usr/bin/make -f
+# Makefile for monolith
 
-all: test
+all: build
 .PHONY: all
 
 build:
 	@cargo build --locked
 .PHONY: build
 
-install:
-	@cargo install --force --locked --path .
-.PHONY: install
-
 test: build
 	@cargo test --locked
 	@cargo fmt --all -- --check
-.PHONY: test
+.PHONY: test_code_formatting
 
 lint:
 	@cargo fmt --all --
 .PHONY: lint
+
+install:
+	@cargo install --force --locked --path .
+.PHONY: install
+
+uninstall:
+	@cargo uninstall
+.PHONY: uninstall
