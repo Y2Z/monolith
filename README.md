@@ -1,6 +1,4 @@
 [![GitHub Actions Build Status](https://github.com/Y2Z/monolith/workflows/Build/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3ABuild)
-[![Travis CI Build Status](https://travis-ci.org/Y2Z/monolith.svg?branch=master)](https://travis-ci.org/Y2Z/monolith)
-[![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/ae7soyjih8jg2bv7/branch/master?svg=true)](https://ci.appveyor.com/project/snshn/monolith/branch/master)
 
 ```
  ___     ___________    __________      ___________________    ___
