@@ -380,7 +380,7 @@ pub fn walk_and_embed_assets(
                         }
                     }
                 }
-                "a" => {
+                "a" | "area" => {
                     for attr in attrs_mut.iter_mut() {
                         if &attr.name.local == "href" {
                             let attr_value = attr.value.trim();
