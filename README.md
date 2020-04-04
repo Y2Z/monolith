@@ -1,3 +1,4 @@
+[![GitHub Actions Build Status](https://github.com/Y2Z/monolith/workflows/Build/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3ABuild)
 [![Travis CI Build Status](https://travis-ci.org/Y2Z/monolith.svg?branch=master)](https://travis-ci.org/Y2Z/monolith)
 [![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/ae7soyjih8jg2bv7/branch/master?svg=true)](https://ci.appveyor.com/project/snshn/monolith/branch/master)
 
@@ -21,11 +22,6 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 ## Installation
 
-#### From source
-    $ git clone https://github.com/Y2Z/monolith.git
-    $ cd monolith
-    $ make install
-
 #### With Homebrew (on macOS and GNU/Linux)
     $ brew install monolith
 
@@ -34,6 +30,11 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 #### Via Docker
 The guide can be found [here](docs/containers.md)
+
+#### From source
+    $ git clone https://github.com/Y2Z/monolith.git
+    $ cd monolith
+    $ make install
 
 ---------------------------------------------------
 

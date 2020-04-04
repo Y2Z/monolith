@@ -8,8 +8,8 @@ os:
 
 rust:
 - stable
-- beta
-- nightly
+# - beta
+# - nightly
 
 git:
   autocrlf: false # don't mangle LF into CRLF on windows

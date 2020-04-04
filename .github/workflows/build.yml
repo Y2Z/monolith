@@ -1,11 +1,11 @@
-name: CI
+name: Build
 
 on:
-  pull_request:
+  push:
     branches: [ master ]
 
 jobs:
-  build_and_test:
+  build:
 
     strategy:
       matrix:
@@ -15,8 +15,6 @@ jobs:
           - windows-latest
         rust:
           - stable
-          - beta
-          - nightly
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -24,7 +22,3 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --all --locked --verbose
-    - name: Run tests
-      run: cargo test --all --locked --verbose
-    - name: Check code formatting
-      run: cargo fmt --all -- --check
