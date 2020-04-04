@@ -22,6 +22,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+    - run: git config --global core.autocrlf false
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --all --locked --verbose
