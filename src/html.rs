@@ -346,6 +346,11 @@ pub fn walk_and_embed_assets(
                         }
                     }
                 }
+                "svg" => {
+                    if opt_no_images {
+                        node.children.borrow_mut().clear();
+                    }
+                }
                 "source" => {
                     for attr in attrs_mut.iter_mut() {
                         let attr_name: &str = &attr.name.local;
