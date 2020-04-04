@@ -1,4 +1,4 @@
-name: Cross-platform build & test
+name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build_and_test:
 
     strategy:
       matrix:
