@@ -1,0 +1,23 @@
+name: CD
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+    - run: git config --global core.autocrlf false
+    - name: Checkout the repository
+      uses: actions/checkout@master
+    - name: Build the executable
+      run: cargo build --all --locked
+    - name: Perform local installation
+      run: cargo install --force --locked --path .
+    - uses: Shopify/upload-to-release@1.0.0
+      with:
+        name: monolith.exe
+        path: C:\Users\runneradmin\.cargo\bin\monolith.exe
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
