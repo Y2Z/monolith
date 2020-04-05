@@ -1,0 +1,21 @@
+name: CD
+
+on:
+  release:
+    types: [created]
+  
+jobs:
+  publish:
+
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@master
+    - name: Generate artifacts
+      run: cargo build --all --locked
+    - name: Upload artifacts
+      env:
+        GITHUB_DEPLOY_TOKEN: ${{ secrets.GITHUB_DEPLOY_TOKEN }}
+      run: |
+        curl -sSL -XPOST -H "Authorization: token ${GITHUB_DEPLOY_TOKEN}" --upload-file D:\a\test-repo\test-repo\target\debug\deps\test-*.exe" --header "Content-Type:application/octet-stream" --write-out "%{http_code}" "https://uploads.github.com/repos/Y2Z/test-repo/releases/latest/assets?name=test.exe"
