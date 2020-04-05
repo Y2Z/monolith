@@ -12,9 +12,7 @@ jobs:
     - run: git config --global core.autocrlf false
     - name: Checkout the repository
       uses: actions/checkout@master
-    - name: Build the executable
-      run: cargo build --all --locked
-    - name: Perform local installation
+    - name: Build and install the executable
       run: cargo install --force --locked --path .
     - uses: Shopify/upload-to-release@1.0.0
       with:
