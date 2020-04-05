@@ -1,4 +1,6 @@
-[![GitHub Actions Build Status](https://github.com/Y2Z/monolith/workflows/Build/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3ABuild)
+[![GitHub Actions Build Status for GNU/Linux](https://github.com/Y2Z/monolith/workflows/GNU%2FLinux/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AGNU%2FLinux)
+[![GitHub Actions Build Status for macOS](https://github.com/Y2Z/monolith/workflows/macOS/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AmacOS)
+[![GitHub Actions Build Status for Windows](https://github.com/Y2Z/monolith/workflows/Windows/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AWindows)
 
 ```
  ___     ___________    __________      ___________________    ___
