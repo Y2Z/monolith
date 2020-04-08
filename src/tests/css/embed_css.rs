@@ -197,3 +197,30 @@ body {\n    \
         CSS
     );
 }
+
+#[test]
+fn passing_transform_percentages_and_degrees() {
+    let cache = &mut HashMap::new();
+    let client = Client::new();
+
+    const CSS: &str = "\
+div {\n    \
+    transform: translate(-50%, -50%) rotate(-45deg);\n\
+    transform: translate(50%, 50%) rotate(45deg);\n\
+    transform: translate(+50%, +50%) rotate(+45deg);\n\
+}\n\
+\n\
+";
+
+    assert_eq!(
+        css::embed_css(
+            cache,
+            &client,
+            "https://doesntmatter.local/",
+            &CSS,
+            false,
+            true,
+        ),
+        CSS
+    );
+}
