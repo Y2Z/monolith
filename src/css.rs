@@ -217,17 +217,21 @@ pub fn process_css<'a>(
                 ref unit_value,
                 ..
             } => {
-                if *has_sign {
-                    result.push_str("-");
+                if *has_sign && *unit_value >= 0. {
+                    result.push_str("+");
                 }
                 result.push_str(str!(unit_value * 100.).as_str());
                 result.push_str("%");
             }
             Token::Dimension {
+                ref has_sign,
                 ref value,
                 ref unit,
                 ..
             } => {
+                if *has_sign && *value >= 0. {
+                    result.push_str("+");
+                }
                 result.push_str(str!(value).as_str());
                 result.push_str(str!(unit).as_str());
             }
