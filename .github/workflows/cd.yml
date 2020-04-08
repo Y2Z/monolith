@@ -1,21 +1,43 @@
+# CD GitHub Actions workflow for Monolith
+
 name: CD
 
 on:
   release:
-    types: [created]
+    types:
+    - created
 
 jobs:
+
   windows:
     runs-on: windows-latest
-
     steps:
     - run: git config --global core.autocrlf false
     - name: Checkout the repository
-      uses: actions/checkout@master
+      uses: actions/checkout@v2
     - name: Build and install the executable
-      run: cargo install --force --locked --path .
+      run: cargo build --release
     - uses: Shopify/upload-to-release@1.0.0
       with:
         name: monolith.exe
-        path: C:\Users\runneradmin\.cargo\bin\monolith.exe
+        path: target\release\monolith.exe
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  gnu_linux_armhf:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Prepare cross-platform environment
+      run: |
+        rustup target add arm-unknown-linux-gnueabihf
+        git clone https://github.com/raspberrypi/tools.git rpi_tools
+    - name: Build and install the executable
+      run: |
+        export RUSTFLAGS="-C linker=rpi_tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc"
+        cargo build --release --target=arm-unknown-linux-gnueabihf
+    - uses: Shopify/upload-to-release@1.0.0
+      with:
+        name: monolith-gnu-linux-armhf
+        path: target/arm-unknown-linux-gnueabihf/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
