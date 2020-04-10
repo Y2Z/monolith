@@ -24,3 +24,13 @@ fn passing_decode_file_url() {
         "file:///tmp/space here/test#1.html"
     );
 }
+
+#[test]
+fn passing_plus_sign() {
+    assert_eq!(
+        utils::decode_url(str!(
+            "fonts.somewhere.com/css?family=Open+Sans:300,400,400italic,600,600italic"
+        )),
+        "fonts.somewhere.com/css?family=Open+Sans:300,400,400italic,600,600italic"
+    );
+}

@@ -163,9 +163,9 @@ fn passing_import_string() {
         "\
 @charset 'UTF-8';\n\
 \n\
-@import 'data:text/css;base64,ZGF0YTp0ZXh0L2NzcyxodG1se2JhY2tncm91bmQtY29sb3I6IzAwMH0=';\n\
+@import 'data:text/css;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9';\n\
 \n\
-@import url('data:text/css;base64,ZGF0YTp0ZXh0L2NzcyxodG1se2NvbG9yOiNmZmZ9')\n\
+@import url('data:text/css;base64,aHRtbHtjb2xvcjojZmZmfQ==')\n\
 "
     );
 }

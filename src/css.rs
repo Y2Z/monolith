@@ -2,7 +2,7 @@ use cssparser::{ParseError, Parser, ParserInput, SourcePosition, Token};
 use reqwest::blocking::Client;
 use std::collections::HashMap;
 
-use crate::utils::{data_to_data_url, decode_url, get_url_fragment, resolve_url, retrieve_asset};
+use crate::utils::{data_to_data_url, get_url_fragment, resolve_url, retrieve_asset};
 
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     "background",
@@ -142,12 +142,11 @@ pub fn process_css<'a>(
 
                     let full_url = resolve_url(&parent_url, value).unwrap_or_default();
                     let url_fragment = get_url_fragment(full_url.clone());
-                    let full_url_decoded = decode_url(full_url);
                     let (css, final_url) = retrieve_asset(
                         cache,
                         client,
                         &parent_url,
-                        &full_url_decoded,
+                        &full_url,
                         false,
                         "",
                         opt_silent,
@@ -261,12 +260,11 @@ pub fn process_css<'a>(
                 if is_import {
                     let full_url = resolve_url(&parent_url, value).unwrap_or_default();
                     let url_fragment = get_url_fragment(full_url.clone());
-                    let full_url_decoded = decode_url(full_url);
                     let (css, final_url) = retrieve_asset(
                         cache,
                         client,
                         &parent_url,
-                        &full_url_decoded,
+                        &full_url,
                         false,
                         "",
                         opt_silent,

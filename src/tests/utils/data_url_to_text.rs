@@ -45,6 +45,14 @@ fn passing_parse_text_html_charset_utf_8_between_two_whitespaces() {
     );
 }
 
+#[test]
+fn passing_parse_text_css_url_encoded() {
+    assert_eq!(
+        utils::data_url_to_text("data:text/css,div{background-color:%23000}"),
+        "div{background-color:#000}"
+    );
+}
+
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
 //  ██╔════╝██╔══██╗██║██║     ██║████╗  ██║██╔════╝
 //  █████╗  ███████║██║██║     ██║██╔██╗ ██║██║  ███╗
