@@ -133,14 +133,10 @@ pub fn clean_url<T: AsRef<str>>(url: T) -> String {
     result.to_string()
 }
 
-pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
-    let parsed_url = Url::parse(url.as_ref()).unwrap_or(Url::parse("http://[::1]").unwrap());
+pub fn data_url_to_text<T: AsRef<str>>(url: T) -> (String, String) {
+    let parsed_url = Url::parse(url.as_ref()).unwrap_or(Url::parse("data:,").unwrap());
     let path: String = parsed_url.path().to_string();
     let comma_loc: usize = path.find(',').unwrap_or(path.len());
-
-    if comma_loc == path.len() {
-        return str!();
-    }
 
     let meta_data: String = path.chars().take(comma_loc).collect();
     let raw_data: String = path.chars().skip(comma_loc + 1).collect();
@@ -148,35 +144,36 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
     let data: String = decode_url(raw_data);
 
     let meta_data_items: Vec<&str> = meta_data.split(';').collect();
-    let mut media_type: &str = "";
     let mut encoding: &str = "";
 
-    // Detect media type and encoding
+    let mut media_type: String = str!();
+    let mut text: String = str!();
+
     let mut i: i8 = 0;
     for item in &meta_data_items {
         if i == 0 {
-            if is_plaintext_media_type(item) {
-                media_type = item;
-                continue;
+            media_type = str!(item);
+        } else {
+            if item.eq_ignore_ascii_case("base64")
+                || item.eq_ignore_ascii_case("utf8")
+                || item.eq_ignore_ascii_case("charset=UTF-8")
+            {
+                encoding = item;
             }
-        }
-
-        if item.eq_ignore_ascii_case("base64") || item.eq_ignore_ascii_case("utf8") {
-            encoding = item;
         }
 
         i = i + 1;
     }
 
-    if is_plaintext_media_type(media_type) {
+    if is_plaintext_media_type(&media_type) || media_type.is_empty() {
         if encoding.eq_ignore_ascii_case("base64") {
-            String::from_utf8(base64::decode(&data).unwrap_or(vec![])).unwrap_or(str!())
+            text = String::from_utf8(base64::decode(&data).unwrap_or(vec![])).unwrap_or(str!())
         } else {
-            data
+            text = data
         }
-    } else {
-        str!()
     }
+
+    (media_type, text)
 }
 
 pub fn decode_url(input: String) -> String {
@@ -238,7 +235,9 @@ pub fn retrieve_asset(
         if as_data_url {
             Ok((url.to_string(), url.to_string()))
         } else {
-            Ok((data_url_to_text(url), url.to_string()))
+            let (_media_type, text) = data_url_to_text(url);
+
+            Ok((text, url.to_string()))
         }
     } else if is_file_url(&url) {
         // Check if parent_url is also file:///

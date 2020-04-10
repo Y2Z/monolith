@@ -122,9 +122,9 @@ fn main() {
         base_url = final_url;
         dom = html_to_dom(&data);
     } else if is_data_url(target_url) {
-        let text: String = data_url_to_text(target_url);
-        if text.len() == 0 {
-            eprintln!("Unsupported data URL input");
+        let (media_type, text): (String, String) = data_url_to_text(target_url);
+        if !media_type.eq_ignore_ascii_case("text/html") {
+            eprintln!("Unsupported data URL media type");
             process::exit(1);
         }
         base_url = str!(target_url);
