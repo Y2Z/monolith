@@ -62,7 +62,7 @@ fn passing_bad_input_data_url() -> Result<(), Box<dyn std::error::Error>> {
     // STDERR should contain error description
     assert_eq!(
         std::str::from_utf8(&out.stderr).unwrap(),
-        "Unsupported data URL input\n"
+        "Unsupported data URL media type\n"
     );
 
     // The exit code should be 1
