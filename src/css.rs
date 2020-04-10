@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use crate::utils::{data_to_data_url, get_url_fragment, resolve_url, retrieve_asset};
 
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
+    // Universal
     "background",
     "background-image",
-    "border",
     "border-image",
     "border-image-source",
     "content",
@@ -16,6 +16,13 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     "list-style-image",
     "mask",
     "mask-image",
+    // Specific to @counter-style
+    "additive-symbols",
+    "negative",
+    "pad",
+    "prefix",
+    "suffix",
+    "symbols",
 ];
 
 pub fn is_image_url_prop(prop_name: &str) -> bool {
