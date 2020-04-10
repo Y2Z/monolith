@@ -21,3 +21,18 @@ fn passing_remove_protocl_and_fragment() {
         );
     }
 }
+
+#[test]
+fn passing_decodes_urls() {
+    if cfg!(windows) {
+        assert_eq!(
+            utils::file_url_to_fs_path("file:///C:/Documents%20and%20Settings/some-file.html"),
+            "C:\\Documents and Settings\\some-file.html"
+        );
+    } else {
+        assert_eq!(
+            utils::file_url_to_fs_path("file:///home/user/My%20Documents"),
+            "/home/user/My Documents"
+        );
+    }
+}

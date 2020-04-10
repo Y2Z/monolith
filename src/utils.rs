@@ -30,6 +30,14 @@ const MAGIC: [[&[u8]; 2]; 18] = [
     [b"\x1A\x45\xDF\xA3", b"video/webm"],
 ];
 
+const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
+    "image/svg+xml",
+    "text/css",
+    "text/html",
+    "text/javascript",
+    "text/plain",
+];
+
 pub fn data_to_data_url(media_type: &str, data: &[u8], url: &str, fragment: &str) -> String {
     let media_type: String = if media_type.is_empty() {
         detect_media_type(data, &url)
@@ -88,6 +96,10 @@ pub fn is_http_url<T: AsRef<str>>(url: T) -> bool {
         .unwrap_or(false)
 }
 
+pub fn is_plaintext_media_type(media_type: &str) -> bool {
+    PLAINTEXT_MEDIA_TYPES.contains(&media_type.to_lowercase().as_str())
+}
+
 pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<String, ParseError> {
     let result = if is_http_url(to.as_ref()) {
         to.as_ref().to_string()
@@ -139,10 +151,11 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
     let mut media_type: &str = "";
     let mut encoding: &str = "";
 
+    // Detect media type and encoding
     let mut i: i8 = 0;
     for item in &meta_data_items {
         if i == 0 {
-            if item.eq_ignore_ascii_case("text/html") {
+            if is_plaintext_media_type(item) {
                 media_type = item;
                 continue;
             }
@@ -155,7 +168,7 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
         i = i + 1;
     }
 
-    if media_type.eq_ignore_ascii_case("text/html") {
+    if is_plaintext_media_type(media_type) {
         if encoding.eq_ignore_ascii_case("base64") {
             String::from_utf8(base64::decode(&data).unwrap_or(vec![])).unwrap_or(str!())
         } else {
@@ -167,6 +180,8 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> String {
 }
 
 pub fn decode_url(input: String) -> String {
+    let input: String = input.replace("+", "%2B");
+
     form_urlencoded::parse(input.as_bytes())
         .map(|(key, val)| {
             [
@@ -200,7 +215,8 @@ pub fn file_url_to_fs_path(url: &str) -> String {
         fs_file_path = fs_file_path.replace("/", "\\");
     }
 
-    fs_file_path
+    // File paths should not be %-encoded
+    decode_url(fs_file_path)
 }
 
 pub fn retrieve_asset(
@@ -219,7 +235,11 @@ pub fn retrieve_asset(
     let cache_key = clean_url(&url);
 
     if is_data_url(&url) {
-        Ok((url.to_string(), url.to_string()))
+        if as_data_url {
+            Ok((url.to_string(), url.to_string()))
+        } else {
+            Ok((data_url_to_text(url), url.to_string()))
+        }
     } else if is_file_url(&url) {
         // Check if parent_url is also file:///
         // (if not, then we don't embed the asset)
