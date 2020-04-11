@@ -122,7 +122,7 @@ pub fn process_css<'a>(
             }
             Token::Ident(ref value) => {
                 curr_prop = str!(value);
-                result.push_str(value);
+                result.push_str(&value.replace(":", "\\:"));
             }
             Token::AtKeyword(ref value) => {
                 curr_rule = str!(value);
