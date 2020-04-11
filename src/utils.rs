@@ -120,17 +120,24 @@ pub fn get_url_fragment<T: AsRef<str>>(url: T) -> String {
     }
 }
 
-pub fn clean_url<T: AsRef<str>>(url: T) -> String {
-    let mut result = Url::parse(url.as_ref()).unwrap();
+pub fn clean_url<T: AsRef<str>>(input: T) -> String {
+    let mut url = Url::parse(input.as_ref()).unwrap();
 
     // Clear fragment
-    result.set_fragment(None);
+    url.set_fragment(None);
 
     // Get rid of stray question mark
-    if result.query() == Some("") {
-        result.set_query(None);
+    if url.query() == Some("") {
+        url.set_query(None);
     }
-    result.to_string()
+
+    // Remove empty trailing ampersand(s)
+    let mut result: String = url.to_string();
+    while result.ends_with("&") {
+        result.pop();
+    }
+
+    result
 }
 
 pub fn data_url_to_text<T: AsRef<str>>(url: T) -> (String, String) {
@@ -217,7 +224,7 @@ pub fn file_url_to_fs_path(url: &str) -> String {
 }
 
 pub fn retrieve_asset(
-    cache: &mut HashMap<String, String>,
+    cache: &mut HashMap<String, Vec<u8>>,
     client: &Client,
     parent_url: &str,
     url: &str,
@@ -228,8 +235,6 @@ pub fn retrieve_asset(
     if url.len() == 0 {
         return Ok((str!(), str!()));
     }
-
-    let cache_key = clean_url(&url);
 
     if is_data_url(&url) {
         if as_data_url {
@@ -270,13 +275,25 @@ pub fn retrieve_asset(
             Ok((str!(), url.to_string()))
         }
     } else {
+        let cache_key: String = clean_url(&url);
+
         if cache.contains_key(&cache_key) {
-            // URL is in cache
+            // URL is in cache, we retrieve it
+            let data = cache.get(&cache_key).unwrap();
+
             if !opt_silent {
                 eprintln!("{} (from cache)", &url);
             }
-            let data = cache.get(&cache_key).unwrap();
-            Ok((data.to_string(), url.to_string()))
+
+            if as_data_url {
+                let url_fragment = get_url_fragment(url);
+                Ok((
+                    data_to_data_url(media_type, data, url, &url_fragment),
+                    url.to_string(),
+                ))
+            } else {
+                Ok((String::from_utf8_lossy(data).to_string(), url.to_string()))
+            }
         } else {
             // URL not in cache, we request it
             let mut response = client.get(url).send()?;
@@ -290,7 +307,7 @@ pub fn retrieve_asset(
                 }
             }
 
-            let new_cache_key = clean_url(&res_url);
+            let new_cache_key: String = clean_url(&res_url);
 
             if as_data_url {
                 // Convert response into a byte array
@@ -309,13 +326,17 @@ pub fn retrieve_asset(
                 };
                 let url_fragment = get_url_fragment(url);
                 let data_url = data_to_data_url(&media_type, &data, url, &url_fragment);
+
                 // Add to cache
-                cache.insert(new_cache_key, data_url.clone());
+                cache.insert(new_cache_key, data);
+
                 Ok((data_url, res_url))
             } else {
                 let content = response.text().unwrap();
+
                 // Add to cache
-                cache.insert(new_cache_key, content.clone());
+                cache.insert(new_cache_key, content.as_bytes().to_vec());
+
                 Ok((content, res_url))
             }
         }
