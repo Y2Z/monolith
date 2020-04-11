@@ -209,7 +209,30 @@ div {\n    \
     transform: translate(50%, 50%) rotate(45deg);\n\
     transform: translate(+50%, +50%) rotate(+45deg);\n\
 }\n\
-\n\
+";
+
+    assert_eq!(
+        css::embed_css(
+            cache,
+            &client,
+            "https://doesntmatter.local/",
+            &CSS,
+            false,
+            true,
+        ),
+        CSS
+    );
+}
+
+#[test]
+fn passing_colons_in_class_names() {
+    let cache = &mut HashMap::new();
+    let client = Client::new();
+
+    const CSS: &str = "\
+.is\\:good:hover {\n    \
+    color: green\n\
+}\n\
 ";
 
     assert_eq!(
