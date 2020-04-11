@@ -225,13 +225,17 @@ div {\n    \
 }
 
 #[test]
-fn passing_colons_in_class_names() {
+fn passing_unusual_indents() {
     let cache = &mut HashMap::new();
     let client = Client::new();
 
     const CSS: &str = "\
 .is\\:good:hover {\n    \
     color: green\n\
+}\n\
+\n\
+#\\~\\!\\@\\$\\%\\^\\&\\*\\(\\)\\+\\=\\,\\.\\/\\\\\\'\\\"\\;\\:\\?\\>\\<\\[\\]\\{\\}\\|\\`\\# {\n    \
+    color: black\n\
 }\n\
 ";
 

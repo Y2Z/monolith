@@ -24,6 +24,7 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     "suffix",
     "symbols",
 ];
+const CSS_SPECIAL_CHARS: &str = "~!@$%^&*()+=,./'\";:?><[]{}|`#";
 
 pub fn is_image_url_prop(prop_name: &str) -> bool {
     CSS_PROPS_WITH_IMAGE_URLS
@@ -38,6 +39,18 @@ pub fn enquote(input: String, double: bool) -> String {
     } else {
         format!("'{}'", input.replace("'", "\\'"))
     }
+}
+
+pub fn escape(value: &str) -> String {
+    let mut res = str!(&value);
+
+    res = res.replace("\\", "\\\\");
+
+    for c in CSS_SPECIAL_CHARS.chars() {
+        res = res.replace(c, format!("\\{}", c).as_str());
+    }
+
+    res
 }
 
 pub fn process_css<'a>(
@@ -122,7 +135,7 @@ pub fn process_css<'a>(
             }
             Token::Ident(ref value) => {
                 curr_prop = str!(value);
-                result.push_str(&value.replace(":", "\\:"));
+                result.push_str(&escape(value));
             }
             Token::AtKeyword(ref value) => {
                 curr_rule = str!(value);
@@ -243,7 +256,7 @@ pub fn process_css<'a>(
             }
             Token::IDHash(ref value) => {
                 result.push_str("#");
-                result.push_str(value);
+                result.push_str(&escape(value));
             }
             Token::UnquotedUrl(ref value) => {
                 let is_import: bool = curr_rule == "import";
