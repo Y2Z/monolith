@@ -21,5 +21,5 @@ saved by monolith, if needed.
 
 ## Consequences
 
-Monolith will not support modification of original document assets for the purpose of reducing their size, sticking to performing only a minimal
+Monolith will not support modification of original document assets for the purpose of reducing their size, sticking to performing only minimal
 amount of modifications to the original web page — whatever is needed to provide security or exclude unwanted asset types.
