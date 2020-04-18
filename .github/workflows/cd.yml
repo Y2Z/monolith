@@ -10,7 +10,7 @@ on:
 jobs:
 
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2019
     steps:
     - run: git config --global core.autocrlf false
     - name: Checkout the repository
@@ -24,19 +24,30 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
   gnu_linux_armhf:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
     - name: Prepare cross-platform environment
       run: |
+        sudo mkdir -p /cross-build-arm
+        sudo echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic main" >> /etc/apt/sources.list
+        sudo apt-get update
+        sudo apt-get install -y gcc-arm-linux-gnueabihf libc6-armhf-cross libc6-dev-armhf-cross
+        sudo apt-get download libssl1.1:armhf libssl-dev:armhf
+        sudo dpkg -x libssl1.1*.deb /cross-build-arm
+        sudo dpkg -x libssl-dev*.deb /cross-build-arm
         rustup target add arm-unknown-linux-gnueabihf
-        git clone https://github.com/raspberrypi/tools.git rpi_tools
-    - name: Build and install the executable
+        echo "::set-env name=C_INCLUDE_PATH::/cross-build-arm/usr/include"
+        echo "::set-env name=OPENSSL_INCLUDE_DIR::/cross-build-arm/usr/include/arm-linux-gnueabihf"
+        echo "::set-env name=OPENSSL_LIB_DIR::/cross-build-arm/usr/lib/arm-linux-gnueabihf"
+        echo "::set-env name=PKG_CONFIG_ALLOW_CROSS::1"
+        echo "::set-env name=RUSTFLAGS::-C linker=arm-linux-gnueabihf-gcc -L/usr/arm-linux-gnueabihf/lib -L/cross-build-arm/usr/lib/arm-linux-gnueabihf -L/cross-build-arm/lib/arm-linux-gnueabihf"
+    - name: Build the executable
       run: |
-        export RUSTFLAGS="-C linker=rpi_tools/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc"
         cargo build --release --target=arm-unknown-linux-gnueabihf
-    - uses: Shopify/upload-to-release@1.0.0
+    - name: Attach artifact to the release
+      uses: Shopify/upload-to-release@1.0.0
       with:
         name: monolith-gnu-linux-armhf
         path: target/arm-unknown-linux-gnueabihf/release/monolith
