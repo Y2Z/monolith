@@ -54,7 +54,7 @@ pub fn escape(value: &str) -> String {
 }
 
 pub fn process_css<'a>(
-    cache: &mut HashMap<String, String>,
+    cache: &mut HashMap<String, Vec<u8>>,
     client: &Client,
     parent_url: &str,
     parser: &mut Parser,
@@ -364,7 +364,7 @@ pub fn process_css<'a>(
 }
 
 pub fn embed_css(
-    cache: &mut HashMap<String, String>,
+    cache: &mut HashMap<String, Vec<u8>>,
     client: &Client,
     parent_url: &str,
     css: &str,

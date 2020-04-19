@@ -37,7 +37,7 @@ pub fn is_icon(attr_value: &str) -> bool {
 }
 
 pub fn walk_and_embed_assets(
-    cache: &mut HashMap<String, String>,
+    cache: &mut HashMap<String, Vec<u8>>,
     client: &Client,
     url: &str,
     node: &Handle,
