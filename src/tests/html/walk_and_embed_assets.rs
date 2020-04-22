@@ -19,6 +19,7 @@ fn passing_basic() {
     let url = "http://localhost";
 
     let opt_no_css: bool = false;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = false;
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
@@ -32,10 +33,11 @@ fn passing_basic() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -55,6 +57,7 @@ fn passing_ensure_no_recursive_iframe() {
     let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = false;
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
@@ -68,10 +71,11 @@ fn passing_ensure_no_recursive_iframe() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -91,6 +95,7 @@ fn passing_ensure_no_recursive_frame() {
     let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = false;
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
@@ -104,10 +109,11 @@ fn passing_ensure_no_recursive_frame() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -129,6 +135,7 @@ fn passing_no_css() {
     let cache = &mut HashMap::new();
 
     let opt_no_css: bool = true;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = false;
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
@@ -141,10 +148,11 @@ fn passing_no_css() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -173,6 +181,7 @@ fn passing_no_images() {
     let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = false;
     let opt_no_js: bool = false;
     let opt_no_images: bool = true;
@@ -186,10 +195,11 @@ fn passing_no_images() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -221,6 +231,7 @@ fn passing_no_body_background_images() {
     let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = false;
     let opt_no_js: bool = false;
     let opt_no_images: bool = true;
@@ -234,10 +245,11 @@ fn passing_no_body_background_images() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -257,6 +269,7 @@ fn passing_no_frames() {
     let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = true;
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
@@ -269,10 +282,11 @@ fn passing_no_frames() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -292,6 +306,7 @@ fn passing_no_iframes() {
     let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = true;
     let opt_no_js: bool = false;
     let opt_no_images: bool = false;
@@ -304,10 +319,11 @@ fn passing_no_iframes() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -330,6 +346,7 @@ fn passing_no_js() {
     let cache = &mut HashMap::new();
 
     let opt_no_css: bool = false;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = false;
     let opt_no_js: bool = true;
     let opt_no_images: bool = false;
@@ -343,10 +360,11 @@ fn passing_no_js() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();
@@ -369,6 +387,7 @@ fn passing_with_no_integrity() {
     let cache = &mut HashMap::new();
     let client = Client::new();
     let opt_no_css: bool = true;
+    let opt_no_fonts: bool = false;
     let opt_no_frames: bool = true;
     let opt_no_js: bool = true;
     let opt_no_images: bool = true;
@@ -380,10 +399,11 @@ fn passing_with_no_integrity() {
         &url,
         &dom.document,
         opt_no_css,
+        opt_no_fonts,
+        opt_no_frames,
         opt_no_js,
         opt_no_images,
         opt_silent,
-        opt_no_frames,
     );
 
     let mut buf: Vec<u8> = Vec::new();

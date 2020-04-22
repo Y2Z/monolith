@@ -61,6 +61,7 @@ pub fn process_css<'a>(
     rule_name: &str,
     prop_name: &str,
     func_name: &str,
+    opt_no_fonts: bool,
     opt_no_images: bool,
     opt_silent: bool,
 ) -> Result<String, ParseError<'a, String>> {
@@ -89,6 +90,10 @@ pub fn process_css<'a>(
             Token::Colon => result.push_str(":"),
             Token::Comma => result.push_str(","),
             Token::ParenthesisBlock | Token::SquareBracketBlock | Token::CurlyBracketBlock => {
+                if opt_no_fonts && curr_rule == "font-face" {
+                    continue;
+                }
+
                 let closure: &str;
                 if token == &Token::ParenthesisBlock {
                     result.push_str("(");
@@ -111,6 +116,7 @@ pub fn process_css<'a>(
                             rule_name,
                             curr_prop.as_str(),
                             func_name,
+                            opt_no_fonts,
                             opt_no_images,
                             opt_silent,
                         )
@@ -133,12 +139,18 @@ pub fn process_css<'a>(
             Token::WhiteSpace(ref value) => {
                 result.push_str(value);
             }
+            // div...
             Token::Ident(ref value) => {
+                curr_rule = str!();
                 curr_prop = str!(value);
                 result.push_str(&escape(value));
             }
+            // @import, @font-face, @charset, @media...
             Token::AtKeyword(ref value) => {
                 curr_rule = str!(value);
+                if opt_no_fonts && curr_rule == "font-face" {
+                    continue;
+                }
                 result.push_str("@");
                 result.push_str(value);
             }
@@ -147,13 +159,10 @@ pub fn process_css<'a>(
                 result.push_str(value);
             }
             Token::QuotedString(ref value) => {
-                let is_import: bool = curr_rule == "import";
-                if is_import {
+                if curr_rule == "import" {
                     // Reset current at-rule value
                     curr_rule = str!();
-                }
 
-                if is_import {
                     // Skip empty import values
                     if value.len() < 1 {
                         result.push_str("''");
@@ -182,6 +191,7 @@ pub fn process_css<'a>(
                                     client,
                                     final_url.as_str(),
                                     &css,
+                                    opt_no_fonts,
                                     opt_no_images,
                                     opt_silent,
                                 )
@@ -254,12 +264,15 @@ pub fn process_css<'a>(
                 result.push_str(str!(value).as_str());
                 result.push_str(str!(unit).as_str());
             }
+            // #selector, #id...
             Token::IDHash(ref value) => {
+                curr_rule = str!();
                 result.push_str("#");
                 result.push_str(&escape(value));
             }
             Token::UnquotedUrl(ref value) => {
                 let is_import: bool = curr_rule == "import";
+
                 if is_import {
                     // Reset current at-rule value
                     curr_rule = str!();
@@ -300,6 +313,7 @@ pub fn process_css<'a>(
                                     client,
                                     final_url.as_str(),
                                     &css,
+                                    opt_no_fonts,
                                     opt_no_images,
                                     opt_silent,
                                 )
@@ -347,6 +361,7 @@ pub fn process_css<'a>(
                             curr_rule.as_str(),
                             curr_prop.as_str(),
                             function_name,
+                            opt_no_fonts,
                             opt_no_images,
                             opt_silent,
                         )
@@ -368,6 +383,7 @@ pub fn embed_css(
     client: &Client,
     parent_url: &str,
     css: &str,
+    opt_no_fonts: bool,
     opt_no_images: bool,
     opt_silent: bool,
 ) -> String {
@@ -382,6 +398,7 @@ pub fn embed_css(
         "",
         "",
         "",
+        opt_no_fonts,
         opt_no_images,
         opt_silent,
     )

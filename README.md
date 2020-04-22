@@ -49,6 +49,7 @@ The guide can be found [here](docs/containers.md)
 ## Options
  - `-c`: Ignore styles
  - `-f`: Exclude frames and iframes
+ - `-F`: Omit web fonts
  - `-i`: Remove images
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
