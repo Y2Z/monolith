@@ -15,7 +15,10 @@ fn passing_empty_input() {
     let cache = &mut HashMap::new();
     let client = Client::new();
 
-    assert_eq!(css::embed_css(cache, &client, "", "", false, false,), "");
+    assert_eq!(
+        css::embed_css(cache, &client, "", "", false, false, false,),
+        ""
+    );
 }
 
 #[test]
@@ -37,6 +40,7 @@ height: calc(100vh - 10pt)";
             &client,
             "https://doesntmatter.local/",
             &STYLE,
+            false,
             true,
             true,
         ),
@@ -67,7 +71,7 @@ line-height: -1; \
 height: calc(100vh - 10pt)";
 
     assert_eq!(
-        css::embed_css(cache, &client, "", &STYLE, true, true,),
+        css::embed_css(cache, &client, "", &STYLE, false, true, true,),
         format!(
             "/* border: none;*/\
 background-image: url('{empty_image}'); \
@@ -95,7 +99,7 @@ fn passing_style_block() {
 html > body {}";
 
     assert_eq!(
-        css::embed_css(cache, &client, "file:///", &CSS, false, true,),
+        css::embed_css(cache, &client, "file:///", &CSS, false, false, true,),
         CSS
     );
 }
@@ -135,7 +139,10 @@ fn passing_attribute_selectors() {
 }
 ";
 
-    assert_eq!(css::embed_css(cache, &client, "", &CSS, false, false,), CSS);
+    assert_eq!(
+        css::embed_css(cache, &client, "", &CSS, false, false, false,),
+        CSS
+    );
 }
 
 #[test]
@@ -157,6 +164,7 @@ fn passing_import_string() {
             &client,
             "https://doesntmatter.local/",
             &CSS,
+            false,
             false,
             true,
         ),
@@ -192,6 +200,7 @@ body {\n    \
             "https://doesntmatter.local/",
             &CSS,
             false,
+            false,
             true,
         ),
         CSS
@@ -217,6 +226,7 @@ div {\n    \
             &client,
             "https://doesntmatter.local/",
             &CSS,
+            false,
             false,
             true,
         ),
@@ -246,8 +256,62 @@ fn passing_unusual_indents() {
             "https://doesntmatter.local/",
             &CSS,
             false,
+            false,
             true,
         ),
         CSS
+    );
+}
+
+#[test]
+fn passing_exclude_fonts() {
+    let cache = &mut HashMap::new();
+    let client = Client::new();
+
+    const CSS: &str = "\
+@font-face {\n    \
+    font-family: 'My Font';\n    \
+    src: url(my_font.woff);\n\
+}\n\
+\n\
+#identifier {\n    \
+    font-family: 'My Font' Arial\n\
+}\n\
+\n\
+@font-face {\n    \
+    font-family: 'My Font';\n    \
+    src: url(my_font.woff);\n\
+}\n\
+\n\
+div {\n    \
+    font-family: 'My Font' Verdana\n\
+}\n\
+";
+
+    const CSS_OUT: &str = " \
+\n\
+\n\
+#identifier {\n    \
+    font-family: 'My Font' Arial\n\
+}\n\
+\n \
+\n\
+\n\
+div {\n    \
+    font-family: 'My Font' Verdana\n\
+}\n\
+";
+
+    assert_eq!(
+        css::embed_css(
+            cache,
+            &client,
+            "https://doesntmatter.local/",
+            &CSS,
+            true,
+            false,
+            true,
+        ),
+        CSS_OUT
     );
 }

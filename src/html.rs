@@ -42,10 +42,11 @@ pub fn walk_and_embed_assets(
     url: &str,
     node: &Handle,
     opt_no_css: bool,
+    opt_no_fonts: bool,
+    opt_no_frames: bool,
     opt_no_js: bool,
     opt_no_images: bool,
     opt_silent: bool,
-    opt_no_frames: bool,
 ) {
     match node.data {
         NodeData::Document => {
@@ -57,10 +58,11 @@ pub fn walk_and_embed_assets(
                     &url,
                     child,
                     opt_no_css,
+                    opt_no_fonts,
+                    opt_no_frames,
                     opt_no_js,
                     opt_no_images,
                     opt_silent,
-                    opt_no_frames,
                 );
             }
         }
@@ -157,17 +159,18 @@ pub fn walk_and_embed_assets(
                                         ) {
                                             // On successful retrieval, traverse CSS
                                             Ok((css_data, final_url)) => {
-                                                let x: String = embed_css(
+                                                let css: String = embed_css(
                                                     cache,
                                                     client,
                                                     &final_url,
                                                     &css_data,
+                                                    opt_no_fonts,
                                                     opt_no_images,
                                                     opt_silent,
                                                 );
                                                 data_to_data_url(
                                                     "text/css",
-                                                    x.as_bytes(),
+                                                    css.as_bytes(),
                                                     &final_url,
                                                     "",
                                                 )
@@ -462,6 +465,7 @@ pub fn walk_and_embed_assets(
                                     client,
                                     &url,
                                     tendril.as_ref(),
+                                    opt_no_fonts,
                                     opt_no_images,
                                     opt_silent,
                                 );
@@ -519,10 +523,11 @@ pub fn walk_and_embed_assets(
                                 &frame_final_url,
                                 &dom.document,
                                 opt_no_css,
+                                opt_no_fonts,
+                                opt_no_frames,
                                 opt_no_js,
                                 opt_no_images,
                                 opt_silent,
-                                opt_no_frames,
                             );
                             let mut buf: Vec<u8> = Vec::new();
                             serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -590,6 +595,7 @@ pub fn walk_and_embed_assets(
                         client,
                         &url,
                         attribute.value.as_ref(),
+                        opt_no_fonts,
                         opt_no_images,
                         opt_silent,
                     );
@@ -621,10 +627,11 @@ pub fn walk_and_embed_assets(
                     &url,
                     child,
                     opt_no_css,
+                    opt_no_fonts,
+                    opt_no_frames,
                     opt_no_js,
                     opt_no_images,
                     opt_silent,
-                    opt_no_frames,
                 );
             }
         }
