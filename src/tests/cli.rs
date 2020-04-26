@@ -75,6 +75,7 @@ fn passing_bad_input_data_url() -> Result<(), Box<dyn std::error::Error>> {
 fn passing_isolate_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
+        .arg("-M")
         .arg("-I")
         .arg("data:text/html,Hello%2C%20World!")
         .output()
@@ -101,6 +102,7 @@ fn passing_isolate_data_url() -> Result<(), Box<dyn std::error::Error>> {
 fn passing_remove_css_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
+        .arg("-M")
         .arg("-c")
         .arg("data:text/html,<style>body{background-color:pink}</style>Hello")
         .output()
@@ -128,6 +130,7 @@ fn passing_remove_css_from_data_url() -> Result<(), Box<dyn std::error::Error>> 
 fn passing_remove_frames_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
+        .arg("-M")
         .arg("-f")
         .arg("data:text/html,<iframe src=\"https://google.com\"></iframe>Hi")
         .output()
@@ -154,6 +157,7 @@ fn passing_remove_frames_from_data_url() -> Result<(), Box<dyn std::error::Error
 fn passing_remove_images_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
+        .arg("-M")
         .arg("-i")
         .arg("data:text/html,<img src=\"https://google.com\"/>Hi")
         .output()
@@ -189,6 +193,7 @@ Hi\
 fn passing_remove_js_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
+        .arg("-M")
         .arg("-j")
         .arg("data:text/html,<script>alert(2)</script>Hi")
         .output()
@@ -220,6 +225,7 @@ fn passing_local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
     let cwd_normalized: String =
         str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
     let out = cmd
+        .arg("-M")
         .arg(if cfg!(windows) {
             "src\\tests\\data\\local-file.html"
         } else {
@@ -274,6 +280,7 @@ fn passing_local_file_target_input_absolute_target_path() -> Result<(), Box<dyn 
         str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
+        .arg("-M")
         .arg("-jciI")
         .arg(if cfg!(windows) {
             format!(
@@ -334,6 +341,7 @@ fn passing_local_file_url_target_input() -> Result<(), Box<dyn std::error::Error
         str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
     let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
     let out = cmd
+        .arg("-M")
         .arg("-cji")
         .arg(if cfg!(windows) {
             format!(
@@ -401,6 +409,7 @@ fn passing_security_disallow_local_assets_within_data_url_targets(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
+        .arg("-M")
         .arg("data:text/html,%3Cscript%20src=\"src/tests/data/local-script.js\"%3E%3C/script%3E")
         .output()
         .unwrap();
@@ -438,7 +447,7 @@ fn passing_embed_file_url_local_asset_within_style_attribute(
         file = file_url_prefix,
         path = str!(file_svg.path().to_str().unwrap()).replace("\\", "/"),
     )?;
-    let out = cmd.arg(file_html.path()).output().unwrap();
+    let out = cmd.arg("-M").arg(file_html.path()).output().unwrap();
 
     // STDOUT should contain HTML with date URL for background-image in it
     assert_eq!(
@@ -489,7 +498,7 @@ fn passing_css_import_string() -> Result<(), Box<dyn std::error::Error>> {
         file = file_url_prefix,
         css_path = str!(file_css.path().to_str().unwrap()).replace("\\", "/"),
     )?;
-    let out = cmd.arg(file_html.path()).output().unwrap();
+    let out = cmd.arg("-M").arg(file_html.path()).output().unwrap();
 
     // STDOUT should contain embedded CSS url()'s
     assert_eq!(

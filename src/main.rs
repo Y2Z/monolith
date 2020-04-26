@@ -2,6 +2,7 @@ use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
 use monolith::utils::{data_url_to_text, is_data_url, is_file_url, is_http_url, retrieve_asset};
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::Url;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -133,6 +134,8 @@ fn main() {
         process::exit(1);
     }
 
+    let time_saved = time::now_utc();
+
     walk_and_embed_assets(
         &mut cache,
         &client,
@@ -146,7 +149,7 @@ fn main() {
         app_args.silent,
     );
 
-    let html: String = stringify_document(
+    let mut html: String = stringify_document(
         &dom.document,
         app_args.no_css,
         app_args.no_frames,
@@ -154,6 +157,32 @@ fn main() {
         app_args.no_images,
         app_args.isolate,
     );
+
+    if !app_args.no_metadata {
+        // Safe to unwrap (we just put this through an HTTP request)
+        let mut clean_url = Url::parse(&base_url).unwrap();
+        clean_url.set_fragment(None);
+        // Don't include credentials
+        clean_url.set_username("");
+        clean_url.set_password(None);
+        let metadata_comment = if is_http_url(&base_url) {
+            format!(
+                "<!--- Saved from {} on {} using {} v{} -->\n",
+                &clean_url,
+                time_saved.rfc3339(),
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+            )
+        } else {
+            format!(
+                "<!--- Saved from local source on {} using {} v{} -->\n",
+                time_saved.rfc3339(),
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+            )
+        };
+        html.insert_str(0, &metadata_comment);
+    }
 
     output
         .writeln_str(&html)
