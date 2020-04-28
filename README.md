@@ -30,7 +30,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 #### From source
 
-    Dependency: `libssl-dev`
+Dependency: `libssl-dev`
 
     $ git clone https://github.com/Y2Z/monolith.git
     $ cd monolith
