@@ -44,8 +44,7 @@ jobs:
         echo "::set-env name=PKG_CONFIG_ALLOW_CROSS::1"
         echo "::set-env name=RUSTFLAGS::-C linker=arm-linux-gnueabihf-gcc -L/usr/arm-linux-gnueabihf/lib -L/cross-build-arm/usr/lib/arm-linux-gnueabihf -L/cross-build-arm/lib/arm-linux-gnueabihf"
     - name: Build the executable
-      run: |
-        cargo build --release --target=arm-unknown-linux-gnueabihf
+      run: cargo build --release --target=arm-unknown-linux-gnueabihf
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@1.0.0
       with:
