@@ -167,7 +167,7 @@ fn main() {
         clean_url.set_password(None);
         let metadata_comment = if is_http_url(&base_url) {
             format!(
-                "<!--- Saved from {} on {} using {} v{} -->\n",
+                "<!-- Saved from {} at {} using {} v{} -->\n",
                 &clean_url,
                 time_saved.rfc3339(),
                 env!("CARGO_PKG_NAME"),
@@ -175,7 +175,7 @@ fn main() {
             )
         } else {
             format!(
-                "<!--- Saved from local source on {} using {} v{} -->\n",
+                "<!-- Saved from local source at {} using {} v{} -->\n",
                 time_saved.rfc3339(),
                 env!("CARGO_PKG_NAME"),
                 env!("CARGO_PKG_VERSION"),
