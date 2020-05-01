@@ -18,6 +18,10 @@ cssparser = "0.27.2"
 html5ever = "0.24.1"
 url = "2.1.1"
 
+# Used to render comments indicating the time the page was saved
+# also required by reqwest as of v0.10.0
+time = "0.1.42"
+
 [dependencies.reqwest]
 version = "0.10.*"
 default-features = false

@@ -14,6 +14,7 @@ pub struct AppArgs {
     pub silent: bool,
     pub timeout: u64,
     pub user_agent: String,
+    pub no_metadata: bool,
 }
 
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
@@ -41,6 +42,7 @@ impl AppArgs {
             .args_from_usage("-I, --isolate 'Cuts off document from the Internet'")
             .args_from_usage("-j, --no-js 'Removes JavaScript'")
             .args_from_usage("-k, --insecure 'Allows invalid X.509 (TLS) certificates'")
+            .args_from_usage("-M, --no-metadata 'Excludes metadata information from the document'")
             .args_from_usage("-o, --output=[document.html] 'Writes output to <file>'")
             .args_from_usage("-s, --silent 'Suppresses verbosity'")
             .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
@@ -59,6 +61,7 @@ impl AppArgs {
         app_args.no_images = app.is_present("no-images");
         app_args.no_js = app.is_present("no-js");
         app_args.insecure = app.is_present("insecure");
+        app_args.no_metadata = app.is_present("no-metadata");
         app_args.isolate = app.is_present("isolate");
         app_args.silent = app.is_present("silent");
         app_args.timeout = app

@@ -38,3 +38,11 @@ fn passing_removes_empty_query_amp_and_empty_fragment() {
         "https://somewhere.com/font.eot?a=b"
     );
 }
+
+#[test]
+fn passing_keeps_credentials() {
+    assert_eq!(
+        utils::clean_url("https://cookie:monster@gibson.internet/"),
+        "https://cookie:monster@gibson.internet/"
+    );
+}
