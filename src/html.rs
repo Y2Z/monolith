@@ -354,6 +354,47 @@ pub fn walk_and_embed_assets(
                         node.children.borrow_mut().clear();
                     }
                 }
+                "image" => {
+                    // Find and remove (xlink:)href attribute(s), keep reference to the last one
+                    let mut image_href: Option<Attribute> = None;
+                    let mut i = 0;
+                    while i < attrs_mut.len() {
+                        let attr_name = attrs_mut[i].name.local.as_ref();
+                        if attr_name.eq_ignore_ascii_case("xlink:href")
+                            || attr_name.eq_ignore_ascii_case("href")
+                        {
+                            image_href = Some(attrs_mut.remove(i));
+                        } else {
+                            i += 1;
+                        }
+                    }
+
+                    if !opt_no_images {
+                        if let Some((data_url, _)) = image_href
+                            .iter()
+                            .map(|attr| attr.value.trim())
+                            .filter(|href| !href.is_empty()) // Skip if empty
+                            .next()
+                            .and_then(|href| resolve_url(&url, href).ok()) // Make absolute
+                            .and_then(|abs_href| // Download and convert to data_url
+                                retrieve_asset(
+                                    cache,
+                                    client,
+                                    &url,
+                                    &abs_href,
+                                    true,
+                                    "",
+                                    opt_silent,
+                                ).ok())
+                        {
+                            // Add new data_url href attribute
+                            attrs_mut.push(Attribute {
+                                name: QualName::new(None, ns!(), local_name!("href")),
+                                value: Tendril::from_slice(data_url.as_ref()),
+                            });
+                        }
+                    }
+                }
                 "source" => {
                     for attr in attrs_mut.iter_mut() {
                         let attr_name: &str = &attr.name.local;
