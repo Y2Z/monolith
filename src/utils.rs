@@ -140,21 +140,19 @@ pub fn clean_url<T: AsRef<str>>(input: T) -> String {
     result
 }
 
-pub fn data_url_to_text<T: AsRef<str>>(url: T) -> (String, String) {
-    let parsed_url = Url::parse(url.as_ref()).unwrap_or(Url::parse("data:,").unwrap());
+pub fn data_url_to_data<T: AsRef<str>>(url: T) -> (String, Vec<u8>) {
+    let parsed_url: Url = Url::parse(url.as_ref()).unwrap_or(Url::parse("data:,").unwrap());
     let path: String = parsed_url.path().to_string();
     let comma_loc: usize = path.find(',').unwrap_or(path.len());
 
     let meta_data: String = path.chars().take(comma_loc).collect();
     let raw_data: String = path.chars().skip(comma_loc + 1).collect();
 
-    let data: String = decode_url(raw_data);
+    let text: String = decode_url(raw_data);
 
     let meta_data_items: Vec<&str> = meta_data.split(';').collect();
-    let mut encoding: &str = "";
-
     let mut media_type: String = str!();
-    let mut text: String = str!();
+    let mut encoding: &str = "";
 
     let mut i: i8 = 0;
     for item in &meta_data_items {
@@ -172,15 +170,13 @@ pub fn data_url_to_text<T: AsRef<str>>(url: T) -> (String, String) {
         i = i + 1;
     }
 
-    if is_plaintext_media_type(&media_type) || media_type.is_empty() {
-        if encoding.eq_ignore_ascii_case("base64") {
-            text = String::from_utf8(base64::decode(&data).unwrap_or(vec![])).unwrap_or(str!())
-        } else {
-            text = data
-        }
-    }
+    let data: Vec<u8> = if encoding.eq_ignore_ascii_case("base64") {
+        base64::decode(&text).unwrap_or(vec![])
+    } else {
+        text.as_bytes().to_vec()
+    };
 
-    (media_type, text)
+    (media_type, data)
 }
 
 pub fn decode_url(input: String) -> String {
@@ -228,74 +224,52 @@ pub fn retrieve_asset(
     client: &Client,
     parent_url: &str,
     url: &str,
-    as_data_url: bool,
-    media_type: &str,
     opt_silent: bool,
-) -> Result<(String, String), reqwest::Error> {
+) -> Result<(Vec<u8>, String, String), reqwest::Error> {
     if url.len() == 0 {
-        return Ok((str!(), str!()));
+        // Provoke error
+        client.get("").send()?;
     }
 
     if is_data_url(&url) {
-        if as_data_url {
-            Ok((url.to_string(), url.to_string()))
-        } else {
-            let (_media_type, text) = data_url_to_text(url);
-
-            Ok((text, url.to_string()))
-        }
+        let (media_type, data) = data_url_to_data(url);
+        Ok((data, url.to_string(), media_type))
     } else if is_file_url(&url) {
         // Check if parent_url is also file:///
         // (if not, then we don't embed the asset)
         if !is_file_url(&parent_url) {
-            return Ok((str!(), str!()));
+            // Provoke error
+            client.get("").send()?;
         }
 
         let fs_file_path: String = file_url_to_fs_path(url);
         let path = Path::new(&fs_file_path);
-        let url_fragment = get_url_fragment(url);
         if path.exists() {
             if !opt_silent {
                 eprintln!("{}", &url);
             }
 
-            if as_data_url {
-                let data_url: String = data_to_data_url(
-                    &media_type,
-                    &fs::read(&fs_file_path).unwrap(),
-                    &fs_file_path,
-                    &url_fragment,
-                );
-                Ok((data_url, url.to_string()))
-            } else {
-                let data: String = fs::read_to_string(&fs_file_path).expect(url);
-                Ok((data, url.to_string()))
-            }
+            Ok((fs::read(&fs_file_path).expect(""), url.to_string(), str!()))
         } else {
-            Ok((str!(), url.to_string()))
+            // Provoke error
+            Err(client.get("").send().unwrap_err())
         }
     } else {
         let cache_key: String = clean_url(&url);
 
         if cache.contains_key(&cache_key) {
-            // URL is in cache, we retrieve it
-            let data = cache.get(&cache_key).unwrap();
-
+            // URL is in cache, we get and return it
             if !opt_silent {
                 eprintln!("{} (from cache)", &url);
             }
 
-            if as_data_url {
-                let url_fragment = get_url_fragment(url);
-                Ok((
-                    data_to_data_url(media_type, data, url, &url_fragment),
-                    url.to_string(),
-                ))
-            } else {
-                Ok((String::from_utf8_lossy(data).to_string(), url.to_string()))
-            }
+            Ok((
+                cache.get(&cache_key).unwrap().to_vec(),
+                url.to_string(),
+                str!(),
+            ))
         } else {
-            // URL not in cache, we request it
+            // URL not in cache, we retrieve the file
             let mut response = client.get(url).send()?;
             let res_url = response.url().to_string();
 
@@ -309,36 +283,21 @@ pub fn retrieve_asset(
 
             let new_cache_key: String = clean_url(&res_url);
 
-            if as_data_url {
-                // Convert response into a byte array
-                let mut data: Vec<u8> = vec![];
-                response.copy_to(&mut data)?;
+            // Convert response into a byte array
+            let mut data: Vec<u8> = vec![];
+            response.copy_to(&mut data)?;
 
-                // Attempt to obtain media type by reading the Content-Type header
-                let media_type = if media_type == "" {
-                    response
-                        .headers()
-                        .get(CONTENT_TYPE)
-                        .and_then(|header| header.to_str().ok())
-                        .unwrap_or(&media_type)
-                } else {
-                    media_type
-                };
-                let url_fragment = get_url_fragment(url);
-                let data_url = data_to_data_url(&media_type, &data, url, &url_fragment);
+            // Attempt to obtain media type by reading the Content-Type header
+            let media_type = response
+                .headers()
+                .get(CONTENT_TYPE)
+                .and_then(|header| header.to_str().ok())
+                .unwrap_or("");
 
-                // Add to cache
-                cache.insert(new_cache_key, data);
+            // Add to cache
+            cache.insert(new_cache_key, data.clone());
 
-                Ok((data_url, res_url))
-            } else {
-                let content = response.text().unwrap();
-
-                // Add to cache
-                cache.insert(new_cache_key, content.as_bytes().to_vec());
-
-                Ok((content, res_url))
-            }
+            Ok((data, res_url, media_type.to_string()))
         }
     }
 }

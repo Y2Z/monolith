@@ -242,9 +242,9 @@ fn passing_local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
 <!DOCTYPE html><html lang=\"en\"><head>\n  \
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  \
 <title>Local HTML file</title>\n  \
-<link href=\"data:text/css;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNmZmY7Cn0K\" rel=\"stylesheet\" type=\"text/css\">\n  \
-<link href=\"data:text/css;base64,\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
-<img alt=\"\" src=\"\">\n  \
+<link rel=\"stylesheet\" type=\"text/css\" href=\"data:text/css;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNmZmY7Cn0K\">\n  \
+<link rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
+<img alt=\"\">\n  \
 <a href=\"file://local-file.html/\">Tricky href</a>\n  \
 <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
 <script src=\"data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==\"></script>\n\n\n\n\
@@ -306,12 +306,12 @@ fn passing_local_file_target_input_absolute_target_path() -> Result<(), Box<dyn 
 <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; script-src 'none'; img-src data:;\"></meta>\n  \
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  \
 <title>Local HTML file</title>\n  \
-<link href=\"\" rel=\"stylesheet\" type=\"text/css\">\n  \
-<link href=\"\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
+<link rel=\"stylesheet\" type=\"text/css\">\n  \
+<link rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
 <img alt=\"\" src=\"{empty_image}\">\n  \
 <a href=\"file://local-file.html/\">Tricky href</a>\n  \
 <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
-<script src=\"\"></script>\n\n\n\n\
+<script></script>\n\n\n\n\
 </body></html>\n\
 ",
             empty_image = empty_image!()
@@ -368,12 +368,12 @@ fn passing_local_file_url_target_input() -> Result<(), Box<dyn std::error::Error
 <meta http-equiv=\"Content-Security-Policy\" content=\"style-src 'none'; script-src 'none'; img-src data:;\"></meta>\n  \
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  \
 <title>Local HTML file</title>\n  \
-<link href=\"\" rel=\"stylesheet\" type=\"text/css\">\n  \
-<link href=\"\" rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
+<link rel=\"stylesheet\" type=\"text/css\">\n  \
+<link rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
 <img alt=\"\" src=\"{empty_image}\">\n  \
 <a href=\"file://local-file.html/\">Tricky href</a>\n  \
 <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
-<script src=\"\"></script>\n\n\n\n\
+<script></script>\n\n\n\n\
 </body></html>\n\
 ",
             empty_image = empty_image!()
@@ -417,7 +417,7 @@ fn passing_security_disallow_local_assets_within_data_url_targets(
     // STDOUT should contain HTML with no JS in it
     assert_eq!(
         std::str::from_utf8(&out.stdout).unwrap(),
-        "<html><head><script src=\"\"></script></head><body></body></html>\n"
+        "<html><head><script></script></head><body></body></html>\n"
     );
 
     // STDERR should be empty

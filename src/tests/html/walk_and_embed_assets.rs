@@ -162,7 +162,7 @@ fn passing_no_css() {
         buf.iter().map(|&c| c as char).collect::<String>(),
         "<html>\
          <head>\
-         <link rel=\"stylesheet\" href=\"\">\
+         <link rel=\"stylesheet\">\
          <style></style>\
          </head>\
          <body>\
@@ -210,7 +210,7 @@ fn passing_no_images() {
         format!(
             "<html>\
          <head>\
-         <link rel=\"icon\" href=\"\">\
+         <link rel=\"icon\">\
          </head>\
          <body>\
          <div>\
@@ -372,7 +372,7 @@ fn passing_no_js() {
 
     assert_eq!(
         buf.iter().map(|&c| c as char).collect::<String>(),
-        "<html><head></head><body><div><script src=\"\"></script>\
+        "<html><head></head><body><div><script></script>\
          <script></script></div></body></html>"
     );
 }
@@ -412,7 +412,7 @@ fn passing_with_no_integrity() {
     assert_eq!(
         buf.iter().map(|&c| c as char).collect::<String>(),
         "<html>\
-         <head><title>No integrity</title><link rel=\"something\"><script src=\"\"></script></head>\
+         <head><title>No integrity</title><link rel=\"something\"><script></script></head>\
          <body></body>\
          </html>"
     );
