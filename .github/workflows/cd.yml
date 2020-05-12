@@ -31,7 +31,8 @@ jobs:
     - name: Prepare cross-platform environment
       run: |
         sudo mkdir -p /cross-build-arm
-        sudo echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic main" >> /etc/apt/sources.list
+        sudo touch /etc/apt/sources.list.d/armhf.list
+        echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic main" | sudo tee -a /etc/apt/sources.list.d/armhf.list
         sudo apt-get update
         sudo apt-get install -y gcc-arm-linux-gnueabihf libc6-armhf-cross libc6-dev-armhf-cross
         sudo apt-get download libssl1.1:armhf libssl-dev:armhf
