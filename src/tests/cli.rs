@@ -227,9 +227,9 @@ fn passing_local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
     let out = cmd
         .arg("-M")
         .arg(if cfg!(windows) {
-            "src\\tests\\data\\local-file.html"
+            "src\\tests\\data\\basic\\local-file.html"
         } else {
-            "src/tests/data/local-file.html"
+            "src/tests/data/basic/local-file.html"
         })
         .output()
         .unwrap();
@@ -257,9 +257,9 @@ fn passing_local_file_target_input() -> Result<(), Box<dyn std::error::Error>> {
         std::str::from_utf8(&out.stderr).unwrap(),
         format!(
             "\
-{file}{cwd}/src/tests/data/local-file.html\n\
-{file}{cwd}/src/tests/data/local-style.css\n\
-{file}{cwd}/src/tests/data/local-script.js\n\
+{file}{cwd}/src/tests/data/basic/local-file.html\n\
+{file}{cwd}/src/tests/data/basic/local-style.css\n\
+{file}{cwd}/src/tests/data/basic/local-script.js\n\
 ",
             file = file_url_protocol,
             cwd = cwd_normalized
@@ -284,12 +284,12 @@ fn passing_local_file_target_input_absolute_target_path() -> Result<(), Box<dyn 
         .arg("-jciI")
         .arg(if cfg!(windows) {
             format!(
-                "{cwd}\\src\\tests\\data\\local-file.html",
+                "{cwd}\\src\\tests\\data\\basic\\local-file.html",
                 cwd = cwd.to_str().unwrap()
             )
         } else {
             format!(
-                "{cwd}/src/tests/data/local-file.html",
+                "{cwd}/src/tests/data/basic/local-file.html",
                 cwd = cwd.to_str().unwrap()
             )
         })
@@ -322,7 +322,7 @@ fn passing_local_file_target_input_absolute_target_path() -> Result<(), Box<dyn 
     assert_eq!(
         std::str::from_utf8(&out.stderr).unwrap(),
         format!(
-            "{file}{cwd}/src/tests/data/local-file.html\n",
+            "{file}{cwd}/src/tests/data/basic/local-file.html\n",
             file = file_url_protocol,
             cwd = cwd_normalized,
         )
@@ -345,13 +345,13 @@ fn passing_local_file_url_target_input() -> Result<(), Box<dyn std::error::Error
         .arg("-cji")
         .arg(if cfg!(windows) {
             format!(
-                "{file}{cwd}/src/tests/data/local-file.html",
+                "{file}{cwd}/src/tests/data/basic/local-file.html",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             )
         } else {
             format!(
-                "{file}{cwd}/src/tests/data/local-file.html",
+                "{file}{cwd}/src/tests/data/basic/local-file.html",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             )
@@ -385,13 +385,13 @@ fn passing_local_file_url_target_input() -> Result<(), Box<dyn std::error::Error
         std::str::from_utf8(&out.stderr).unwrap(),
         if cfg!(windows) {
             format!(
-                "{file}{cwd}/src/tests/data/local-file.html\n",
+                "{file}{cwd}/src/tests/data/basic/local-file.html\n",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             )
         } else {
             format!(
-                "{file}{cwd}/src/tests/data/local-file.html\n",
+                "{file}{cwd}/src/tests/data/basic/local-file.html\n",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             )
@@ -410,7 +410,7 @@ fn passing_security_disallow_local_assets_within_data_url_targets(
     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
     let out = cmd
         .arg("-M")
-        .arg("data:text/html,%3Cscript%20src=\"src/tests/data/local-script.js\"%3E%3C/script%3E")
+        .arg("data:text/html,%3Cscript%20src=\"src/tests/data/basic/local-script.js\"%3E%3C/script%3E")
         .output()
         .unwrap();
 
