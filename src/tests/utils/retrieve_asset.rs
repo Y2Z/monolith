@@ -49,12 +49,12 @@ fn passing_read_local_file_with_file_url_parent() {
         cache,
         &client,
         &format!(
-            "{file}{cwd}/src/tests/data/local-file.html",
+            "{file}{cwd}/src/tests/data/basic/local-file.html",
             file = file_url_protocol,
             cwd = cwd.to_str().unwrap()
         ),
         &format!(
-            "{file}{cwd}/src/tests/data/local-script.js",
+            "{file}{cwd}/src/tests/data/basic/local-script.js",
             file = file_url_protocol,
             cwd = cwd.to_str().unwrap()
         ),
@@ -65,7 +65,7 @@ fn passing_read_local_file_with_file_url_parent() {
     assert_eq!(
         &final_url,
         &format!(
-            "{file}{cwd}/src/tests/data/local-script.js",
+            "{file}{cwd}/src/tests/data/basic/local-script.js",
             file = file_url_protocol,
             cwd = cwd.to_str().unwrap()
         )

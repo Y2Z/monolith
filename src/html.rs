@@ -16,6 +16,11 @@ use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::collections::HashMap;
 use std::default::Default;
 
+struct SrcSetItem<'a> {
+    path: &'a str,
+    descriptor: &'a str,
+}
+
 const ICON_VALUES: &[&str] = &[
     "icon",
     "shortcut icon",
@@ -56,6 +61,70 @@ pub fn has_proper_integrity(data: &[u8], integrity: &str) -> bool {
     } else {
         false
     }
+}
+
+pub fn embed_srcset(
+    cache: &mut HashMap<String, Vec<u8>>,
+    client: &Client,
+    parent_url: &str,
+    srcset: &str,
+    opt_no_images: bool,
+    opt_silent: bool,
+) -> String {
+    let mut array: Vec<SrcSetItem> = vec![];
+    let srcset_items: Vec<&str> = srcset.split(',').collect();
+    for srcset_item in srcset_items {
+        let parts: Vec<&str> = srcset_item.trim().split_whitespace().collect();
+        let path = parts[0].trim();
+        let descriptor = if parts.len() > 1 { parts[1].trim() } else { "" };
+        let srcset_real_item = SrcSetItem { path, descriptor };
+        array.push(srcset_real_item);
+    }
+
+    let mut result: String = str!();
+    let mut i: usize = array.len();
+    for part in array {
+        if opt_no_images {
+            result.push_str(empty_image!());
+        } else {
+            let image_full_url = resolve_url(&parent_url, part.path).unwrap_or_default();
+            let image_url_fragment = get_url_fragment(image_full_url.clone());
+            match retrieve_asset(cache, client, &parent_url, &image_full_url, opt_silent) {
+                Ok((image_data, image_final_url, image_media_type)) => {
+                    let image_data_url = data_to_data_url(
+                        &image_media_type,
+                        &image_data,
+                        &image_final_url,
+                        &image_url_fragment,
+                    );
+                    // Append retreved asset as a data URL
+                    result.push_str(image_data_url.as_ref());
+                }
+                Err(_) => {
+                    // Keep remote reference if unable to retrieve the asset
+                    if is_http_url(image_full_url.clone()) {
+                        result.push_str(image_full_url.as_ref());
+                    } else {
+                        // Avoid breaking the structure in case if not an HTTP(S) URL
+                        result.push_str(empty_image!());
+                    }
+                }
+            }
+        }
+
+        if !part.descriptor.is_empty() {
+            result.push_str(" ");
+            result.push_str(part.descriptor);
+        }
+
+        if i > 1 {
+            result.push_str(", ");
+        }
+
+        i -= 1;
+    }
+
+    result
 }
 
 pub fn walk_and_embed_assets(
@@ -352,15 +421,18 @@ pub fn walk_and_embed_assets(
                 }
                 "img" => {
                     // Find source attribute(s)
-                    let mut img_src: String = str!();
                     let mut img_data_src: String = str!();
+                    let mut img_src: String = str!();
+                    let mut img_srcset: String = str!();
                     let mut i = 0;
                     while i < attrs_mut.len() {
                         let attr_name: &str = &attrs_mut[i].name.local;
-                        if attr_name.eq_ignore_ascii_case("src") {
-                            img_src = str!(attrs_mut.remove(i).value.trim());
-                        } else if attr_name.eq_ignore_ascii_case("data-src") {
+                        if attr_name.eq_ignore_ascii_case("data-src") {
                             img_data_src = str!(attrs_mut.remove(i).value.trim());
+                        } else if attr_name.eq_ignore_ascii_case("src") {
+                            img_src = str!(attrs_mut.remove(i).value.trim());
+                        } else if attr_name.eq_ignore_ascii_case("srcset") {
+                            img_srcset = str!(attrs_mut.remove(i).value.trim());
                         } else {
                             i += 1;
                         }
@@ -415,6 +487,23 @@ pub fn walk_and_embed_assets(
                                 }
                             }
                         }
+                    }
+
+                    if !img_srcset.is_empty() {
+                        attrs_mut.push(Attribute {
+                            name: QualName::new(None, ns!(), local_name!("srcset")),
+                            value: Tendril::from_slice(
+                                embed_srcset(
+                                    cache,
+                                    client,
+                                    &url,
+                                    &img_srcset,
+                                    opt_no_images,
+                                    opt_silent,
+                                )
+                                .as_ref(),
+                            ),
+                        });
                     }
                 }
                 "svg" => {
