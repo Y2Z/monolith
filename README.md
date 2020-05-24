@@ -55,9 +55,9 @@ The guide can be found [here](docs/containers.md)
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-o`: Write output to file
- - `-s`: Silent mode
- - `-t`: Set custom network request timeout
- - `-u`: Provide own User-Agent
+ - `-s`: Enable silent mode
+ - `-t`: Adjust network request timeout
+ - `-u`: Provide custom User-Agent
 
 ---------------------------------------------------
 
