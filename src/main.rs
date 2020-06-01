@@ -160,9 +160,12 @@ fn main() {
         // Safe to unwrap (we just put this through an HTTP request)
         let mut clean_url = Url::parse(&base_url).unwrap();
         clean_url.set_fragment(None);
-        // Don't include credentials
-        clean_url.set_username("").unwrap();
-        clean_url.set_password(None).unwrap();
+        // Prevent credentials from getting into metadata
+        if is_http_url(&base_url) {
+            // Only HTTP(S) URLs may feature credentials
+            clean_url.set_username("").unwrap();
+            clean_url.set_password(None).unwrap();
+        }
         let metadata_comment = if is_http_url(&base_url) {
             format!(
                 "<!-- Saved from {} at {} using {} v{} -->\n",
