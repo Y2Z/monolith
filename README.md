@@ -3,13 +3,13 @@
 [![Monolith Build Status for Windows](https://github.com/Y2Z/monolith/workflows/Windows/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AWindows)
 
 ```
- ___     ___________    __________      ___________________    ___
-|   \   /           \  |          |    |                   |  |   |
-|    \_/     __      \_|    __    |    |    ___     ___    |__|   |
-|           |  |           |  |   |    |   |   |   |   |          |
-|           |__|    _      |__|   |____|   |   |   |   |    __    |
-|   |\_/|          | \                     |   |   |   |   |  |   |
-|___|   |__________|  \____________________|   |___|   |___|  |___|
+ _____     ______________    __________      ___________________    ___
+|     \   /              \  |          |    |                   |  |   |
+|      \_/       __       \_|    __    |    |    ___     ___    |__|   |
+|               |  |            |  |   |    |   |   |   |   |          |
+|   |\     /|   |__|    _       |__|   |____|   |   |   |   |    __    |
+|   | \___/ |          | \                      |   |   |   |   |  |   |
+|___|       |__________|  \_____________________|   |___|   |___|  |___|
 ```
 
 A data hoarder’s dream come true: bundle any web page into a single HTML file. You can finally replace that gazillion of open tabs with a gazillion of .html files stored somewhere on your precious little drive.
