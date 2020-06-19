@@ -40,7 +40,7 @@ Dependency: `libssl-dev`
     $ cd monolith
     $ make install
 
-#### With Docker
+#### Using Containers
 The guide can be found [here](docs/containers.md)
 
 ---------------------------------------------------
