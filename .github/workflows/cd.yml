@@ -52,3 +52,16 @@ jobs:
         name: monolith-gnu-linux-armhf
         path: target/arm-unknown-linux-gnueabihf/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  gnu_linux_x86_64:
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    - name: Build and install the executable
+      run: cargo build --release
+    - uses: Shopify/upload-to-release@1.0.0
+      with:
+        name: monolith-gnu-linux-x86_64
+        path: target/release/monolith
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
