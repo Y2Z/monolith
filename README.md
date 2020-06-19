@@ -28,6 +28,10 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 #### Using Snapcraft (on GNU/Linux)
     $ snap install monolith
 
+#### Using Ports collection (on FreeBSD and TrueOS)
+    $ cd /usr/ports/www/monolith/
+    $ make install clean
+
 #### From source
 
 Dependency: `libssl-dev`
