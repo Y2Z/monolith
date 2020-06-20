@@ -12,19 +12,19 @@ authors = [
 description = "CLI tool for saving web pages as a single HTML file"
 
 [dependencies]
-base64 = "0.12.0"
-clap = "2.33.0"
+base64 = "0.12.2"
+chrono = "0.4.11" # Used to render comments indicating the time the page was saved
+clap = "2.33.1"
 cssparser = "0.27.2"
 html5ever = "0.24.1"
-sha2 = "0.8.1" # Used in calculating checksums during integrity checks
-time = "0.1.42" # Used to render comments indicating the time the page was saved
+sha2 = "0.9.0" # Used in calculating checksums during integrity checks
 url = "2.1.1"
 
 [dependencies.reqwest]
-version = "0.10.*"
+version = "0.10.6"
 default-features = false
 features = ["default-tls", "blocking", "gzip"]
 
 [dev-dependencies]
-assert_cmd = "0.12.0"
+assert_cmd = "1.0.1"
 tempfile = "3.1.0"

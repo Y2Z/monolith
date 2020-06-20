@@ -48,16 +48,16 @@ pub fn is_icon(attr_value: &str) -> bool {
 pub fn has_proper_integrity(data: &[u8], integrity: &str) -> bool {
     if integrity.starts_with("sha256-") {
         let mut hasher = Sha256::new();
-        hasher.input(data);
-        base64::encode(hasher.result()) == integrity[7..]
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
     } else if integrity.starts_with("sha384-") {
         let mut hasher = Sha384::new();
-        hasher.input(data);
-        base64::encode(hasher.result()) == integrity[7..]
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
     } else if integrity.starts_with("sha512-") {
         let mut hasher = Sha512::new();
-        hasher.input(data);
-        base64::encode(hasher.result()) == integrity[7..]
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
     } else {
         false
     }
