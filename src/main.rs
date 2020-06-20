@@ -1,3 +1,4 @@
+use chrono::prelude::*;
 use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
 use monolith::utils::{data_url_to_data, is_data_url, is_file_url, is_http_url, retrieve_asset};
 use reqwest::blocking::Client;
@@ -132,7 +133,7 @@ fn main() {
         process::exit(1);
     }
 
-    let time_saved = time::now_utc();
+    let time_saved = Utc::now();
 
     walk_and_embed_assets(
         &mut cache,
@@ -166,18 +167,19 @@ fn main() {
             clean_url.set_username("").unwrap();
             clean_url.set_password(None).unwrap();
         }
+        let timestamp = time_saved.to_rfc3339_opts(SecondsFormat::Secs, true);
         let metadata_comment = if is_http_url(&base_url) {
             format!(
                 "<!-- Saved from {} at {} using {} v{} -->\n",
                 &clean_url,
-                time_saved.rfc3339(),
+                timestamp,
                 env!("CARGO_PKG_NAME"),
                 env!("CARGO_PKG_VERSION"),
             )
         } else {
             format!(
                 "<!-- Saved from local source at {} using {} v{} -->\n",
-                time_saved.rfc3339(),
+                timestamp,
                 env!("CARGO_PKG_NAME"),
                 env!("CARGO_PKG_VERSION"),
             )

@@ -23,3 +23,7 @@ install:
 uninstall:
 	@cargo uninstall
 .PHONY: uninstall
+
+clean:
+	@cargo clean
+.PHONY: clean
