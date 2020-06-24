@@ -7,20 +7,45 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::utils;
+    use crate::url;
 
     #[test]
-    fn data_url() {
+    fn removes_fragment() {
         assert_eq!(
-            utils::get_url_fragment(
-                "data:image/svg+xml;base64,V2VsY29tZSBUbyBUaGUgUGFydHksIDxiPlBhbDwvYj4h#test"
-            ),
-            "test"
+            url::clean_url("https://somewhere.com/font.eot#iefix"),
+            "https://somewhere.com/font.eot"
         );
     }
 
     #[test]
-    fn https_empty() {
-        assert_eq!(utils::get_url_fragment("https://kernel.org#"), "");
+    fn removes_empty_fragment() {
+        assert_eq!(
+            url::clean_url("https://somewhere.com/font.eot#"),
+            "https://somewhere.com/font.eot"
+        );
+    }
+
+    #[test]
+    fn removes_empty_query_and_empty_fragment() {
+        assert_eq!(
+            url::clean_url("https://somewhere.com/font.eot?#"),
+            "https://somewhere.com/font.eot"
+        );
+    }
+
+    #[test]
+    fn removes_empty_query_amp_and_empty_fragment() {
+        assert_eq!(
+            url::clean_url("https://somewhere.com/font.eot?a=b&#"),
+            "https://somewhere.com/font.eot?a=b"
+        );
+    }
+
+    #[test]
+    fn keeps_credentials() {
+        assert_eq!(
+            url::clean_url("https://cookie:monster@gibson.internet/"),
+            "https://cookie:monster@gibson.internet/"
+        );
     }
 }

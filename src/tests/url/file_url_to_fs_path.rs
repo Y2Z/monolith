@@ -7,25 +7,35 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::utils;
+    use crate::url;
 
     #[test]
-    fn encode_string_with_specific_media_type() {
-        let mime = "application/javascript";
-        let data = "var word = 'hello';\nalert(word);\n";
-        let data_url = utils::data_to_data_url(mime, data.as_bytes(), "", "");
-
-        assert_eq!(
-            &data_url,
-            "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
-        );
+    fn remove_protocl_and_fragment() {
+        if cfg!(windows) {
+            assert_eq!(
+                url::file_url_to_fs_path("file:///C:/documents/some-path/some-file.svg#fragment"),
+                "C:\\documents\\some-path\\some-file.svg"
+            );
+        } else {
+            assert_eq!(
+                url::file_url_to_fs_path("file:///tmp/some-path/some-file.svg#fragment"),
+                "/tmp/some-path/some-file.svg"
+            );
+        }
     }
 
     #[test]
-    fn encode_append_fragment() {
-        let data = "<svg></svg>\n";
-        let data_url = utils::data_to_data_url("text/css", data.as_bytes(), "", "fragment");
-
-        assert_eq!(&data_url, "data:text/css;base64,PHN2Zz48L3N2Zz4K#fragment");
+    fn decodes_urls() {
+        if cfg!(windows) {
+            assert_eq!(
+                url::file_url_to_fs_path("file:///C:/Documents%20and%20Settings/some-file.html"),
+                "C:\\Documents and Settings\\some-file.html"
+            );
+        } else {
+            assert_eq!(
+                url::file_url_to_fs_path("file:///home/user/My%20Documents"),
+                "/home/user/My Documents"
+            );
+        }
     }
 }

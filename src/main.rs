@@ -1,6 +1,4 @@
 use chrono::prelude::*;
-use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
-use monolith::utils::{data_url_to_data, is_data_url, is_file_url, is_http_url, retrieve_asset};
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use reqwest::Url;
@@ -11,6 +9,10 @@ use std::io::{self, Error, Write};
 use std::path::Path;
 use std::process;
 use std::time::Duration;
+
+use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
+use monolith::url::{data_url_to_data, is_data_url, is_file_url, is_http_url};
+use monolith::utils::retrieve_asset;
 
 mod args;
 mod macros;

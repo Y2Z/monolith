@@ -7,35 +7,33 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::utils;
+    use crate::url;
 
     #[test]
-    fn remove_protocl_and_fragment() {
-        if cfg!(windows) {
-            assert_eq!(
-                utils::file_url_to_fs_path("file:///C:/documents/some-path/some-file.svg#fragment"),
-                "C:\\documents\\some-path\\some-file.svg"
-            );
-        } else {
-            assert_eq!(
-                utils::file_url_to_fs_path("file:///tmp/some-path/some-file.svg#fragment"),
-                "/tmp/some-path/some-file.svg"
-            );
-        }
+    fn decode_unicode_characters() {
+        assert_eq!(
+            url::decode_url(str!(
+                "%E6%A4%9C%E3%83%92%E3%83%A0%E8%A7%A3%E5%A1%97%E3%82%83%E3%83%83%20%3D%20%E3%82%B5"
+            )),
+            "検ヒム解塗ゃッ = サ"
+        );
     }
 
     #[test]
-    fn decodes_urls() {
-        if cfg!(windows) {
-            assert_eq!(
-                utils::file_url_to_fs_path("file:///C:/Documents%20and%20Settings/some-file.html"),
-                "C:\\Documents and Settings\\some-file.html"
-            );
-        } else {
-            assert_eq!(
-                utils::file_url_to_fs_path("file:///home/user/My%20Documents"),
-                "/home/user/My Documents"
-            );
-        }
+    fn decode_file_url() {
+        assert_eq!(
+            url::decode_url(str!("file:///tmp/space%20here/test%231.html")),
+            "file:///tmp/space here/test#1.html"
+        );
+    }
+
+    #[test]
+    fn plus_sign() {
+        assert_eq!(
+            url::decode_url(str!(
+                "fonts.somewhere.com/css?family=Open+Sans:300,400,400italic,600,600italic"
+            )),
+            "fonts.somewhere.com/css?family=Open+Sans:300,400,400italic,600,600italic"
+        );
     }
 }
