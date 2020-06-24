@@ -2,9 +2,8 @@ use cssparser::{ParseError, Parser, ParserInput, SourcePosition, Token};
 use reqwest::blocking::Client;
 use std::collections::HashMap;
 
-use crate::utils::{
-    data_to_data_url, get_url_fragment, is_http_url, resolve_url, retrieve_asset, url_with_fragment,
-};
+use crate::url::{data_to_data_url, get_url_fragment, is_http_url, resolve_url, url_with_fragment};
+use crate::utils::retrieve_asset;
 
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     // Universal

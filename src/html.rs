@@ -1,9 +1,3 @@
-use crate::css::embed_css;
-use crate::js::attr_is_event_handler;
-use crate::utils::{
-    data_to_data_url, get_url_fragment, is_http_url, resolve_url, retrieve_asset, url_has_protocol,
-    url_with_fragment,
-};
 use base64;
 use html5ever::interface::QualName;
 use html5ever::parse_document;
@@ -16,6 +10,14 @@ use reqwest::blocking::Client;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::collections::HashMap;
 use std::default::Default;
+
+use crate::css::embed_css;
+use crate::js::attr_is_event_handler;
+use crate::url::{
+    data_to_data_url, get_url_fragment, is_http_url, resolve_url, url_has_protocol,
+    url_with_fragment,
+};
+use crate::utils::retrieve_asset;
 
 struct SrcSetItem<'a> {
     path: &'a str,

@@ -7,34 +7,35 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::utils;
+    use crate::url;
 
     #[test]
-    fn url_with_fragment_url() {
-        let url = "https://localhost.localdomain/path/";
-        let fragment = "test";
-        let assembled_url = utils::url_with_fragment(url, fragment);
-
-        assert_eq!(&assembled_url, "https://localhost.localdomain/path/#test");
-    }
-    #[test]
-    fn url_with_fragment_empty_url() {
-        let url = "https://localhost.localdomain/path/";
-        let fragment = "";
-        let assembled_url = utils::url_with_fragment(url, fragment);
-
-        assert_eq!(&assembled_url, "https://localhost.localdomain/path/");
+    fn remove_protocl_and_fragment() {
+        if cfg!(windows) {
+            assert_eq!(
+                url::file_url_to_fs_path("file:///C:/documents/some-path/some-file.svg#fragment"),
+                "C:\\documents\\some-path\\some-file.svg"
+            );
+        } else {
+            assert_eq!(
+                url::file_url_to_fs_path("file:///tmp/some-path/some-file.svg#fragment"),
+                "/tmp/some-path/some-file.svg"
+            );
+        }
     }
 
     #[test]
-    fn url_with_fragment_data_url() {
-        let url = "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4K";
-        let fragment = "fragment";
-        let assembled_url = utils::url_with_fragment(url, fragment);
-
-        assert_eq!(
-            &assembled_url,
-            "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4K#fragment"
-        );
+    fn decodes_urls() {
+        if cfg!(windows) {
+            assert_eq!(
+                url::file_url_to_fs_path("file:///C:/Documents%20and%20Settings/some-file.html"),
+                "C:\\Documents and Settings\\some-file.html"
+            );
+        } else {
+            assert_eq!(
+                url::file_url_to_fs_path("file:///home/user/My%20Documents"),
+                "/home/user/My Documents"
+            );
+        }
     }
 }

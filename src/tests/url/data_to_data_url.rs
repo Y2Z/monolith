@@ -7,33 +7,25 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::utils;
+    use crate::url;
 
     #[test]
-    fn decode_unicode_characters() {
+    fn encode_string_with_specific_media_type() {
+        let mime = "application/javascript";
+        let data = "var word = 'hello';\nalert(word);\n";
+        let data_url = url::data_to_data_url(mime, data.as_bytes(), "");
+
         assert_eq!(
-            utils::decode_url(str!(
-                "%E6%A4%9C%E3%83%92%E3%83%A0%E8%A7%A3%E5%A1%97%E3%82%83%E3%83%83%20%3D%20%E3%82%B5"
-            )),
-            "検ヒム解塗ゃッ = サ"
+            &data_url,
+            "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
         );
     }
 
     #[test]
-    fn decode_file_url() {
-        assert_eq!(
-            utils::decode_url(str!("file:///tmp/space%20here/test%231.html")),
-            "file:///tmp/space here/test#1.html"
-        );
-    }
+    fn encode_append_fragment() {
+        let data = "<svg></svg>\n";
+        let data_url = url::data_to_data_url("image/svg+xml", data.as_bytes(), "");
 
-    #[test]
-    fn plus_sign() {
-        assert_eq!(
-            utils::decode_url(str!(
-                "fonts.somewhere.com/css?family=Open+Sans:300,400,400italic,600,600italic"
-            )),
-            "fonts.somewhere.com/css?family=Open+Sans:300,400,400italic,600,600italic"
-        );
+        assert_eq!(&data_url, "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4K");
     }
 }
