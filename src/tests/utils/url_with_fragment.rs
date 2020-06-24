@@ -10,22 +10,31 @@ mod passing {
     use crate::utils;
 
     #[test]
-    fn encode_string_with_specific_media_type() {
-        let mime = "application/javascript";
-        let data = "var word = 'hello';\nalert(word);\n";
-        let data_url = utils::data_to_data_url(mime, data.as_bytes(), "");
+    fn url_with_fragment_url() {
+        let url = "https://localhost.localdomain/path/";
+        let fragment = "test";
+        let assembled_url = utils::url_with_fragment(url, fragment);
 
-        assert_eq!(
-            &data_url,
-            "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
-        );
+        assert_eq!(&assembled_url, "https://localhost.localdomain/path/#test");
+    }
+    #[test]
+    fn url_with_fragment_empty_url() {
+        let url = "https://localhost.localdomain/path/";
+        let fragment = "";
+        let assembled_url = utils::url_with_fragment(url, fragment);
+
+        assert_eq!(&assembled_url, "https://localhost.localdomain/path/");
     }
 
     #[test]
-    fn encode_append_fragment() {
-        let data = "<svg></svg>\n";
-        let data_url = utils::data_to_data_url("image/svg+xml", data.as_bytes(), "");
+    fn url_with_fragment_data_url() {
+        let url = "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4K";
+        let fragment = "fragment";
+        let assembled_url = utils::url_with_fragment(url, fragment);
 
-        assert_eq!(&data_url, "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4K");
+        assert_eq!(
+            &assembled_url,
+            "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4K#fragment"
+        );
     }
 }

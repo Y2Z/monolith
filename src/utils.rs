@@ -38,24 +38,14 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "text/plain",
 ];
 
-pub fn data_to_data_url(media_type: &str, data: &[u8], url: &str, fragment: &str) -> String {
+pub fn data_to_data_url(media_type: &str, data: &[u8], url: &str) -> String {
     let media_type: String = if media_type.is_empty() {
         detect_media_type(data, &url)
     } else {
         media_type.to_string()
     };
-    let hash: String = if fragment != "" {
-        format!("#{}", fragment)
-    } else {
-        str!()
-    };
 
-    format!(
-        "data:{};base64,{}{}",
-        media_type,
-        base64::encode(data),
-        hash
-    )
+    format!("data:{};base64,{}", media_type, base64::encode(data))
 }
 
 pub fn detect_media_type(data: &[u8], url: &str) -> String {
@@ -300,4 +290,15 @@ pub fn retrieve_asset(
             Ok((data, res_url, media_type.to_string()))
         }
     }
+}
+
+pub fn url_with_fragment(url: &str, fragment: &str) -> String {
+    let mut result = str!(&url);
+
+    if !fragment.is_empty() {
+        result += "#";
+        result += fragment;
+    }
+
+    result
 }

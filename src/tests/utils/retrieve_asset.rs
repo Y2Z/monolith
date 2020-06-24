@@ -28,12 +28,12 @@ mod passing {
         )
         .unwrap();
         assert_eq!(
-            utils::data_to_data_url(&media_type, &data, &final_url, ""),
-            utils::data_to_data_url("text/html", "target".as_bytes(), "", "")
+            utils::data_to_data_url(&media_type, &data, &final_url),
+            utils::data_to_data_url("text/html", "target".as_bytes(), "")
         );
         assert_eq!(
             final_url,
-            utils::data_to_data_url("text/html", "target".as_bytes(), "", "")
+            utils::data_to_data_url("text/html", "target".as_bytes(), "")
         );
         assert_eq!(&media_type, "text/html");
     }
@@ -63,7 +63,7 @@ mod passing {
             false,
         )
         .unwrap();
-        assert_eq!(utils::data_to_data_url("application/javascript", &data, &final_url, ""), "data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==");
+        assert_eq!(utils::data_to_data_url("application/javascript", &data, &final_url), "data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==");
         assert_eq!(
             &final_url,
             &format!(

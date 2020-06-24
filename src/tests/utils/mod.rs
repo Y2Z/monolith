@@ -11,3 +11,4 @@ mod is_http_url;
 mod resolve_url;
 mod retrieve_asset;
 mod url_has_protocol;
+mod url_with_fragment;
