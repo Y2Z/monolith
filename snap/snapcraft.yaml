@@ -21,8 +21,9 @@ confinement: strict
 # Building on armhf fails, so we specify all supported non-armhf architectures
 architectures:
   - build-on: amd64
-  - build-on: i386
   - build-on: arm64
+  - build-on: armhf
+  - build-on: i386
   - build-on: ppc64el
   - build-on: s390x
 
