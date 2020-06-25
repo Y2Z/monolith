@@ -52,14 +52,14 @@ The guide can be found [here](docs/containers.md)
 
 ## Options
  - `-c`: Ignore styles
- - `-f`: Exclude frames and iframes
+ - `-f`: Exclude frames
  - `-F`: Omit web fonts
  - `-i`: Remove images
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-o`: Write output to file
- - `-s`: Enable silent mode
+ - `-s`: Be quiet
  - `-t`: Adjust network request timeout
  - `-u`: Provide custom User-Agent
 
