@@ -1,4 +1,5 @@
 use base64;
+use chrono::prelude::*;
 use html5ever::interface::QualName;
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
@@ -7,6 +8,7 @@ use html5ever::tendril::{format_tendril, Tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns};
 use reqwest::blocking::Client;
+use reqwest::Url;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::collections::HashMap;
 use std::default::Default;
@@ -1118,4 +1120,40 @@ pub fn stringify_document(
     }
 
     result
+}
+
+pub fn metadata_tag(url: &str) -> String {
+    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+
+    // Safe to unwrap (we just put this through an HTTP request)
+    match Url::parse(url) {
+        Ok(mut clean_url) => {
+            clean_url.set_fragment(None);
+
+            // Prevent credentials from getting into metadata
+            if is_http_url(url) {
+                // Only HTTP(S) URLs may feature credentials
+                clean_url.set_username("").unwrap();
+                clean_url.set_password(None).unwrap();
+            }
+
+            if is_http_url(url) {
+                format!(
+                    "<!-- Saved from {} at {} using {} v{} -->",
+                    &clean_url,
+                    timestamp,
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION"),
+                )
+            } else {
+                format!(
+                    "<!-- Saved from local source at {} using {} v{} -->",
+                    timestamp,
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION"),
+                )
+            }
+        }
+        Err(_) => str!(),
+    }
 }

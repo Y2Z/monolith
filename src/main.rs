@@ -1,7 +1,5 @@
-use chrono::prelude::*;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
-use reqwest::Url;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -10,7 +8,7 @@ use std::path::Path;
 use std::process;
 use std::time::Duration;
 
-use monolith::html::{html_to_dom, stringify_document, walk_and_embed_assets};
+use monolith::html::{html_to_dom, metadata_tag, stringify_document, walk_and_embed_assets};
 use monolith::url::{data_url_to_data, is_data_url, is_file_url, is_http_url};
 use monolith::utils::retrieve_asset;
 
@@ -63,6 +61,7 @@ fn main() {
     let mut target: String = str!(original_target.clone()).replace("\\", "/");
     let path_is_relative: bool = path.is_relative();
 
+    // Determine exact target URL
     if target.clone().len() == 0 {
         eprintln!("No target specified");
         process::exit(1);
@@ -89,6 +88,7 @@ fn main() {
         target_url = target.as_str();
     }
 
+    // Define output
     let mut output = Output::new(&app_args.output).expect("Could not prepare output");
 
     // Initialize client
@@ -98,7 +98,6 @@ fn main() {
         USER_AGENT,
         HeaderValue::from_str(&app_args.user_agent).expect("Invalid User-Agent header specified"),
     );
-
     let timeout: u64 = if app_args.timeout > 0 {
         app_args.timeout
     } else {
@@ -111,7 +110,7 @@ fn main() {
         .build()
         .expect("Failed to initialize HTTP client");
 
-    // Retrieve root document
+    // Retrieve target document
     if is_file_url(target_url) || is_http_url(target_url) {
         match retrieve_asset(&mut cache, &client, target_url, target_url, app_args.silent) {
             Ok((data, final_url, _media_type)) => {
@@ -135,8 +134,7 @@ fn main() {
         process::exit(1);
     }
 
-    let time_saved = Utc::now();
-
+    // Embed remote assets
     walk_and_embed_assets(
         &mut cache,
         &client,
@@ -150,7 +148,8 @@ fn main() {
         app_args.silent,
     );
 
-    let mut html: String = stringify_document(
+    // Serialize DOM tree
+    let mut result: String = stringify_document(
         &dom.document,
         app_args.no_css,
         app_args.no_frames,
@@ -159,37 +158,17 @@ fn main() {
         app_args.isolate,
     );
 
+    // Add metadata tag
     if !app_args.no_metadata {
-        // Safe to unwrap (we just put this through an HTTP request)
-        let mut clean_url = Url::parse(&base_url).unwrap();
-        clean_url.set_fragment(None);
-        // Prevent credentials from getting into metadata
-        if is_http_url(&base_url) {
-            // Only HTTP(S) URLs may feature credentials
-            clean_url.set_username("").unwrap();
-            clean_url.set_password(None).unwrap();
+        let metadata_comment = metadata_tag(&base_url);
+        result.insert_str(0, &metadata_comment);
+        if metadata_comment.len() > 0 {
+            result.insert_str(metadata_comment.len(), "\n");
         }
-        let timestamp = time_saved.to_rfc3339_opts(SecondsFormat::Secs, true);
-        let metadata_comment = if is_http_url(&base_url) {
-            format!(
-                "<!-- Saved from {} at {} using {} v{} -->\n",
-                &clean_url,
-                timestamp,
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION"),
-            )
-        } else {
-            format!(
-                "<!-- Saved from local source at {} using {} v{} -->\n",
-                timestamp,
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION"),
-            )
-        };
-        html.insert_str(0, &metadata_comment);
     }
 
+    // Write result into stdout or file
     output
-        .writeln_str(&html)
+        .writeln_str(&result)
         .expect("Could not write HTML output");
 }
