@@ -211,15 +211,15 @@ mod passing {
             buf.iter().map(|&c| c as char).collect::<String>(),
             format!(
                 "<html>\
-            <head>\
-            <link rel=\"icon\">\
-            </head>\
-            <body>\
-            <div>\
-            <img src=\"{empty_image}\">\
-            </div>\
-            </body>\
-            </html>",
+                    <head>\
+                        <link rel=\"icon\">\
+                    </head>\
+                    <body>\
+                        <div>\
+                            <img src=\"{empty_image}\">\
+                        </div>\
+                    </body>\
+                </html>",
                 empty_image = empty_image!()
             )
         );
@@ -341,8 +341,8 @@ mod passing {
     #[test]
     fn no_js() {
         let html = "<div onClick=\"void(0)\">\
-                    <script src=\"http://localhost/assets/some.js\"></script>\
-                    <script>alert(1)</script>\
+                        <script src=\"http://localhost/assets/some.js\"></script>\
+                        <script>alert(1)</script>\
                     </div>";
         let dom = html::html_to_dom(&html);
         let url = "http://localhost";
@@ -381,7 +381,7 @@ mod passing {
     }
 
     #[test]
-    fn with_no_integrity() {
+    fn discards_integrity() {
         let html = "<title>No integrity</title>\
                     <link integrity=\"sha384-...\" rel=\"something\"/>\
                     <script integrity=\"sha384-...\" src=\"some.js\"></script>";
@@ -415,8 +415,56 @@ mod passing {
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
             "<html>\
-            <head><title>No integrity</title><link rel=\"something\"><script></script></head>\
+                <head><title>No integrity</title><link rel=\"something\"><script></script></head>\
+                <body></body>\
+            </html>"
+        );
+    }
+
+    #[test]
+    fn removes_unwanted_meta_tags() {
+        let html = "<html>\
+            <head>\
+                <meta http-equiv=\"Refresh\" value=\"20\"/>\
+                <meta http-equiv=\"Location\" value=\"https://freebsd.org\"/>\
+            </head>\
             <body></body>\
+        </html>";
+        let dom = html::html_to_dom(&html);
+        let url = "http://localhost";
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+        let opt_no_css: bool = true;
+        let opt_no_fonts: bool = false;
+        let opt_no_frames: bool = true;
+        let opt_no_js: bool = true;
+        let opt_no_images: bool = true;
+        let opt_silent = true;
+
+        html::walk_and_embed_assets(
+            cache,
+            &client,
+            &url,
+            &dom.document,
+            opt_no_css,
+            opt_no_fonts,
+            opt_no_frames,
+            opt_no_js,
+            opt_no_images,
+            opt_silent,
+        );
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "<html>\
+                <head>\
+                    <meta>\
+                    <meta>\
+                </head>\
+                <body></body>\
             </html>"
         );
     }

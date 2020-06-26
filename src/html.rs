@@ -170,6 +170,25 @@ pub fn walk_and_embed_assets(
             let attrs_mut = &mut attrs.borrow_mut();
 
             match name.local.as_ref() {
+                "meta" => {
+                    // Determine type
+                    let mut is_unwanted_meta: bool = false;
+                    for attr in attrs_mut.iter_mut() {
+                        let attr_name: &str = &attr.name.local;
+                        if attr_name.eq_ignore_ascii_case("http-equiv") {
+                            let value: String = attr.value.to_string();
+                            is_unwanted_meta = value.eq_ignore_ascii_case("refresh")
+                                || value.eq_ignore_ascii_case("location");
+                        }
+                    }
+
+                    if is_unwanted_meta {
+                        // Strip this node off all its attributes
+                        while attrs_mut.len() > 0 {
+                            attrs_mut.remove(0);
+                        }
+                    }
+                }
                 "link" => {
                     // Remove integrity attributes, keep value of the last one
                     let mut integrity: String = str!();
