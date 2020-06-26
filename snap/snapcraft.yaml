@@ -18,7 +18,6 @@ description: |
 
 confinement: strict
 
-# Building on armhf fails, so we specify all supported non-armhf architectures
 architectures:
   - build-on: amd64
   - build-on: arm64
