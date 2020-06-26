@@ -15,6 +15,7 @@ mod passing {
         let dom = html::html_to_dom(&html);
 
         let opt_no_css: bool = false;
+        let opt_no_fonts: bool = false;
         let opt_no_frames: bool = false;
         let opt_no_js: bool = false;
         let opt_no_images: bool = false;
@@ -24,6 +25,7 @@ mod passing {
             html::stringify_document(
                 &dom.document,
                 opt_no_css,
+                opt_no_fonts,
                 opt_no_frames,
                 opt_no_js,
                 opt_no_images,
@@ -42,6 +44,7 @@ mod passing {
         let dom = html::html_to_dom(&html);
 
         let opt_no_css: bool = false;
+        let opt_no_fonts: bool = false;
         let opt_no_frames: bool = false;
         let opt_no_js: bool = false;
         let opt_no_images: bool = false;
@@ -51,6 +54,7 @@ mod passing {
             html::stringify_document(
                 &dom.document,
                 opt_no_css,
+                opt_no_fonts,
                 opt_no_frames,
                 opt_no_js,
                 opt_no_images,
@@ -81,6 +85,7 @@ mod passing {
         let dom = html::html_to_dom(&html);
 
         let opt_no_css: bool = true;
+        let opt_no_fonts: bool = false;
         let opt_no_frames: bool = false;
         let opt_no_js: bool = false;
         let opt_no_images: bool = false;
@@ -90,6 +95,7 @@ mod passing {
             html::stringify_document(
                 &dom.document,
                 opt_no_css,
+                opt_no_fonts,
                 opt_no_frames,
                 opt_no_js,
                 opt_no_images,
@@ -116,6 +122,7 @@ mod passing {
         let dom = html::html_to_dom(&html);
 
         let opt_no_css: bool = false;
+        let opt_no_fonts: bool = false;
         let opt_no_frames: bool = true;
         let opt_no_js: bool = false;
         let opt_no_images: bool = false;
@@ -125,6 +132,7 @@ mod passing {
             html::stringify_document(
                 &dom.document,
                 opt_no_css,
+                opt_no_fonts,
                 opt_no_frames,
                 opt_no_js,
                 opt_no_images,
@@ -149,14 +157,15 @@ mod passing {
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                     <link rel=\"stylesheet\" href=\"some.css\">\
                     <div>\
-                    <script src=\"some.js\"></script>\
-                    <img style=\"width: 100%;\" src=\"some.png\" />\
-                    <iframe src=\"some.html\"></iframe>\
+                        <script src=\"some.js\"></script>\
+                        <img style=\"width: 100%;\" src=\"some.png\" />\
+                        <iframe src=\"some.html\"></iframe>\
                     </div>";
         let dom = html::html_to_dom(&html);
 
         let opt_isolate: bool = true;
         let opt_no_css: bool = true;
+        let opt_no_fonts: bool = true;
         let opt_no_frames: bool = true;
         let opt_no_js: bool = true;
         let opt_no_images: bool = true;
@@ -165,6 +174,7 @@ mod passing {
             html::stringify_document(
                 &dom.document,
                 opt_no_css,
+                opt_no_fonts,
                 opt_no_frames,
                 opt_no_js,
                 opt_no_images,
@@ -173,7 +183,7 @@ mod passing {
             "<!DOCTYPE html>\
                 <html>\
                     <head>\
-                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;\"></meta>\
+                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;\"></meta>\
                         <title>no-frame no-css no-js no-image isolated document</title>\
                         <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                         <link rel=\"stylesheet\" href=\"some.css\">\

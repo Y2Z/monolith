@@ -129,12 +129,40 @@ mod passing {
     }
 
     #[test]
+    fn remove_fonts_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+        let out = cmd
+            .arg("-M")
+            .arg("-F")
+            .arg("data:text/html,<style>@font-face { font-family: myFont; src: url(font.woff); }</style>Hi")
+            .output()
+            .unwrap();
+
+        // STDOUT should contain HTML with no web fonts
+        assert_eq!(
+            std::str::from_utf8(&out.stdout).unwrap(),
+            "<html><head>\
+            <meta http-equiv=\"Content-Security-Policy\" content=\"font-src 'none';\"></meta>\
+            <style> </style>\
+            </head><body>Hi</body></html>\n"
+        );
+
+        // STDERR should be empty
+        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
+
+        // The exit code should be 0
+        out.assert().code(0);
+
+        Ok(())
+    }
+
+    #[test]
     fn remove_frames_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
         let out = cmd
             .arg("-M")
             .arg("-f")
-            .arg("data:text/html,<iframe src=\"https://google.com\"></iframe>Hi")
+            .arg("data:text/html,<iframe src=\"https://duckduckgo.com\"></iframe>Hi")
             .output()
             .unwrap();
 

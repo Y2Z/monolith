@@ -152,6 +152,7 @@ fn main() {
     let mut result: String = stringify_document(
         &dom.document,
         app_args.no_css,
+        app_args.no_fonts,
         app_args.no_frames,
         app_args.no_js,
         app_args.no_images,

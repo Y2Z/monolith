@@ -1076,6 +1076,7 @@ fn get_child_node_by_name(handle: &Handle, node_name: &str) -> Handle {
 pub fn stringify_document(
     handle: &Handle,
     opt_no_css: bool,
+    opt_no_fonts: bool,
     opt_no_frames: bool,
     opt_no_js: bool,
     opt_no_images: bool,
@@ -1088,7 +1089,7 @@ pub fn stringify_document(
     let mut result = String::from_utf8(buf).unwrap();
 
     // Take care of CSP
-    if opt_isolate || opt_no_css || opt_no_frames || opt_no_js || opt_no_images {
+    if opt_isolate || opt_no_css || opt_no_fonts || opt_no_frames || opt_no_js || opt_no_images {
         let mut buf: Vec<u8> = Vec::new();
         let mut dom = html_to_dom(&result);
         let doc = dom.get_document();
@@ -1097,6 +1098,7 @@ pub fn stringify_document(
         let csp_content: String = csp(
             opt_isolate,
             opt_no_css,
+            opt_no_fonts,
             opt_no_frames,
             opt_no_js,
             opt_no_images,
@@ -1137,6 +1139,7 @@ pub fn stringify_document(
 pub fn csp(
     opt_isolate: bool,
     opt_no_css: bool,
+    opt_no_fonts: bool,
     opt_no_frames: bool,
     opt_no_js: bool,
     opt_no_images: bool,
@@ -1149,6 +1152,10 @@ pub fn csp(
 
     if opt_no_css {
         string_list.push("style-src 'none';");
+    }
+
+    if opt_no_fonts {
+        string_list.push("font-src 'none';");
     }
 
     if opt_no_frames {
