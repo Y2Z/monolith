@@ -142,7 +142,7 @@ mod passing {
         assert_eq!(
             std::str::from_utf8(&out.stdout).unwrap(),
             "<html><head>\
-            <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none';child-src 'none';\"></meta>\
+            <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none'; child-src 'none';\"></meta>\
             </head><body><iframe src=\"\"></iframe>Hi</body></html>\n"
         );
 

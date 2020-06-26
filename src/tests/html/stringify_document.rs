@@ -133,7 +133,7 @@ mod passing {
             "<!DOCTYPE html>\
                 <html>\
                 <head>\
-                <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none';child-src 'none';\"></meta>\
+                <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none'; child-src 'none';\"></meta>\
                 <title>Frameless document</title>\
                 <link rel=\"something\">\
                 </head>\
@@ -173,7 +173,7 @@ mod passing {
             "<!DOCTYPE html>\
                 <html>\
                     <head>\
-                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; frame-src 'none';child-src 'none'; script-src 'none'; img-src data:;\"></meta>\
+                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;\"></meta>\
                         <title>no-frame no-css no-js no-image isolated document</title>\
                         <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                         <link rel=\"stylesheet\" href=\"some.css\">\
