@@ -143,7 +143,7 @@ mod passing {
             std::str::from_utf8(&out.stdout).unwrap(),
             "<html><head>\
             <meta http-equiv=\"Content-Security-Policy\" content=\"font-src 'none';\"></meta>\
-            <style> </style>\
+            <style></style>\
             </head><body>Hi</body></html>\n"
         );
 
