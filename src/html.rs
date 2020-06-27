@@ -1076,6 +1076,7 @@ fn get_child_node_by_name(handle: &Handle, node_name: &str) -> Handle {
 pub fn stringify_document(
     handle: &Handle,
     opt_no_css: bool,
+    opt_no_fonts: bool,
     opt_no_frames: bool,
     opt_no_js: bool,
     opt_no_images: bool,
@@ -1087,28 +1088,21 @@ pub fn stringify_document(
 
     let mut result = String::from_utf8(buf).unwrap();
 
-    if opt_isolate || opt_no_css || opt_no_frames || opt_no_js || opt_no_images {
+    // Take care of CSP
+    if opt_isolate || opt_no_css || opt_no_fonts || opt_no_frames || opt_no_js || opt_no_images {
         let mut buf: Vec<u8> = Vec::new();
         let mut dom = html_to_dom(&result);
         let doc = dom.get_document();
         let html = get_child_node_by_name(&doc, "html");
         let head = get_child_node_by_name(&html, "head");
-        let mut content_attr = str!();
-        if opt_isolate {
-            content_attr += " default-src 'unsafe-inline' data:;";
-        }
-        if opt_no_css {
-            content_attr += " style-src 'none';";
-        }
-        if opt_no_frames {
-            content_attr += " frame-src 'none';child-src 'none';";
-        }
-        if opt_no_js {
-            content_attr += " script-src 'none';";
-        }
-        if opt_no_images {
-            content_attr += " img-src data:;";
-        }
+        let csp_content: String = csp(
+            opt_isolate,
+            opt_no_css,
+            opt_no_fonts,
+            opt_no_frames,
+            opt_no_js,
+            opt_no_images,
+        );
 
         let meta = dom.create_element(
             QualName::new(None, ns!(), local_name!("meta")),
@@ -1119,26 +1113,66 @@ pub fn stringify_document(
                 },
                 Attribute {
                     name: QualName::new(None, ns!(), local_name!("content")),
-                    value: format_tendril!("{}", content_attr.trim()),
+                    value: format_tendril!("{}", csp_content),
                 },
             ],
             Default::default(),
         );
-        head.children.borrow_mut().reverse();
-        head.children.borrow_mut().push(meta.clone());
-        head.children.borrow_mut().reverse();
         // Note: the CSP meta-tag has to be prepended, never appended,
         //       since there already may be one defined in the document,
         //       and browsers don't allow re-defining them (for obvious reasons)
+        head.children.borrow_mut().reverse();
+        head.children.borrow_mut().push(meta.clone());
+        head.children.borrow_mut().reverse();
 
+        // Note: we can't make it isolate the page right away since it may have no HEAD element,
+        //       ergo we have to serialize, parse the DOM again, insert the CSP meta tag, and then
+        //       finally serialize the result
         serialize(&mut buf, &doc, SerializeOpts::default())
             .expect("unable to serialize DOM into buffer");
         result = String::from_utf8(buf).unwrap();
-        // Note: we can't make it isolate the page right away since it may have no HEAD element,
-        //       ergo we have to serialize, parse DOM again, and then finally serialize the result
     }
 
     result
+}
+
+pub fn csp(
+    opt_isolate: bool,
+    opt_no_css: bool,
+    opt_no_fonts: bool,
+    opt_no_frames: bool,
+    opt_no_js: bool,
+    opt_no_images: bool,
+) -> String {
+    let mut string_list = vec![];
+
+    if opt_isolate {
+        string_list.push("default-src 'unsafe-inline' data:;");
+    }
+
+    if opt_no_css {
+        string_list.push("style-src 'none';");
+    }
+
+    if opt_no_fonts {
+        string_list.push("font-src 'none';");
+    }
+
+    if opt_no_frames {
+        string_list.push("frame-src 'none';");
+        string_list.push("child-src 'none';");
+    }
+
+    if opt_no_js {
+        string_list.push("script-src 'none';");
+    }
+
+    if opt_no_images {
+        // Note: data: is needed for transparent pixels
+        string_list.push("img-src data:;");
+    }
+
+    string_list.join(" ")
 }
 
 pub fn metadata_tag(url: &str) -> String {
