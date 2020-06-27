@@ -23,6 +23,25 @@ mod passing {
     }
 
     #[test]
+    fn trim_if_empty() {
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+
+        assert_eq!(
+            css::embed_css(
+                cache,
+                &client,
+                "https://doesntmatter.local/",
+                "\t     \t   ",
+                false,
+                false,
+                false,
+            ),
+            ""
+        );
+    }
+
+    #[test]
     fn style_exclude_unquoted_images() {
         let cache = &mut HashMap::new();
         let client = Client::new();

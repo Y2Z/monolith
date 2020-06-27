@@ -394,6 +394,11 @@ pub fn process_css<'a>(
         }
     }
 
+    // Ensure empty CSS is really empty
+    if result.len() > 0 && result.trim().len() == 0 {
+        result = result.trim().to_string()
+    }
+
     Ok(result)
 }
 
