@@ -1,7 +1,7 @@
 use clap::{App, Arg};
 
 #[derive(Default)]
-pub struct AppArgs {
+pub struct Options {
     pub target: String,
     pub no_css: bool,
     pub no_fonts: bool,
@@ -21,8 +21,8 @@ const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
 
-impl AppArgs {
-    pub fn get() -> AppArgs {
+impl Options {
+    pub fn from_args() -> Options {
         let app = App::new(env!("CARGO_PKG_NAME"))
             .version(crate_version!())
             .author(crate_authors!("\n"))
@@ -34,7 +34,7 @@ impl AppArgs {
                     .index(1)
                     .help("URL or file path"),
             )
-            // .args_from_usage("-a, --include-audio 'Removes audio sources'")
+            // .args_from_usage("-a, --no-audio 'Removes audio sources'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
             .args_from_usage("-F, --no-fonts 'Removes fonts'")
@@ -47,33 +47,35 @@ impl AppArgs {
             .args_from_usage("-s, --silent 'Suppresses verbosity'")
             .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
             .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
-            // .args_from_usage("-v, --include-video 'Removes video sources'")
+            // .args_from_usage("-v, --no-video 'Removes video sources'")
             .get_matches();
-        let mut app_args = AppArgs::default();
+        let mut options: Options = Options::default();
+
         // Process the command
-        app_args.target = app
+        options.target = app
             .value_of("target")
             .expect("please set target")
             .to_string();
-        app_args.no_css = app.is_present("no-css");
-        app_args.no_fonts = app.is_present("no-fonts");
-        app_args.no_frames = app.is_present("no-frames");
-        app_args.no_images = app.is_present("no-images");
-        app_args.no_js = app.is_present("no-js");
-        app_args.insecure = app.is_present("insecure");
-        app_args.no_metadata = app.is_present("no-metadata");
-        app_args.isolate = app.is_present("isolate");
-        app_args.silent = app.is_present("silent");
-        app_args.timeout = app
+        options.no_css = app.is_present("no-css");
+        options.no_frames = app.is_present("no-frames");
+        options.no_fonts = app.is_present("no-fonts");
+        options.no_images = app.is_present("no-images");
+        options.isolate = app.is_present("isolate");
+        options.no_js = app.is_present("no-js");
+        options.insecure = app.is_present("insecure");
+        options.no_metadata = app.is_present("no-metadata");
+        options.output = app.value_of("output").unwrap_or("").to_string();
+        options.silent = app.is_present("silent");
+        options.timeout = app
             .value_of("timeout")
             .unwrap_or(&DEFAULT_NETWORK_TIMEOUT.to_string())
             .parse::<u64>()
             .unwrap();
-        app_args.output = app.value_of("output").unwrap_or("").to_string();
-        app_args.user_agent = app
+        options.user_agent = app
             .value_of("user-agent")
             .unwrap_or(DEFAULT_USER_AGENT)
             .to_string();
-        app_args
+
+        options
     }
 }

@@ -9,15 +9,11 @@ use std::process;
 use std::time::Duration;
 
 use monolith::html::{html_to_dom, metadata_tag, stringify_document, walk_and_embed_assets};
+use monolith::opts::Options;
 use monolith::url::{data_url_to_data, is_data_url, is_file_url, is_http_url};
 use monolith::utils::retrieve_asset;
 
-mod args;
 mod macros;
-
-#[macro_use]
-extern crate clap;
-use crate::args::AppArgs;
 
 enum Output {
     Stdout(io::Stdout),
@@ -48,8 +44,8 @@ impl Output {
 }
 
 fn main() {
-    let app_args = AppArgs::get();
-    let original_target: &str = &app_args.target;
+    let options = Options::from_args();
+    let original_target: &str = &options.target;
     let target_url: &str;
     let base_url;
     let dom;
@@ -89,30 +85,30 @@ fn main() {
     }
 
     // Define output
-    let mut output = Output::new(&app_args.output).expect("Could not prepare output");
+    let mut output = Output::new(&options.output).expect("Could not prepare output");
 
     // Initialize client
     let mut cache = HashMap::new();
     let mut header_map = HeaderMap::new();
     header_map.insert(
         USER_AGENT,
-        HeaderValue::from_str(&app_args.user_agent).expect("Invalid User-Agent header specified"),
+        HeaderValue::from_str(&options.user_agent).expect("Invalid User-Agent header specified"),
     );
-    let timeout: u64 = if app_args.timeout > 0 {
-        app_args.timeout
+    let timeout: u64 = if options.timeout > 0 {
+        options.timeout
     } else {
         std::u64::MAX / 4
     };
     let client = Client::builder()
         .timeout(Duration::from_secs(timeout))
-        .danger_accept_invalid_certs(app_args.insecure)
+        .danger_accept_invalid_certs(options.insecure)
         .default_headers(header_map)
         .build()
         .expect("Failed to initialize HTTP client");
 
     // Retrieve target document
     if is_file_url(target_url) || is_http_url(target_url) {
-        match retrieve_asset(&mut cache, &client, target_url, target_url, app_args.silent) {
+        match retrieve_asset(&mut cache, &client, target_url, target_url, options.silent) {
             Ok((data, final_url, _media_type)) => {
                 base_url = final_url;
                 dom = html_to_dom(&String::from_utf8_lossy(&data));
@@ -135,32 +131,13 @@ fn main() {
     }
 
     // Embed remote assets
-    walk_and_embed_assets(
-        &mut cache,
-        &client,
-        &base_url,
-        &dom.document,
-        app_args.no_css,
-        app_args.no_fonts,
-        app_args.no_frames,
-        app_args.no_js,
-        app_args.no_images,
-        app_args.silent,
-    );
+    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options);
 
     // Serialize DOM tree
-    let mut result: String = stringify_document(
-        &dom.document,
-        app_args.no_css,
-        app_args.no_fonts,
-        app_args.no_frames,
-        app_args.no_js,
-        app_args.no_images,
-        app_args.isolate,
-    );
+    let mut result: String = stringify_document(&dom.document, &options);
 
     // Add metadata tag
-    if !app_args.no_metadata {
+    if !options.no_metadata {
         let metadata_comment = metadata_tag(&base_url);
         result.insert_str(0, &metadata_comment);
         if metadata_comment.len() > 0 {

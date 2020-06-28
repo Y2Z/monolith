@@ -7,10 +7,12 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::html;
     use html5ever::serialize::{serialize, SerializeOpts};
     use reqwest::blocking::Client;
     use std::collections::HashMap;
+
+    use crate::html;
+    use crate::opts::Options;
 
     #[test]
     fn basic() {
@@ -20,27 +22,12 @@ mod passing {
         let dom = html::html_to_dom(&html);
         let url = "http://localhost";
 
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.silent = true;
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -58,27 +45,12 @@ mod passing {
         let url = "http://localhost";
         let cache = &mut HashMap::new();
 
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.silent = true;
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -96,27 +68,12 @@ mod passing {
         let url = "http://localhost";
         let cache = &mut HashMap::new();
 
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.silent = true;
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -136,26 +93,13 @@ mod passing {
         let url = "http://localhost";
         let cache = &mut HashMap::new();
 
-        let opt_no_css: bool = true;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.no_css = true;
+        options.silent = true;
+
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -182,27 +126,13 @@ mod passing {
         let url = "http://localhost";
         let cache = &mut HashMap::new();
 
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = true;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -233,27 +163,13 @@ mod passing {
         let url = "http://localhost";
         let cache = &mut HashMap::new();
 
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = true;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -271,26 +187,13 @@ mod passing {
         let url = "http://localhost";
         let cache = &mut HashMap::new();
 
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.no_frames = true;
+        options.silent = true;
+
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -308,26 +211,13 @@ mod passing {
         let url = "http://localhost";
         let cache = &mut HashMap::new();
 
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.no_frames = true;
+        options.silent = true;
+
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -348,27 +238,13 @@ mod passing {
         let url = "http://localhost";
         let cache = &mut HashMap::new();
 
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = true;
-        let opt_no_images: bool = false;
-        let opt_silent = true;
+        let mut options = Options::default();
+        options.no_js = true;
+        options.silent = true;
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -388,26 +264,17 @@ mod passing {
         let dom = html::html_to_dom(&html);
         let url = "http://localhost";
         let cache = &mut HashMap::new();
-        let client = Client::new();
-        let opt_no_css: bool = true;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = true;
-        let opt_no_images: bool = true;
-        let opt_silent = true;
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        let mut options = Options::default();
+        options.no_css = true;
+        options.no_frames = true;
+        options.no_js = true;
+        options.no_images = true;
+        options.silent = true;
+
+        let client = Client::new();
+
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -433,26 +300,17 @@ mod passing {
         let dom = html::html_to_dom(&html);
         let url = "http://localhost";
         let cache = &mut HashMap::new();
-        let client = Client::new();
-        let opt_no_css: bool = true;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = true;
-        let opt_no_images: bool = true;
-        let opt_silent = true;
 
-        html::walk_and_embed_assets(
-            cache,
-            &client,
-            &url,
-            &dom.document,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-            opt_silent,
-        );
+        let mut options = Options::default();
+        options.no_css = true;
+        options.no_frames = true;
+        options.no_js = true;
+        options.no_images = true;
+        options.silent = true;
+
+        let client = Client::new();
+
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
