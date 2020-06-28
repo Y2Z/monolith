@@ -19,7 +19,7 @@ mod passing {
         let client = Client::new();
         let options = Options::default();
 
-        assert_eq!(css::embed_css(cache, &client, "", "", &options), "");
+        assert_eq!(css::embed_css(cache, &client, "", "", &options, 0), "");
     }
 
     #[test]
@@ -35,6 +35,7 @@ mod passing {
                 "https://doesntmatter.local/",
                 "\t     \t   ",
                 &options,
+                0,
             ),
             ""
         );
@@ -63,6 +64,7 @@ mod passing {
                 "https://doesntmatter.local/",
                 &STYLE,
                 &options,
+                0,
             ),
             format!(
                 "/* border: none;*/\
@@ -94,7 +96,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(cache, &client, "", &STYLE, &options),
+            css::embed_css(cache, &client, "", &STYLE, &options, 0),
             format!(
                 "/* border: none;*/\
                 background-image: url('{empty_image}'); \
@@ -124,7 +126,7 @@ mod passing {
             html > body {}";
 
         assert_eq!(
-            css::embed_css(cache, &client, "file:///", &CSS, &options),
+            css::embed_css(cache, &client, "file:///", &CSS, &options, 0),
             CSS
         );
     }
@@ -166,7 +168,7 @@ mod passing {
             }
             ";
 
-        assert_eq!(css::embed_css(cache, &client, "", &CSS, &options), CSS);
+        assert_eq!(css::embed_css(cache, &client, "", &CSS, &options, 0), CSS);
     }
 
     #[test]
@@ -191,6 +193,7 @@ mod passing {
                 "https://doesntmatter.local/",
                 &CSS,
                 &options,
+                0,
             ),
             "\
             @charset 'UTF-8';\n\
@@ -226,6 +229,7 @@ mod passing {
                 "https://doesntmatter.local/",
                 &CSS,
                 &options,
+                0,
             ),
             CSS
         );
@@ -253,6 +257,7 @@ mod passing {
                 "https://doesntmatter.local/",
                 &CSS,
                 &options,
+                0,
             ),
             CSS
         );
@@ -282,6 +287,7 @@ mod passing {
                 "https://doesntmatter.local/",
                 &CSS,
                 &options,
+                0,
             ),
             CSS
         );
@@ -336,6 +342,7 @@ mod passing {
                 "https://doesntmatter.local/",
                 &CSS,
                 &options,
+                0,
             ),
             CSS_OUT
         );

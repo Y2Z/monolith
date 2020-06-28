@@ -287,8 +287,8 @@ mod passing {
             std::str::from_utf8(&out.stderr).unwrap(),
             format!(
                 "\
-                {file}{cwd}/src/tests/data/basic/local-file.html\n\
-                {file}{cwd}/src/tests/data/basic/local-style.css\n\
+                {file}{cwd}/src/tests/data/basic/local-file.html\n \
+                {file}{cwd}/src/tests/data/basic/local-style.css\n \
                 {file}{cwd}/src/tests/data/basic/local-script.js\n\
                 ",
                 file = file_url_protocol,
@@ -489,7 +489,7 @@ mod passing {
             std::str::from_utf8(&out.stderr).unwrap(),
             format!(
                 "\
-                {file}{html_path}\n\
+                {file}{html_path}\n \
                 {file}{svg_path}\n\
                 ",
                 file = file_url_prefix,
@@ -540,9 +540,9 @@ mod passing {
             std::str::from_utf8(&out.stderr).unwrap(),
             format!(
                 "\
-                {file}{html_path}\n\
-                {file}{css_path}\n\
-                {file}{css_path}\n\
+                {file}{html_path}\n \
+                {file}{css_path}\n \
+                {file}{css_path}\n \
                 {file}{css_path}\n\
                 ",
                 file = file_url_prefix,

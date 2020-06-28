@@ -75,6 +75,7 @@ pub fn embed_srcset(
     parent_url: &str,
     srcset: &str,
     options: &Options,
+    depth: u32,
 ) -> String {
     let mut array: Vec<SrcSetItem> = vec![];
     let srcset_items: Vec<&str> = srcset.split(',').collect();
@@ -94,7 +95,14 @@ pub fn embed_srcset(
         } else {
             let image_full_url = resolve_url(&parent_url, part.path).unwrap_or_default();
             let image_url_fragment = get_url_fragment(image_full_url.clone());
-            match retrieve_asset(cache, client, &parent_url, &image_full_url, options.silent) {
+            match retrieve_asset(
+                cache,
+                client,
+                &parent_url,
+                &image_full_url,
+                options.silent,
+                depth + 1,
+            ) {
                 Ok((image_data, image_final_url, image_media_type)) => {
                     let image_data_url =
                         data_to_data_url(&image_media_type, &image_data, &image_final_url);
@@ -138,12 +146,13 @@ pub fn walk_and_embed_assets(
     url: &str,
     node: &Handle,
     options: &Options,
+    depth: u32,
 ) {
     match node.data {
         NodeData::Document => {
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(cache, client, &url, child, options);
+                walk_and_embed_assets(cache, client, &url, child, options, depth);
             }
         }
         NodeData::Element {
@@ -240,6 +249,7 @@ pub fn walk_and_embed_assets(
                                     &url,
                                     &link_href_full_url,
                                     options.silent,
+                                    depth + 1,
                                 ) {
                                     Ok((
                                         link_href_data,
@@ -312,6 +322,7 @@ pub fn walk_and_embed_assets(
                                     &url,
                                     &link_href_full_url,
                                     options.silent,
+                                    depth + 1,
                                 ) {
                                     Ok((
                                         link_href_data,
@@ -328,6 +339,7 @@ pub fn walk_and_embed_assets(
                                                 &link_href_final_url,
                                                 &String::from_utf8_lossy(&link_href_data),
                                                 options,
+                                                depth + 1,
                                             );
                                             let link_href_data_url = data_to_data_url(
                                                 "text/css",
@@ -406,6 +418,7 @@ pub fn walk_and_embed_assets(
                             &url,
                             &background_full_url,
                             options.silent,
+                            depth + 1,
                         ) {
                             Ok((background_data, background_final_url, background_media_type)) => {
                                 let background_data_url = data_to_data_url(
@@ -483,8 +496,14 @@ pub fn walk_and_embed_assets(
                             )
                             .unwrap_or_default();
                             let img_url_fragment = get_url_fragment(img_full_url.clone());
-                            match retrieve_asset(cache, client, &url, &img_full_url, options.silent)
-                            {
+                            match retrieve_asset(
+                                cache,
+                                client,
+                                &url,
+                                &img_full_url,
+                                options.silent,
+                                depth + 1,
+                            ) {
                                 Ok((img_data, img_final_url, img_media_type)) => {
                                     let img_data_url = data_to_data_url(
                                         &img_media_type,
@@ -521,7 +540,8 @@ pub fn walk_and_embed_assets(
                         attrs_mut.push(Attribute {
                             name: QualName::new(None, ns!(), local_name!("srcset")),
                             value: Tendril::from_slice(
-                                embed_srcset(cache, client, &url, &img_srcset, options).as_ref(),
+                                embed_srcset(cache, client, &url, &img_srcset, options, depth)
+                                    .as_ref(),
                             ),
                         });
                     }
@@ -573,6 +593,7 @@ pub fn walk_and_embed_assets(
                                 &url,
                                 &input_image_full_url,
                                 options.silent,
+                                depth + 1,
                             ) {
                                 Ok((
                                     input_image_data,
@@ -629,7 +650,14 @@ pub fn walk_and_embed_assets(
                     if !options.no_images && !image_href.is_empty() {
                         let image_full_url = resolve_url(&url, image_href).unwrap_or_default();
                         let image_url_fragment = get_url_fragment(image_full_url.clone());
-                        match retrieve_asset(cache, client, &url, &image_full_url, options.silent) {
+                        match retrieve_asset(
+                            cache,
+                            client,
+                            &url,
+                            &image_full_url,
+                            options.silent,
+                            depth + 1,
+                        ) {
                             Ok((image_data, image_final_url, image_media_type)) => {
                                 let image_data_url = data_to_data_url(
                                     &image_media_type,
@@ -687,6 +715,7 @@ pub fn walk_and_embed_assets(
                                         &url,
                                         &srcset_full_url,
                                         options.silent,
+                                        depth + 1,
                                     ) {
                                         Ok((srcset_data, srcset_final_url, srcset_media_type)) => {
                                             let srcset_data_url = data_to_data_url(
@@ -763,8 +792,14 @@ pub fn walk_and_embed_assets(
                         node.children.borrow_mut().clear();
                     } else if !script_src.is_empty() {
                         let script_full_url = resolve_url(&url, script_src).unwrap_or_default();
-                        match retrieve_asset(cache, client, &url, &script_full_url, options.silent)
-                        {
+                        match retrieve_asset(
+                            cache,
+                            client,
+                            &url,
+                            &script_full_url,
+                            options.silent,
+                            depth + 1,
+                        ) {
                             Ok((script_data, script_final_url, _script_media_type)) => {
                                 // Only embed if we're able to validate integrity
                                 if script_integrity.is_empty()
@@ -802,8 +837,14 @@ pub fn walk_and_embed_assets(
                         for node in node.children.borrow_mut().iter_mut() {
                             if let NodeData::Text { ref contents } = node.data {
                                 let mut tendril = contents.borrow_mut();
-                                let replacement =
-                                    embed_css(cache, client, &url, tendril.as_ref(), options);
+                                let replacement = embed_css(
+                                    cache,
+                                    client,
+                                    &url,
+                                    tendril.as_ref(),
+                                    options,
+                                    depth,
+                                );
                                 tendril.clear();
                                 tendril.push_slice(&replacement);
                             }
@@ -850,6 +891,7 @@ pub fn walk_and_embed_assets(
                                 &url,
                                 &frame_full_url,
                                 options.silent,
+                                depth + 1,
                             ) {
                                 Ok((frame_data, frame_final_url, frame_media_type)) => {
                                     let frame_dom =
@@ -860,6 +902,7 @@ pub fn walk_and_embed_assets(
                                         &frame_final_url,
                                         &frame_dom.document,
                                         &options,
+                                        depth + 1,
                                     );
                                     let mut frame_data: Vec<u8> = Vec::new();
                                     serialize(
@@ -921,6 +964,7 @@ pub fn walk_and_embed_assets(
                                 &url,
                                 &video_poster_full_url,
                                 options.silent,
+                                depth + 1,
                             ) {
                                 Ok((
                                     video_poster_data,
@@ -975,8 +1019,14 @@ pub fn walk_and_embed_assets(
                     .iter_mut()
                     .filter(|a| a.name.local.as_ref().eq_ignore_ascii_case("style"))
                 {
-                    let replacement =
-                        embed_css(cache, client, &url, attribute.value.as_ref(), options);
+                    let replacement = embed_css(
+                        cache,
+                        client,
+                        &url,
+                        attribute.value.as_ref(),
+                        options,
+                        depth,
+                    );
                     // let replacement = str!();
                     attribute.value.clear();
                     attribute.value.push_slice(&replacement);
@@ -999,7 +1049,7 @@ pub fn walk_and_embed_assets(
 
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(cache, client, &url, child, options);
+                walk_and_embed_assets(cache, client, &url, child, options, depth);
             }
         }
         _ => {

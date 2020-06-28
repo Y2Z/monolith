@@ -27,7 +27,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -50,7 +50,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -73,7 +73,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -99,7 +99,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -132,7 +132,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -169,7 +169,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -193,7 +193,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -217,7 +217,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -244,7 +244,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -274,7 +274,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
@@ -310,7 +310,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
