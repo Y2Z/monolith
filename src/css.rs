@@ -61,6 +61,7 @@ pub fn process_css<'a>(
     parent_url: &str,
     parser: &mut Parser,
     options: &Options,
+    depth: u32,
     rule_name: &str,
     prop_name: &str,
     func_name: &str,
@@ -114,6 +115,7 @@ pub fn process_css<'a>(
                             parent_url,
                             parser,
                             options,
+                            depth,
                             rule_name,
                             curr_prop.as_str(),
                             func_name,
@@ -175,6 +177,7 @@ pub fn process_css<'a>(
                         &parent_url,
                         &import_full_url,
                         options.silent,
+                        depth + 1,
                     ) {
                         Ok((import_contents, import_final_url, _import_media_type)) => {
                             let import_data_url = data_to_data_url(
@@ -185,6 +188,7 @@ pub fn process_css<'a>(
                                     &import_final_url,
                                     &String::from_utf8_lossy(&import_contents),
                                     options,
+                                    depth + 1,
                                 )
                                 .as_bytes(),
                                 &import_final_url,
@@ -224,6 +228,7 @@ pub fn process_css<'a>(
                                 &parent_url,
                                 &resolved_url,
                                 options.silent,
+                                depth + 1,
                             ) {
                                 Ok((data, final_url, media_type)) => {
                                     let data_url = data_to_data_url(&media_type, &data, &final_url);
@@ -310,7 +315,14 @@ pub fn process_css<'a>(
                 if is_import {
                     let full_url = resolve_url(&parent_url, value).unwrap_or_default();
                     let url_fragment = get_url_fragment(full_url.clone());
-                    match retrieve_asset(cache, client, &parent_url, &full_url, options.silent) {
+                    match retrieve_asset(
+                        cache,
+                        client,
+                        &parent_url,
+                        &full_url,
+                        options.silent,
+                        depth + 1,
+                    ) {
                         Ok((css, final_url, _media_type)) => {
                             let data_url = data_to_data_url(
                                 "text/css",
@@ -320,6 +332,7 @@ pub fn process_css<'a>(
                                     &final_url,
                                     &String::from_utf8_lossy(&css),
                                     options,
+                                    depth + 1,
                                 )
                                 .as_bytes(),
                                 &final_url,
@@ -338,13 +351,19 @@ pub fn process_css<'a>(
                         }
                     }
                 } else {
-                    if options.no_images && is_image_url_prop(curr_prop.as_str()) {
+                    if is_image_url_prop(curr_prop.as_str()) && options.no_images {
                         result.push_str(enquote(str!(empty_image!()), false).as_str());
                     } else {
                         let full_url = resolve_url(&parent_url, value).unwrap_or_default();
                         let url_fragment = get_url_fragment(full_url.clone());
-                        match retrieve_asset(cache, client, &parent_url, &full_url, options.silent)
-                        {
+                        match retrieve_asset(
+                            cache,
+                            client,
+                            &parent_url,
+                            &full_url,
+                            options.silent,
+                            depth + 1,
+                        ) {
                             Ok((data, final_url, media_type)) => {
                                 let data_url = data_to_data_url(&media_type, &data, &final_url);
                                 let assembled_url: String =
@@ -378,6 +397,7 @@ pub fn process_css<'a>(
                             parent_url,
                             parser,
                             options,
+                            depth,
                             curr_rule.as_str(),
                             curr_prop.as_str(),
                             function_name,
@@ -406,9 +426,21 @@ pub fn embed_css(
     parent_url: &str,
     css: &str,
     options: &Options,
+    depth: u32,
 ) -> String {
     let mut input = ParserInput::new(&css);
     let mut parser = Parser::new(&mut input);
 
-    process_css(cache, client, parent_url, &mut parser, options, "", "", "").unwrap()
+    process_css(
+        cache,
+        client,
+        parent_url,
+        &mut parser,
+        options,
+        depth,
+        "",
+        "",
+        "",
+    )
+    .unwrap()
 }

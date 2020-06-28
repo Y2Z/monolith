@@ -21,7 +21,7 @@ mod passing {
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options);
+        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
 
         assert_eq!(
             format!("{} 1x, {} 2x", empty_image!(), empty_image!()),

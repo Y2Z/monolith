@@ -108,7 +108,14 @@ fn main() {
 
     // Retrieve target document
     if is_file_url(target_url) || is_http_url(target_url) {
-        match retrieve_asset(&mut cache, &client, target_url, target_url, options.silent) {
+        match retrieve_asset(
+            &mut cache,
+            &client,
+            target_url,
+            target_url,
+            options.silent,
+            0,
+        ) {
             Ok((data, final_url, _media_type)) => {
                 base_url = final_url;
                 dom = html_to_dom(&String::from_utf8_lossy(&data));
@@ -131,7 +138,7 @@ fn main() {
     }
 
     // Embed remote assets
-    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options);
+    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options, 0);
 
     // Serialize DOM tree
     let mut result: String = stringify_document(&dom.document, &options);

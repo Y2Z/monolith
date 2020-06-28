@@ -6,6 +6,8 @@ use std::path::Path;
 
 use crate::url::{clean_url, data_url_to_data, file_url_to_fs_path, is_data_url, is_file_url};
 
+const INDENT: &str = " ";
+
 const MAGIC: [[&[u8]; 2]; 18] = [
     // Image
     [b"GIF87a", b"image/gif"],
@@ -56,12 +58,23 @@ pub fn is_plaintext_media_type(media_type: &str) -> bool {
     PLAINTEXT_MEDIA_TYPES.contains(&media_type.to_lowercase().as_str())
 }
 
+pub fn indent(level: u32) -> String {
+    let mut result = str!();
+    let mut l: u32 = level;
+    while l > 0 {
+        result += INDENT;
+        l -= 1;
+    }
+    result
+}
+
 pub fn retrieve_asset(
     cache: &mut HashMap<String, Vec<u8>>,
     client: &Client,
     parent_url: &str,
     url: &str,
     opt_silent: bool,
+    depth: u32,
 ) -> Result<(Vec<u8>, String, String), reqwest::Error> {
     if url.len() == 0 {
         // Provoke error
@@ -83,7 +96,7 @@ pub fn retrieve_asset(
         let path = Path::new(&fs_file_path);
         if path.exists() {
             if !opt_silent {
-                eprintln!("{}", &url);
+                eprintln!("{}{}", indent(depth).as_str(), &url);
             }
 
             Ok((fs::read(&fs_file_path).expect(""), url.to_string(), str!()))
@@ -97,7 +110,7 @@ pub fn retrieve_asset(
         if cache.contains_key(&cache_key) {
             // URL is in cache, we get and return it
             if !opt_silent {
-                eprintln!("{} (from cache)", &url);
+                eprintln!("{}{} (from cache)", indent(depth).as_str(), &url);
             }
 
             Ok((
@@ -112,9 +125,9 @@ pub fn retrieve_asset(
 
             if !opt_silent {
                 if url == res_url {
-                    eprintln!("{}", &url);
+                    eprintln!("{}{}", indent(depth).as_str(), &url);
                 } else {
-                    eprintln!("{} -> {}", &url, &res_url);
+                    eprintln!("{}{} -> {}", indent(depth).as_str(), &url, &res_url);
                 }
             }
 

@@ -27,6 +27,7 @@ mod passing {
             "data:text/html;base64,c291cmNl",
             "data:text/html;base64,dGFyZ2V0",
             false,
+            0,
         )
         .unwrap();
         assert_eq!(
@@ -63,6 +64,7 @@ mod passing {
                 cwd = cwd.to_str().unwrap()
             ),
             false,
+            0,
         )
         .unwrap();
         assert_eq!(url::data_to_data_url("application/javascript", &data, &final_url), "data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==");
@@ -103,6 +105,7 @@ mod failing {
             "data:text/html;base64,SoUrCe",
             "file:///etc/passwd",
             false,
+            0,
         ) {
             Ok((..)) => {
                 assert!(false);
@@ -125,6 +128,7 @@ mod failing {
             "https://kernel.org/",
             "file:///etc/passwd",
             false,
+            0,
         ) {
             Ok((..)) => {
                 assert!(false);
