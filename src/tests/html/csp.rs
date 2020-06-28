@@ -8,143 +8,72 @@
 #[cfg(test)]
 mod passing {
     use crate::html;
+    use crate::opts::Options;
 
     #[test]
     fn isolated() {
-        let opt_isolate: bool = true;
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let csp_content = html::csp(
-            opt_isolate,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-        );
+        let mut options = Options::default();
+        options.isolate = true;
+        let csp_content = html::csp(&options);
 
         assert_eq!(csp_content, "default-src 'unsafe-inline' data:;");
     }
 
     #[test]
     fn no_css() {
-        let opt_isolate: bool = false;
-        let opt_no_css: bool = true;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let csp_content = html::csp(
-            opt_isolate,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-        );
+        let mut options = Options::default();
+        options.no_css = true;
+        let csp_content = html::csp(&options);
 
         assert_eq!(csp_content, "style-src 'none';");
     }
 
     #[test]
     fn no_fonts() {
-        let opt_isolate: bool = false;
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = true;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let csp_content = html::csp(
-            opt_isolate,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-        );
+        let mut options = Options::default();
+        options.no_fonts = true;
+        let csp_content = html::csp(&options);
 
         assert_eq!(csp_content, "font-src 'none';");
     }
 
     #[test]
     fn no_frames() {
-        let opt_isolate: bool = false;
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let csp_content = html::csp(
-            opt_isolate,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-        );
+        let mut options = Options::default();
+        options.no_frames = true;
+        let csp_content = html::csp(&options);
 
         assert_eq!(csp_content, "frame-src 'none'; child-src 'none';");
     }
 
     #[test]
     fn no_js() {
-        let opt_isolate: bool = false;
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = true;
-        let opt_no_images: bool = false;
-        let csp_content = html::csp(
-            opt_isolate,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-        );
+        let mut options = Options::default();
+        options.no_js = true;
+        let csp_content = html::csp(&options);
 
         assert_eq!(csp_content, "script-src 'none';");
     }
 
     #[test]
-    fn no_image() {
-        let opt_isolate: bool = false;
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = true;
-        let csp_content = html::csp(
-            opt_isolate,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-        );
+    fn no_images() {
+        let mut options = Options::default();
+        options.no_images = true;
+        let csp_content = html::csp(&options);
 
         assert_eq!(csp_content, "img-src data:;");
     }
 
     #[test]
     fn all() {
-        let opt_isolate: bool = true;
-        let opt_no_css: bool = true;
-        let opt_no_fonts: bool = true;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = true;
-        let opt_no_images: bool = true;
-        let csp_content = html::csp(
-            opt_isolate,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-        );
+        let mut options = Options::default();
+        options.isolate = true;
+        options.no_css = true;
+        options.no_fonts = true;
+        options.no_frames = true;
+        options.no_js = true;
+        options.no_images = true;
+        let csp_content = html::csp(&options);
 
         assert_eq!(csp_content, "default-src 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;");
     }

@@ -8,29 +8,16 @@
 #[cfg(test)]
 mod passing {
     use crate::html;
+    use crate::opts::Options;
 
     #[test]
     fn div_as_root_element() {
         let html = "<div><script src=\"some.js\"></script></div>";
         let dom = html::html_to_dom(&html);
-
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_isolate: bool = false;
+        let options = Options::default();
 
         assert_eq!(
-            html::stringify_document(
-                &dom.document,
-                opt_no_css,
-                opt_no_fonts,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
-            ),
+            html::stringify_document(&dom.document, &options),
             "<html><head></head><body><div><script src=\"some.js\"></script></div></body></html>"
         );
     }
@@ -42,23 +29,13 @@ mod passing {
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                     <div><script src=\"some.js\"></script></div>";
         let dom = html::html_to_dom(&html);
-
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_isolate: bool = true;
+        let mut options = Options::default();
+        options.isolate = true;
 
         assert_eq!(
             html::stringify_document(
                 &dom.document,
-                opt_no_css,
-                opt_no_fonts,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
+                &options
             ),
             "<html>\
                 <head>\
@@ -83,24 +60,11 @@ mod passing {
                     <link rel=\"stylesheet\" href=\"main.css\"/>\
                     <div style=\"display: none;\"></div>";
         let dom = html::html_to_dom(&html);
-
-        let opt_no_css: bool = true;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = false;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_isolate: bool = false;
+        let mut options = Options::default();
+        options.no_css = true;
 
         assert_eq!(
-            html::stringify_document(
-                &dom.document,
-                opt_no_css,
-                opt_no_fonts,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
-            ),
+            html::stringify_document(&dom.document, &options),
             "<!DOCTYPE html>\
             <html>\
             <head>\
@@ -120,23 +84,13 @@ mod passing {
                     <link rel=\"something\"/>\
                     <div><script src=\"some.js\"></script></div>";
         let dom = html::html_to_dom(&html);
-
-        let opt_no_css: bool = false;
-        let opt_no_fonts: bool = false;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = false;
-        let opt_no_images: bool = false;
-        let opt_isolate: bool = false;
+        let mut options = Options::default();
+        options.no_frames = true;
 
         assert_eq!(
             html::stringify_document(
                 &dom.document,
-                opt_no_css,
-                opt_no_fonts,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
+                &options
             ),
             "<!DOCTYPE html>\
                 <html>\
@@ -162,23 +116,18 @@ mod passing {
                         <iframe src=\"some.html\"></iframe>\
                     </div>";
         let dom = html::html_to_dom(&html);
-
-        let opt_isolate: bool = true;
-        let opt_no_css: bool = true;
-        let opt_no_fonts: bool = true;
-        let opt_no_frames: bool = true;
-        let opt_no_js: bool = true;
-        let opt_no_images: bool = true;
+        let mut options = Options::default();
+        options.isolate = true;
+        options.no_css = true;
+        options.no_fonts = true;
+        options.no_frames = true;
+        options.no_js = true;
+        options.no_images = true;
 
         assert_eq!(
             html::stringify_document(
                 &dom.document,
-                opt_no_css,
-                opt_no_fonts,
-                opt_no_frames,
-                opt_no_js,
-                opt_no_images,
-                opt_isolate,
+                &options
             ),
             "<!DOCTYPE html>\
                 <html>\

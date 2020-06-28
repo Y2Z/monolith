@@ -2,6 +2,7 @@ use cssparser::{ParseError, Parser, ParserInput, SourcePosition, Token};
 use reqwest::blocking::Client;
 use std::collections::HashMap;
 
+use crate::opts::Options;
 use crate::url::{data_to_data_url, get_url_fragment, is_http_url, resolve_url, url_with_fragment};
 use crate::utils::retrieve_asset;
 
@@ -59,12 +60,10 @@ pub fn process_css<'a>(
     client: &Client,
     parent_url: &str,
     parser: &mut Parser,
+    options: &Options,
     rule_name: &str,
     prop_name: &str,
     func_name: &str,
-    opt_no_fonts: bool,
-    opt_no_images: bool,
-    opt_silent: bool,
 ) -> Result<String, ParseError<'a, String>> {
     let mut result: String = str!();
 
@@ -91,7 +90,7 @@ pub fn process_css<'a>(
             Token::Colon => result.push_str(":"),
             Token::Comma => result.push_str(","),
             Token::ParenthesisBlock | Token::SquareBracketBlock | Token::CurlyBracketBlock => {
-                if opt_no_fonts && curr_rule == "font-face" {
+                if options.no_fonts && curr_rule == "font-face" {
                     continue;
                 }
 
@@ -114,12 +113,10 @@ pub fn process_css<'a>(
                             client,
                             parent_url,
                             parser,
+                            options,
                             rule_name,
                             curr_prop.as_str(),
                             func_name,
-                            opt_no_fonts,
-                            opt_no_images,
-                            opt_silent,
                         )
                     })
                     .unwrap();
@@ -149,7 +146,7 @@ pub fn process_css<'a>(
             // @import, @font-face, @charset, @media...
             Token::AtKeyword(ref value) => {
                 curr_rule = str!(value);
-                if opt_no_fonts && curr_rule == "font-face" {
+                if options.no_fonts && curr_rule == "font-face" {
                     continue;
                 }
                 result.push_str("@");
@@ -172,7 +169,13 @@ pub fn process_css<'a>(
 
                     let import_full_url = resolve_url(&parent_url, value).unwrap_or_default();
                     let import_url_fragment = get_url_fragment(import_full_url.clone());
-                    match retrieve_asset(cache, client, &parent_url, &import_full_url, opt_silent) {
+                    match retrieve_asset(
+                        cache,
+                        client,
+                        &parent_url,
+                        &import_full_url,
+                        options.silent,
+                    ) {
                         Ok((import_contents, import_final_url, _import_media_type)) => {
                             let import_data_url = data_to_data_url(
                                 "text/css",
@@ -181,9 +184,7 @@ pub fn process_css<'a>(
                                     client,
                                     &import_final_url,
                                     &String::from_utf8_lossy(&import_contents),
-                                    opt_no_fonts,
-                                    opt_no_images,
-                                    opt_silent,
+                                    options,
                                 )
                                 .as_bytes(),
                                 &import_final_url,
@@ -212,7 +213,7 @@ pub fn process_css<'a>(
                             continue;
                         }
 
-                        if opt_no_images && is_image_url_prop(curr_prop.as_str()) {
+                        if options.no_images && is_image_url_prop(curr_prop.as_str()) {
                             result.push_str(enquote(str!(empty_image!()), false).as_str());
                         } else {
                             let resolved_url = resolve_url(&parent_url, value).unwrap_or_default();
@@ -222,7 +223,7 @@ pub fn process_css<'a>(
                                 client,
                                 &parent_url,
                                 &resolved_url,
-                                opt_silent,
+                                options.silent,
                             ) {
                                 Ok((data, final_url, media_type)) => {
                                     let data_url = data_to_data_url(&media_type, &data, &final_url);
@@ -265,7 +266,7 @@ pub fn process_css<'a>(
                 if *has_sign && *unit_value >= 0. {
                     result.push_str("+");
                 }
-                result.push_str(str!(unit_value * 100.).as_str());
+                result.push_str(str!(unit_value * 100.0).as_str());
                 result.push_str("%");
             }
             Token::Dimension {
@@ -309,7 +310,7 @@ pub fn process_css<'a>(
                 if is_import {
                     let full_url = resolve_url(&parent_url, value).unwrap_or_default();
                     let url_fragment = get_url_fragment(full_url.clone());
-                    match retrieve_asset(cache, client, &parent_url, &full_url, opt_silent) {
+                    match retrieve_asset(cache, client, &parent_url, &full_url, options.silent) {
                         Ok((css, final_url, _media_type)) => {
                             let data_url = data_to_data_url(
                                 "text/css",
@@ -318,9 +319,7 @@ pub fn process_css<'a>(
                                     client,
                                     &final_url,
                                     &String::from_utf8_lossy(&css),
-                                    opt_no_fonts,
-                                    opt_no_images,
-                                    opt_silent,
+                                    options,
                                 )
                                 .as_bytes(),
                                 &final_url,
@@ -339,12 +338,13 @@ pub fn process_css<'a>(
                         }
                     }
                 } else {
-                    if opt_no_images && is_image_url_prop(curr_prop.as_str()) {
+                    if options.no_images && is_image_url_prop(curr_prop.as_str()) {
                         result.push_str(enquote(str!(empty_image!()), false).as_str());
                     } else {
                         let full_url = resolve_url(&parent_url, value).unwrap_or_default();
                         let url_fragment = get_url_fragment(full_url.clone());
-                        match retrieve_asset(cache, client, &parent_url, &full_url, opt_silent) {
+                        match retrieve_asset(cache, client, &parent_url, &full_url, options.silent)
+                        {
                             Ok((data, final_url, media_type)) => {
                                 let data_url = data_to_data_url(&media_type, &data, &final_url);
                                 let assembled_url: String =
@@ -377,12 +377,10 @@ pub fn process_css<'a>(
                             client,
                             parent_url,
                             parser,
+                            options,
                             curr_rule.as_str(),
                             curr_prop.as_str(),
                             function_name,
-                            opt_no_fonts,
-                            opt_no_images,
-                            opt_silent,
                         )
                     })
                     .unwrap();
@@ -407,24 +405,10 @@ pub fn embed_css(
     client: &Client,
     parent_url: &str,
     css: &str,
-    opt_no_fonts: bool,
-    opt_no_images: bool,
-    opt_silent: bool,
+    options: &Options,
 ) -> String {
     let mut input = ParserInput::new(&css);
     let mut parser = Parser::new(&mut input);
 
-    process_css(
-        cache,
-        client,
-        parent_url,
-        &mut parser,
-        "",
-        "",
-        "",
-        opt_no_fonts,
-        opt_no_images,
-        opt_silent,
-    )
-    .unwrap()
+    process_css(cache, client, parent_url, &mut parser, options, "", "", "").unwrap()
 }

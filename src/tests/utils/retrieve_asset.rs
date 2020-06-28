@@ -86,9 +86,10 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use crate::utils;
     use reqwest::blocking::Client;
     use std::collections::HashMap;
+
+    use crate::utils;
 
     #[test]
     fn read_local_file_with_data_url_parent() {

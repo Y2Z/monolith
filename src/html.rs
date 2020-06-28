@@ -15,6 +15,7 @@ use std::default::Default;
 
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
+use crate::opts::Options;
 use crate::url::{
     data_to_data_url, get_url_fragment, is_http_url, resolve_url, url_has_protocol,
     url_with_fragment,
@@ -73,8 +74,7 @@ pub fn embed_srcset(
     client: &Client,
     parent_url: &str,
     srcset: &str,
-    opt_no_images: bool,
-    opt_silent: bool,
+    options: &Options,
 ) -> String {
     let mut array: Vec<SrcSetItem> = vec![];
     let srcset_items: Vec<&str> = srcset.split(',').collect();
@@ -89,12 +89,12 @@ pub fn embed_srcset(
     let mut result: String = str!();
     let mut i: usize = array.len();
     for part in array {
-        if opt_no_images {
+        if options.no_images {
             result.push_str(empty_image!());
         } else {
             let image_full_url = resolve_url(&parent_url, part.path).unwrap_or_default();
             let image_url_fragment = get_url_fragment(image_full_url.clone());
-            match retrieve_asset(cache, client, &parent_url, &image_full_url, opt_silent) {
+            match retrieve_asset(cache, client, &parent_url, &image_full_url, options.silent) {
                 Ok((image_data, image_final_url, image_media_type)) => {
                     let image_data_url =
                         data_to_data_url(&image_media_type, &image_data, &image_final_url);
@@ -137,29 +137,13 @@ pub fn walk_and_embed_assets(
     client: &Client,
     url: &str,
     node: &Handle,
-    opt_no_css: bool,
-    opt_no_fonts: bool,
-    opt_no_frames: bool,
-    opt_no_js: bool,
-    opt_no_images: bool,
-    opt_silent: bool,
+    options: &Options,
 ) {
     match node.data {
         NodeData::Document => {
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(
-                    cache,
-                    client,
-                    &url,
-                    child,
-                    opt_no_css,
-                    opt_no_fonts,
-                    opt_no_frames,
-                    opt_no_js,
-                    opt_no_images,
-                    opt_silent,
-                );
+                walk_and_embed_assets(cache, client, &url, child, options);
             }
         }
         NodeData::Element {
@@ -245,7 +229,7 @@ pub fn walk_and_embed_assets(
                                 }
                             }
 
-                            if !opt_no_images && !link_href.is_empty() {
+                            if !options.no_images && !link_href.is_empty() {
                                 let link_href_full_url =
                                     resolve_url(&url, link_href).unwrap_or_default();
                                 let link_href_url_fragment =
@@ -255,7 +239,7 @@ pub fn walk_and_embed_assets(
                                     client,
                                     &url,
                                     &link_href_full_url,
-                                    opt_silent,
+                                    options.silent,
                                 ) {
                                     Ok((
                                         link_href_data,
@@ -319,7 +303,7 @@ pub fn walk_and_embed_assets(
                                 }
                             }
 
-                            if !opt_no_css && !link_href.is_empty() {
+                            if !options.no_css && !link_href.is_empty() {
                                 let link_href_full_url =
                                     resolve_url(&url, link_href).unwrap_or_default();
                                 match retrieve_asset(
@@ -327,7 +311,7 @@ pub fn walk_and_embed_assets(
                                     client,
                                     &url,
                                     &link_href_full_url,
-                                    opt_silent,
+                                    options.silent,
                                 ) {
                                     Ok((
                                         link_href_data,
@@ -343,9 +327,7 @@ pub fn walk_and_embed_assets(
                                                 client,
                                                 &link_href_final_url,
                                                 &String::from_utf8_lossy(&link_href_data),
-                                                opt_no_fonts,
-                                                opt_no_images,
-                                                opt_silent,
+                                                options,
                                             );
                                             let link_href_data_url = data_to_data_url(
                                                 "text/css",
@@ -415,11 +397,16 @@ pub fn walk_and_embed_assets(
                         }
                     }
 
-                    if !opt_no_images && !background.is_empty() {
+                    if !options.no_images && !background.is_empty() {
                         let background_full_url = resolve_url(&url, background).unwrap_or_default();
                         let background_url_fragment = get_url_fragment(background_full_url.clone());
-                        match retrieve_asset(cache, client, &url, &background_full_url, opt_silent)
-                        {
+                        match retrieve_asset(
+                            cache,
+                            client,
+                            &url,
+                            &background_full_url,
+                            options.silent,
+                        ) {
                             Ok((background_data, background_final_url, background_media_type)) => {
                                 let background_data_url = data_to_data_url(
                                     &background_media_type,
@@ -471,7 +458,7 @@ pub fn walk_and_embed_assets(
                         }
                     }
 
-                    if opt_no_images {
+                    if options.no_images {
                         // Add empty image src attribute
                         attrs_mut.push(Attribute {
                             name: QualName::new(None, ns!(), local_name!("src")),
@@ -496,7 +483,8 @@ pub fn walk_and_embed_assets(
                             )
                             .unwrap_or_default();
                             let img_url_fragment = get_url_fragment(img_full_url.clone());
-                            match retrieve_asset(cache, client, &url, &img_full_url, opt_silent) {
+                            match retrieve_asset(cache, client, &url, &img_full_url, options.silent)
+                            {
                                 Ok((img_data, img_final_url, img_media_type)) => {
                                     let img_data_url = data_to_data_url(
                                         &img_media_type,
@@ -533,21 +521,13 @@ pub fn walk_and_embed_assets(
                         attrs_mut.push(Attribute {
                             name: QualName::new(None, ns!(), local_name!("srcset")),
                             value: Tendril::from_slice(
-                                embed_srcset(
-                                    cache,
-                                    client,
-                                    &url,
-                                    &img_srcset,
-                                    opt_no_images,
-                                    opt_silent,
-                                )
-                                .as_ref(),
+                                embed_srcset(cache, client, &url, &img_srcset, options).as_ref(),
                             ),
                         });
                     }
                 }
                 "svg" => {
-                    if opt_no_images {
+                    if options.no_images {
                         node.children.borrow_mut().clear();
                     }
                 }
@@ -573,7 +553,7 @@ pub fn walk_and_embed_assets(
                             }
                         }
 
-                        if opt_no_images || input_image_src.is_empty() {
+                        if options.no_images || input_image_src.is_empty() {
                             attrs_mut.push(Attribute {
                                 name: QualName::new(None, ns!(), local_name!("src")),
                                 value: Tendril::from_slice(if input_image_src.is_empty() {
@@ -592,7 +572,7 @@ pub fn walk_and_embed_assets(
                                 client,
                                 &url,
                                 &input_image_full_url,
-                                opt_silent,
+                                options.silent,
                             ) {
                                 Ok((
                                     input_image_data,
@@ -646,10 +626,10 @@ pub fn walk_and_embed_assets(
                         }
                     }
 
-                    if !opt_no_images && !image_href.is_empty() {
+                    if !options.no_images && !image_href.is_empty() {
                         let image_full_url = resolve_url(&url, image_href).unwrap_or_default();
                         let image_url_fragment = get_url_fragment(image_full_url.clone());
-                        match retrieve_asset(cache, client, &url, &image_full_url, opt_silent) {
+                        match retrieve_asset(cache, client, &url, &image_full_url, options.silent) {
                             Ok((image_data, image_final_url, image_media_type)) => {
                                 let image_data_url = data_to_data_url(
                                     &image_media_type,
@@ -693,7 +673,7 @@ pub fn walk_and_embed_assets(
                             attr.value.push_slice(src_full_url.as_str());
                         } else if attr_name.eq_ignore_ascii_case("srcset") {
                             if get_node_name(&get_parent_node(&node)) == Some("picture") {
-                                if opt_no_images {
+                                if options.no_images {
                                     attr.value.clear();
                                     attr.value.push_slice(empty_image!());
                                 } else {
@@ -706,7 +686,7 @@ pub fn walk_and_embed_assets(
                                         client,
                                         &url,
                                         &srcset_full_url,
-                                        opt_silent,
+                                        options.silent,
                                     ) {
                                         Ok((srcset_data, srcset_final_url, srcset_media_type)) => {
                                             let srcset_data_url = data_to_data_url(
@@ -744,7 +724,7 @@ pub fn walk_and_embed_assets(
                         if attr_name.eq_ignore_ascii_case("href") {
                             let attr_value = attr.value.trim();
 
-                            if opt_no_js && attr_value.starts_with("javascript:") {
+                            if options.no_js && attr_value.trim().starts_with("javascript:") {
                                 attr.value.clear();
                                 // Replace with empty JS call to preserve original behavior
                                 attr.value.push_slice("javascript:;");
@@ -778,12 +758,13 @@ pub fn walk_and_embed_assets(
                         }
                     }
 
-                    if opt_no_js {
+                    if options.no_js {
                         // Empty inner content (src is already gone)
                         node.children.borrow_mut().clear();
                     } else if !script_src.is_empty() {
                         let script_full_url = resolve_url(&url, script_src).unwrap_or_default();
-                        match retrieve_asset(cache, client, &url, &script_full_url, opt_silent) {
+                        match retrieve_asset(cache, client, &url, &script_full_url, options.silent)
+                        {
                             Ok((script_data, script_final_url, _script_media_type)) => {
                                 // Only embed if we're able to validate integrity
                                 if script_integrity.is_empty()
@@ -814,22 +795,15 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "style" => {
-                    if opt_no_css {
+                    if options.no_css {
                         // Empty inner content of STYLE tags
                         node.children.borrow_mut().clear();
                     } else {
                         for node in node.children.borrow_mut().iter_mut() {
                             if let NodeData::Text { ref contents } = node.data {
                                 let mut tendril = contents.borrow_mut();
-                                let replacement = embed_css(
-                                    cache,
-                                    client,
-                                    &url,
-                                    tendril.as_ref(),
-                                    opt_no_fonts,
-                                    opt_no_images,
-                                    opt_silent,
-                                );
+                                let replacement =
+                                    embed_css(cache, client, &url, tendril.as_ref(), options);
                                 tendril.clear();
                                 tendril.push_slice(&replacement);
                             }
@@ -855,7 +829,7 @@ pub fn walk_and_embed_assets(
                     for attr in attrs_mut.iter_mut() {
                         let attr_name: &str = &attr.name.local;
                         if attr_name.eq_ignore_ascii_case("src") {
-                            if opt_no_frames {
+                            if options.no_frames {
                                 // Empty the src attribute
                                 attr.value.clear();
                                 continue;
@@ -870,7 +844,13 @@ pub fn walk_and_embed_assets(
 
                             let frame_full_url = resolve_url(&url, frame_src).unwrap_or_default();
                             let frame_url_fragment = get_url_fragment(frame_full_url.clone());
-                            match retrieve_asset(cache, client, &url, &frame_full_url, opt_silent) {
+                            match retrieve_asset(
+                                cache,
+                                client,
+                                &url,
+                                &frame_full_url,
+                                options.silent,
+                            ) {
                                 Ok((frame_data, frame_final_url, frame_media_type)) => {
                                     let frame_dom =
                                         html_to_dom(&String::from_utf8_lossy(&frame_data));
@@ -879,12 +859,7 @@ pub fn walk_and_embed_assets(
                                         client,
                                         &frame_final_url,
                                         &frame_dom.document,
-                                        opt_no_css,
-                                        opt_no_fonts,
-                                        opt_no_frames,
-                                        opt_no_js,
-                                        opt_no_images,
-                                        opt_silent,
+                                        &options,
                                     );
                                     let mut frame_data: Vec<u8> = Vec::new();
                                     serialize(
@@ -931,7 +906,7 @@ pub fn walk_and_embed_assets(
                                 continue;
                             }
 
-                            if opt_no_images {
+                            if options.no_images {
                                 attr.value.clear();
                                 continue;
                             }
@@ -945,7 +920,7 @@ pub fn walk_and_embed_assets(
                                 client,
                                 &url,
                                 &video_poster_full_url,
-                                opt_silent,
+                                options.silent,
                             ) {
                                 Ok((
                                     video_poster_data,
@@ -983,7 +958,7 @@ pub fn walk_and_embed_assets(
             }
 
             // Process style attributes
-            if opt_no_css {
+            if options.no_css {
                 // Get rid of style attributes
                 let mut i = 0;
                 while i < attrs_mut.len() {
@@ -1000,22 +975,15 @@ pub fn walk_and_embed_assets(
                     .iter_mut()
                     .filter(|a| a.name.local.as_ref().eq_ignore_ascii_case("style"))
                 {
-                    let replacement = embed_css(
-                        cache,
-                        client,
-                        &url,
-                        attribute.value.as_ref(),
-                        opt_no_fonts,
-                        opt_no_images,
-                        opt_silent,
-                    );
+                    let replacement =
+                        embed_css(cache, client, &url, attribute.value.as_ref(), options);
                     // let replacement = str!();
                     attribute.value.clear();
                     attribute.value.push_slice(&replacement);
                 }
             }
 
-            if opt_no_js {
+            if options.no_js {
                 // Get rid of JS event attributes
                 let mut js_attr_indexes = Vec::new();
                 for (i, attr) in attrs_mut.iter_mut().enumerate() {
@@ -1031,22 +999,11 @@ pub fn walk_and_embed_assets(
 
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(
-                    cache,
-                    client,
-                    &url,
-                    child,
-                    opt_no_css,
-                    opt_no_fonts,
-                    opt_no_frames,
-                    opt_no_js,
-                    opt_no_images,
-                    opt_silent,
-                );
+                walk_and_embed_assets(cache, client, &url, child, options);
             }
         }
         _ => {
-            // Note: in case of opt_no_js being set to true, there's no need to worry about
+            // Note: in case of options.no_js being set to true, there's no need to worry about
             //       getting rid of comments that may contain scripts, e.g. <!--[if IE]><script>...
             //       since that's not part of W3C standard and therefore gets ignored
             //       by browsers other than IE [5, 9]
@@ -1073,15 +1030,7 @@ fn get_child_node_by_name(handle: &Handle, node_name: &str) -> Handle {
     }
 }
 
-pub fn stringify_document(
-    handle: &Handle,
-    opt_no_css: bool,
-    opt_no_fonts: bool,
-    opt_no_frames: bool,
-    opt_no_js: bool,
-    opt_no_images: bool,
-    opt_isolate: bool,
-) -> String {
+pub fn stringify_document(handle: &Handle, options: &Options) -> String {
     let mut buf: Vec<u8> = Vec::new();
     serialize(&mut buf, handle, SerializeOpts::default())
         .expect("unable to serialize DOM into buffer");
@@ -1089,20 +1038,19 @@ pub fn stringify_document(
     let mut result = String::from_utf8(buf).unwrap();
 
     // Take care of CSP
-    if opt_isolate || opt_no_css || opt_no_fonts || opt_no_frames || opt_no_js || opt_no_images {
+    if options.isolate
+        || options.no_css
+        || options.no_fonts
+        || options.no_frames
+        || options.no_js
+        || options.no_images
+    {
         let mut buf: Vec<u8> = Vec::new();
         let mut dom = html_to_dom(&result);
         let doc = dom.get_document();
         let html = get_child_node_by_name(&doc, "html");
         let head = get_child_node_by_name(&html, "head");
-        let csp_content: String = csp(
-            opt_isolate,
-            opt_no_css,
-            opt_no_fonts,
-            opt_no_frames,
-            opt_no_js,
-            opt_no_images,
-        );
+        let csp_content: String = csp(options);
 
         let meta = dom.create_element(
             QualName::new(None, ns!(), local_name!("meta")),
@@ -1136,38 +1084,31 @@ pub fn stringify_document(
     result
 }
 
-pub fn csp(
-    opt_isolate: bool,
-    opt_no_css: bool,
-    opt_no_fonts: bool,
-    opt_no_frames: bool,
-    opt_no_js: bool,
-    opt_no_images: bool,
-) -> String {
+pub fn csp(options: &Options) -> String {
     let mut string_list = vec![];
 
-    if opt_isolate {
+    if options.isolate {
         string_list.push("default-src 'unsafe-inline' data:;");
     }
 
-    if opt_no_css {
+    if options.no_css {
         string_list.push("style-src 'none';");
     }
 
-    if opt_no_fonts {
+    if options.no_fonts {
         string_list.push("font-src 'none';");
     }
 
-    if opt_no_frames {
+    if options.no_frames {
         string_list.push("frame-src 'none';");
         string_list.push("child-src 'none';");
     }
 
-    if opt_no_js {
+    if options.no_js {
         string_list.push("script-src 'none';");
     }
 
-    if opt_no_images {
+    if options.no_images {
         // Note: data: is needed for transparent pixels
         string_list.push("img-src data:;");
     }

@@ -7,25 +7,26 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::css;
     use reqwest::blocking::Client;
     use std::collections::HashMap;
+
+    use crate::css;
+    use crate::opts::Options;
 
     #[test]
     fn empty_input() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let options = Options::default();
 
-        assert_eq!(
-            css::embed_css(cache, &client, "", "", false, false, false,),
-            ""
-        );
+        assert_eq!(css::embed_css(cache, &client, "", "", &options), "");
     }
 
     #[test]
     fn trim_if_empty() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let options = Options::default();
 
         assert_eq!(
             css::embed_css(
@@ -33,9 +34,7 @@ mod passing {
                 &client,
                 "https://doesntmatter.local/",
                 "\t     \t   ",
-                false,
-                false,
-                false,
+                &options,
             ),
             ""
         );
@@ -45,6 +44,9 @@ mod passing {
     fn style_exclude_unquoted_images() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
 
         const STYLE: &str = "/* border: none;*/\
             background-image: url(https://somewhere.com/bg.png); \
@@ -60,9 +62,7 @@ mod passing {
                 &client,
                 "https://doesntmatter.local/",
                 &STYLE,
-                false,
-                true,
-                true,
+                &options,
             ),
             format!(
                 "/* border: none;*/\
@@ -81,6 +81,9 @@ mod passing {
     fn style_exclude_single_quoted_images() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
 
         const STYLE: &str = "/* border: none;*/\
             background-image: url('https://somewhere.com/bg.png'); \
@@ -91,7 +94,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(cache, &client, "", &STYLE, false, true, true,),
+            css::embed_css(cache, &client, "", &STYLE, &options),
             format!(
                 "/* border: none;*/\
                 background-image: url('{empty_image}'); \
@@ -109,6 +112,8 @@ mod passing {
     fn style_block() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.silent = true;
 
         const CSS: &str = "\
             #id.class-name:not(:nth-child(3n+0)) {\n  \
@@ -119,7 +124,7 @@ mod passing {
             html > body {}";
 
         assert_eq!(
-            css::embed_css(cache, &client, "file:///", &CSS, false, false, true,),
+            css::embed_css(cache, &client, "file:///", &CSS, &options),
             CSS
         );
     }
@@ -128,6 +133,8 @@ mod passing {
     fn attribute_selectors() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.silent = true;
 
         const CSS: &str = "\
             [data-value] {
@@ -159,16 +166,15 @@ mod passing {
             }
             ";
 
-        assert_eq!(
-            css::embed_css(cache, &client, "", &CSS, false, false, false,),
-            CSS
-        );
+        assert_eq!(css::embed_css(cache, &client, "", &CSS, &options), CSS);
     }
 
     #[test]
     fn import_string() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.silent = true;
 
         const CSS: &str = "\
             @charset 'UTF-8';\n\
@@ -184,9 +190,7 @@ mod passing {
                 &client,
                 "https://doesntmatter.local/",
                 &CSS,
-                false,
-                false,
-                true,
+                &options,
             ),
             "\
             @charset 'UTF-8';\n\
@@ -202,6 +206,8 @@ mod passing {
     fn hash_urls() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.silent = true;
 
         const CSS: &str = "\
             body {\n    \
@@ -219,9 +225,7 @@ mod passing {
                 &client,
                 "https://doesntmatter.local/",
                 &CSS,
-                false,
-                false,
-                true,
+                &options,
             ),
             CSS
         );
@@ -231,6 +235,8 @@ mod passing {
     fn transform_percentages_and_degrees() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.silent = true;
 
         const CSS: &str = "\
             div {\n    \
@@ -246,9 +252,7 @@ mod passing {
                 &client,
                 "https://doesntmatter.local/",
                 &CSS,
-                false,
-                false,
-                true,
+                &options,
             ),
             CSS
         );
@@ -258,6 +262,8 @@ mod passing {
     fn unusual_indents() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.silent = true;
 
         const CSS: &str = "\
             .is\\:good:hover {\n    \
@@ -275,9 +281,7 @@ mod passing {
                 &client,
                 "https://doesntmatter.local/",
                 &CSS,
-                false,
-                false,
-                true,
+                &options,
             ),
             CSS
         );
@@ -287,6 +291,9 @@ mod passing {
     fn exclude_fonts() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let mut options = Options::default();
+        options.no_fonts = true;
+        options.silent = true;
 
         const CSS: &str = "\
             @font-face {\n    \
@@ -328,9 +335,7 @@ mod passing {
                 &client,
                 "https://doesntmatter.local/",
                 &CSS,
-                true,
-                false,
-                true,
+                &options,
             ),
             CSS_OUT
         );

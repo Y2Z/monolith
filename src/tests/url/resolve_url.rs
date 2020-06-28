@@ -7,8 +7,9 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::url;
     use url::ParseError;
+
+    use crate::url;
 
     #[test]
     fn from_https_to_level_up_relative() -> Result<(), ParseError> {

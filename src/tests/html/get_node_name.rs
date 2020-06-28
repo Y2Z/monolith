@@ -7,8 +7,9 @@
 
 #[cfg(test)]
 mod passing {
-    use crate::html;
     use html5ever::rcdom::{Handle, NodeData};
+
+    use crate::html;
 
     #[test]
     fn get_node_name() {
