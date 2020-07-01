@@ -17,6 +17,15 @@ pub struct Options {
     pub no_metadata: bool,
 }
 
+const ASCII: &str = " \
+ _____     ______________    __________      ___________________    ___
+|     \\   /              \\  |          |    |                   |  |   |
+|      \\_/       __       \\_|    __    |    |    ___     ___    |__|   |
+|               |  |            |  |   |    |   |   |   |   |          |
+|   |\\     /|   |__|    _       |__|   |____|   |   |   |   |    __    |
+|   | \\___/ |          | \\                      |   |   |   |   |  |   |
+|___|       |__________|  \\_____________________|   |___|   |___|  |___|
+";
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
@@ -26,7 +35,7 @@ impl Options {
         let app = App::new(env!("CARGO_PKG_NAME"))
             .version(crate_version!())
             .author(crate_authors!("\n"))
-            .about(crate_description!())
+            .about(format!("{}\n{}", ASCII, crate_description!()).as_str())
             .arg(
                 Arg::with_name("target")
                     .required(true)
