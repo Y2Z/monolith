@@ -52,10 +52,10 @@ impl Options {
             .args_from_usage("-j, --no-js 'Removes JavaScript'")
             .args_from_usage("-k, --insecure 'Allows invalid X.509 (TLS) certificates'")
             .args_from_usage("-M, --no-metadata 'Excludes metadata information from the document'")
-            .args_from_usage("-o, --output=[document.html] 'Writes output to <file>'")
+            .args_from_usage("-o, --output=[document.html] 'Write output to <file>'")
             .args_from_usage("-s, --silent 'Suppresses verbosity'")
-            .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
-            .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
+            .args_from_usage("-t, --timeout=[60] 'Adjust network request timeout'")
+            .args_from_usage("-u, --user-agent=[Firefox] 'Set custom User-Agent string'")
             // .args_from_usage("-v, --no-video 'Removes video sources'")
             .get_matches();
         let mut options: Options = Options::default();
