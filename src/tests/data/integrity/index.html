@@ -4,14 +4,16 @@
 
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-inline' file:;" />
   <title>Local HTML file</title>
-  <link href="style.css" rel="stylesheet" type="text/css" integrity="sha512-good" />
-  <link href="style.css" rel="stylesheet" type="text/css" integrity="sha512-bad" />
+  <link href="style.css" rel="stylesheet" type="text/css" integrity="sha512-IWaCTORHkRhOWzcZeILSVmV6V6gPTHgNem6o6rsFAyaKTieDFkeeMrWjtO0DuWrX3bqZY46CVTZXUu0mia0qXQ==" crossorigin="anonymous" />
+  <link href="style.css" rel="stylesheet" type="text/css" integrity="sha512-vWBzl4NE9oIg8NFOPAyOZbaam0UXWr6aDHPaY2kodSzAFl+mKoj/RMNc6C31NDqK4mE2i68IWxYWqWJPLCgPOw==" crossorigin="anonymous" />
 </head>
 
 <body>
-  <script src="script.js" integrity="sha-256-good"></script>
-  <script src="script.js" integrity="sha-256-bad"></script>
+  <p>This page should have black background and white foreground, but only when served via http: (not via file:)</p>
+  <script src="script.js" integrity="sha256-ecrEsYh3+ICCX8BCrNSotXgI5534282JwJjx8Q9ZWLc="></script>
+  <script src="script.js" integrity="sha256-6idk9dK0bOkVdG7Oz4/0YLXSJya8xZHqbRZKMhYrt6o="></script>
 </body>
 
 </html>
