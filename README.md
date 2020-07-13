@@ -32,6 +32,9 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ cd /usr/ports/www/monolith/
     $ make install clean
 
+#### Using pre-built binaries (Windows, ARM-based devices, etc)
+Every [release](https://github.com/Y2Z/monolith/releases) contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
+
 #### From source
 
 Dependency: `libssl-dev`
