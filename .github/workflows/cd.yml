@@ -15,7 +15,7 @@ jobs:
     - run: git config --global core.autocrlf false
     - name: Checkout the repository
       uses: actions/checkout@v2
-    - name: Build and install the executable
+    - name: Build the executable
       run: cargo build --release
     - uses: Shopify/upload-to-release@1.0.0
       with:
@@ -58,7 +58,7 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
-    - name: Build and install the executable
+    - name: Build the executable
       run: cargo build --release
     - uses: Shopify/upload-to-release@1.0.0
       with:
