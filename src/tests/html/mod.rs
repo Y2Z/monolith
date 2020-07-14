@@ -1,6 +1,8 @@
+mod add_favicon;
 mod csp;
 mod embed_srcset;
 mod get_node_name;
+mod has_favicon;
 mod has_proper_integrity;
 mod is_icon;
 mod metadata_tag;

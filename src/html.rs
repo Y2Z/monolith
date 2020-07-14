@@ -27,13 +27,38 @@ struct SrcSetItem<'a> {
     descriptor: &'a str,
 }
 
-const ICON_VALUES: &[&str] = &[
-    "icon",
-    "shortcut icon",
-    "mask-icon",
-    "apple-touch-icon",
-    "fluid-icon",
-];
+const ICON_VALUES: &[&str] = &["icon", "shortcut icon"];
+
+pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
+    let mut buf: Vec<u8> = Vec::new();
+    serialize(&mut buf, document, SerializeOpts::default())
+        .expect("unable to serialize DOM into buffer");
+    let result = String::from_utf8(buf).unwrap();
+
+    let mut dom = html_to_dom(&result);
+    let doc = dom.get_document();
+    let html = get_child_node_by_name(&doc, "html");
+    let head = get_child_node_by_name(&html, "head");
+    let favicon_node = dom.create_element(
+        QualName::new(None, ns!(), local_name!("link")),
+        vec![
+            Attribute {
+                name: QualName::new(None, ns!(), local_name!("rel")),
+                value: format_tendril!("icon"),
+            },
+            Attribute {
+                name: QualName::new(None, ns!(), local_name!("href")),
+                value: format_tendril!("{}", favicon_data_url),
+            },
+        ],
+        Default::default(),
+    );
+
+    // Append favicon node to HEAD
+    head.children.borrow_mut().push(favicon_node.clone());
+
+    dom
+}
 
 pub fn get_parent_node(node: &Handle) -> Handle {
     let parent = node.parent.take().clone();
@@ -138,6 +163,56 @@ pub fn embed_srcset(
     }
 
     result
+}
+
+pub fn has_favicon(handle: &Handle) -> bool {
+    let mut found_favicon: bool = false;
+
+    match handle.data {
+        NodeData::Document => {
+            // Dig deeper
+            for child in handle.children.borrow().iter() {
+                if has_favicon(child) {
+                    found_favicon = true;
+                    break;
+                }
+            }
+        }
+        NodeData::Element {
+            ref name,
+            ref attrs,
+            ..
+        } => {
+            match name.local.as_ref() {
+                "link" => {
+                    let attrs_mut = &mut attrs.borrow_mut();
+
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "rel" {
+                            if is_icon(attr.value.trim()) {
+                                found_favicon = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            if !found_favicon {
+                // Dig deeper
+                for child in handle.children.borrow().iter() {
+                    if has_favicon(child) {
+                        found_favicon = true;
+                        break;
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+
+    found_favicon
 }
 
 pub fn walk_and_embed_assets(
@@ -1061,7 +1136,7 @@ pub fn walk_and_embed_assets(
     }
 }
 
-pub fn html_to_dom(data: &str) -> html5ever::rcdom::RcDom {
+pub fn html_to_dom(data: &str) -> RcDom {
     parse_document(RcDom::default(), Default::default())
         .from_utf8()
         .read_from(&mut data.as_bytes())
@@ -1087,7 +1162,9 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
 
     let mut result = String::from_utf8(buf).unwrap();
 
-    // Take care of CSP
+    // We can't make it isolate the page right away since it may have no HEAD element,
+    // ergo we have to serialize, parse the DOM again, insert the CSP meta tag, and then
+    // finally serialize and return the resulting string
     if options.isolate
         || options.no_css
         || options.no_fonts
@@ -1095,6 +1172,7 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
         || options.no_js
         || options.no_images
     {
+        // Take care of CSP
         let mut buf: Vec<u8> = Vec::new();
         let mut dom = html_to_dom(&result);
         let doc = dom.get_document();
@@ -1123,9 +1201,6 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
         head.children.borrow_mut().push(meta.clone());
         head.children.borrow_mut().reverse();
 
-        // Note: we can't make it isolate the page right away since it may have no HEAD element,
-        //       ergo we have to serialize, parse the DOM again, insert the CSP meta tag, and then
-        //       finally serialize the result
         serialize(&mut buf, &doc, SerializeOpts::default())
             .expect("unable to serialize DOM into buffer");
         result = String::from_utf8(buf).unwrap();

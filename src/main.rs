@@ -8,9 +8,13 @@ use std::path::Path;
 use std::process;
 use std::time::Duration;
 
-use monolith::html::{html_to_dom, metadata_tag, stringify_document, walk_and_embed_assets};
+use monolith::html::{
+    add_favicon, has_favicon, html_to_dom, metadata_tag, stringify_document, walk_and_embed_assets,
+};
 use monolith::opts::Options;
-use monolith::url::{data_url_to_data, is_data_url, is_file_url, is_http_url};
+use monolith::url::{
+    data_to_data_url, data_url_to_data, is_data_url, is_file_url, is_http_url, resolve_url,
+};
 use monolith::utils::retrieve_asset;
 
 mod macros;
@@ -48,7 +52,7 @@ fn main() {
     let original_target: &str = &options.target;
     let target_url: &str;
     let base_url;
-    let dom;
+    let mut dom;
 
     // Pre-process the input
     let cwd_normalized: String =
@@ -135,6 +139,28 @@ fn main() {
         dom = html_to_dom(&String::from_utf8_lossy(&data));
     } else {
         process::exit(1);
+    }
+
+    // Request and embed /favicon.ico (unless it's already linked in the document)
+    if !options.no_images && is_http_url(target_url) && !has_favicon(&dom.document) {
+        let favicon_ico_url: String = resolve_url(&base_url, "/favicon.ico").unwrap();
+
+        match retrieve_asset(
+            &mut cache,
+            &client,
+            &base_url,
+            &favicon_ico_url,
+            options.silent,
+            0,
+        ) {
+            Ok((data, final_url, media_type)) => {
+                let favicon_data_url: String = data_to_data_url(&media_type, &data, &final_url);
+                dom = add_favicon(&dom.document, favicon_data_url);
+            }
+            Err(_) => {
+                // Failed to retrieve favicon.ico
+            }
+        }
     }
 
     // Embed remote assets
