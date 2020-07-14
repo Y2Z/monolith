@@ -60,38 +60,36 @@ pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     dom
 }
 
-pub fn get_parent_node(node: &Handle) -> Handle {
-    let parent = node.parent.take().clone();
-    parent.and_then(|node| node.upgrade()).unwrap()
-}
+pub fn csp(options: &Options) -> String {
+    let mut string_list = vec![];
 
-pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
-    match &node.data {
-        NodeData::Element { ref name, .. } => Some(name.local.as_ref()),
-        _ => None,
+    if options.isolate {
+        string_list.push("default-src 'unsafe-inline' data:;");
     }
-}
 
-pub fn is_icon(attr_value: &str) -> bool {
-    ICON_VALUES.contains(&attr_value.to_lowercase().as_str())
-}
-
-pub fn has_proper_integrity(data: &[u8], integrity: &str) -> bool {
-    if integrity.starts_with("sha256-") {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
-    } else if integrity.starts_with("sha384-") {
-        let mut hasher = Sha384::new();
-        hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
-    } else if integrity.starts_with("sha512-") {
-        let mut hasher = Sha512::new();
-        hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
-    } else {
-        false
+    if options.no_css {
+        string_list.push("style-src 'none';");
     }
+
+    if options.no_fonts {
+        string_list.push("font-src 'none';");
+    }
+
+    if options.no_frames {
+        string_list.push("frame-src 'none';");
+        string_list.push("child-src 'none';");
+    }
+
+    if options.no_js {
+        string_list.push("script-src 'none';");
+    }
+
+    if options.no_images {
+        // Note: data: is needed for transparent pixels
+        string_list.push("img-src data:;");
+    }
+
+    string_list.join(" ")
 }
 
 pub fn embed_srcset(
@@ -165,6 +163,48 @@ pub fn embed_srcset(
     result
 }
 
+fn get_child_node_by_name(handle: &Handle, node_name: &str) -> Handle {
+    let children = handle.children.borrow();
+    let matching_children = children.iter().find(|child| match child.data {
+        NodeData::Element { ref name, .. } => &*name.local == node_name,
+        _ => false,
+    });
+    match matching_children {
+        Some(node) => node.clone(),
+        _ => handle.clone(),
+    }
+}
+
+pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
+    match &node.data {
+        NodeData::Element { ref name, .. } => Some(name.local.as_ref()),
+        _ => None,
+    }
+}
+
+pub fn get_parent_node(node: &Handle) -> Handle {
+    let parent = node.parent.take().clone();
+    parent.and_then(|node| node.upgrade()).unwrap()
+}
+
+pub fn has_proper_integrity(data: &[u8], integrity: &str) -> bool {
+    if integrity.starts_with("sha256-") {
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
+    } else if integrity.starts_with("sha384-") {
+        let mut hasher = Sha384::new();
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
+    } else if integrity.starts_with("sha512-") {
+        let mut hasher = Sha512::new();
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
+    } else {
+        false
+    }
+}
+
 pub fn has_favicon(handle: &Handle) -> bool {
     let mut found_favicon: bool = false;
 
@@ -213,6 +253,107 @@ pub fn has_favicon(handle: &Handle) -> bool {
     }
 
     found_favicon
+}
+
+pub fn html_to_dom(data: &str) -> RcDom {
+    parse_document(RcDom::default(), Default::default())
+        .from_utf8()
+        .read_from(&mut data.as_bytes())
+        .unwrap()
+}
+
+pub fn is_icon(attr_value: &str) -> bool {
+    ICON_VALUES.contains(&attr_value.to_lowercase().as_str())
+}
+
+pub fn metadata_tag(url: &str) -> String {
+    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+
+    // Safe to unwrap (we just put this through an HTTP request)
+    match Url::parse(url) {
+        Ok(mut clean_url) => {
+            clean_url.set_fragment(None);
+
+            // Prevent credentials from getting into metadata
+            if is_http_url(url) {
+                // Only HTTP(S) URLs may feature credentials
+                clean_url.set_username("").unwrap();
+                clean_url.set_password(None).unwrap();
+            }
+
+            if is_http_url(url) {
+                format!(
+                    "<!-- Saved from {} at {} using {} v{} -->",
+                    &clean_url,
+                    timestamp,
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION"),
+                )
+            } else {
+                format!(
+                    "<!-- Saved from local source at {} using {} v{} -->",
+                    timestamp,
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION"),
+                )
+            }
+        }
+        Err(_) => str!(),
+    }
+}
+
+pub fn stringify_document(handle: &Handle, options: &Options) -> String {
+    let mut buf: Vec<u8> = Vec::new();
+    serialize(&mut buf, handle, SerializeOpts::default())
+        .expect("unable to serialize DOM into buffer");
+
+    let mut result = String::from_utf8(buf).unwrap();
+
+    // We can't make it isolate the page right away since it may have no HEAD element,
+    // ergo we have to serialize, parse the DOM again, insert the CSP meta tag, and then
+    // finally serialize and return the resulting string
+    if options.isolate
+        || options.no_css
+        || options.no_fonts
+        || options.no_frames
+        || options.no_js
+        || options.no_images
+    {
+        // Take care of CSP
+        let mut buf: Vec<u8> = Vec::new();
+        let mut dom = html_to_dom(&result);
+        let doc = dom.get_document();
+        let html = get_child_node_by_name(&doc, "html");
+        let head = get_child_node_by_name(&html, "head");
+        let csp_content: String = csp(options);
+
+        let meta = dom.create_element(
+            QualName::new(None, ns!(), local_name!("meta")),
+            vec![
+                Attribute {
+                    name: QualName::new(None, ns!(), local_name!("http-equiv")),
+                    value: format_tendril!("Content-Security-Policy"),
+                },
+                Attribute {
+                    name: QualName::new(None, ns!(), local_name!("content")),
+                    value: format_tendril!("{}", csp_content),
+                },
+            ],
+            Default::default(),
+        );
+        // Note: the CSP meta-tag has to be prepended, never appended,
+        //       since there already may be one defined in the document,
+        //       and browsers don't allow re-defining them (for obvious reasons)
+        head.children.borrow_mut().reverse();
+        head.children.borrow_mut().push(meta.clone());
+        head.children.borrow_mut().reverse();
+
+        serialize(&mut buf, &doc, SerializeOpts::default())
+            .expect("unable to serialize DOM into buffer");
+        result = String::from_utf8(buf).unwrap();
+    }
+
+    result
 }
 
 pub fn walk_and_embed_assets(
@@ -1133,146 +1274,5 @@ pub fn walk_and_embed_assets(
             //       since that's not part of W3C standard and therefore gets ignored
             //       by browsers other than IE [5, 9]
         }
-    }
-}
-
-pub fn html_to_dom(data: &str) -> RcDom {
-    parse_document(RcDom::default(), Default::default())
-        .from_utf8()
-        .read_from(&mut data.as_bytes())
-        .unwrap()
-}
-
-fn get_child_node_by_name(handle: &Handle, node_name: &str) -> Handle {
-    let children = handle.children.borrow();
-    let matching_children = children.iter().find(|child| match child.data {
-        NodeData::Element { ref name, .. } => &*name.local == node_name,
-        _ => false,
-    });
-    match matching_children {
-        Some(node) => node.clone(),
-        _ => handle.clone(),
-    }
-}
-
-pub fn stringify_document(handle: &Handle, options: &Options) -> String {
-    let mut buf: Vec<u8> = Vec::new();
-    serialize(&mut buf, handle, SerializeOpts::default())
-        .expect("unable to serialize DOM into buffer");
-
-    let mut result = String::from_utf8(buf).unwrap();
-
-    // We can't make it isolate the page right away since it may have no HEAD element,
-    // ergo we have to serialize, parse the DOM again, insert the CSP meta tag, and then
-    // finally serialize and return the resulting string
-    if options.isolate
-        || options.no_css
-        || options.no_fonts
-        || options.no_frames
-        || options.no_js
-        || options.no_images
-    {
-        // Take care of CSP
-        let mut buf: Vec<u8> = Vec::new();
-        let mut dom = html_to_dom(&result);
-        let doc = dom.get_document();
-        let html = get_child_node_by_name(&doc, "html");
-        let head = get_child_node_by_name(&html, "head");
-        let csp_content: String = csp(options);
-
-        let meta = dom.create_element(
-            QualName::new(None, ns!(), local_name!("meta")),
-            vec![
-                Attribute {
-                    name: QualName::new(None, ns!(), local_name!("http-equiv")),
-                    value: format_tendril!("Content-Security-Policy"),
-                },
-                Attribute {
-                    name: QualName::new(None, ns!(), local_name!("content")),
-                    value: format_tendril!("{}", csp_content),
-                },
-            ],
-            Default::default(),
-        );
-        // Note: the CSP meta-tag has to be prepended, never appended,
-        //       since there already may be one defined in the document,
-        //       and browsers don't allow re-defining them (for obvious reasons)
-        head.children.borrow_mut().reverse();
-        head.children.borrow_mut().push(meta.clone());
-        head.children.borrow_mut().reverse();
-
-        serialize(&mut buf, &doc, SerializeOpts::default())
-            .expect("unable to serialize DOM into buffer");
-        result = String::from_utf8(buf).unwrap();
-    }
-
-    result
-}
-
-pub fn csp(options: &Options) -> String {
-    let mut string_list = vec![];
-
-    if options.isolate {
-        string_list.push("default-src 'unsafe-inline' data:;");
-    }
-
-    if options.no_css {
-        string_list.push("style-src 'none';");
-    }
-
-    if options.no_fonts {
-        string_list.push("font-src 'none';");
-    }
-
-    if options.no_frames {
-        string_list.push("frame-src 'none';");
-        string_list.push("child-src 'none';");
-    }
-
-    if options.no_js {
-        string_list.push("script-src 'none';");
-    }
-
-    if options.no_images {
-        // Note: data: is needed for transparent pixels
-        string_list.push("img-src data:;");
-    }
-
-    string_list.join(" ")
-}
-
-pub fn metadata_tag(url: &str) -> String {
-    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-
-    // Safe to unwrap (we just put this through an HTTP request)
-    match Url::parse(url) {
-        Ok(mut clean_url) => {
-            clean_url.set_fragment(None);
-
-            // Prevent credentials from getting into metadata
-            if is_http_url(url) {
-                // Only HTTP(S) URLs may feature credentials
-                clean_url.set_username("").unwrap();
-                clean_url.set_password(None).unwrap();
-            }
-
-            if is_http_url(url) {
-                format!(
-                    "<!-- Saved from {} at {} using {} v{} -->",
-                    &clean_url,
-                    timestamp,
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                )
-            } else {
-                format!(
-                    "<!-- Saved from local source at {} using {} v{} -->",
-                    timestamp,
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                )
-            }
-        }
-        Err(_) => str!(),
     }
 }
