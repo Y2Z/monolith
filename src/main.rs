@@ -26,7 +26,7 @@ enum Output {
 
 impl Output {
     fn new(file_path: &str) -> Result<Output, Error> {
-        if file_path.is_empty() {
+        if file_path.is_empty() || file_path.eq("-") {
             Ok(Output::Stdout(io::stdout()))
         } else {
             Ok(Output::File(fs::File::create(file_path)?))
