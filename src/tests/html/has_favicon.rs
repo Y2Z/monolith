@@ -8,20 +8,24 @@
 #[cfg(test)]
 mod passing {
     use crate::html;
+    use crate::opts::Options;
 
     #[test]
     fn icon() {
-        assert!(html::is_icon("icon"));
+        let html = "<link rel=\"icon\" href=\"\" /><div>text</div>";
+        let dom = html::html_to_dom(&html);
+        let res: bool = html::has_favicon(&dom.document);
+
+        assert!(res);
     }
 
     #[test]
-    fn shortcut_icon_capitalized() {
-        assert!(html::is_icon("Shortcut Icon"));
-    }
+    fn shortcut_icon() {
+        let html = "<link rel=\"shortcut icon\" href=\"\" /><div>text</div>";
+        let dom = html::html_to_dom(&html);
+        let res: bool = html::has_favicon(&dom.document);
 
-    #[test]
-    fn icon_uppercase() {
-        assert!(html::is_icon("ICON"));
+        assert!(res);
     }
 }
 
@@ -35,24 +39,14 @@ mod passing {
 #[cfg(test)]
 mod failing {
     use crate::html;
+    use crate::opts::Options;
 
     #[test]
-    fn mask_icon() {
-        assert!(!html::is_icon("mask-icon"));
-    }
+    fn absent() {
+        let html = "<div>text</div>";
+        let dom = html::html_to_dom(&html);
+        let res: bool = html::has_favicon(&dom.document);
 
-    #[test]
-    fn fluid_icon() {
-        assert!(!html::is_icon("fluid-icon"));
-    }
-
-    #[test]
-    fn stylesheet() {
-        assert!(!html::is_icon("stylesheet"));
-    }
-
-    #[test]
-    fn empty_string() {
-        assert!(!html::is_icon(""));
+        assert!(!res);
     }
 }
