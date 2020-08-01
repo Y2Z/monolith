@@ -12,12 +12,12 @@ authors = [
 description = "CLI tool for saving web pages as a single HTML file"
 
 [dependencies]
-base64 = "0.12.2"
-chrono = "0.4.11" # Used to render comments indicating the time the page was saved
+base64 = "0.12.3"
+chrono = "0.4.13" # Used to render comments indicating the time the page was saved
 clap = "2.33.1"
 cssparser = "0.27.2"
 html5ever = "0.24.1"
-sha2 = "0.9.0" # Used in calculating checksums during integrity checks
+sha2 = "0.9.1" # Used in calculating checksums during integrity checks
 url = "2.1.1"
 
 [dependencies.reqwest]
