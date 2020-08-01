@@ -29,6 +29,31 @@ struct SrcSetItem<'a> {
 
 const ICON_VALUES: &[&str] = &["icon", "shortcut icon"];
 
+pub fn add_base_tag(document: &Handle, url: String) -> RcDom {
+    let mut buf: Vec<u8> = Vec::new();
+    serialize(&mut buf, document, SerializeOpts::default())
+        .expect("unable to serialize DOM into buffer");
+    let result = String::from_utf8(buf).unwrap();
+
+    let mut dom = html_to_dom(&result);
+    let doc = dom.get_document();
+    let html = get_child_node_by_name(&doc, "html");
+    let head = get_child_node_by_name(&html, "head");
+    let favicon_node = dom.create_element(
+        QualName::new(None, ns!(), local_name!("base")),
+        vec![Attribute {
+            name: QualName::new(None, ns!(), local_name!("href")),
+            value: format_tendril!("{}", url),
+        }],
+        Default::default(),
+    );
+
+    // Insert BASE tag into HEAD
+    head.children.borrow_mut().push(favicon_node.clone());
+
+    dom
+}
+
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
     serialize(&mut buf, document, SerializeOpts::default())
@@ -54,7 +79,7 @@ pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
         Default::default(),
     );
 
-    // Append favicon node to HEAD
+    // Insert favicon LINK tag into HEAD
     head.children.borrow_mut().push(favicon_node.clone());
 
     dom
@@ -203,6 +228,56 @@ pub fn has_proper_integrity(data: &[u8], integrity: &str) -> bool {
     } else {
         false
     }
+}
+
+pub fn has_base_tag(handle: &Handle) -> bool {
+    let mut found_base_tag: bool = false;
+
+    match handle.data {
+        NodeData::Document => {
+            // Dig deeper
+            for child in handle.children.borrow().iter() {
+                if has_base_tag(child) {
+                    found_base_tag = true;
+                    break;
+                }
+            }
+        }
+        NodeData::Element {
+            ref name,
+            ref attrs,
+            ..
+        } => {
+            match name.local.as_ref() {
+                "base" => {
+                    let attrs_mut = &mut attrs.borrow_mut();
+
+                    for attr in attrs_mut.iter_mut() {
+                        if &attr.name.local == "href" {
+                            if !attr.value.trim().is_empty() {
+                                found_base_tag = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            if !found_base_tag {
+                // Dig deeper
+                for child in handle.children.borrow().iter() {
+                    if has_base_tag(child) {
+                        found_base_tag = true;
+                        break;
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+
+    found_base_tag
 }
 
 pub fn has_favicon(handle: &Handle) -> bool {
@@ -600,6 +675,7 @@ pub fn walk_and_embed_assets(
                             }
                         }
                         LinkType::Unknown => {
+                            // Make sure that all other LINKs' href attributes are full URLs
                             for attr in attrs_mut.iter_mut() {
                                 let attr_name: &str = &attr.name.local;
                                 if attr_name.eq_ignore_ascii_case("href") {
@@ -608,6 +684,20 @@ pub fn walk_and_embed_assets(
                                     attr.value.clear();
                                     attr.value.push_slice(&href_full_url.as_str());
                                 }
+                            }
+                        }
+                    }
+                }
+                "base" => {
+                    if is_http_url(url) {
+                        // Ensure BASE href is a full URL, not a relative one
+                        for attr in attrs_mut.iter_mut() {
+                            let attr_name: &str = &attr.name.local;
+                            if attr_name.eq_ignore_ascii_case("href") {
+                                let href_full_url =
+                                    resolve_url(&url, attr.value.trim()).unwrap_or_default();
+                                attr.value.clear();
+                                attr.value.push_slice(&href_full_url.as_str());
                             }
                         }
                     }

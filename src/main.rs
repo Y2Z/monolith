@@ -9,7 +9,8 @@ use std::process;
 use std::time::Duration;
 
 use monolith::html::{
-    add_favicon, has_favicon, html_to_dom, metadata_tag, stringify_document, walk_and_embed_assets,
+    add_base_tag, add_favicon, has_base_tag, has_favicon, html_to_dom, metadata_tag,
+    stringify_document, walk_and_embed_assets,
 };
 use monolith::opts::Options;
 use monolith::url::{
@@ -141,6 +142,14 @@ fn main() {
         process::exit(1);
     }
 
+    // Embed remote assets
+    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options, 0);
+
+    // Take care of BASE tag
+    if is_http_url(base_url.clone()) && !has_base_tag(&dom.document) {
+        dom = add_base_tag(&dom.document, base_url.clone());
+    }
+
     // Request and embed /favicon.ico (unless it's already linked in the document)
     if !options.no_images && is_http_url(target_url) && !has_favicon(&dom.document) {
         let favicon_ico_url: String = resolve_url(&base_url, "/favicon.ico").unwrap();
@@ -163,15 +172,12 @@ fn main() {
         }
     }
 
-    // Embed remote assets
-    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options, 0);
-
     // Serialize DOM tree
     let mut result: String = stringify_document(&dom.document, &options);
 
     // Add metadata tag
     if !options.no_metadata {
-        let metadata_comment = metadata_tag(&base_url);
+        let metadata_comment: String = metadata_tag(&base_url);
         result.insert_str(0, &metadata_comment);
         if metadata_comment.len() > 0 {
             result.insert_str(metadata_comment.len(), "\n");
