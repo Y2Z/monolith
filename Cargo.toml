@@ -14,7 +14,7 @@ description = "CLI tool for saving web pages as a single HTML file"
 [dependencies]
 base64 = "0.12.3"
 chrono = "0.4.13" # Used to render comments indicating the time the page was saved
-clap = "2.33.1"
+clap = "2.33.3"
 cssparser = "0.27.2"
 html5ever = "0.24.1"
 sha2 = "0.9.1" # Used in calculating checksums during integrity checks
