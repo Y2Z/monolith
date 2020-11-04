@@ -8,7 +8,6 @@
 #[cfg(test)]
 mod passing {
     use crate::html;
-    use crate::opts::Options;
 
     #[test]
     fn icon() {
@@ -39,7 +38,6 @@ mod passing {
 #[cfg(test)]
 mod failing {
     use crate::html;
-    use crate::opts::Options;
 
     #[test]
     fn absent() {
