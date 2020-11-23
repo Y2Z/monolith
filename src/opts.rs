@@ -4,6 +4,7 @@ use clap::{App, Arg};
 pub struct Options {
     pub target: String,
     pub no_css: bool,
+    pub ignore_errors: bool,
     pub no_fonts: bool,
     pub no_frames: bool,
     pub no_images: bool,
@@ -45,6 +46,7 @@ impl Options {
             )
             // .args_from_usage("-a, --no-audio 'Removes audio sources'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
+            .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
             .args_from_usage("-F, --no-fonts 'Removes fonts'")
             .args_from_usage("-i, --no-images 'Removes images'")
@@ -66,6 +68,7 @@ impl Options {
             .expect("please set target")
             .to_string();
         options.no_css = app.is_present("no-css");
+        options.ignore_errors = app.is_present("ignore-errors");
         options.no_frames = app.is_present("no-frames");
         options.no_fonts = app.is_present("no-fonts");
         options.no_images = app.is_present("no-images");

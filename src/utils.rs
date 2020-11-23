@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use crate::opts::Options;
 use crate::url::{clean_url, data_url_to_data, file_url_to_fs_path, is_data_url, is_file_url};
 
 const INDENT: &str = " ";
@@ -73,7 +74,7 @@ pub fn retrieve_asset(
     client: &Client,
     parent_url: &str,
     url: &str,
-    opt_silent: bool,
+    options: &Options,
     depth: u32,
 ) -> Result<(Vec<u8>, String, String), reqwest::Error> {
     if url.len() == 0 {
@@ -95,7 +96,7 @@ pub fn retrieve_asset(
         let fs_file_path: String = file_url_to_fs_path(url);
         let path = Path::new(&fs_file_path);
         if path.exists() {
-            if !opt_silent {
+            if !options.silent {
                 eprintln!("{}{}", indent(depth).as_str(), &url);
             }
 
@@ -109,7 +110,7 @@ pub fn retrieve_asset(
 
         if cache.contains_key(&cache_key) {
             // URL is in cache, we get and return it
-            if !opt_silent {
+            if !options.silent {
                 eprintln!("{}{} (from cache)", indent(depth).as_str(), &url);
             }
 
@@ -120,34 +121,46 @@ pub fn retrieve_asset(
             ))
         } else {
             // URL not in cache, we retrieve the file
-            let mut response = client.get(url).send()?;
-            let res_url = response.url().to_string();
+            match client.get(url).send() {
+                Ok(mut response) => {
+                    if !options.ignore_errors && response.status() != 200 {
+                        if !options.silent {
+                            eprintln!("Unable to retrieve {} ({})", &url, response.status());
+                        }
+                        // Provoke error
+                        return Err(client.get("").send().unwrap_err());
+                    }
 
-            if !opt_silent {
-                if url == res_url {
-                    eprintln!("{}{}", indent(depth).as_str(), &url);
-                } else {
-                    eprintln!("{}{} -> {}", indent(depth).as_str(), &url, &res_url);
+                    let res_url = response.url().to_string();
+
+                    if !options.silent {
+                        if url == res_url {
+                            eprintln!("{}{}", indent(depth).as_str(), &url);
+                        } else {
+                            eprintln!("{}{} -> {}", indent(depth).as_str(), &url, &res_url);
+                        }
+                    }
+
+                    let new_cache_key: String = clean_url(&res_url);
+
+                    // Convert response into a byte array
+                    let mut data: Vec<u8> = vec![];
+                    response.copy_to(&mut data)?;
+
+                    // Attempt to obtain media type by reading the Content-Type header
+                    let media_type = response
+                        .headers()
+                        .get(CONTENT_TYPE)
+                        .and_then(|header| header.to_str().ok())
+                        .unwrap_or("");
+
+                    // Add retrieved resource to cache
+                    cache.insert(new_cache_key, data.clone());
+
+                    Ok((data, res_url, media_type.to_string()))
                 }
+                Err(error) => Err(error),
             }
-
-            let new_cache_key: String = clean_url(&res_url);
-
-            // Convert response into a byte array
-            let mut data: Vec<u8> = vec![];
-            response.copy_to(&mut data)?;
-
-            // Attempt to obtain media type by reading the Content-Type header
-            let media_type = response
-                .headers()
-                .get(CONTENT_TYPE)
-                .and_then(|header| header.to_str().ok())
-                .unwrap_or("");
-
-            // Add to cache
-            cache.insert(new_cache_key, data.clone());
-
-            Ok((data, res_url, media_type.to_string()))
         }
     }
 }

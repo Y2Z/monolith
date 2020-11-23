@@ -11,6 +11,7 @@ mod passing {
     use std::collections::HashMap;
     use std::env;
 
+    use crate::opts::Options;
     use crate::url;
     use crate::utils;
 
@@ -19,6 +20,9 @@ mod passing {
         let cache = &mut HashMap::new();
         let client = Client::new();
 
+        let mut options = Options::default();
+        options.silent = true;
+
         // If both source and target are data URLs,
         // ensure the result contains target data URL
         let (data, final_url, media_type) = utils::retrieve_asset(
@@ -26,7 +30,7 @@ mod passing {
             &client,
             "data:text/html;base64,c291cmNl",
             "data:text/html;base64,dGFyZ2V0",
-            false,
+            &options,
             0,
         )
         .unwrap();
@@ -46,6 +50,9 @@ mod passing {
         let cache = &mut HashMap::new();
         let client = Client::new();
 
+        let mut options = Options::default();
+        options.silent = true;
+
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
 
         // Inclusion of local assets from local sources should be allowed
@@ -63,7 +70,7 @@ mod passing {
                 file = file_url_protocol,
                 cwd = cwd.to_str().unwrap()
             ),
-            false,
+            &options,
             0,
         )
         .unwrap();
@@ -91,6 +98,7 @@ mod failing {
     use reqwest::blocking::Client;
     use std::collections::HashMap;
 
+    use crate::opts::Options;
     use crate::utils;
 
     #[test]
@@ -98,13 +106,16 @@ mod failing {
         let cache = &mut HashMap::new();
         let client = Client::new();
 
+        let mut options = Options::default();
+        options.silent = true;
+
         // Inclusion of local assets from data URL sources should not be allowed
         match utils::retrieve_asset(
             cache,
             &client,
             "data:text/html;base64,SoUrCe",
             "file:///etc/passwd",
-            false,
+            &options,
             0,
         ) {
             Ok((..)) => {
@@ -121,13 +132,16 @@ mod failing {
         let cache = &mut HashMap::new();
         let client = Client::new();
 
+        let mut options = Options::default();
+        options.silent = true;
+
         // Inclusion of local assets from remote sources should not be allowed
         match utils::retrieve_asset(
             cache,
             &client,
             "https://kernel.org/",
             "file:///etc/passwd",
-            false,
+            &options,
             0,
         ) {
             Ok((..)) => {
