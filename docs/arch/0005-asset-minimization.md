@@ -1,4 +1,4 @@
-# 4. Asset Minimization
+# 5. Asset Minimization
 
 Date: 2020-03-14
 

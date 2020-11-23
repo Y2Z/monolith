@@ -1,4 +1,4 @@
-# 4. Reload and location `meta` tags
+# 6. Reload and location `meta` tags
 
 Date: 2020-06-25
 
