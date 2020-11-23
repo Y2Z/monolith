@@ -5,7 +5,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::opts::Options;
-use crate::url::{clean_url, data_url_to_data, file_url_to_fs_path, is_data_url, is_file_url};
+use crate::url::{clean_url, file_url_to_fs_path, is_data_url, is_file_url, parse_data_url};
 
 const INDENT: &str = " ";
 
@@ -83,7 +83,7 @@ pub fn retrieve_asset(
     }
 
     if is_data_url(&url) {
-        let (media_type, data) = data_url_to_data(url);
+        let (media_type, data) = parse_data_url(url);
         Ok((data, url.to_string(), media_type))
     } else if is_file_url(&url) {
         // Check if parent_url is also file:///

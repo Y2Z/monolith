@@ -12,8 +12,8 @@ mod passing {
     use crate::html;
 
     #[test]
-    fn parent_node_names() {
-        let html = "<!doctype html><html><HEAD></HEAD><body><div><P></P></div></body></html>";
+    fn div_two_style_attributes() {
+        let html = "<!doctype html><html><head></head><body><DIV STYLE=\"color: blue;\" style=\"display: none;\"></div></body></html>";
         let dom = html::html_to_dom(&html);
         let mut count = 0;
 
@@ -22,20 +22,21 @@ mod passing {
 
             match &node.data {
                 NodeData::Document => {
+                    // Dig deeper
                     for child in node.children.borrow().iter() {
                         test_walk(child, &mut *i);
                     }
                 }
                 NodeData::Element { ref name, .. } => {
                     let node_name = name.local.as_ref().to_string();
-                    let parent = html::get_parent_node(node);
-                    let parent_node_name = html::get_node_name(&parent);
-                    if node_name == "head" || node_name == "body" {
-                        assert_eq!(parent_node_name, Some("html"));
+
+                    if node_name == "body" {
+                        assert_eq!(html::get_node_attr(node, "class"), None);
                     } else if node_name == "div" {
-                        assert_eq!(parent_node_name, Some("body"));
-                    } else if node_name == "p" {
-                        assert_eq!(parent_node_name, Some("div"));
+                        assert_eq!(
+                            html::get_node_attr(node, "style"),
+                            Some(str!("color: blue;"))
+                        );
                     }
 
                     for child in node.children.borrow().iter() {
@@ -48,6 +49,6 @@ mod passing {
 
         test_walk(&dom.document, &mut count);
 
-        assert_eq!(count, 7);
+        assert_eq!(count, 6);
     }
 }

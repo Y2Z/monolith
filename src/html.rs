@@ -6,7 +6,7 @@ use html5ever::rcdom::{Handle, NodeData, RcDom};
 use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::{format_tendril, Tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
-use html5ever::{local_name, namespace_url, ns};
+use html5ever::{local_name, namespace_url, ns, LocalName};
 use reqwest::blocking::Client;
 use reqwest::Url;
 use sha2::{Digest, Sha256, Sha384, Sha512};
@@ -29,31 +29,6 @@ struct SrcSetItem<'a> {
 
 const ICON_VALUES: &[&str] = &["icon", "shortcut icon"];
 
-pub fn add_base_tag(document: &Handle, url: String) -> RcDom {
-    let mut buf: Vec<u8> = Vec::new();
-    serialize(&mut buf, document, SerializeOpts::default())
-        .expect("unable to serialize DOM into buffer");
-    let result = String::from_utf8(buf).unwrap();
-
-    let mut dom = html_to_dom(&result);
-    let doc = dom.get_document();
-    let html = get_child_node_by_name(&doc, "html");
-    let head = get_child_node_by_name(&html, "head");
-    let favicon_node = dom.create_element(
-        QualName::new(None, ns!(), local_name!("base")),
-        vec![Attribute {
-            name: QualName::new(None, ns!(), local_name!("href")),
-            value: format_tendril!("{}", url),
-        }],
-        Default::default(),
-    );
-
-    // Insert BASE tag into HEAD
-    head.children.borrow_mut().push(favicon_node.clone());
-
-    dom
-}
-
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
     serialize(&mut buf, document, SerializeOpts::default())
@@ -62,30 +37,49 @@ pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
 
     let mut dom = html_to_dom(&result);
     let doc = dom.get_document();
-    let html = get_child_node_by_name(&doc, "html");
-    let head = get_child_node_by_name(&html, "head");
-    let favicon_node = dom.create_element(
-        QualName::new(None, ns!(), local_name!("link")),
-        vec![
-            Attribute {
-                name: QualName::new(None, ns!(), local_name!("rel")),
-                value: format_tendril!("icon"),
-            },
-            Attribute {
-                name: QualName::new(None, ns!(), local_name!("href")),
-                value: format_tendril!("{}", favicon_data_url),
-            },
-        ],
-        Default::default(),
-    );
-
-    // Insert favicon LINK tag into HEAD
-    head.children.borrow_mut().push(favicon_node.clone());
+    if let Some(html) = get_child_node_by_name(&doc, "html") {
+        if let Some(head) = get_child_node_by_name(&html, "head") {
+            let favicon_node = dom.create_element(
+                QualName::new(None, ns!(), local_name!("link")),
+                vec![
+                    Attribute {
+                        name: QualName::new(None, ns!(), local_name!("rel")),
+                        value: format_tendril!("icon"),
+                    },
+                    Attribute {
+                        name: QualName::new(None, ns!(), local_name!("href")),
+                        value: format_tendril!("{}", favicon_data_url),
+                    },
+                ],
+                Default::default(),
+            );
+            // Insert favicon LINK tag into HEAD
+            head.children.borrow_mut().push(favicon_node.clone());
+        }
+    }
 
     dom
 }
 
-pub fn csp(options: &Options) -> String {
+pub fn check_integrity(data: &[u8], integrity: &str) -> bool {
+    if integrity.starts_with("sha256-") {
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
+    } else if integrity.starts_with("sha384-") {
+        let mut hasher = Sha384::new();
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
+    } else if integrity.starts_with("sha512-") {
+        let mut hasher = Sha512::new();
+        hasher.update(data);
+        base64::encode(hasher.finalize()) == integrity[7..]
+    } else {
+        false
+    }
+}
+
+pub fn compose_csp(options: &Options) -> String {
     let mut string_list = vec![];
 
     if options.isolate {
@@ -115,6 +109,42 @@ pub fn csp(options: &Options) -> String {
     }
 
     string_list.join(" ")
+}
+
+pub fn create_metadata_tag(url: &str) -> String {
+    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+
+    // Safe to unwrap (we just put this through an HTTP request)
+    match Url::parse(url) {
+        Ok(mut clean_url) => {
+            clean_url.set_fragment(None);
+
+            // Prevent credentials from getting into metadata
+            if is_http_url(url) {
+                // Only HTTP(S) URLs may feature credentials
+                clean_url.set_username("").unwrap();
+                clean_url.set_password(None).unwrap();
+            }
+
+            if is_http_url(url) {
+                format!(
+                    "<!-- Saved from {} at {} using {} v{} -->",
+                    &clean_url,
+                    timestamp,
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION"),
+                )
+            } else {
+                format!(
+                    "<!-- Saved from local source at {} using {} v{} -->",
+                    timestamp,
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION"),
+                )
+            }
+        }
+        Err(_) => str!(),
+    }
 }
 
 pub fn embed_srcset(
@@ -188,15 +218,54 @@ pub fn embed_srcset(
     result
 }
 
-fn get_child_node_by_name(handle: &Handle, node_name: &str) -> Handle {
-    let children = handle.children.borrow();
+pub fn find_base_node(node: &Handle) -> Option<Handle> {
+    match node.data {
+        NodeData::Document => {
+            // Dig deeper
+            for child in node.children.borrow().iter() {
+                if let Some(base_node) = find_base_node(child) {
+                    return Some(base_node);
+                }
+            }
+        }
+        NodeData::Element { ref name, .. } => {
+            match name.local.as_ref() {
+                "head" => {
+                    return get_child_node_by_name(node, "base");
+                }
+                _ => {}
+            }
+
+            // Dig deeper
+            for child in node.children.borrow().iter() {
+                if let Some(base_node) = find_base_node(child) {
+                    return Some(base_node);
+                }
+            }
+        }
+        _ => {}
+    }
+
+    None
+}
+
+pub fn get_base_url(handle: &Handle) -> Option<String> {
+    if let Some(base_node) = find_base_node(handle) {
+        get_node_attr(&base_node, "href")
+    } else {
+        None
+    }
+}
+
+pub fn get_child_node_by_name(parent: &Handle, node_name: &str) -> Option<Handle> {
+    let children = parent.children.borrow();
     let matching_children = children.iter().find(|child| match child.data {
         NodeData::Element { ref name, .. } => &*name.local == node_name,
         _ => false,
     });
     match matching_children {
-        Some(node) => node.clone(),
-        _ => handle.clone(),
+        Some(node) => Some(node.clone()),
+        _ => None,
     }
 }
 
@@ -207,77 +276,23 @@ pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
     }
 }
 
-pub fn get_parent_node(node: &Handle) -> Handle {
-    let parent = node.parent.take().clone();
+pub fn get_node_attr(node: &Handle, attr_name: &str) -> Option<String> {
+    match &node.data {
+        NodeData::Element { ref attrs, .. } => {
+            for attr in attrs.borrow().iter() {
+                if &*attr.name.local == attr_name {
+                    return Some(str!(&*attr.value));
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+pub fn get_parent_node(child: &Handle) -> Handle {
+    let parent = child.parent.take().clone();
     parent.and_then(|node| node.upgrade()).unwrap()
-}
-
-pub fn has_proper_integrity(data: &[u8], integrity: &str) -> bool {
-    if integrity.starts_with("sha256-") {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
-    } else if integrity.starts_with("sha384-") {
-        let mut hasher = Sha384::new();
-        hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
-    } else if integrity.starts_with("sha512-") {
-        let mut hasher = Sha512::new();
-        hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
-    } else {
-        false
-    }
-}
-
-pub fn has_base_tag(handle: &Handle) -> bool {
-    let mut found_base_tag: bool = false;
-
-    match handle.data {
-        NodeData::Document => {
-            // Dig deeper
-            for child in handle.children.borrow().iter() {
-                if has_base_tag(child) {
-                    found_base_tag = true;
-                    break;
-                }
-            }
-        }
-        NodeData::Element {
-            ref name,
-            ref attrs,
-            ..
-        } => {
-            match name.local.as_ref() {
-                "base" => {
-                    let attrs_mut = &mut attrs.borrow_mut();
-
-                    for attr in attrs_mut.iter_mut() {
-                        if &attr.name.local == "href" {
-                            if !attr.value.trim().is_empty() {
-                                found_base_tag = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-
-            if !found_base_tag {
-                // Dig deeper
-                for child in handle.children.borrow().iter() {
-                    if has_base_tag(child) {
-                        found_base_tag = true;
-                        break;
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
-
-    found_base_tag
 }
 
 pub fn has_favicon(handle: &Handle) -> bool {
@@ -293,21 +308,12 @@ pub fn has_favicon(handle: &Handle) -> bool {
                 }
             }
         }
-        NodeData::Element {
-            ref name,
-            ref attrs,
-            ..
-        } => {
+        NodeData::Element { ref name, .. } => {
             match name.local.as_ref() {
                 "link" => {
-                    let attrs_mut = &mut attrs.borrow_mut();
-
-                    for attr in attrs_mut.iter_mut() {
-                        if &attr.name.local == "rel" {
-                            if is_icon(attr.value.trim()) {
-                                found_favicon = true;
-                                break;
-                            }
+                    if let Some(attr_value) = get_node_attr(handle, "rel") {
+                        if is_icon(attr_value.trim()) {
+                            found_favicon = true;
                         }
                     }
                 }
@@ -341,46 +347,82 @@ pub fn is_icon(attr_value: &str) -> bool {
     ICON_VALUES.contains(&attr_value.to_lowercase().as_str())
 }
 
-pub fn metadata_tag(url: &str) -> String {
-    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
+    let mut buf: Vec<u8> = Vec::new();
+    serialize(&mut buf, document, SerializeOpts::default())
+        .expect("unable to serialize DOM into buffer");
+    let result = String::from_utf8(buf).unwrap();
 
-    // Safe to unwrap (we just put this through an HTTP request)
-    match Url::parse(url) {
-        Ok(mut clean_url) => {
-            clean_url.set_fragment(None);
-
-            // Prevent credentials from getting into metadata
-            if is_http_url(url) {
-                // Only HTTP(S) URLs may feature credentials
-                clean_url.set_username("").unwrap();
-                clean_url.set_password(None).unwrap();
-            }
-
-            if is_http_url(url) {
-                format!(
-                    "<!-- Saved from {} at {} using {} v{} -->",
-                    &clean_url,
-                    timestamp,
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                )
+    let mut dom = html_to_dom(&result);
+    let doc = dom.get_document();
+    if let Some(html_node) = get_child_node_by_name(&doc, "html") {
+        if let Some(head_node) = get_child_node_by_name(&html_node, "head") {
+            // Check if BASE node already exists in the DOM tree
+            if let Some(base_node) = get_child_node_by_name(&head_node, "base") {
+                set_node_attr(&base_node, "href", Some(desired_base_href));
             } else {
-                format!(
-                    "<!-- Saved from local source at {} using {} v{} -->",
-                    timestamp,
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                )
+                let base_node = dom.create_element(
+                    QualName::new(None, ns!(), local_name!("base")),
+                    vec![Attribute {
+                        name: QualName::new(None, ns!(), local_name!("href")),
+                        value: format_tendril!("{}", desired_base_href),
+                    }],
+                    Default::default(),
+                );
+
+                // Insert newly created BASE node into HEAD
+                head_node.children.borrow_mut().push(base_node.clone());
             }
         }
-        Err(_) => str!(),
     }
+
+    dom
+}
+
+pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>) {
+    match &node.data {
+        NodeData::Element { ref attrs, .. } => {
+            let attrs_mut = &mut attrs.borrow_mut();
+            let mut i = 0;
+            let mut found_existing_attr: bool = false;
+
+            while i < attrs_mut.len() {
+                if &attrs_mut[i].name.local == attr_name {
+                    found_existing_attr = true;
+
+                    if let Some(attr_value) = attr_value.clone() {
+                        &attrs_mut[i].value.clear();
+                        &attrs_mut[i].value.push_slice(&attr_value.as_str());
+                    } else {
+                        // Remove attr completely if attr_value is not defined
+                        attrs_mut.remove(i);
+                        continue;
+                    }
+                }
+
+                i += 1;
+            }
+
+            if !found_existing_attr {
+                // Add new attribute (since originally the target node didn't have it)
+                if let Some(attr_value) = attr_value.clone() {
+                    let name = LocalName::from(attr_name);
+
+                    attrs_mut.push(Attribute {
+                        name: QualName::new(None, ns!(), name),
+                        value: format_tendril!("{}", attr_value),
+                    });
+                }
+            }
+        }
+        _ => {}
+    };
 }
 
 pub fn stringify_document(handle: &Handle, options: &Options) -> String {
     let mut buf: Vec<u8> = Vec::new();
     serialize(&mut buf, handle, SerializeOpts::default())
-        .expect("unable to serialize DOM into buffer");
+        .expect("Unable to serialize DOM into buffer");
 
     let mut result = String::from_utf8(buf).unwrap();
 
@@ -398,33 +440,33 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
         let mut buf: Vec<u8> = Vec::new();
         let mut dom = html_to_dom(&result);
         let doc = dom.get_document();
-        let html = get_child_node_by_name(&doc, "html");
-        let head = get_child_node_by_name(&html, "head");
-        let csp_content: String = csp(options);
-
-        let meta = dom.create_element(
-            QualName::new(None, ns!(), local_name!("meta")),
-            vec![
-                Attribute {
-                    name: QualName::new(None, ns!(), local_name!("http-equiv")),
-                    value: format_tendril!("Content-Security-Policy"),
-                },
-                Attribute {
-                    name: QualName::new(None, ns!(), local_name!("content")),
-                    value: format_tendril!("{}", csp_content),
-                },
-            ],
-            Default::default(),
-        );
-        // Note: the CSP meta-tag has to be prepended, never appended,
-        //       since there already may be one defined in the document,
-        //       and browsers don't allow re-defining them (for obvious reasons)
-        head.children.borrow_mut().reverse();
-        head.children.borrow_mut().push(meta.clone());
-        head.children.borrow_mut().reverse();
+        if let Some(html) = get_child_node_by_name(&doc, "html") {
+            if let Some(head) = get_child_node_by_name(&html, "head") {
+                let meta = dom.create_element(
+                    QualName::new(None, ns!(), local_name!("meta")),
+                    vec![
+                        Attribute {
+                            name: QualName::new(None, ns!(), local_name!("http-equiv")),
+                            value: format_tendril!("Content-Security-Policy"),
+                        },
+                        Attribute {
+                            name: QualName::new(None, ns!(), local_name!("content")),
+                            value: format_tendril!("{}", compose_csp(options)),
+                        },
+                    ],
+                    Default::default(),
+                );
+                // Note: the CSP meta-tag has to be prepended, never appended,
+                //       since there already may be one defined in the original document,
+                //       and browsers don't allow re-defining them (for obvious reasons)
+                head.children.borrow_mut().reverse();
+                head.children.borrow_mut().push(meta.clone());
+                head.children.borrow_mut().reverse();
+            }
+        }
 
         serialize(&mut buf, &doc, SerializeOpts::default())
-            .expect("unable to serialize DOM into buffer");
+            .expect("Unable to serialize DOM into buffer");
         result = String::from_utf8(buf).unwrap();
     }
 
@@ -549,7 +591,7 @@ pub fn walk_and_embed_assets(
                                     )) => {
                                         // Check integrity
                                         if integrity.is_empty()
-                                            || has_proper_integrity(&link_href_data, &integrity)
+                                            || check_integrity(&link_href_data, &integrity)
                                         {
                                             let link_href_data_url = data_to_data_url(
                                                 &link_href_media_type,
@@ -622,7 +664,7 @@ pub fn walk_and_embed_assets(
                                     )) => {
                                         // Check integrity
                                         if integrity.is_empty()
-                                            || has_proper_integrity(&link_href_data, &integrity)
+                                            || check_integrity(&link_href_data, &integrity)
                                         {
                                             let css: String = embed_css(
                                                 cache,
@@ -690,7 +732,7 @@ pub fn walk_and_embed_assets(
                 }
                 "base" => {
                     if is_http_url(url) {
-                        // Ensure BASE href is a full URL, not a relative one
+                        // Ensure the BASE node doesn't have a relative URL
                         for attr in attrs_mut.iter_mut() {
                             let attr_name: &str = &attr.name.local;
                             if attr_name.eq_ignore_ascii_case("href") {
@@ -858,80 +900,77 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "input" => {
-                    // Determine input type
-                    let mut is_image_input: bool = false;
-                    for attr in attrs_mut.iter_mut() {
-                        let attr_name: &str = &attr.name.local;
-                        if attr_name.eq_ignore_ascii_case("type") {
-                            is_image_input = attr.value.to_string().eq_ignore_ascii_case("image");
-                        }
-                    }
-
-                    if is_image_input {
-                        let mut input_image_src: String = str!();
-                        let mut i = 0;
-                        while i < attrs_mut.len() {
-                            let attr_name: &str = &attrs_mut[i].name.local;
-                            if attr_name.eq_ignore_ascii_case("src") {
-                                input_image_src = str!(attrs_mut.remove(i).value.trim());
-                            } else {
-                                i += 1;
-                            }
-                        }
-
-                        if options.no_images || input_image_src.is_empty() {
-                            attrs_mut.push(Attribute {
-                                name: QualName::new(None, ns!(), local_name!("src")),
-                                value: Tendril::from_slice(if input_image_src.is_empty() {
-                                    ""
+                    if let Some(attr_value) = get_node_attr(node, "type") {
+                        if attr_value.to_string().eq_ignore_ascii_case("image") {
+                            let mut input_image_src: String = str!();
+                            let mut i = 0;
+                            while i < attrs_mut.len() {
+                                let attr_name: &str = &attrs_mut[i].name.local;
+                                if attr_name.eq_ignore_ascii_case("src") {
+                                    input_image_src = str!(attrs_mut.remove(i).value.trim());
                                 } else {
-                                    empty_image!()
-                                }),
-                            });
-                        } else {
-                            let input_image_full_url =
-                                resolve_url(&url, input_image_src).unwrap_or_default();
-                            let input_image_url_fragment =
-                                get_url_fragment(input_image_full_url.clone());
-                            match retrieve_asset(
-                                cache,
-                                client,
-                                &url,
-                                &input_image_full_url,
-                                options,
-                                depth + 1,
-                            ) {
-                                Ok((
-                                    input_image_data,
-                                    input_image_final_url,
-                                    input_image_media_type,
-                                )) => {
-                                    let input_image_data_url = data_to_data_url(
-                                        &input_image_media_type,
-                                        &input_image_data,
-                                        &input_image_final_url,
-                                    );
-                                    // Add data URL src attribute
-                                    let assembled_url: String = url_with_fragment(
-                                        input_image_data_url.as_str(),
-                                        input_image_url_fragment.as_str(),
-                                    );
-                                    attrs_mut.push(Attribute {
-                                        name: QualName::new(None, ns!(), local_name!("src")),
-                                        value: Tendril::from_slice(assembled_url.as_ref()),
-                                    });
+                                    i += 1;
                                 }
-                                Err(_) => {
-                                    // Keep remote reference if unable to retrieve the asset
-                                    if is_http_url(input_image_full_url.clone()) {
+                            }
+
+                            if options.no_images || input_image_src.is_empty() {
+                                attrs_mut.push(Attribute {
+                                    name: QualName::new(None, ns!(), local_name!("src")),
+                                    value: Tendril::from_slice(if input_image_src.is_empty() {
+                                        ""
+                                    } else {
+                                        empty_image!()
+                                    }),
+                                });
+                            } else {
+                                let input_image_full_url =
+                                    resolve_url(&url, input_image_src).unwrap_or_default();
+                                let input_image_url_fragment =
+                                    get_url_fragment(input_image_full_url.clone());
+                                match retrieve_asset(
+                                    cache,
+                                    client,
+                                    &url,
+                                    &input_image_full_url,
+                                    options,
+                                    depth + 1,
+                                ) {
+                                    Ok((
+                                        input_image_data,
+                                        input_image_final_url,
+                                        input_image_media_type,
+                                    )) => {
+                                        let input_image_data_url = data_to_data_url(
+                                            &input_image_media_type,
+                                            &input_image_data,
+                                            &input_image_final_url,
+                                        );
+                                        // Add data URL src attribute
                                         let assembled_url: String = url_with_fragment(
-                                            input_image_full_url.as_str(),
+                                            input_image_data_url.as_str(),
                                             input_image_url_fragment.as_str(),
                                         );
                                         attrs_mut.push(Attribute {
                                             name: QualName::new(None, ns!(), local_name!("src")),
                                             value: Tendril::from_slice(assembled_url.as_ref()),
                                         });
+                                    }
+                                    Err(_) => {
+                                        // Keep remote reference if unable to retrieve the asset
+                                        if is_http_url(input_image_full_url.clone()) {
+                                            let assembled_url: String = url_with_fragment(
+                                                input_image_full_url.as_str(),
+                                                input_image_url_fragment.as_str(),
+                                            );
+                                            attrs_mut.push(Attribute {
+                                                name: QualName::new(
+                                                    None,
+                                                    ns!(),
+                                                    local_name!("src"),
+                                                ),
+                                                value: Tendril::from_slice(assembled_url.as_ref()),
+                                            });
+                                        }
                                     }
                                 }
                             }
@@ -1066,7 +1105,7 @@ pub fn walk_and_embed_assets(
                                 continue;
                             }
 
-                            // Don't touch email links or hrefs which begin with a hash sign
+                            // Don't touch email links or hrefs which begin with a hash
                             if attr_value.starts_with('#') || url_has_protocol(attr_value) {
                                 continue;
                             }
@@ -1109,7 +1148,7 @@ pub fn walk_and_embed_assets(
                             Ok((script_data, script_final_url, _script_media_type)) => {
                                 // Only embed if we're able to validate integrity
                                 if script_integrity.is_empty()
-                                    || has_proper_integrity(&script_data, &script_integrity)
+                                    || check_integrity(&script_data, &script_integrity)
                                 {
                                     let script_data_url = data_to_data_url(
                                         "application/javascript",
