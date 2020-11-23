@@ -54,9 +54,10 @@ The guide can be found [here](docs/containers.md)
 ---------------------------------------------------
 
 ## Options
- - `-c`: Ignore styles
- - `-f`: Exclude frames
- - `-F`: Omit web fonts
+ - `-c`: Exclude CSS
+ - `-e`: Ignore network errors
+ - `-f`: Omit frames
+ - `-F`: Exclude web fonts
  - `-i`: Remove images
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript

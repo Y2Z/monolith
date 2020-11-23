@@ -113,20 +113,15 @@ fn main() {
 
     // Retrieve target document
     if is_file_url(target_url) || is_http_url(target_url) {
-        match retrieve_asset(
-            &mut cache,
-            &client,
-            target_url,
-            target_url,
-            options.silent,
-            0,
-        ) {
+        match retrieve_asset(&mut cache, &client, target_url, target_url, &options, 0) {
             Ok((data, final_url, _media_type)) => {
                 base_url = final_url;
                 dom = html_to_dom(&String::from_utf8_lossy(&data));
             }
             Err(_) => {
-                eprintln!("Could not retrieve target document");
+                if !options.silent {
+                    eprintln!("Could not retrieve target document");
+                }
                 process::exit(1);
             }
         }
@@ -159,7 +154,7 @@ fn main() {
             &client,
             &base_url,
             &favicon_ico_url,
-            options.silent,
+            &options,
             0,
         ) {
             Ok((data, final_url, media_type)) => {

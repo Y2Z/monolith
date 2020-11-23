@@ -176,7 +176,7 @@ pub fn process_css<'a>(
                         client,
                         &parent_url,
                         &import_full_url,
-                        options.silent,
+                        options,
                         depth + 1,
                     ) {
                         Ok((import_contents, import_final_url, _import_media_type)) => {
@@ -227,7 +227,7 @@ pub fn process_css<'a>(
                                 client,
                                 &parent_url,
                                 &resolved_url,
-                                options.silent,
+                                options,
                                 depth + 1,
                             ) {
                                 Ok((data, final_url, media_type)) => {
@@ -315,14 +315,8 @@ pub fn process_css<'a>(
                 if is_import {
                     let full_url = resolve_url(&parent_url, value).unwrap_or_default();
                     let url_fragment = get_url_fragment(full_url.clone());
-                    match retrieve_asset(
-                        cache,
-                        client,
-                        &parent_url,
-                        &full_url,
-                        options.silent,
-                        depth + 1,
-                    ) {
+                    match retrieve_asset(cache, client, &parent_url, &full_url, options, depth + 1)
+                    {
                         Ok((css, final_url, _media_type)) => {
                             let data_url = data_to_data_url(
                                 "text/css",
@@ -361,7 +355,7 @@ pub fn process_css<'a>(
                             client,
                             &parent_url,
                             &full_url,
-                            options.silent,
+                            options,
                             depth + 1,
                         ) {
                             Ok((data, final_url, media_type)) => {

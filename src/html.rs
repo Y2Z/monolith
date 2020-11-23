@@ -148,7 +148,7 @@ pub fn embed_srcset(
                 client,
                 &parent_url,
                 &image_full_url,
-                options.silent,
+                options,
                 depth + 1,
             ) {
                 Ok((image_data, image_final_url, image_media_type)) => {
@@ -539,7 +539,7 @@ pub fn walk_and_embed_assets(
                                     client,
                                     &url,
                                     &link_href_full_url,
-                                    options.silent,
+                                    options,
                                     depth + 1,
                                 ) {
                                     Ok((
@@ -612,7 +612,7 @@ pub fn walk_and_embed_assets(
                                     client,
                                     &url,
                                     &link_href_full_url,
-                                    options.silent,
+                                    options,
                                     depth + 1,
                                 ) {
                                     Ok((
@@ -723,7 +723,7 @@ pub fn walk_and_embed_assets(
                             client,
                             &url,
                             &background_full_url,
-                            options.silent,
+                            options,
                             depth + 1,
                         ) {
                             Ok((background_data, background_final_url, background_media_type)) => {
@@ -807,7 +807,7 @@ pub fn walk_and_embed_assets(
                                 client,
                                 &url,
                                 &img_full_url,
-                                options.silent,
+                                options,
                                 depth + 1,
                             ) {
                                 Ok((img_data, img_final_url, img_media_type)) => {
@@ -898,7 +898,7 @@ pub fn walk_and_embed_assets(
                                 client,
                                 &url,
                                 &input_image_full_url,
-                                options.silent,
+                                options,
                                 depth + 1,
                             ) {
                                 Ok((
@@ -961,7 +961,7 @@ pub fn walk_and_embed_assets(
                             client,
                             &url,
                             &image_full_url,
-                            options.silent,
+                            options,
                             depth + 1,
                         ) {
                             Ok((image_data, image_final_url, image_media_type)) => {
@@ -1020,7 +1020,7 @@ pub fn walk_and_embed_assets(
                                         client,
                                         &url,
                                         &srcset_full_url,
-                                        options.silent,
+                                        options,
                                         depth + 1,
                                     ) {
                                         Ok((srcset_data, srcset_final_url, srcset_media_type)) => {
@@ -1103,7 +1103,7 @@ pub fn walk_and_embed_assets(
                             client,
                             &url,
                             &script_full_url,
-                            options.silent,
+                            options,
                             depth + 1,
                         ) {
                             Ok((script_data, script_final_url, _script_media_type)) => {
@@ -1196,7 +1196,7 @@ pub fn walk_and_embed_assets(
                                 client,
                                 &url,
                                 &frame_full_url,
-                                options.silent,
+                                options,
                                 depth + 1,
                             ) {
                                 Ok((frame_data, frame_final_url, frame_media_type)) => {
@@ -1269,7 +1269,7 @@ pub fn walk_and_embed_assets(
                                 client,
                                 &url,
                                 &video_poster_full_url,
-                                options.silent,
+                                options,
                                 depth + 1,
                             ) {
                                 Ok((

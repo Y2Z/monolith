@@ -1,4 +1,4 @@
-# 2. Network request timeout
+# 3. Network request timeout
 
 Date: 2020-02-15
 
