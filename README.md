@@ -83,6 +83,7 @@ Please open an issue if something is wrong, that helps make this project better.
  - `Monolith Chrome Extension`: https://github.com/rhysd/monolith-of-web
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
  - `Personal WayBack Machine`: https://github.com/popey/pwbm
+ - `Hako`: https://github.com/dmpop/hako
 
 ---------------------------------------------------
 
