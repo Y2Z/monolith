@@ -62,6 +62,7 @@ The guide can be found [here](docs/containers.md)
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
+ - `-M`: Don't add timestamp and URL information
  - `-o`: Write output to file
  - `-s`: Be quiet
  - `-t`: Adjust network request timeout
