@@ -70,7 +70,7 @@ The guide can be found [here](docs/containers.md)
 
 ---------------------------------------------------
 
-## HTTPS and HTTP proxies
+## Proxies
 Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
 
 ---------------------------------------------------
