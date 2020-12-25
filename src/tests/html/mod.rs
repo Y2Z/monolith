@@ -1,10 +1,13 @@
 mod add_favicon;
-mod csp;
+mod check_integrity;
+mod compose_csp;
+mod create_metadata_tag;
 mod embed_srcset;
+mod get_base_url;
+mod get_node_attr;
 mod get_node_name;
 mod has_favicon;
-mod has_proper_integrity;
 mod is_icon;
-mod metadata_tag;
+mod set_node_attr;
 mod stringify_document;
 mod walk_and_embed_assets;

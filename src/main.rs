@@ -9,12 +9,12 @@ use std::process;
 use std::time::Duration;
 
 use monolith::html::{
-    add_base_tag, add_favicon, has_base_tag, has_favicon, html_to_dom, metadata_tag,
+    add_favicon, create_metadata_tag, get_base_url, has_favicon, html_to_dom, set_base_url,
     stringify_document, walk_and_embed_assets,
 };
 use monolith::opts::Options;
 use monolith::url::{
-    data_to_data_url, data_url_to_data, is_data_url, is_file_url, is_http_url, resolve_url,
+    data_to_data_url, is_data_url, is_file_url, is_http_url, parse_data_url, resolve_url,
 };
 use monolith::utils::retrieve_asset;
 
@@ -52,7 +52,7 @@ fn main() {
     let options = Options::from_args();
     let original_target: &str = &options.target;
     let target_url: &str;
-    let base_url;
+    let mut base_url: String;
     let mut dom;
 
     // Pre-process the input
@@ -64,7 +64,9 @@ fn main() {
 
     // Determine exact target URL
     if target.clone().len() == 0 {
-        eprintln!("No target specified");
+        if !options.silent {
+            eprintln!("No target specified");
+        }
         process::exit(1);
     } else if is_http_url(target.clone()) || is_data_url(target.clone()) {
         target_url = target.as_str();
@@ -72,7 +74,9 @@ fn main() {
         target_url = target.as_str();
     } else if path.exists() {
         if !path.is_file() {
-            eprintln!("Local target is not a file: {}", original_target);
+            if !options.silent {
+                eprintln!("Local target is not a file: {}", original_target);
+            }
             process::exit(1);
         }
         target.insert_str(0, if cfg!(windows) { "file:///" } else { "file://" });
@@ -111,11 +115,16 @@ fn main() {
         .build()
         .expect("Failed to initialize HTTP client");
 
+    // At this stage we assume that the base URL is the same as the target URL
+    base_url = str!(target_url);
+
     // Retrieve target document
     if is_file_url(target_url) || is_http_url(target_url) {
         match retrieve_asset(&mut cache, &client, target_url, target_url, &options, 0) {
             Ok((data, final_url, _media_type)) => {
-                base_url = final_url;
+                if options.base_url.clone().unwrap_or(str!()).is_empty() {
+                    base_url = final_url
+                }
                 dom = html_to_dom(&String::from_utf8_lossy(&data));
             }
             Err(_) => {
@@ -126,23 +135,40 @@ fn main() {
             }
         }
     } else if is_data_url(target_url) {
-        let (media_type, data): (String, Vec<u8>) = data_url_to_data(target_url);
+        let (media_type, data): (String, Vec<u8>) = parse_data_url(target_url);
         if !media_type.eq_ignore_ascii_case("text/html") {
-            eprintln!("Unsupported data URL media type");
+            if !options.silent {
+                eprintln!("Unsupported data URL media type");
+            }
             process::exit(1);
         }
-        base_url = str!(target_url);
         dom = html_to_dom(&String::from_utf8_lossy(&data));
     } else {
         process::exit(1);
     }
 
+    // Use custom base URL if specified, read and use what's in the DOM otherwise
+    if !options.base_url.clone().unwrap_or(str!()).is_empty() {
+        if is_data_url(options.base_url.clone().unwrap()) {
+            if !options.silent {
+                eprintln!("Data URLs cannot be used as base URL");
+            }
+            process::exit(1);
+        } else {
+            base_url = options.base_url.clone().unwrap();
+        }
+    } else {
+        if let Some(existing_base_url) = get_base_url(&dom.document) {
+            base_url = resolve_url(target_url, existing_base_url).unwrap();
+        }
+    }
+
     // Embed remote assets
     walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options, 0);
 
-    // Take care of BASE tag
-    if is_http_url(base_url.clone()) && !has_base_tag(&dom.document) {
-        dom = add_base_tag(&dom.document, base_url.clone());
+    // Update or add new BASE tag to reroute network requests and hash-links in the final document
+    if let Some(new_base_url) = options.base_url.clone() {
+        dom = set_base_url(&dom.document, new_base_url);
     }
 
     // Request and embed /favicon.ico (unless it's already linked in the document)
@@ -172,7 +198,7 @@ fn main() {
 
     // Add metadata tag
     if !options.no_metadata {
-        let metadata_comment: String = metadata_tag(&base_url);
+        let metadata_comment: String = create_metadata_tag(&base_url);
         result.insert_str(0, &metadata_comment);
         if metadata_comment.len() > 0 {
             result.insert_str(metadata_comment.len(), "\n");

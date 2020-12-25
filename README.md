@@ -54,6 +54,7 @@ The guide can be found [here](docs/containers.md)
 ---------------------------------------------------
 
 ## Options
+ - `-b`: Use custom base URL
  - `-c`: Exclude CSS
  - `-e`: Ignore network errors
  - `-f`: Omit frames

@@ -2,20 +2,21 @@ use clap::{App, Arg};
 
 #[derive(Default)]
 pub struct Options {
-    pub target: String,
+    pub base_url: Option<String>,
     pub no_css: bool,
     pub ignore_errors: bool,
-    pub no_fonts: bool,
     pub no_frames: bool,
+    pub no_fonts: bool,
     pub no_images: bool,
+    pub isolate: bool,
     pub no_js: bool,
     pub insecure: bool,
-    pub isolate: bool,
+    pub no_metadata: bool,
     pub output: String,
     pub silent: bool,
     pub timeout: u64,
     pub user_agent: String,
-    pub no_metadata: bool,
+    pub target: String,
 }
 
 const ASCII: &str = " \
@@ -37,14 +38,8 @@ impl Options {
             .version(crate_version!())
             .author(crate_authors!("\n"))
             .about(format!("{}\n{}", ASCII, crate_description!()).as_str())
-            .arg(
-                Arg::with_name("target")
-                    .required(true)
-                    .takes_value(true)
-                    .index(1)
-                    .help("URL or file path"),
-            )
             // .args_from_usage("-a, --no-audio 'Removes audio sources'")
+            .args_from_usage("-b, --base-url=[http://localhost/] 'Use custom base URL'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
@@ -53,12 +48,19 @@ impl Options {
             .args_from_usage("-I, --isolate 'Cuts off document from the Internet'")
             .args_from_usage("-j, --no-js 'Removes JavaScript'")
             .args_from_usage("-k, --insecure 'Allows invalid X.509 (TLS) certificates'")
-            .args_from_usage("-M, --no-metadata 'Excludes metadata information from the document'")
+            .args_from_usage("-M, --no-metadata 'Excludes timestamp and source information'")
             .args_from_usage("-o, --output=[document.html] 'Write output to <file>'")
             .args_from_usage("-s, --silent 'Suppresses verbosity'")
             .args_from_usage("-t, --timeout=[60] 'Adjust network request timeout'")
             .args_from_usage("-u, --user-agent=[Firefox] 'Set custom User-Agent string'")
             // .args_from_usage("-v, --no-video 'Removes video sources'")
+            .arg(
+                Arg::with_name("target")
+                    .required(true)
+                    .takes_value(true)
+                    .index(1)
+                    .help("URL or file path"),
+            )
             .get_matches();
         let mut options: Options = Options::default();
 
@@ -67,6 +69,9 @@ impl Options {
             .value_of("target")
             .expect("please set target")
             .to_string();
+        if let Some(base_url) = app.value_of("base-url") {
+            options.base_url = Some(str!(base_url));
+        }
         options.no_css = app.is_present("no-css");
         options.ignore_errors = app.is_present("ignore-errors");
         options.no_frames = app.is_present("no-frames");

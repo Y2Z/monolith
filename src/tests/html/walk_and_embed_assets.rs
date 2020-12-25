@@ -319,8 +319,8 @@ mod passing {
             buf.iter().map(|&c| c as char).collect::<String>(),
             "<html>\
                 <head>\
-                    <meta>\
-                    <meta>\
+                    <meta http-equiv=\"disabled by monolith (Refresh)\" value=\"20\">\
+                    <meta http-equiv=\"disabled by monolith (Location)\" value=\"https://freebsd.org\">\
                 </head>\
                 <body></body>\
             </html>"

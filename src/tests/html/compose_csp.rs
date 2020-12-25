@@ -14,7 +14,7 @@ mod passing {
     fn isolated() {
         let mut options = Options::default();
         options.isolate = true;
-        let csp_content = html::csp(&options);
+        let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "default-src 'unsafe-inline' data:;");
     }
@@ -23,7 +23,7 @@ mod passing {
     fn no_css() {
         let mut options = Options::default();
         options.no_css = true;
-        let csp_content = html::csp(&options);
+        let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "style-src 'none';");
     }
@@ -32,7 +32,7 @@ mod passing {
     fn no_fonts() {
         let mut options = Options::default();
         options.no_fonts = true;
-        let csp_content = html::csp(&options);
+        let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "font-src 'none';");
     }
@@ -41,7 +41,7 @@ mod passing {
     fn no_frames() {
         let mut options = Options::default();
         options.no_frames = true;
-        let csp_content = html::csp(&options);
+        let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "frame-src 'none'; child-src 'none';");
     }
@@ -50,7 +50,7 @@ mod passing {
     fn no_js() {
         let mut options = Options::default();
         options.no_js = true;
-        let csp_content = html::csp(&options);
+        let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "script-src 'none';");
     }
@@ -59,7 +59,7 @@ mod passing {
     fn no_images() {
         let mut options = Options::default();
         options.no_images = true;
-        let csp_content = html::csp(&options);
+        let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "img-src data:;");
     }
@@ -73,7 +73,7 @@ mod passing {
         options.no_frames = true;
         options.no_js = true;
         options.no_images = true;
-        let csp_content = html::csp(&options);
+        let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "default-src 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;");
     }

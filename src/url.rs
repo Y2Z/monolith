@@ -33,45 +33,6 @@ pub fn data_to_data_url(media_type: &str, data: &[u8], url: &str) -> String {
     format!("data:{};base64,{}", media_type, base64::encode(data))
 }
 
-pub fn data_url_to_data<T: AsRef<str>>(url: T) -> (String, Vec<u8>) {
-    let parsed_url: Url = Url::parse(url.as_ref()).unwrap_or(Url::parse("data:,").unwrap());
-    let path: String = parsed_url.path().to_string();
-    let comma_loc: usize = path.find(',').unwrap_or(path.len());
-
-    let meta_data: String = path.chars().take(comma_loc).collect();
-    let raw_data: String = path.chars().skip(comma_loc + 1).collect();
-
-    let text: String = decode_url(raw_data);
-
-    let meta_data_items: Vec<&str> = meta_data.split(';').collect();
-    let mut media_type: String = str!();
-    let mut encoding: &str = "";
-
-    let mut i: i8 = 0;
-    for item in &meta_data_items {
-        if i == 0 {
-            media_type = str!(item);
-        } else {
-            if item.eq_ignore_ascii_case("base64")
-                || item.eq_ignore_ascii_case("utf8")
-                || item.eq_ignore_ascii_case("charset=UTF-8")
-            {
-                encoding = item;
-            }
-        }
-
-        i = i + 1;
-    }
-
-    let data: Vec<u8> = if encoding.eq_ignore_ascii_case("base64") {
-        base64::decode(&text).unwrap_or(vec![])
-    } else {
-        text.as_bytes().to_vec()
-    };
-
-    (media_type, data)
-}
-
 pub fn decode_url(input: String) -> String {
     let input: String = input.replace("+", "%2B");
 
@@ -136,6 +97,45 @@ pub fn is_http_url<T: AsRef<str>>(url: T) -> bool {
     Url::parse(url.as_ref())
         .and_then(|u| Ok(u.scheme() == "http" || u.scheme() == "https"))
         .unwrap_or(false)
+}
+
+pub fn parse_data_url<T: AsRef<str>>(url: T) -> (String, Vec<u8>) {
+    let parsed_url: Url = Url::parse(url.as_ref()).unwrap_or(Url::parse("data:,").unwrap());
+    let path: String = parsed_url.path().to_string();
+    let comma_loc: usize = path.find(',').unwrap_or(path.len());
+
+    let meta_data: String = path.chars().take(comma_loc).collect();
+    let raw_data: String = path.chars().skip(comma_loc + 1).collect();
+
+    let text: String = decode_url(raw_data);
+
+    let meta_data_items: Vec<&str> = meta_data.split(';').collect();
+    let mut media_type: String = str!();
+    let mut encoding: &str = "";
+
+    let mut i: i8 = 0;
+    for item in &meta_data_items {
+        if i == 0 {
+            media_type = str!(item);
+        } else {
+            if item.eq_ignore_ascii_case("base64")
+                || item.eq_ignore_ascii_case("utf8")
+                || item.eq_ignore_ascii_case("charset=UTF-8")
+            {
+                encoding = item;
+            }
+        }
+
+        i = i + 1;
+    }
+
+    let data: Vec<u8> = if encoding.eq_ignore_ascii_case("base64") {
+        base64::decode(&text).unwrap_or(vec![])
+    } else {
+        text.as_bytes().to_vec()
+    };
+
+    (media_type, data)
 }
 
 pub fn resolve_url<T: AsRef<str>, U: AsRef<str>>(from: T, to: U) -> Result<String, ParseError> {
