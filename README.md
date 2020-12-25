@@ -63,7 +63,7 @@ The guide can be found [here](docs/containers.md)
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
- - `-M`: Don’t add timestamp and source information
+ - `-M`: Don't add timestamp and URL information
  - `-o`: Write output to file
  - `-s`: Be quiet
  - `-t`: Adjust network request timeout
@@ -71,7 +71,7 @@ The guide can be found [here](docs/containers.md)
 
 ---------------------------------------------------
 
-## HTTPS and HTTP proxies
+## Proxies
 Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
 
 ---------------------------------------------------
@@ -85,6 +85,7 @@ Please open an issue if something is wrong, that helps make this project better.
  - `Monolith Chrome Extension`: https://github.com/rhysd/monolith-of-web
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
  - `Personal WayBack Machine`: https://github.com/popey/pwbm
+ - `Hako`: https://github.com/dmpop/hako
 
 ---------------------------------------------------
 
