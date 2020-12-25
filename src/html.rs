@@ -4,7 +4,7 @@ use html5ever::interface::QualName;
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
 use html5ever::serialize::{serialize, SerializeOpts};
-use html5ever::tendril::{format_tendril, Tendril, TendrilSink};
+use html5ever::tendril::{format_tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns, LocalName};
 use reqwest::blocking::Client;
@@ -493,39 +493,33 @@ pub fn walk_and_embed_assets(
             ref attrs,
             ..
         } => {
-            let attrs_mut = &mut attrs.borrow_mut();
-
             match name.local.as_ref() {
                 "meta" => {
-                    // Determine type
-                    let mut is_unwanted_meta: bool = false;
-                    for attr in attrs_mut.iter_mut() {
-                        let attr_name: &str = &attr.name.local;
-                        if attr_name.eq_ignore_ascii_case("http-equiv") {
-                            let value: String = attr.value.to_string();
-                            is_unwanted_meta = value.eq_ignore_ascii_case("refresh")
-                                || value.eq_ignore_ascii_case("location");
-                        }
-                    }
-
-                    if is_unwanted_meta {
-                        // Strip this node off all its attributes
-                        while attrs_mut.len() > 0 {
-                            attrs_mut.remove(0);
+                    // Remove http-equiv attributes from META nodes if they're able to control the page
+                    if let Some(meta_attr_http_equiv_value) = get_node_attr(node, "http-equiv") {
+                        let meta_attr_http_equiv_value: &str = &meta_attr_http_equiv_value;
+                        if meta_attr_http_equiv_value.eq_ignore_ascii_case("refresh")
+                            || meta_attr_http_equiv_value.eq_ignore_ascii_case("location")
+                        {
+                            set_node_attr(
+                                &node,
+                                "http-equiv",
+                                Some(format!(
+                                    "disabled by monolith ({})",
+                                    meta_attr_http_equiv_value
+                                )),
+                            );
                         }
                     }
                 }
                 "link" => {
-                    // Remove integrity attributes, keep value of the last one
-                    let mut integrity: String = str!();
-                    let mut i = 0;
-                    while i < attrs_mut.len() {
-                        let attr_name: &str = &attrs_mut[i].name.local;
-                        if attr_name.eq_ignore_ascii_case("integrity") {
-                            integrity = str!(attrs_mut.remove(i).value.trim());
-                        } else {
-                            i += 1;
-                        }
+                    // Read and remember integrity attribute value of this LINK node
+                    let link_attr_integrity_value: Option<String> =
+                        get_node_attr(node, "integrity");
+
+                    // Remove integrity attribute from the LINK node
+                    if link_attr_integrity_value != None {
+                        set_node_attr(node, "integrity", None);
                     }
 
                     enum LinkType {
@@ -537,195 +531,167 @@ pub fn walk_and_embed_assets(
                     }
 
                     let mut link_type = LinkType::Unknown;
-                    for attr in attrs_mut.iter_mut() {
-                        if &attr.name.local == "rel" {
-                            let value = attr.value.trim();
-                            if is_icon(value) {
-                                link_type = LinkType::Icon;
-                                break;
-                            } else if value.eq_ignore_ascii_case("stylesheet") {
-                                link_type = LinkType::Stylesheet;
-                                break;
-                            } else if value.eq_ignore_ascii_case("preload") {
-                                link_type = LinkType::Preload;
-                                break;
-                            } else if value.eq_ignore_ascii_case("dns-prefetch") {
-                                link_type = LinkType::DnsPrefetch;
-                                break;
-                            }
+                    if let Some(link_attr_rel_value) = get_node_attr(node, "rel") {
+                        if is_icon(&link_attr_rel_value) {
+                            link_type = LinkType::Icon;
+                        } else if link_attr_rel_value.eq_ignore_ascii_case("stylesheet") {
+                            link_type = LinkType::Stylesheet;
+                        } else if link_attr_rel_value.eq_ignore_ascii_case("preload") {
+                            link_type = LinkType::Preload;
+                        } else if link_attr_rel_value.eq_ignore_ascii_case("dns-prefetch") {
+                            link_type = LinkType::DnsPrefetch;
                         }
                     }
+                    // Shadow the variable (to make it non-mutable)
                     let link_type = link_type;
 
                     match link_type {
                         LinkType::Icon => {
-                            // Find and remove href attribute(s), keep value of the last found one
-                            let mut link_href: String = str!();
-                            let mut i = 0;
-                            while i < attrs_mut.len() {
-                                let attr_name: &str = &attrs_mut[i].name.local;
-                                if attr_name.eq_ignore_ascii_case("href") {
-                                    link_href = str!(attrs_mut.remove(i).value.trim());
-                                } else {
-                                    i += 1;
-                                }
-                            }
+                            // Find and resolve this LINK node's href attribute
+                            if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                                if !options.no_images && !link_attr_href_value.is_empty() {
+                                    let link_href_full_url =
+                                        resolve_url(&url, link_attr_href_value).unwrap_or_default();
+                                    let link_href_url_fragment =
+                                        get_url_fragment(link_href_full_url.clone());
+                                    match retrieve_asset(
+                                        cache,
+                                        client,
+                                        &url,
+                                        &link_href_full_url,
+                                        options,
+                                        depth + 1,
+                                    ) {
+                                        Ok((
+                                            link_href_data,
+                                            link_href_final_url,
+                                            link_href_media_type,
+                                        )) => {
+                                            let mut ok_to_include = true;
 
-                            if !options.no_images && !link_href.is_empty() {
-                                let link_href_full_url =
-                                    resolve_url(&url, link_href).unwrap_or_default();
-                                let link_href_url_fragment =
-                                    get_url_fragment(link_href_full_url.clone());
-                                match retrieve_asset(
-                                    cache,
-                                    client,
-                                    &url,
-                                    &link_href_full_url,
-                                    options,
-                                    depth + 1,
-                                ) {
-                                    Ok((
-                                        link_href_data,
-                                        link_href_final_url,
-                                        link_href_media_type,
-                                    )) => {
-                                        // Check integrity
-                                        if integrity.is_empty()
-                                            || check_integrity(&link_href_data, &integrity)
-                                        {
-                                            let link_href_data_url = data_to_data_url(
-                                                &link_href_media_type,
-                                                &link_href_data,
-                                                &link_href_final_url,
-                                            );
-                                            // Add new data URL href attribute
-                                            let assembled_url: String = url_with_fragment(
-                                                link_href_data_url.as_str(),
-                                                link_href_url_fragment.as_str(),
-                                            );
-                                            attrs_mut.push(Attribute {
-                                                name: QualName::new(
-                                                    None,
-                                                    ns!(),
-                                                    local_name!("href"),
-                                                ),
-                                                value: Tendril::from_slice(assembled_url.as_ref()),
-                                            });
+                                            // Check integrity
+                                            if let Some(link_attr_integrity_value) =
+                                                link_attr_integrity_value
+                                            {
+                                                if !link_attr_integrity_value.is_empty() {
+                                                    ok_to_include = check_integrity(
+                                                        &link_href_data,
+                                                        &link_attr_integrity_value,
+                                                    );
+                                                }
+                                            }
+
+                                            if ok_to_include {
+                                                let link_href_data_url = data_to_data_url(
+                                                    &link_href_media_type,
+                                                    &link_href_data,
+                                                    &link_href_final_url,
+                                                );
+                                                // Add new data URL href attribute
+                                                let assembled_url: String = url_with_fragment(
+                                                    link_href_data_url.as_str(),
+                                                    link_href_url_fragment.as_str(),
+                                                );
+                                                set_node_attr(&node, "href", Some(assembled_url));
+                                            }
+                                        }
+                                        Err(_) => {
+                                            // Keep remote reference if unable to retrieve the asset
+                                            if is_http_url(link_href_full_url.clone()) {
+                                                let assembled_url: String = url_with_fragment(
+                                                    link_href_full_url.as_str(),
+                                                    link_href_url_fragment.as_str(),
+                                                );
+                                                set_node_attr(node, "href", Some(assembled_url));
+                                            }
                                         }
                                     }
-                                    Err(_) => {
-                                        // Keep remote reference if unable to retrieve the asset
-                                        if is_http_url(link_href_full_url.clone()) {
-                                            let assembled_url: String = url_with_fragment(
-                                                link_href_full_url.as_str(),
-                                                link_href_url_fragment.as_str(),
-                                            );
-                                            attrs_mut.push(Attribute {
-                                                name: QualName::new(
-                                                    None,
-                                                    ns!(),
-                                                    local_name!("href"),
-                                                ),
-                                                value: Tendril::from_slice(assembled_url.as_ref()),
-                                            });
-                                        }
-                                    }
+                                } else {
+                                    set_node_attr(node, "href", None);
                                 }
                             }
                         }
                         LinkType::Stylesheet => {
-                            // Find and remove href attribute(s), keep value of the last found one
-                            let mut link_href: String = str!();
-                            let mut i = 0;
-                            while i < attrs_mut.len() {
-                                let attr_name: &str = &attrs_mut[i].name.local;
-                                if attr_name.eq_ignore_ascii_case("href") {
-                                    link_href = str!(attrs_mut.remove(i).value.trim());
-                                } else {
-                                    i += 1;
-                                }
-                            }
+                            // Find and resolve this LINK node's href attribute
+                            if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                                set_node_attr(node, "href", None);
 
-                            if !options.no_css && !link_href.is_empty() {
-                                let link_href_full_url =
-                                    resolve_url(&url, link_href).unwrap_or_default();
-                                match retrieve_asset(
-                                    cache,
-                                    client,
-                                    &url,
-                                    &link_href_full_url,
-                                    options,
-                                    depth + 1,
-                                ) {
-                                    Ok((
-                                        link_href_data,
-                                        link_href_final_url,
-                                        _link_href_media_type,
-                                    )) => {
-                                        // Check integrity
-                                        if integrity.is_empty()
-                                            || check_integrity(&link_href_data, &integrity)
-                                        {
-                                            let css: String = embed_css(
-                                                cache,
-                                                client,
-                                                &link_href_final_url,
-                                                &String::from_utf8_lossy(&link_href_data),
-                                                options,
-                                                depth + 1,
-                                            );
-                                            let link_href_data_url = data_to_data_url(
-                                                "text/css",
-                                                css.as_bytes(),
-                                                &link_href_final_url,
-                                            );
-                                            // Add new data URL href attribute
-                                            attrs_mut.push(Attribute {
-                                                name: QualName::new(
-                                                    None,
-                                                    ns!(),
-                                                    local_name!("href"),
-                                                ),
-                                                value: Tendril::from_slice(
-                                                    link_href_data_url.as_ref(),
-                                                ),
-                                            });
+                                if !options.no_css && !link_attr_href_value.is_empty() {
+                                    let link_href_full_url =
+                                        resolve_url(&url, link_attr_href_value).unwrap_or_default();
+                                    match retrieve_asset(
+                                        cache,
+                                        client,
+                                        &url,
+                                        &link_href_full_url,
+                                        options,
+                                        depth + 1,
+                                    ) {
+                                        Ok((
+                                            link_href_data,
+                                            link_href_final_url,
+                                            _link_href_media_type,
+                                        )) => {
+                                            let mut ok_to_include = true;
+
+                                            // Check integrity
+                                            if let Some(link_attr_integrity_value) =
+                                                link_attr_integrity_value
+                                            {
+                                                if !link_attr_integrity_value.is_empty() {
+                                                    ok_to_include = check_integrity(
+                                                        &link_href_data,
+                                                        &link_attr_integrity_value,
+                                                    );
+                                                }
+                                            }
+
+                                            if ok_to_include {
+                                                let css: String = embed_css(
+                                                    cache,
+                                                    client,
+                                                    &link_href_final_url,
+                                                    &String::from_utf8_lossy(&link_href_data),
+                                                    options,
+                                                    depth + 1,
+                                                );
+                                                let link_href_data_url = data_to_data_url(
+                                                    "text/css",
+                                                    css.as_bytes(),
+                                                    &link_href_final_url,
+                                                );
+                                                // Add new data URL href attribute
+                                                set_node_attr(
+                                                    &node,
+                                                    "href",
+                                                    Some(link_href_data_url),
+                                                );
+                                            }
                                         }
-                                    }
-                                    Err(_) => {
-                                        // Keep remote reference if unable to retrieve the asset
-                                        if is_http_url(link_href_full_url.clone()) {
-                                            attrs_mut.push(Attribute {
-                                                name: QualName::new(
-                                                    None,
-                                                    ns!(),
-                                                    local_name!("href"),
-                                                ),
-                                                value: Tendril::from_slice(
-                                                    link_href_full_url.as_ref(),
-                                                ),
-                                            });
+                                        Err(_) => {
+                                            // Keep remote reference if unable to retrieve the asset
+                                            if is_http_url(link_href_full_url.clone()) {
+                                                set_node_attr(
+                                                    &node,
+                                                    "href",
+                                                    Some(link_href_full_url),
+                                                );
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                         LinkType::Preload | LinkType::DnsPrefetch => {
-                            // Since all resources are embedded as data URL, preloading and prefetching are unnecessary
-                            for _ in 0..attrs_mut.len() {
-                                attrs_mut.remove(0);
-                            }
+                            // Since all resources are embedded as data URLs, preloading and prefetching are not necessary
+                            set_node_attr(node, "rel", None);
                         }
                         LinkType::Unknown => {
                             // Make sure that all other LINKs' href attributes are full URLs
-                            for attr in attrs_mut.iter_mut() {
-                                let attr_name: &str = &attr.name.local;
-                                if attr_name.eq_ignore_ascii_case("href") {
-                                    let href_full_url =
-                                        resolve_url(&url, attr.value.trim()).unwrap_or_default();
-                                    attr.value.clear();
-                                    attr.value.push_slice(&href_full_url.as_str());
-                                }
+                            if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                                let href_full_url =
+                                    resolve_url(&url, link_attr_href_value).unwrap_or_default();
+                                set_node_attr(node, "href", Some(href_full_url));
                             }
                         }
                     }
@@ -733,68 +699,58 @@ pub fn walk_and_embed_assets(
                 "base" => {
                     if is_http_url(url) {
                         // Ensure the BASE node doesn't have a relative URL
-                        for attr in attrs_mut.iter_mut() {
-                            let attr_name: &str = &attr.name.local;
-                            if attr_name.eq_ignore_ascii_case("href") {
-                                let href_full_url =
-                                    resolve_url(&url, attr.value.trim()).unwrap_or_default();
-                                attr.value.clear();
-                                attr.value.push_slice(&href_full_url.as_str());
-                            }
+                        if let Some(base_attr_href_value) = get_node_attr(node, "href") {
+                            let href_full_url =
+                                resolve_url(&url, base_attr_href_value).unwrap_or_default();
+                            set_node_attr(node, "href", Some(href_full_url));
                         }
                     }
                 }
                 "body" => {
-                    // Find and remove background attribute(s), keep value of the last found one
-                    let mut background: String = str!();
-                    let mut i = 0;
-                    while i < attrs_mut.len() {
-                        let attr_name: &str = &attrs_mut[i].name.local;
-                        if attr_name.eq_ignore_ascii_case("background") {
-                            background = str!(attrs_mut.remove(i).value.trim());
-                        } else {
-                            i += 1;
-                        }
-                    }
+                    // Read and remember background attribute value of this BODY node
+                    if let Some(body_attr_background_value) = get_node_attr(node, "background") {
+                        // Remove background BODY node attribute by default
+                        set_node_attr(node, "background", None);
 
-                    if !options.no_images && !background.is_empty() {
-                        let background_full_url = resolve_url(&url, background).unwrap_or_default();
-                        let background_url_fragment = get_url_fragment(background_full_url.clone());
-                        match retrieve_asset(
-                            cache,
-                            client,
-                            &url,
-                            &background_full_url,
-                            options,
-                            depth + 1,
-                        ) {
-                            Ok((background_data, background_final_url, background_media_type)) => {
-                                let background_data_url = data_to_data_url(
-                                    &background_media_type,
-                                    &background_data,
-                                    &background_final_url,
-                                );
-                                // Add new data URL background attribute
-                                let assembled_url: String = url_with_fragment(
-                                    background_data_url.as_str(),
-                                    background_url_fragment.as_str(),
-                                );
-                                attrs_mut.push(Attribute {
-                                    name: QualName::new(None, ns!(), local_name!("background")),
-                                    value: Tendril::from_slice(assembled_url.as_ref()),
-                                });
-                            }
-                            Err(_) => {
-                                // Keep remote reference if unable to retrieve the asset
-                                if is_http_url(background_full_url.clone()) {
+                        if !options.no_images && !body_attr_background_value.is_empty() {
+                            let background_full_url =
+                                resolve_url(&url, body_attr_background_value).unwrap_or_default();
+                            let background_url_fragment =
+                                get_url_fragment(background_full_url.clone());
+                            match retrieve_asset(
+                                cache,
+                                client,
+                                &url,
+                                &background_full_url,
+                                options,
+                                depth + 1,
+                            ) {
+                                Ok((
+                                    background_data,
+                                    background_final_url,
+                                    background_media_type,
+                                )) => {
+                                    let background_data_url = data_to_data_url(
+                                        &background_media_type,
+                                        &background_data,
+                                        &background_final_url,
+                                    );
+                                    // Convert background attribute to data URL
                                     let assembled_url: String = url_with_fragment(
-                                        background_full_url.as_str(),
+                                        background_data_url.as_str(),
                                         background_url_fragment.as_str(),
                                     );
-                                    attrs_mut.push(Attribute {
-                                        name: QualName::new(None, ns!(), local_name!("background")),
-                                        value: Tendril::from_slice(assembled_url.as_ref()),
-                                    });
+                                    set_node_attr(node, "background", Some(assembled_url));
+                                }
+                                Err(_) => {
+                                    // Keep remote reference if unable to retrieve the asset
+                                    if is_http_url(background_full_url.clone()) {
+                                        let assembled_url: String = url_with_fragment(
+                                            background_full_url.as_str(),
+                                            background_url_fragment.as_str(),
+                                        );
+                                        set_node_attr(node, "background", Some(assembled_url));
+                                    }
                                 }
                             }
                         }
@@ -802,48 +758,43 @@ pub fn walk_and_embed_assets(
                 }
                 "img" => {
                     // Find source attribute(s)
-                    let mut img_data_src: String = str!();
-                    let mut img_src: String = str!();
-                    let mut img_srcset: String = str!();
-                    let mut i = 0;
-                    while i < attrs_mut.len() {
-                        let attr_name: &str = &attrs_mut[i].name.local;
-                        if attr_name.eq_ignore_ascii_case("data-src") {
-                            img_data_src = str!(attrs_mut.remove(i).value.trim());
-                        } else if attr_name.eq_ignore_ascii_case("src") {
-                            img_src = str!(attrs_mut.remove(i).value.trim());
-                        } else if attr_name.eq_ignore_ascii_case("srcset") {
-                            img_srcset = str!(attrs_mut.remove(i).value.trim());
-                        } else {
-                            i += 1;
-                        }
-                    }
+                    let img_attr_src_value: Option<String> = get_node_attr(node, "src");
+                    let img_attr_data_src_value: Option<String> = get_node_attr(node, "data-src");
 
                     if options.no_images {
-                        // Add empty image src attribute
-                        attrs_mut.push(Attribute {
-                            name: QualName::new(None, ns!(), local_name!("src")),
-                            value: Tendril::from_slice(empty_image!()),
-                        });
+                        // Put empty images into src and data-src attributes
+                        if img_attr_src_value != None {
+                            set_node_attr(node, "src", Some(str!(empty_image!())));
+                        }
+                        if img_attr_data_src_value != None {
+                            set_node_attr(node, "data-src", Some(str!(empty_image!())));
+                        }
                     } else {
-                        if img_src.is_empty() && img_data_src.is_empty() {
+                        if img_attr_src_value.clone().unwrap_or_default().is_empty()
+                            && img_attr_data_src_value
+                                .clone()
+                                .unwrap_or_default()
+                                .is_empty()
+                        {
                             // Add empty src attribute
-                            attrs_mut.push(Attribute {
-                                name: QualName::new(None, ns!(), local_name!("src")),
-                                value: Tendril::from_slice(""),
-                            });
+                            set_node_attr(node, "src", Some(str!()));
                         } else {
                             // Add data URL src attribute
                             let img_full_url = resolve_url(
                                 &url,
-                                if !img_data_src.is_empty() {
-                                    img_data_src
+                                if !img_attr_data_src_value
+                                    .clone()
+                                    .unwrap_or_default()
+                                    .is_empty()
+                                {
+                                    img_attr_data_src_value.unwrap_or_default()
                                 } else {
-                                    img_src
+                                    img_attr_src_value.unwrap_or_default()
                                 },
                             )
                             .unwrap_or_default();
                             let img_url_fragment = get_url_fragment(img_full_url.clone());
+
                             match retrieve_asset(
                                 cache,
                                 client,
@@ -862,36 +813,32 @@ pub fn walk_and_embed_assets(
                                         img_data_url.as_str(),
                                         img_url_fragment.as_str(),
                                     );
-                                    attrs_mut.push(Attribute {
-                                        name: QualName::new(None, ns!(), local_name!("src")),
-                                        value: Tendril::from_slice(assembled_url.as_ref()),
-                                    });
+                                    set_node_attr(node, "src", Some(assembled_url));
                                 }
                                 Err(_) => {
-                                    // Keep remote reference if unable to retrieve the asset
                                     if is_http_url(img_full_url.clone()) {
+                                        // Keep remote reference if unable to retrieve the asset
                                         let assembled_url: String = url_with_fragment(
                                             img_full_url.as_str(),
                                             img_url_fragment.as_str(),
                                         );
-                                        attrs_mut.push(Attribute {
-                                            name: QualName::new(None, ns!(), local_name!("src")),
-                                            value: Tendril::from_slice(assembled_url.as_ref()),
-                                        });
+                                        set_node_attr(node, "src", Some(assembled_url));
+                                    } else {
+                                        // Don't keep original reference if it's not a remote target
+                                        set_node_attr(node, "src", None);
                                     }
                                 }
                             }
                         }
                     }
 
-                    if !img_srcset.is_empty() {
-                        attrs_mut.push(Attribute {
-                            name: QualName::new(None, ns!(), local_name!("srcset")),
-                            value: Tendril::from_slice(
-                                embed_srcset(cache, client, &url, &img_srcset, options, depth)
-                                    .as_ref(),
-                            ),
-                        });
+                    // Resolve srcset attribute
+                    if let Some(img_srcset) = get_node_attr(node, "srcset") {
+                        if !img_srcset.is_empty() {
+                            let resolved_srcset: String =
+                                embed_srcset(cache, client, &url, &img_srcset, options, depth);
+                            set_node_attr(node, "srcset", Some(resolved_srcset));
+                        }
                     }
                 }
                 "svg" => {
@@ -900,76 +847,55 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "input" => {
-                    if let Some(attr_value) = get_node_attr(node, "type") {
-                        if attr_value.to_string().eq_ignore_ascii_case("image") {
-                            let mut input_image_src: String = str!();
-                            let mut i = 0;
-                            while i < attrs_mut.len() {
-                                let attr_name: &str = &attrs_mut[i].name.local;
-                                if attr_name.eq_ignore_ascii_case("src") {
-                                    input_image_src = str!(attrs_mut.remove(i).value.trim());
-                                } else {
-                                    i += 1;
-                                }
-                            }
-
-                            if options.no_images || input_image_src.is_empty() {
-                                attrs_mut.push(Attribute {
-                                    name: QualName::new(None, ns!(), local_name!("src")),
-                                    value: Tendril::from_slice(if input_image_src.is_empty() {
-                                        ""
+                    if let Some(input_attr_type_value) = get_node_attr(node, "type") {
+                        if input_attr_type_value.eq_ignore_ascii_case("image") {
+                            if let Some(input_attr_src_value) = get_node_attr(node, "src") {
+                                if options.no_images || input_attr_src_value.is_empty() {
+                                    let value = if input_attr_src_value.is_empty() {
+                                        str!()
                                     } else {
-                                        empty_image!()
-                                    }),
-                                });
-                            } else {
-                                let input_image_full_url =
-                                    resolve_url(&url, input_image_src).unwrap_or_default();
-                                let input_image_url_fragment =
-                                    get_url_fragment(input_image_full_url.clone());
-                                match retrieve_asset(
-                                    cache,
-                                    client,
-                                    &url,
-                                    &input_image_full_url,
-                                    options,
-                                    depth + 1,
-                                ) {
-                                    Ok((
-                                        input_image_data,
-                                        input_image_final_url,
-                                        input_image_media_type,
-                                    )) => {
-                                        let input_image_data_url = data_to_data_url(
-                                            &input_image_media_type,
-                                            &input_image_data,
-                                            &input_image_final_url,
-                                        );
-                                        // Add data URL src attribute
-                                        let assembled_url: String = url_with_fragment(
-                                            input_image_data_url.as_str(),
-                                            input_image_url_fragment.as_str(),
-                                        );
-                                        attrs_mut.push(Attribute {
-                                            name: QualName::new(None, ns!(), local_name!("src")),
-                                            value: Tendril::from_slice(assembled_url.as_ref()),
-                                        });
-                                    }
-                                    Err(_) => {
-                                        // Keep remote reference if unable to retrieve the asset
-                                        if is_http_url(input_image_full_url.clone()) {
+                                        str!(empty_image!())
+                                    };
+                                    set_node_attr(node, "src", Some(value));
+                                } else {
+                                    let input_image_full_url =
+                                        resolve_url(&url, input_attr_src_value).unwrap_or_default();
+                                    let input_image_url_fragment =
+                                        get_url_fragment(input_image_full_url.clone());
+                                    match retrieve_asset(
+                                        cache,
+                                        client,
+                                        &url,
+                                        &input_image_full_url,
+                                        options,
+                                        depth + 1,
+                                    ) {
+                                        Ok((
+                                            input_image_data,
+                                            input_image_final_url,
+                                            input_image_media_type,
+                                        )) => {
+                                            let input_image_data_url = data_to_data_url(
+                                                &input_image_media_type,
+                                                &input_image_data,
+                                                &input_image_final_url,
+                                            );
+                                            // Add data URL src attribute
                                             let assembled_url: String = url_with_fragment(
-                                                input_image_full_url.as_str(),
+                                                input_image_data_url.as_str(),
                                                 input_image_url_fragment.as_str(),
                                             );
-                                            attrs_mut.push(Attribute {
-                                                name: QualName::new(
-                                                    None,
-                                                    ns!(),
-                                                    local_name!("src"),
-                                                ),
-                                                value: Tendril::from_slice(assembled_url.as_ref()),
-                                            });
+                                            set_node_attr(node, "src", Some(assembled_url));
+                                        }
+                                        Err(_) => {
+                                            // Keep remote reference if unable to retrieve the asset
+                                            if is_http_url(input_image_full_url.clone()) {
+                                                let assembled_url: String = url_with_fragment(
+                                                    input_image_full_url.as_str(),
+                                                    input_image_url_fragment.as_str(),
+                                                );
+                                                set_node_attr(node, "src", Some(assembled_url));
+                                            }
                                         }
                                     }
                                 }
@@ -978,17 +904,18 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "image" => {
-                    // Find and remove (xlink:)href attribute(s), keep value of the last one
                     let mut image_href: String = str!();
-                    let mut i = 0;
-                    while i < attrs_mut.len() {
-                        let attr_name: &str = &attrs_mut[i].name.local;
-                        if attr_name.eq_ignore_ascii_case("xlink:href")
-                            || attr_name.eq_ignore_ascii_case("href")
-                        {
-                            image_href = str!(attrs_mut.remove(i).value.trim());
-                        } else {
-                            i += 1;
+
+                    if let Some(image_attr_href_value) = get_node_attr(node, "href") {
+                        image_href = image_attr_href_value;
+                        if options.no_images {
+                            set_node_attr(node, "href", None);
+                        }
+                    }
+                    if let Some(image_attr_xlink_href_value) = get_node_attr(node, "xlink:href") {
+                        image_href = image_attr_xlink_href_value;
+                        if options.no_images {
+                            set_node_attr(node, "xlink:href", None);
                         }
                     }
 
@@ -1014,10 +941,7 @@ pub fn walk_and_embed_assets(
                                     image_data_url.as_str(),
                                     image_url_fragment.as_str(),
                                 );
-                                attrs_mut.push(Attribute {
-                                    name: QualName::new(None, ns!(), local_name!("href")),
-                                    value: Tendril::from_slice(assembled_url.as_ref()),
-                                });
+                                set_node_attr(node, "href", Some(assembled_url));
                             }
                             Err(_) => {
                                 // Keep remote reference if unable to retrieve the asset
@@ -1026,65 +950,55 @@ pub fn walk_and_embed_assets(
                                         image_full_url.as_str(),
                                         image_url_fragment.as_str(),
                                     );
-                                    attrs_mut.push(Attribute {
-                                        name: QualName::new(None, ns!(), local_name!("href")),
-                                        value: Tendril::from_slice(assembled_url.as_ref()),
-                                    });
+                                    set_node_attr(node, "href", Some(assembled_url));
                                 }
                             }
                         }
                     }
                 }
                 "source" => {
-                    for attr in attrs_mut.iter_mut() {
-                        let attr_name: &str = &attr.name.local;
+                    if let Some(source_attr_src_value) = get_node_attr(node, "src") {
+                        let src_full_url: String = resolve_url(&url, source_attr_src_value.clone())
+                            .unwrap_or_else(|_| source_attr_src_value.to_string());
+                        set_node_attr(node, "src", Some(src_full_url));
+                    }
 
-                        if attr_name.eq_ignore_ascii_case("src") {
-                            let src_full_url = resolve_url(&url, attr.value.trim())
-                                .unwrap_or_else(|_| attr.value.to_string());
-                            attr.value.clear();
-                            attr.value.push_slice(src_full_url.as_str());
-                        } else if attr_name.eq_ignore_ascii_case("srcset") {
-                            if get_node_name(&get_parent_node(&node)) == Some("picture") {
-                                if options.no_images {
-                                    attr.value.clear();
-                                    attr.value.push_slice(empty_image!());
-                                } else {
-                                    let srcset_full_url =
-                                        resolve_url(&url, attr.value.trim()).unwrap_or_default();
-                                    let srcset_url_fragment =
-                                        get_url_fragment(srcset_full_url.clone());
-                                    match retrieve_asset(
-                                        cache,
-                                        client,
-                                        &url,
-                                        &srcset_full_url,
-                                        options,
-                                        depth + 1,
-                                    ) {
-                                        Ok((srcset_data, srcset_final_url, srcset_media_type)) => {
-                                            let srcset_data_url = data_to_data_url(
-                                                &srcset_media_type,
-                                                &srcset_data,
-                                                &srcset_final_url,
-                                            );
-                                            attr.value.clear();
+                    if let Some(source_attr_srcset_value) = get_node_attr(node, "srcset") {
+                        if get_node_name(&get_parent_node(&node)) == Some("picture") {
+                            if options.no_images {
+                                set_node_attr(node, "srcset", Some(str!(empty_image!())));
+                            } else {
+                                let srcset_full_url =
+                                    resolve_url(&url, source_attr_srcset_value).unwrap_or_default();
+                                let srcset_url_fragment = get_url_fragment(srcset_full_url.clone());
+                                match retrieve_asset(
+                                    cache,
+                                    client,
+                                    &url,
+                                    &srcset_full_url,
+                                    options,
+                                    depth + 1,
+                                ) {
+                                    Ok((srcset_data, srcset_final_url, srcset_media_type)) => {
+                                        let srcset_data_url = data_to_data_url(
+                                            &srcset_media_type,
+                                            &srcset_data,
+                                            &srcset_final_url,
+                                        );
+                                        let assembled_url: String = url_with_fragment(
+                                            srcset_data_url.as_str(),
+                                            srcset_url_fragment.as_str(),
+                                        );
+                                        set_node_attr(node, "srcset", Some(assembled_url));
+                                    }
+                                    Err(_) => {
+                                        // Keep remote reference if unable to retrieve the asset
+                                        if is_http_url(srcset_full_url.clone()) {
                                             let assembled_url: String = url_with_fragment(
-                                                srcset_data_url.as_str(),
+                                                srcset_full_url.as_str(),
                                                 srcset_url_fragment.as_str(),
                                             );
-                                            attr.value.push_slice(assembled_url.as_str());
-                                        }
-                                        Err(_) => {
-                                            // Keep remote reference if unable to retrieve the asset
-                                            if is_http_url(srcset_full_url.clone()) {
-                                                attr.value.clear();
-                                                let assembled_url: String = url_with_fragment(
-                                                    srcset_full_url.as_str(),
-                                                    srcset_url_fragment.as_str(),
-                                                );
-                                                attr.value.push_slice(assembled_url.as_str());
-                                            }
+                                            set_node_attr(node, "srcset", Some(assembled_url));
                                         }
                                     }
                                 }
@@ -1093,50 +1007,47 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "a" | "area" => {
-                    for attr in attrs_mut.iter_mut() {
-                        let attr_name: &str = &attr.name.local;
-                        if attr_name.eq_ignore_ascii_case("href") {
-                            let attr_value = attr.value.trim();
-
-                            if options.no_js && attr_value.trim().starts_with("javascript:") {
-                                attr.value.clear();
-                                // Replace with empty JS call to preserve original behavior
-                                attr.value.push_slice("javascript:;");
-                                continue;
-                            }
-
+                    if let Some(anchor_attr_href_value) = get_node_attr(node, "href") {
+                        if options.no_js
+                            && anchor_attr_href_value
+                                .clone()
+                                .trim()
+                                .starts_with("javascript:")
+                        {
+                            // Replace with empty JS call to preserve original behavior
+                            set_node_attr(node, "href", Some(str!("javascript:;")));
+                        } else if anchor_attr_href_value.clone().starts_with('#')
+                            || url_has_protocol(anchor_attr_href_value.clone())
+                        {
                             // Don't touch email links or hrefs which begin with a hash
-                            if attr_value.starts_with('#') || url_has_protocol(attr_value) {
-                                continue;
-                            }
-
-                            let href_full_url = resolve_url(&url, attr_value).unwrap_or_default();
-                            attr.value.clear();
-                            attr.value.push_slice(href_full_url.as_str());
+                        } else {
+                            let href_full_url =
+                                resolve_url(&url, anchor_attr_href_value).unwrap_or_default();
+                            set_node_attr(node, "href", Some(href_full_url));
                         }
                     }
                 }
                 "script" => {
-                    // Remove integrity and src attributes, keep values of the last ones
-                    let mut script_integrity: String = str!();
-                    let mut script_src: String = str!();
-                    let mut i = 0;
-                    while i < attrs_mut.len() {
-                        let attr_name: &str = &attrs_mut[i].name.local;
-                        if attr_name.eq_ignore_ascii_case("integrity") {
-                            script_integrity = str!(attrs_mut.remove(i).value.trim());
-                        } else if attr_name.eq_ignore_ascii_case("src") {
-                            script_src = str!(attrs_mut.remove(i).value.trim());
-                        } else {
-                            i += 1;
-                        }
+                    // Read values of integrity and src attributes
+                    let script_attr_integrity: Option<String> = get_node_attr(node, "integrity");
+                    let script_attr_src: Option<String> = get_node_attr(node, "src");
+
+                    // Wipe integrity attribute
+                    if script_attr_integrity != None {
+                        set_node_attr(node, "integrity", None);
                     }
 
                     if options.no_js {
-                        // Empty inner content (src is already gone)
+                        // Empty inner content
                         node.children.borrow_mut().clear();
-                    } else if !script_src.is_empty() {
-                        let script_full_url = resolve_url(&url, script_src).unwrap_or_default();
+                        // Remove src attribute
+                        if script_attr_src != None {
+                            set_node_attr(node, "src", None);
+                        }
+                    } else if !script_attr_src.clone().unwrap_or_default().is_empty() {
+                        let script_full_url =
+                            resolve_url(&url, script_attr_src.unwrap_or_default())
+                                .unwrap_or_default();
                         match retrieve_asset(
                             cache,
                             client,
@@ -1146,29 +1057,37 @@ pub fn walk_and_embed_assets(
                             depth + 1,
                         ) {
                             Ok((script_data, script_final_url, _script_media_type)) => {
-                                // Only embed if we're able to validate integrity
-                                if script_integrity.is_empty()
-                                    || check_integrity(&script_data, &script_integrity)
-                                {
+                                let mut ok_to_include = true;
+
+                                // Check integrity
+                                if let Some(script_attr_integrity_value) = script_attr_integrity {
+                                    if !script_attr_integrity_value.is_empty() {
+                                        ok_to_include = check_integrity(
+                                            &script_data,
+                                            &script_attr_integrity_value,
+                                        );
+                                    }
+                                }
+
+                                if ok_to_include {
+                                    // Only embed if we're able to validate integrity
                                     let script_data_url = data_to_data_url(
                                         "application/javascript",
                                         &script_data,
                                         &script_final_url,
                                     );
-                                    // Add new data URL src attribute
-                                    attrs_mut.push(Attribute {
-                                        name: QualName::new(None, ns!(), local_name!("src")),
-                                        value: Tendril::from_slice(script_data_url.as_ref()),
-                                    });
+                                    set_node_attr(node, "src", Some(script_data_url));
+                                } else {
+                                    set_node_attr(node, "src", None);
                                 }
                             }
                             Err(_) => {
-                                // Keep remote reference if unable to retrieve the asset
                                 if is_http_url(script_full_url.clone()) {
-                                    attrs_mut.push(Attribute {
-                                        name: QualName::new(None, ns!(), local_name!("src")),
-                                        value: Tendril::from_slice(script_full_url.as_ref()),
-                                    });
+                                    // Keep remote reference if unable to retrieve the asset
+                                    set_node_attr(node, "src", Some(script_full_url));
+                                } else {
+                                    // Remove src attribute if target is not remote
+                                    set_node_attr(node, "src", None);
                                 }
                             }
                         };
@@ -1197,86 +1116,74 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "form" => {
-                    for attr in attrs_mut.iter_mut() {
-                        let attr_name: &str = &attr.name.local;
-                        if attr_name.eq_ignore_ascii_case("action") {
-                            let form_action = attr.value.trim();
-                            // Modify action property to ensure it's a full URL
-                            if !is_http_url(form_action) {
-                                let form_action_full_url =
-                                    resolve_url(&url, form_action).unwrap_or_default();
-                                attr.value.clear();
-                                attr.value.push_slice(form_action_full_url.as_str());
-                            }
+                    if let Some(form_attr_action_value) = get_node_attr(node, "action") {
+                        // Modify action property to ensure it's a full URL
+                        if !is_http_url(form_attr_action_value.clone()) {
+                            let form_action_full_url =
+                                resolve_url(&url, form_attr_action_value).unwrap_or_default();
+                            set_node_attr(node, "action", Some(form_action_full_url));
                         }
                     }
                 }
                 "frame" | "iframe" => {
-                    for attr in attrs_mut.iter_mut() {
-                        let attr_name: &str = &attr.name.local;
-                        if attr_name.eq_ignore_ascii_case("src") {
-                            if options.no_frames {
-                                // Empty the src attribute
-                                attr.value.clear();
-                                continue;
-                            }
+                    if let Some(frame_attr_src_value) = get_node_attr(node, "src") {
+                        if options.no_frames {
+                            // Empty the src attribute
+                            set_node_attr(node, "src", Some(str!()));
+                        } else {
+                            let frame_src = frame_attr_src_value.trim();
 
-                            let frame_src = attr.value.trim();
-
-                            // Ignore (i)frames with empty source — they cause infinite loops
-                            if frame_src.is_empty() {
-                                continue;
-                            }
-
-                            let frame_full_url = resolve_url(&url, frame_src).unwrap_or_default();
-                            let frame_url_fragment = get_url_fragment(frame_full_url.clone());
-                            match retrieve_asset(
-                                cache,
-                                client,
-                                &url,
-                                &frame_full_url,
-                                options,
-                                depth + 1,
-                            ) {
-                                Ok((frame_data, frame_final_url, frame_media_type)) => {
-                                    let frame_dom =
-                                        html_to_dom(&String::from_utf8_lossy(&frame_data));
-                                    walk_and_embed_assets(
-                                        cache,
-                                        client,
-                                        &frame_final_url,
-                                        &frame_dom.document,
-                                        &options,
-                                        depth + 1,
-                                    );
-                                    let mut frame_data: Vec<u8> = Vec::new();
-                                    serialize(
-                                        &mut frame_data,
-                                        &frame_dom.document,
-                                        SerializeOpts::default(),
-                                    )
-                                    .unwrap();
-                                    let frame_data_url = data_to_data_url(
-                                        &frame_media_type,
-                                        &frame_data,
-                                        &frame_final_url,
-                                    );
-                                    attr.value.clear();
-                                    let assembled_url: String = url_with_fragment(
-                                        frame_data_url.as_str(),
-                                        frame_url_fragment.as_str(),
-                                    );
-                                    attr.value.push_slice(assembled_url.as_str());
-                                }
-                                Err(_) => {
-                                    // Keep remote reference if unable to retrieve the asset
-                                    if is_http_url(frame_full_url.clone()) {
-                                        attr.value.clear();
+                            // Ignore (i)frames with empty source (they cause infinite loops)
+                            if !frame_src.is_empty() {
+                                let frame_full_url =
+                                    resolve_url(&url, frame_src).unwrap_or_default();
+                                let frame_url_fragment = get_url_fragment(frame_full_url.clone());
+                                match retrieve_asset(
+                                    cache,
+                                    client,
+                                    &url,
+                                    &frame_full_url,
+                                    options,
+                                    depth + 1,
+                                ) {
+                                    Ok((frame_data, frame_final_url, frame_media_type)) => {
+                                        let frame_dom =
+                                            html_to_dom(&String::from_utf8_lossy(&frame_data));
+                                        walk_and_embed_assets(
+                                            cache,
+                                            client,
+                                            &frame_final_url,
+                                            &frame_dom.document,
+                                            &options,
+                                            depth + 1,
+                                        );
+                                        let mut frame_data: Vec<u8> = Vec::new();
+                                        serialize(
+                                            &mut frame_data,
+                                            &frame_dom.document,
+                                            SerializeOpts::default(),
+                                        )
+                                        .unwrap();
+                                        let frame_data_url = data_to_data_url(
+                                            &frame_media_type,
+                                            &frame_data,
+                                            &frame_final_url,
+                                        );
                                         let assembled_url: String = url_with_fragment(
-                                            frame_full_url.as_str(),
+                                            frame_data_url.as_str(),
                                             frame_url_fragment.as_str(),
                                         );
-                                        attr.value.push_slice(assembled_url.as_str());
+                                        set_node_attr(node, "src", Some(assembled_url));
+                                    }
+                                    Err(_) => {
+                                        // Keep remote reference if unable to retrieve the asset
+                                        if is_http_url(frame_full_url.clone()) {
+                                            let assembled_url: String = url_with_fragment(
+                                                frame_full_url.as_str(),
+                                                frame_url_fragment.as_str(),
+                                            );
+                                            set_node_attr(node, "src", Some(assembled_url));
+                                        }
                                     }
                                 }
                             }
@@ -1284,59 +1191,49 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "video" => {
-                    for attr in attrs_mut.iter_mut() {
-                        let attr_name: &str = &attr.name.local;
-                        if attr_name.eq_ignore_ascii_case("poster") {
-                            let video_poster_url = attr.value.trim();
-
-                            // Skip posters with empty source
-                            if video_poster_url.is_empty() {
-                                continue;
-                            }
-
+                    if let Some(video_attr_poster_value) = get_node_attr(node, "poster") {
+                        // Skip posters with empty source
+                        if !video_attr_poster_value.is_empty() {
                             if options.no_images {
-                                attr.value.clear();
-                                continue;
-                            }
-
-                            let video_poster_full_url =
-                                resolve_url(&url, video_poster_url).unwrap_or_default();
-                            let video_poster_url_fragment =
-                                get_url_fragment(video_poster_full_url.clone());
-                            match retrieve_asset(
-                                cache,
-                                client,
-                                &url,
-                                &video_poster_full_url,
-                                options,
-                                depth + 1,
-                            ) {
-                                Ok((
-                                    video_poster_data,
-                                    video_poster_final_url,
-                                    video_poster_media_type,
-                                )) => {
-                                    let video_poster_data_url = data_to_data_url(
-                                        &video_poster_media_type,
-                                        &video_poster_data,
-                                        &video_poster_final_url,
-                                    );
-                                    attr.value.clear();
-                                    let assembled_url: String = url_with_fragment(
-                                        video_poster_data_url.as_str(),
-                                        video_poster_url_fragment.as_str(),
-                                    );
-                                    attr.value.push_slice(assembled_url.as_str());
-                                }
-                                Err(_) => {
-                                    // Keep remote reference if unable to retrieve the asset
-                                    if is_http_url(video_poster_full_url.clone()) {
-                                        attr.value.clear();
+                                set_node_attr(node, "poster", Some(str!(empty_image!())));
+                            } else {
+                                let video_poster_full_url =
+                                    resolve_url(&url, video_attr_poster_value).unwrap_or_default();
+                                let video_poster_url_fragment =
+                                    get_url_fragment(video_poster_full_url.clone());
+                                match retrieve_asset(
+                                    cache,
+                                    client,
+                                    &url,
+                                    &video_poster_full_url,
+                                    options,
+                                    depth + 1,
+                                ) {
+                                    Ok((
+                                        video_poster_data,
+                                        video_poster_final_url,
+                                        video_poster_media_type,
+                                    )) => {
+                                        let video_poster_data_url = data_to_data_url(
+                                            &video_poster_media_type,
+                                            &video_poster_data,
+                                            &video_poster_final_url,
+                                        );
                                         let assembled_url: String = url_with_fragment(
-                                            video_poster_full_url.as_str(),
+                                            video_poster_data_url.as_str(),
                                             video_poster_url_fragment.as_str(),
                                         );
-                                        attr.value.push_slice(assembled_url.as_str());
+                                        set_node_attr(node, "poster", Some(assembled_url));
+                                    }
+                                    Err(_) => {
+                                        // Keep remote reference if unable to retrieve the asset
+                                        if is_http_url(video_poster_full_url.clone()) {
+                                            let assembled_url: String = url_with_fragment(
+                                                video_poster_full_url.as_str(),
+                                                video_poster_url_fragment.as_str(),
+                                            );
+                                            set_node_attr(node, "poster", Some(assembled_url));
+                                        }
                                     }
                                 }
                             }
@@ -1349,39 +1246,21 @@ pub fn walk_and_embed_assets(
             // Process style attributes
             if options.no_css {
                 // Get rid of style attributes
-                let mut i = 0;
-                while i < attrs_mut.len() {
-                    let attr_name: &str = &attrs_mut[i].name.local;
-                    if attr_name.eq_ignore_ascii_case("style") {
-                        attrs_mut.remove(i);
-                    } else {
-                        i += 1;
-                    }
-                }
+                set_node_attr(node, "style", None);
             } else {
-                // Otherwise, parse any links found in the attributes
-                for attribute in attrs_mut
-                    .iter_mut()
-                    .filter(|a| a.name.local.as_ref().eq_ignore_ascii_case("style"))
-                {
-                    let replacement = embed_css(
-                        cache,
-                        client,
-                        &url,
-                        attribute.value.as_ref(),
-                        options,
-                        depth,
-                    );
-                    // let replacement = str!();
-                    attribute.value.clear();
-                    attribute.value.push_slice(&replacement);
+                // Embed URLs found within the style attribute of this node
+                if let Some(node_attr_style_value) = get_node_attr(node, "style") {
+                    let embedded_style =
+                        embed_css(cache, client, &url, &node_attr_style_value, options, depth);
+                    set_node_attr(node, "style", Some(embedded_style));
                 }
             }
 
             if options.no_js {
+                let attrs_mut = &mut attrs.borrow_mut();
                 // Get rid of JS event attributes
                 let mut js_attr_indexes = Vec::new();
-                for (i, attr) in attrs_mut.iter_mut().enumerate() {
+                for (i, attr) in attrs_mut.iter().enumerate() {
                     if attr_is_event_handler(&attr.name.local) {
                         js_attr_indexes.push(i);
                     }

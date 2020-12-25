@@ -63,4 +63,43 @@ mod passing {
 
         assert_eq!(count, 5);
     }
+
+    #[test]
+    fn body_background() {
+        let html = "<!doctype html><html lang=\"en\"><head></head><body background=\"1\" background=\"2\"></body></html>";
+        let dom = html::html_to_dom(&html);
+        let mut count = 0;
+
+        fn test_walk(node: &Handle, i: &mut i8) {
+            *i += 1;
+
+            match &node.data {
+                NodeData::Document => {
+                    // Dig deeper
+                    for child in node.children.borrow().iter() {
+                        test_walk(child, &mut *i);
+                    }
+                }
+                NodeData::Element { ref name, .. } => {
+                    let node_name = name.local.as_ref().to_string();
+
+                    if node_name == "body" {
+                        assert_eq!(html::get_node_attr(node, "background"), Some(str!("1")));
+
+                        html::set_node_attr(node, "background", None);
+                        assert_eq!(html::get_node_attr(node, "background"), None);
+                    }
+
+                    for child in node.children.borrow().iter() {
+                        test_walk(child, &mut *i);
+                    }
+                }
+                _ => (),
+            };
+        }
+
+        test_walk(&dom.document, &mut count);
+
+        assert_eq!(count, 5);
+    }
 }

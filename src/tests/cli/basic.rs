@@ -337,7 +337,7 @@ mod passing {
                 <title>Local HTML file</title>\n  \
                 <link rel=\"stylesheet\" type=\"text/css\">\n  \
                 <link rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
-                <img alt=\"\" src=\"{empty_image}\">\n  \
+                <img src=\"{empty_image}\" alt=\"\">\n  \
                 <a href=\"file://local-file.html/\">Tricky href</a>\n  \
                 <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
                 <script></script>\n\n\n\n\
@@ -399,7 +399,7 @@ mod passing {
                 <title>Local HTML file</title>\n  \
                 <link rel=\"stylesheet\" type=\"text/css\">\n  \
                 <link rel=\"stylesheet\" type=\"text/css\">\n</head>\n\n<body>\n  \
-                <img alt=\"\" src=\"{empty_image}\">\n  \
+                <img src=\"{empty_image}\" alt=\"\">\n  \
                 <a href=\"file://local-file.html/\">Tricky href</a>\n  \
                 <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
                 <script></script>\n\n\n\n\
