@@ -22,6 +22,9 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 ## Installation
 
+### Using Cargo
+    $ cargo install monolith
+
 #### Via Homebrew (on macOS and GNU/Linux)
     $ brew install monolith
 

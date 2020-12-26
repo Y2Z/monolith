@@ -1,7 +1,6 @@
 [package]
 name = "monolith"
-version = "2.3.1"
-edition = "2018"
+version = "2.4.0"
 authors = [
     "Sunshine <sunshine@uberspace.net>",
     "Mahdi Robatipoor <mahdi.robatipoor@gmail.com>",
@@ -9,7 +8,19 @@ authors = [
     "Emi Simpson <emi@alchemi.dev>",
     "rhysd <lin90162@yahoo.co.jp>",
 ]
+edition = "2018"
 description = "CLI tool for saving web pages as a single HTML file"
+homepage = "https://github.com/Y2Z/monolith"
+repository = "https://github.com/Y2Z/monolith"
+readme = "README.md"
+keywords = ["web", "http", "https", "html", "download", "command-line", "tool", "data-url"]
+categories = ["command-line-utilities", "web-programming"]
+include = [
+    "src/*.rs",
+    "Cargo.toml",
+]
+license = "The Unlicense"
+license-file = "LICENSE"
 
 [dependencies]
 base64 = "0.13.0"
