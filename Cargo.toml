@@ -17,6 +17,7 @@ chrono = "0.4.19" # Used for formatting creation timestamp
 clap = "2.33.3"
 cssparser = "0.27.2"
 html5ever = "0.24.1"
+regex = "1.4.2" # Used for parsing srcset
 sha2 = "0.9.2" # Used for calculating checksums during integrity checks
 url = "2.2.0"
 

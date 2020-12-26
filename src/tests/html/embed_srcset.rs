@@ -24,8 +24,45 @@ mod passing {
         let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
 
         assert_eq!(
+            embedded_css,
             format!("{} 1x, {} 2x", empty_image!(), empty_image!()),
-            embedded_css
+        );
+    }
+
+    #[test]
+    fn commas_within_file_names() {
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+        let srcset_value = "small,s.png 1x, large,l.png 2x";
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
+        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
+
+        assert_eq!(
+            embedded_css,
+            format!("{} 1x, {} 2x", empty_image!(), empty_image!()),
+        );
+    }
+
+    #[test]
+    fn tabs_and_newlines_after_commas() {
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+        let srcset_value = "small,s.png 1x,\nmedium,m.png 2x,\nlarge,l.png 3x";
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
+        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
+
+        assert_eq!(
+            embedded_css,
+            format!(
+                "{} 1x, {} 2x, {} 3x",
+                empty_image!(),
+                empty_image!(),
+                empty_image!()
+            ),
         );
     }
 }
@@ -56,8 +93,8 @@ mod failing {
         let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
 
         assert_eq!(
-            format!("{} 1x, {} 2x", empty_image!(), empty_image!()),
-            embedded_css
+            embedded_css,
+            format!("{} 1x, {} 2x,", empty_image!(), empty_image!()),
         );
     }
 }
