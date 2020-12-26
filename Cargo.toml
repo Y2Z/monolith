@@ -13,7 +13,7 @@ description = "CLI tool for saving web pages as a single HTML file"
 homepage = "https://github.com/Y2Z/monolith"
 repository = "https://github.com/Y2Z/monolith"
 readme = "README.md"
-keywords = ["web", "http", "https", "html", "download", "command-line", "tool", "data-url"]
+keywords = ["web", "http", "html", "download", "command-line"]
 categories = ["command-line-utilities", "web-programming"]
 include = [
     "src/*.rs",
