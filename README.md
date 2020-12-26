@@ -53,6 +53,9 @@ The guide can be found [here](docs/containers.md)
 
 ## Usage
     $ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
+or
+
+    $ cat index.html | monolith -aIiFfcMv - > index-processed.html
 
 ---------------------------------------------------
 
