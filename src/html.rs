@@ -7,6 +7,7 @@ use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::{format_tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns, LocalName};
+use regex::Regex;
 use reqwest::blocking::Client;
 use reqwest::Url;
 use sha2::{Digest, Sha256, Sha384, Sha512};
@@ -156,8 +157,8 @@ pub fn embed_srcset(
     depth: u32,
 ) -> String {
     let mut array: Vec<SrcSetItem> = vec![];
-    let srcset_items: Vec<&str> = srcset.split(',').collect();
-    for srcset_item in srcset_items {
+    let re = Regex::new(r",\s+").unwrap();
+    for srcset_item in re.split(srcset) {
         let parts: Vec<&str> = srcset_item.trim().split_whitespace().collect();
         if parts.len() > 0 {
             let path = parts[0].trim();
