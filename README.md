@@ -54,6 +54,7 @@ The guide can be found [here](docs/containers.md)
 ---------------------------------------------------
 
 ## Options
+ - `-a`: Exclude audio sources
  - `-b`: Use custom base URL
  - `-c`: Exclude CSS
  - `-e`: Ignore network errors
@@ -68,6 +69,7 @@ The guide can be found [here](docs/containers.md)
  - `-s`: Be quiet
  - `-t`: Adjust network request timeout
  - `-u`: Provide custom User-Agent
+ - `-v`: Exclude videos
 
 ---------------------------------------------------
 

@@ -2,6 +2,7 @@ use clap::{App, Arg};
 
 #[derive(Default)]
 pub struct Options {
+    pub no_audio: bool,
     pub base_url: Option<String>,
     pub no_css: bool,
     pub ignore_errors: bool,
@@ -16,6 +17,7 @@ pub struct Options {
     pub silent: bool,
     pub timeout: u64,
     pub user_agent: String,
+    pub no_video: bool,
     pub target: String,
 }
 
@@ -38,8 +40,8 @@ impl Options {
             .version(crate_version!())
             .author(crate_authors!("\n"))
             .about(format!("{}\n{}", ASCII, crate_description!()).as_str())
-            // .args_from_usage("-a, --no-audio 'Removes audio sources'")
-            .args_from_usage("-b, --base-url=[http://localhost/] 'Use custom base URL'")
+            .args_from_usage("-a, --no-audio 'Removes audio sources'")
+            .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
@@ -49,11 +51,11 @@ impl Options {
             .args_from_usage("-j, --no-js 'Removes JavaScript'")
             .args_from_usage("-k, --insecure 'Allows invalid X.509 (TLS) certificates'")
             .args_from_usage("-M, --no-metadata 'Excludes timestamp and source information'")
-            .args_from_usage("-o, --output=[document.html] 'Write output to <file>'")
+            .args_from_usage("-o, --output=[document.html] 'Writes output to <file>'")
             .args_from_usage("-s, --silent 'Suppresses verbosity'")
-            .args_from_usage("-t, --timeout=[60] 'Adjust network request timeout'")
-            .args_from_usage("-u, --user-agent=[Firefox] 'Set custom User-Agent string'")
-            // .args_from_usage("-v, --no-video 'Removes video sources'")
+            .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
+            .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
+            .args_from_usage("-v, --no-video 'Removes video sources'")
             .arg(
                 Arg::with_name("target")
                     .required(true)
@@ -69,6 +71,7 @@ impl Options {
             .value_of("target")
             .expect("please set target")
             .to_string();
+        options.no_audio = app.is_present("no-audio");
         if let Some(base_url) = app.value_of("base-url") {
             options.base_url = Some(str!(base_url));
         }
@@ -92,6 +95,7 @@ impl Options {
             .value_of("user-agent")
             .unwrap_or(DEFAULT_USER_AGENT)
             .to_string();
+        options.no_video = app.is_present("no-video");
 
         options
     }
