@@ -159,10 +159,12 @@ pub fn embed_srcset(
     let srcset_items: Vec<&str> = srcset.split(',').collect();
     for srcset_item in srcset_items {
         let parts: Vec<&str> = srcset_item.trim().split_whitespace().collect();
-        let path = parts[0].trim();
-        let descriptor = if parts.len() > 1 { parts[1].trim() } else { "" };
-        let srcset_real_item = SrcSetItem { path, descriptor };
-        array.push(srcset_real_item);
+        if parts.len() > 0 {
+            let path = parts[0].trim();
+            let descriptor = if parts.len() > 1 { parts[1].trim() } else { "" };
+            let srcset_real_item = SrcSetItem { path, descriptor };
+            array.push(srcset_real_item);
+        }
     }
 
     let mut result: String = str!();
