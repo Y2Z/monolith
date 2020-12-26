@@ -4,4 +4,5 @@ mod html;
 mod js;
 mod macros;
 mod opts;
+mod url;
 mod utils;

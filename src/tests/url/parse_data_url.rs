@@ -59,8 +59,7 @@ mod passing {
 
     #[test]
     fn parse_text_css_url_encoded() {
-        let (media_type, data) =
-            url::parse_data_url("data:text/css,div{background-color:%23000}");
+        let (media_type, data) = url::parse_data_url("data:text/css,div{background-color:%23000}");
 
         assert_eq!(media_type, "text/css");
         assert_eq!(String::from_utf8_lossy(&data), "div{background-color:#000}");
