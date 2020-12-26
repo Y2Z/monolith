@@ -19,7 +19,7 @@ include = [
     "src/*.rs",
     "Cargo.toml",
 ]
-license = "The Unlicense"
+license = "Unlicense"
 license-file = "LICENSE"
 
 [dependencies]
