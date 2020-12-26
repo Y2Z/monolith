@@ -54,6 +54,11 @@ mod passing {
             "MAILTO:somebody@somewhere.com?subject=hello"
         ));
     }
+
+    #[test]
+    fn empty_data_url() {
+        assert!(url::url_has_protocol("data:text/html,"));
+    }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
@@ -65,13 +70,11 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use crate::utils;
+    use crate::url;
 
     #[test]
     fn url_with_no_protocol() {
-        assert!(!url::url_has_protocol(
-            "//some-hostname.com/some-file.html"
-        ));
+        assert!(!url::url_has_protocol("//some-hostname.com/some-file.html"));
     }
 
     #[test]

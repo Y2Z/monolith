@@ -3,7 +3,7 @@ use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io::{self, Error, Write};
+use std::io::{self, prelude::*, Error, Write};
 use std::path::Path;
 use std::process;
 use std::time::Duration;
@@ -48,12 +48,22 @@ impl Output {
     }
 }
 
+pub fn read_stdin() -> String {
+    let mut buffer = String::new();
+    for line in io::stdin().lock().lines() {
+        buffer += line.unwrap_or_default().as_str();
+        buffer += "\n";
+    }
+    buffer
+}
+
 fn main() {
     let options = Options::from_args();
     let original_target: &str = &options.target;
     let target_url: &str;
     let mut base_url: String;
     let mut dom;
+    let mut use_stdin: bool = false;
 
     // Pre-process the input
     let cwd_normalized: String =
@@ -68,6 +78,11 @@ fn main() {
             eprintln!("No target specified");
         }
         process::exit(1);
+    } else if target.clone() == "-" {
+        // Read from pipe (stdin)
+        use_stdin = true;
+        // Default target URL to empty data URL; the user can control it via --base-url
+        target_url = "data:text/html,"
     } else if is_http_url(target.clone()) || is_data_url(target.clone()) {
         target_url = target.as_str();
     } else if is_file_url(target.clone()) {
@@ -119,7 +134,9 @@ fn main() {
     base_url = str!(target_url);
 
     // Retrieve target document
-    if is_file_url(target_url) || is_http_url(target_url) {
+    if use_stdin {
+        dom = html_to_dom(&read_stdin());
+    } else if is_file_url(target_url) || is_http_url(target_url) {
         match retrieve_asset(&mut cache, &client, target_url, target_url, &options, 0) {
             Ok((data, final_url, _media_type)) => {
                 if options.base_url.clone().unwrap_or(str!()).is_empty() {
@@ -198,7 +215,7 @@ fn main() {
 
     // Add metadata tag
     if !options.no_metadata {
-        let metadata_comment: String = create_metadata_tag(&base_url);
+        let metadata_comment: String = create_metadata_tag(&target_url);
         result.insert_str(0, &metadata_comment);
         if metadata_comment.len() > 0 {
             result.insert_str(metadata_comment.len(), "\n");

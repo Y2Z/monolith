@@ -74,10 +74,9 @@ pub fn file_url_to_fs_path(url: &str) -> String {
 }
 
 pub fn get_url_fragment<T: AsRef<str>>(url: T) -> String {
-    if Url::parse(url.as_ref()).unwrap().fragment() == None {
-        str!()
-    } else {
-        str!(Url::parse(url.as_ref()).unwrap().fragment().unwrap())
+    match Url::parse(url.as_ref()) {
+        Ok(parsed_url) => parsed_url.fragment().unwrap_or("").to_string(),
+        Err(_err) => str!(),
     }
 }
 
