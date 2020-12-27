@@ -39,11 +39,11 @@ jobs:
         sudo dpkg -x libssl1.1*.deb /cross-build-arm
         sudo dpkg -x libssl-dev*.deb /cross-build-arm
         rustup target add arm-unknown-linux-gnueabihf
-        echo "::set-env name=C_INCLUDE_PATH::/cross-build-arm/usr/include"
-        echo "::set-env name=OPENSSL_INCLUDE_DIR::/cross-build-arm/usr/include/arm-linux-gnueabihf"
-        echo "::set-env name=OPENSSL_LIB_DIR::/cross-build-arm/usr/lib/arm-linux-gnueabihf"
-        echo "::set-env name=PKG_CONFIG_ALLOW_CROSS::1"
-        echo "::set-env name=RUSTFLAGS::-C linker=arm-linux-gnueabihf-gcc -L/usr/arm-linux-gnueabihf/lib -L/cross-build-arm/usr/lib/arm-linux-gnueabihf -L/cross-build-arm/lib/arm-linux-gnueabihf"
+        echo "C_INCLUDE_PATH=/cross-build-arm/usr/include" >> $GITHUB_ENV
+        echo "OPENSSL_INCLUDE_DIR=/cross-build-arm/usr/include/arm-linux-gnueabihf" >> $GITHUB_ENV
+        echo "OPENSSL_LIB_DIR=/cross-build-arm/usr/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
+        echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+        echo "RUSTFLAGS=-C linker=arm-linux-gnueabihf-gcc -L/usr/arm-linux-gnueabihf/lib -L/cross-build-arm/usr/lib/arm-linux-gnueabihf -L/cross-build-arm/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
     - name: Build the executable
       run: cargo build --release --target=arm-unknown-linux-gnueabihf
     - name: Attach artifact to the release
