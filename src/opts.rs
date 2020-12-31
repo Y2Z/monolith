@@ -16,7 +16,7 @@ pub struct Options {
     pub output: String,
     pub silent: bool,
     pub timeout: u64,
-    pub user_agent: String,
+    pub user_agent: Option<String>,
     pub no_video: bool,
     pub target: String,
 }
@@ -38,7 +38,7 @@ impl Options {
     pub fn from_args() -> Options {
         let app = App::new(env!("CARGO_PKG_NAME"))
             .version(crate_version!())
-            .author(crate_authors!("\n"))
+            .author(format!("\n{}", crate_authors!("\n")).as_str())
             .about(format!("{}\n{}", ASCII, crate_description!()).as_str())
             .args_from_usage("-a, --no-audio 'Removes audio sources'")
             .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
@@ -61,7 +61,7 @@ impl Options {
                     .required(true)
                     .takes_value(true)
                     .index(1)
-                    .help("URL or file path"),
+                    .help("URL or file path, use - for stdin"),
             )
             .get_matches();
         let mut options: Options = Options::default();
@@ -91,10 +91,11 @@ impl Options {
             .unwrap_or(&DEFAULT_NETWORK_TIMEOUT.to_string())
             .parse::<u64>()
             .unwrap();
-        options.user_agent = app
-            .value_of("user-agent")
-            .unwrap_or(DEFAULT_USER_AGENT)
-            .to_string();
+        if let Some(user_agent) = app.value_of("user-agent") {
+            options.user_agent = Some(str!(user_agent));
+        } else {
+            options.user_agent = Some(DEFAULT_USER_AGENT.to_string());
+        }
         options.no_video = app.is_present("no-video");
 
         options

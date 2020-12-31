@@ -13,8 +13,8 @@ mod passing {
     fn defaults() {
         let options: Options = Options::default();
 
-        assert_eq!(options.target, str!());
         assert_eq!(options.no_audio, false);
+        assert_eq!(options.base_url, None);
         assert_eq!(options.no_css, false);
         assert_eq!(options.no_frames, false);
         assert_eq!(options.no_fonts, false);
@@ -26,7 +26,9 @@ mod passing {
         assert_eq!(options.output, str!());
         assert_eq!(options.silent, false);
         assert_eq!(options.timeout, 0);
-        assert_eq!(options.user_agent, "");
+        assert_eq!(options.user_agent, None);
         assert_eq!(options.no_video, false);
+
+        assert_eq!(options.target, str!());
     }
 }
