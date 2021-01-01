@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>monolith</id>
+    <version>2.4.0</version>
+    <title>Monolith</title>
+    <authors>Sunshine, Mahdi Robatipoor, Emmanuel Delaborde, Emi Simpson, rhysd</authors>
+    <projectUrl>https://github.com/Y2Z/monolith</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/Y2Z/monolith/master/assets/icon/icon.png</iconUrl>
+    <licenseUrl>https://raw.githubusercontent.com/Y2Z/monolith/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>CLI tool for saving complete web pages as a single HTML file
+
+A data hoarder’s dream come true: bundle any web page into a single HTML file. You can finally replace that gazillion of open tabs with a gazillion of .html files stored somewhere on your precious little drive.
+
+Unlike the conventional “Save page as”, monolith not only saves the target document, it embeds CSS, image, and JavaScript assets all at once, producing a single HTML5 document that is a joy to store and share.
+
+If compared to saving websites using wget, this tool embeds all assets as data URLs and therefore lets browsers render the saved page exactly the way it was on the Internet, even when no network connection is available.
+    </description>
+    <copyright>Public Domain</copyright>
+    <language>en-US</language>
+    <tags>scraping archiving</tags>
+    <docsUrl>https://github.com/Y2Z/monolith/blob/master/README.md</docsUrl>
+  </metadata>
+</package>
