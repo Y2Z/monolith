@@ -1,4 +1,5 @@
 use clap::{App, Arg};
+use std::env;
 
 #[derive(Default)]
 pub struct Options {
@@ -19,6 +20,7 @@ pub struct Options {
     pub user_agent: Option<String>,
     pub no_video: bool,
     pub target: String,
+    pub no_color: bool,
 }
 
 const ASCII: &str = " \
@@ -33,6 +35,8 @@ const ASCII: &str = " \
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
+const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
+const ENV_VAR_TERM: &str = "TERM";
 
 impl Options {
     pub fn from_args() -> Options {
@@ -97,6 +101,14 @@ impl Options {
             options.user_agent = Some(DEFAULT_USER_AGENT.to_string());
         }
         options.no_video = app.is_present("no-video");
+
+        options.no_color =
+            env::var_os(ENV_VAR_NO_COLOR).is_some() || atty::isnt(atty::Stream::Stderr);
+        if let Some(term) = env::var_os(ENV_VAR_TERM) {
+            if term == "dumb" {
+                options.no_color = true;
+            }
+        }
 
         options
     }

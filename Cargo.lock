@@ -27,9 +27,9 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "doc-comment 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "predicates 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "predicates-core 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "predicates-tree 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "predicates 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "predicates-core 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "predicates-tree 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "wait-timeout 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -608,6 +608,7 @@ name = "monolith"
 version = "2.4.0"
 dependencies = [
  "assert_cmd 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "atty 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "base64 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -858,24 +859,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "predicates"
-version = "1.0.6"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "difference 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "predicates-core 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "predicates-core 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "predicates-core"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "predicates-tree"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "predicates-core 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "predicates-core 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "treeline 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1755,9 +1756,9 @@ dependencies = [
 "checksum pkg-config 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)" = "3831453b3449ceb48b6d9c7ad7c96d5ea673e9b470a1dc578c2ce6521230884c"
 "checksum ppv-lite86 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)" = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
 "checksum precomputed-hash 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
-"checksum predicates 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "73dd9b7b200044694dfede9edf907c1ca19630908443e9447e624993700c6932"
-"checksum predicates-core 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fb3dbeaaf793584e29c58c7e3a82bbb3c7c06b63cea68d13b0e3cddc124104dc"
-"checksum predicates-tree 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "aee95d988ee893cb35c06b148c80ed2cd52c8eea927f50ba7a0be1a786aeab73"
+"checksum predicates 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "eeb433456c1a57cc93554dea3ce40b4c19c4057e41c55d4a0f3d84ea71c325aa"
+"checksum predicates-core 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "57e35a3326b75e49aa85f5dc6ec15b41108cf5aee58eabb1f274dd18b73c2451"
+"checksum predicates-tree 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "15f553275e5721409451eb85e15fd9a860a6e5ab4496eb215987502b5f5391f2"
 "checksum proc-macro-hack 0.5.19 (registry+https://github.com/rust-lang/crates.io-index)" = "dbf0c48bc1d91375ae5c3cd81e3722dff1abcf81a30960240640d223f59fe0e5"
 "checksum proc-macro2 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)" = "1e0704ee1a7e00d7bb417d0770ea303c1bccbabf0ef1667dae92b5967f5f8a71"
 "checksum quote 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)" = "991431c3519a3f36861882da93630ce66b52918dcf1b8e2fd66b397fc96f28df"
