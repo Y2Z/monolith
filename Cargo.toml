@@ -20,23 +20,22 @@ include = [
     "Cargo.toml",
 ]
 license = "Unlicense"
-license-file = "LICENSE"
 
 [dependencies]
 base64 = "0.13.0"
 chrono = "0.4.19" # Used for formatting creation timestamp
 clap = "2.33.3"
-cssparser = "0.28.0"
+cssparser = "0.28.1"
 html5ever = "0.24.1"
-regex = "1.4.2" # Used for parsing srcset
+regex = "1.4.3" # Used for parsing srcset
 sha2 = "0.9.2" # Used for calculating checksums during integrity checks
 url = "2.2.0"
 
 [dependencies.reqwest]
-version = "0.10.10"
+version = "0.11.0"
 default-features = false
 features = ["default-tls", "blocking", "gzip"]
 
 [dev-dependencies]
 assert_cmd = "1.0.2"
-tempfile = "3.1.0"
+tempfile = "3.2.0"
