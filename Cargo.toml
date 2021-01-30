@@ -22,6 +22,7 @@ include = [
 license = "Unlicense"
 
 [dependencies]
+atty = "0.2" # Used for highlighting network errors
 base64 = "0.13.0"
 chrono = "0.4.19" # Used for formatting creation timestamp
 clap = "2.33.3"
