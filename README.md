@@ -61,7 +61,7 @@ or
 
 ## Options
  - `-a`: Exclude audio sources
- - `-b`: Use custom base URL
+ - `-b`: Use custom `base URL`
  - `-c`: Exclude CSS
  - `-e`: Ignore network errors
  - `-f`: Omit frames
@@ -71,10 +71,10 @@ or
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-M`: Don't add timestamp and URL information
- - `-o`: Write output to file
+ - `-o`: Write output to `file`
  - `-s`: Be quiet
- - `-t`: Adjust network request timeout
- - `-u`: Provide custom User-Agent
+ - `-t`: Adjust `network request timeout`
+ - `-u`: Provide `custom User-Agent`
  - `-v`: Exclude videos
 
 ---------------------------------------------------
