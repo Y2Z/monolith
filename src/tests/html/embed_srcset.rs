@@ -14,10 +14,10 @@ mod passing {
     use crate::opts::Options;
 
     #[test]
-    fn replace_with_empty_images() {
+    fn small_medium_large() {
         let cache = &mut HashMap::new();
         let client = Client::new();
-        let srcset_value = "small.png 1x, large.png 2x";
+        let srcset_value = "small.png 1x, medium.png 1.5x, large.png 2x";
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
@@ -25,7 +25,28 @@ mod passing {
 
         assert_eq!(
             embedded_css,
-            format!("{} 1x, {} 2x", empty_image!(), empty_image!()),
+            format!(
+                "{} 1x, {} 1.5x, {} 2x",
+                empty_image!(),
+                empty_image!(),
+                empty_image!(),
+            ),
+        );
+    }
+
+    #[test]
+    fn small_medium_only_medium_has_scale() {
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+        let srcset_value = "small.png, medium.png 1.5x";
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
+        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
+
+        assert_eq!(
+            embedded_css,
+            format!("{}, {} 1.5x", empty_image!(), empty_image!()),
         );
     }
 
