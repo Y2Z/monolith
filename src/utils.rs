@@ -7,6 +7,8 @@ use std::path::Path;
 use crate::opts::Options;
 use crate::url::{clean_url, file_url_to_fs_path, is_data_url, is_file_url, parse_data_url};
 
+const ANSI_COLOR_RED: &'static str = "\x1b[31m";
+const ANSI_COLOR_RESET: &'static str = "\x1b[0m";
 const INDENT: &'static str = " ";
 
 const MAGIC: [[&[u8]; 2]; 18] = [
@@ -32,7 +34,6 @@ const MAGIC: [[&[u8]; 2]; 18] = [
     [b"....moov", b"video/quicktime"],
     [b"\x1A\x45\xDF\xA3", b"video/webm"],
 ];
-
 const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "application/javascript",
     "image/svg+xml",
@@ -128,7 +129,18 @@ pub fn retrieve_asset(
                 Ok(mut response) => {
                     if !options.ignore_errors && response.status() != 200 {
                         if !options.silent {
-                            eprintln!("Unable to retrieve {} (error: {})", &url, response.status());
+                            eprintln!(
+                                "{}{}{} ({}){}",
+                                indent(depth).as_str(),
+                                if options.no_color { "" } else { ANSI_COLOR_RED },
+                                &url,
+                                response.status(),
+                                if options.no_color {
+                                    ""
+                                } else {
+                                    ANSI_COLOR_RESET
+                                },
+                            );
                         }
                         // Provoke error
                         return Err(client.get("").send().unwrap_err());

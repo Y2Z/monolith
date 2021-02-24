@@ -326,4 +326,45 @@ mod passing {
             </html>"
         );
     }
+
+    #[test]
+    fn processes_noscript_tags() {
+        let html = "<html>\
+            <body>\
+                <noscript>\
+                    <img src=\"image.png\" />\
+                </noscript>\
+            </body>\
+        </html>";
+        let dom = html::html_to_dom(&html);
+        let url = "http://localhost";
+        let cache = &mut HashMap::new();
+
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
+
+        let client = Client::new();
+
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            format!(
+                "<html>\
+                    <head>\
+                    </head>\
+                    <body>\
+                        <noscript>\
+                            <img src=\"{}\">\
+                        </noscript>\
+                    </body>\
+                </html>",
+                empty_image!(),
+            )
+        );
+    }
 }

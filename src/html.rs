@@ -1063,45 +1063,19 @@ pub fn walk_and_embed_assets(
 
                     if let Some(source_attr_srcset_value) = get_node_attr(node, "srcset") {
                         if parent_node_name == "picture" {
-                            if options.no_images {
-                                set_node_attr(node, "srcset", Some(str!(empty_image!())));
-                            } else {
-                                let srcset_full_url =
-                                    resolve_url(&url, source_attr_srcset_value).unwrap_or_default();
-                                let srcset_url_fragment = get_url_fragment(srcset_full_url.clone());
-                                match retrieve_asset(
-                                    cache,
-                                    client,
-                                    &url,
-                                    &srcset_full_url,
-                                    options,
-                                    depth + 1,
-                                ) {
-                                    Ok((srcset_data, srcset_final_url, srcset_media_type)) => {
-                                        let srcset_data_url = data_to_data_url(
-                                            &srcset_media_type,
-                                            &srcset_data,
-                                            &srcset_final_url,
-                                        );
-                                        let assembled_url: String = url_with_fragment(
-                                            srcset_data_url.as_str(),
-                                            srcset_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "srcset", Some(assembled_url));
-                                    }
-                                    Err(_) => {
-                                        if is_http_url(srcset_full_url.clone()) {
-                                            // Keep remote reference if unable to retrieve the asset
-                                            let assembled_url: String = url_with_fragment(
-                                                srcset_full_url.as_str(),
-                                                srcset_url_fragment.as_str(),
-                                            );
-                                            set_node_attr(node, "srcset", Some(assembled_url));
-                                        } else {
-                                            // Exclude non-remote URLs
-                                            set_node_attr(node, "srcset", None);
-                                        }
-                                    }
+                            if !source_attr_srcset_value.is_empty() {
+                                if options.no_images {
+                                    set_node_attr(node, "srcset", Some(str!(empty_image!())));
+                                } else {
+                                    let resolved_srcset: String = embed_srcset(
+                                        cache,
+                                        client,
+                                        &url,
+                                        &source_attr_srcset_value,
+                                        options,
+                                        depth,
+                                    );
+                                    set_node_attr(node, "srcset", Some(resolved_srcset));
                                 }
                             }
                         }
@@ -1199,8 +1173,8 @@ pub fn walk_and_embed_assets(
                         // Empty inner content of STYLE tags
                         node.children.borrow_mut().clear();
                     } else {
-                        for node in node.children.borrow_mut().iter_mut() {
-                            if let NodeData::Text { ref contents } = node.data {
+                        for child_node in node.children.borrow_mut().iter_mut() {
+                            if let NodeData::Text { ref contents } = child_node.data {
                                 let mut tendril = contents.borrow_mut();
                                 let replacement = embed_css(
                                     cache,
@@ -1433,6 +1407,42 @@ pub fn walk_and_embed_assets(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+                "noscript" => {
+                    for child_node in node.children.borrow_mut().iter_mut() {
+                        match child_node.data {
+                            NodeData::Text { ref contents } => {
+                                // Get contents of the NOSCRIPT node
+                                let mut noscript_contents = contents.borrow_mut();
+                                // Parse contents of the NOSCRIPT node
+                                let noscript_contents_dom: RcDom = html_to_dom(&noscript_contents);
+                                // Embed assets within the NOSCRIPT node
+                                walk_and_embed_assets(
+                                    cache,
+                                    client,
+                                    &url,
+                                    &noscript_contents_dom.document,
+                                    &options,
+                                    depth,
+                                );
+                                // Get rid of original contents
+                                noscript_contents.clear();
+                                // Insert HTML containing embedded assets into the NOSCRIPT node
+                                if let Some(html) =
+                                    get_child_node_by_name(&noscript_contents_dom.document, "html")
+                                {
+                                    if let Some(body) = get_child_node_by_name(&html, "body") {
+                                        let mut buf: Vec<u8> = Vec::new();
+                                        serialize(&mut buf, &body, SerializeOpts::default())
+                                            .expect("Unable to serialize DOM into buffer");
+                                        let result = String::from_utf8(buf).unwrap();
+                                        noscript_contents.push_slice(&result);
+                                    }
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }
