@@ -69,8 +69,7 @@ mod passing {
     #[test]
     fn local_file_target_input_absolute_target_path() -> Result<(), Box<dyn std::error::Error>> {
         let cwd = env::current_dir().unwrap();
-        let cwd_normalized: String =
-            str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
+        let cwd_normalized: String = str!(cwd.to_str().unwrap()).replace("\\", "/");
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
         let out = cmd
             .arg("-M")

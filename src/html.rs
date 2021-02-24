@@ -28,7 +28,7 @@ struct SrcSetItem<'a> {
     descriptor: &'a str,
 }
 
-const ICON_VALUES: &[&str] = &["icon", "shortcut icon"];
+const ICON_VALUES: &'static [&str] = &["icon", "shortcut icon"];
 
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
@@ -105,7 +105,7 @@ pub fn compose_csp(options: &Options) -> String {
     }
 
     if options.no_images {
-        // Note: data: is needed for transparent pixels
+        // Note: "data:" is required for transparent pixel images to work
         string_list.push("img-src data:;");
     }
 
@@ -127,22 +127,17 @@ pub fn create_metadata_tag(url: &str) -> String {
                 clean_url.set_password(None).unwrap();
             }
 
-            if is_http_url(url) {
-                format!(
-                    "<!-- Saved from {} at {} using {} v{} -->",
-                    &clean_url,
-                    timestamp,
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                )
-            } else {
-                format!(
-                    "<!-- Saved from local source at {} using {} v{} -->",
-                    timestamp,
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                )
-            }
+            format!(
+                "<!-- Saved from {} at {} using {} v{} -->",
+                if is_http_url(url) {
+                    &clean_url.as_str()
+                } else {
+                    "local source"
+                },
+                timestamp,
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+            )
         }
         Err(_) => str!(),
     }
@@ -498,12 +493,12 @@ pub fn walk_and_embed_assets(
         } => {
             match name.local.as_ref() {
                 "meta" => {
-                    // Remove http-equiv attributes from META nodes if they're able to control the page
                     if let Some(meta_attr_http_equiv_value) = get_node_attr(node, "http-equiv") {
                         let meta_attr_http_equiv_value: &str = &meta_attr_http_equiv_value;
                         if meta_attr_http_equiv_value.eq_ignore_ascii_case("refresh")
                             || meta_attr_http_equiv_value.eq_ignore_ascii_case("location")
                         {
+                            // Remove http-equiv attributes from META nodes if they're able to control the page
                             set_node_attr(
                                 &node,
                                 "http-equiv",
@@ -512,7 +507,20 @@ pub fn walk_and_embed_assets(
                                     meta_attr_http_equiv_value
                                 )),
                             );
+                        } else if meta_attr_http_equiv_value.eq_ignore_ascii_case("Content-Type") {
+                            // Enforce charset to be set to UTF-8
+                            if let Some(_attr_value) = get_node_attr(node, "content") {
+                                set_node_attr(
+                                    &node,
+                                    "content",
+                                    Some(str!("text/html; charset=utf-8")),
+                                );
+                            }
                         }
+                    } else if let Some(_meta_attr_http_equiv_value) = get_node_attr(node, "charset")
+                    {
+                        // Enforce charset to be set to UTF-8
+                        set_node_attr(&node, "charset", Some(str!("utf-8")));
                     }
                 }
                 "link" => {
