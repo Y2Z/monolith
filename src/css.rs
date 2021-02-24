@@ -26,7 +26,7 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     "suffix",
     "symbols",
 ];
-const CSS_SPECIAL_CHARS: &str = "~!@$%^&*()+=,./'\";:?><[]{}|`#";
+const CSS_SPECIAL_CHARS: &'static str = "~!@$%^&*()+=,./'\";:?><[]{}|`#";
 
 pub fn is_image_url_prop(prop_name: &str) -> bool {
     CSS_PROPS_WITH_IMAGE_URLS

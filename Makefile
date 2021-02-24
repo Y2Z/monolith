@@ -10,7 +10,7 @@ build:
 test: build
 	@cargo test --locked
 	@cargo fmt --all -- --check
-.PHONY: test_code_formatting
+.PHONY: test
 
 lint:
 	@cargo fmt --all --

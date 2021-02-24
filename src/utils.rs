@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::opts::Options;
 use crate::url::{clean_url, file_url_to_fs_path, is_data_url, is_file_url, parse_data_url};
 
-const INDENT: &str = " ";
+const INDENT: &'static str = " ";
 
 const MAGIC: [[&[u8]; 2]; 18] = [
     // Image
@@ -34,11 +34,13 @@ const MAGIC: [[&[u8]; 2]; 18] = [
 ];
 
 const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
+    "application/javascript",
     "image/svg+xml",
-    "text/css",
-    "text/html",
-    "text/javascript",
-    "text/plain",
+    // "text/css",
+    // "text/csv",
+    // "text/html",
+    // "text/javascript",
+    // "text/plain",
 ];
 
 pub fn detect_media_type(data: &[u8], url: &str) -> String {
@@ -56,7 +58,8 @@ pub fn detect_media_type(data: &[u8], url: &str) -> String {
 }
 
 pub fn is_plaintext_media_type(media_type: &str) -> bool {
-    PLAINTEXT_MEDIA_TYPES.contains(&media_type.to_lowercase().as_str())
+    media_type.to_lowercase().as_str().starts_with("text/")
+        || PLAINTEXT_MEDIA_TYPES.contains(&media_type.to_lowercase().as_str())
 }
 
 pub fn indent(level: u32) -> String {
@@ -125,7 +128,7 @@ pub fn retrieve_asset(
                 Ok(mut response) => {
                     if !options.ignore_errors && response.status() != 200 {
                         if !options.silent {
-                            eprintln!("Unable to retrieve {} ({})", &url, response.status());
+                            eprintln!("Unable to retrieve {} (error: {})", &url, response.status());
                         }
                         // Provoke error
                         return Err(client.get("").send().unwrap_err());

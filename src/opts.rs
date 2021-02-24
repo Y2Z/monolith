@@ -21,7 +21,7 @@ pub struct Options {
     pub target: String,
 }
 
-const ASCII: &str = " \
+const ASCII: &'static str = " \
  _____     ______________    __________      ___________________    ___
 |     \\   /              \\  |          |    |                   |  |   |
 |      \\_/       __       \\_|    __    |    |    ___     ___    |__|   |
@@ -31,7 +31,7 @@ const ASCII: &str = " \
 |___|       |__________|  \\_____________________|   |___|   |___|  |___|
 ";
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
-const DEFAULT_USER_AGENT: &str =
+const DEFAULT_USER_AGENT: &'static str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
 
 impl Options {
