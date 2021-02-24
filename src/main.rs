@@ -212,9 +212,6 @@ fn main() {
         }
     }
 
-    // Remove charset meta-tag
-    // set_charset_meta_to_utf8(&dom.document);
-
     // Serialize DOM tree
     let mut result: String = stringify_document(&dom.document, &options);
 
