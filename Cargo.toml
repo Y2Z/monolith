@@ -19,7 +19,7 @@ include = [
     "src/*.rs",
     "Cargo.toml",
 ]
-license = "Unlicense"
+license = "CC0-1.0"
 
 [dependencies]
 atty = "0.2" # Used for highlighting network errors
