@@ -47,7 +47,9 @@ Dependency: `libssl-dev`
     $ make install
 
 #### Using Containers
-The guide can be found [here](docs/containers.md)
+
+    $ docker build -t Y2Z/monolith .
+    $ sudo install -b utils/run-in-container.sh /usr/local/bin/monolith
 
 ---------------------------------------------------
 
