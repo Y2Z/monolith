@@ -32,11 +32,18 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ snap install monolith
 
 #### Using Ports collection (on FreeBSD and TrueOS)
+    $ pkg install monolith
+or
+
     $ cd /usr/ports/www/monolith/
     $ make install clean
 
 #### Using pre-built binaries (Windows, ARM-based devices, etc)
 Every [release](https://github.com/Y2Z/monolith/releases) contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
+
+#### Using Containers
+    $ docker build -t Y2Z/monolith .
+    $ sudo install -b utils/run-in-container.sh /usr/local/bin/monolith
 
 #### From source
 
@@ -45,11 +52,6 @@ Dependency: `libssl-dev`
     $ git clone https://github.com/Y2Z/monolith.git
     $ cd monolith
     $ make install
-
-#### Using Containers
-
-    $ docker build -t Y2Z/monolith .
-    $ sudo install -b utils/run-in-container.sh /usr/local/bin/monolith
 
 ---------------------------------------------------
 
