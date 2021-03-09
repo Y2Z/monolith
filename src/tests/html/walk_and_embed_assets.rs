@@ -87,6 +87,7 @@ mod passing {
     #[test]
     fn no_css() {
         let html = "<link rel=\"stylesheet\" href=\"main.css\">\
+                    <link rel=\"alternate stylesheet\" href=\"main.css\">\
                     <style>html{background-color: #000;}</style>\
                     <div style=\"display: none;\"></div>";
         let dom = html::html_to_dom(&html);
@@ -109,6 +110,7 @@ mod passing {
             "<html>\
             <head>\
             <link rel=\"stylesheet\">\
+            <link rel=\"alternate stylesheet\">\
             <style></style>\
             </head>\
             <body>\
