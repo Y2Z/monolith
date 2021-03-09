@@ -545,7 +545,9 @@ pub fn walk_and_embed_assets(
                     if let Some(link_attr_rel_value) = get_node_attr(node, "rel") {
                         if is_icon(&link_attr_rel_value) {
                             link_type = LinkType::Icon;
-                        } else if link_attr_rel_value.eq_ignore_ascii_case("stylesheet") {
+                        } else if link_attr_rel_value.eq_ignore_ascii_case("stylesheet")
+                            || link_attr_rel_value.eq_ignore_ascii_case("alternate stylesheet")
+                        {
                             link_type = LinkType::Stylesheet;
                         } else if link_attr_rel_value.eq_ignore_ascii_case("preload") {
                             link_type = LinkType::Preload;
