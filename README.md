@@ -59,7 +59,7 @@ Dependency: `libssl-dev`
     $ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
 or
 
-    $ cat index.html | monolith -aIiFfcMv - > index-processed.html
+    $ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 
 ---------------------------------------------------
 
@@ -103,8 +103,8 @@ Please open an issue if something is wrong, that helps make this project better.
 
 ## License
 
-<a href="http://creativecommons.org/publicdomain/zero/1.0/">
-    <img src="http://i.creativecommons.org/p/zero/1.0/88x31.png" alt="CC0-1.0" />
+<a href="https://creativecommons.org/publicdomain/zero/1.0/">
+    <img src="https://i.creativecommons.org/p/zero/1.0/88x31.png" alt="CC0-1.0" />
 </a>
 <br />
 To the extent possible under law, the author(s) have dedicated all copyright related and neighboring rights to this software to the public domain worldwide.
