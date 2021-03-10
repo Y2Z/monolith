@@ -22,26 +22,26 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 ## Installation
 
-### Using Cargo
+#### Using [Cargo](https://crates.io/crates/monolith)
     $ cargo install monolith
 
-#### Via Homebrew (macOS and GNU/Linux)
+#### Via [Homebrew](https://formulae.brew.sh/formula/monolith) (macOS and GNU/Linux)
     $ brew install monolith
 
-#### Using Snapcraft (GNU/Linux)
+#### Using [Snapcraft](https://snapcraft.io/monolith) (GNU/Linux)
     $ snap install monolith
 
-#### Using FreeBSD packages (FreeBSD)
+#### Using [FreeBSD packages](https://svnweb.freebsd.org/ports/head/www/monolith/) (FreeBSD)
     $ pkg install monolith
 
-#### Using FreeBSD ports (FreeBSD)
+#### Using [FreeBSD ports](https://www.freshports.org/www/monolith/) (FreeBSD)
     $ cd /usr/ports/www/monolith/
     $ make install clean
 
-#### Using pre-built binaries (Windows, ARM-based devices, etc)
-Every [release](https://github.com/Y2Z/monolith/releases) contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
+#### Using [pre-built binaries](https://github.com/Y2Z/monolith/releases) (Windows, ARM-based devices, etc)
+Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
 
-#### Using Containers
+#### Using [containers](https://www.docker.com/)
     $ docker build -t Y2Z/monolith .
     $ sudo install -b utils/run-in-container.sh /usr/local/bin/monolith
 
