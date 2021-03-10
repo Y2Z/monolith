@@ -25,16 +25,16 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 ### Using Cargo
     $ cargo install monolith
 
-#### Via Homebrew (on macOS and GNU/Linux)
+#### Via Homebrew (macOS and GNU/Linux)
     $ brew install monolith
 
-#### Using Snapcraft (on GNU/Linux)
+#### Using Snapcraft (GNU/Linux)
     $ snap install monolith
 
-#### Using Ports collection (on FreeBSD and TrueOS)
+#### Using FreeBSD packages (FreeBSD)
     $ pkg install monolith
-or
 
+#### Using FreeBSD ports (FreeBSD)
     $ cd /usr/ports/www/monolith/
     $ make install clean
 
