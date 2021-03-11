@@ -7,131 +7,171 @@
 
 #[cfg(test)]
 mod passing {
+    use reqwest::Url;
+
     use crate::utils;
 
     #[test]
     fn image_gif87() {
-        assert_eq!(utils::detect_media_type(b"GIF87a", ""), "image/gif");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(utils::detect_media_type(b"GIF87a", &dummy_url), "image/gif");
     }
 
     #[test]
     fn image_gif89() {
-        assert_eq!(utils::detect_media_type(b"GIF89a", ""), "image/gif");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(utils::detect_media_type(b"GIF89a", &dummy_url), "image/gif");
     }
 
     #[test]
     fn image_jpeg() {
-        assert_eq!(utils::detect_media_type(b"\xFF\xD8\xFF", ""), "image/jpeg");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(
+            utils::detect_media_type(b"\xFF\xD8\xFF", &dummy_url),
+            "image/jpeg"
+        );
     }
 
     #[test]
     fn image_png() {
+        let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            utils::detect_media_type(b"\x89PNG\x0D\x0A\x1A\x0A", ""),
+            utils::detect_media_type(b"\x89PNG\x0D\x0A\x1A\x0A", &dummy_url),
             "image/png"
         );
     }
 
     #[test]
     fn image_svg() {
-        assert_eq!(utils::detect_media_type(b"<svg ", ""), "image/svg+xml");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(
+            utils::detect_media_type(b"<svg ", &dummy_url),
+            "image/svg+xml"
+        );
     }
 
     #[test]
     fn image_webp() {
+        let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            utils::detect_media_type(b"RIFF....WEBPVP8 ", ""),
+            utils::detect_media_type(b"RIFF....WEBPVP8 ", &dummy_url),
             "image/webp"
         );
     }
 
     #[test]
     fn image_icon() {
+        let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            utils::detect_media_type(b"\x00\x00\x01\x00", ""),
+            utils::detect_media_type(b"\x00\x00\x01\x00", &dummy_url),
             "image/x-icon"
         );
     }
 
     #[test]
     fn image_svg_filename() {
+        let file_url: Url = Url::parse("file:///tmp/local-file.svg").unwrap();
         assert_eq!(
-            utils::detect_media_type(b"<?xml ", "local-file.svg"),
+            utils::detect_media_type(b"<?xml ", &file_url),
             "image/svg+xml"
         );
     }
 
     #[test]
     fn image_svg_url_uppercase() {
-        assert_eq!(
-            utils::detect_media_type(b"", "https://some-site.com/images/local-file.SVG"),
-            "image/svg+xml"
-        );
+        let https_url: Url = Url::parse("https://some-site.com/images/local-file.SVG").unwrap();
+        assert_eq!(utils::detect_media_type(b"", &https_url), "image/svg+xml");
     }
 
     #[test]
     fn audio_mpeg() {
-        assert_eq!(utils::detect_media_type(b"ID3", ""), "audio/mpeg");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(utils::detect_media_type(b"ID3", &dummy_url), "audio/mpeg");
     }
 
     #[test]
     fn audio_mpeg_2() {
-        assert_eq!(utils::detect_media_type(b"\xFF\x0E", ""), "audio/mpeg");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(
+            utils::detect_media_type(b"\xFF\x0E", &dummy_url),
+            "audio/mpeg"
+        );
     }
 
     #[test]
     fn audio_mpeg_3() {
-        assert_eq!(utils::detect_media_type(b"\xFF\x0F", ""), "audio/mpeg");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(
+            utils::detect_media_type(b"\xFF\x0F", &dummy_url),
+            "audio/mpeg"
+        );
     }
 
     #[test]
     fn audio_ogg() {
-        assert_eq!(utils::detect_media_type(b"OggS", ""), "audio/ogg");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(utils::detect_media_type(b"OggS", &dummy_url), "audio/ogg");
     }
 
     #[test]
     fn audio_wav() {
+        let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            utils::detect_media_type(b"RIFF....WAVEfmt ", ""),
+            utils::detect_media_type(b"RIFF....WAVEfmt ", &dummy_url),
             "audio/wav"
         );
     }
 
     #[test]
     fn audio_flac() {
-        assert_eq!(utils::detect_media_type(b"fLaC", ""), "audio/x-flac");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(
+            utils::detect_media_type(b"fLaC", &dummy_url),
+            "audio/x-flac"
+        );
     }
 
     #[test]
     fn video_avi() {
+        let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            utils::detect_media_type(b"RIFF....AVI LIST", ""),
+            utils::detect_media_type(b"RIFF....AVI LIST", &dummy_url),
             "video/avi"
         );
     }
 
     #[test]
     fn video_mp4() {
-        assert_eq!(utils::detect_media_type(b"....ftyp", ""), "video/mp4");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(
+            utils::detect_media_type(b"....ftyp", &dummy_url),
+            "video/mp4"
+        );
     }
 
     #[test]
     fn video_mpeg() {
+        let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            utils::detect_media_type(b"\x00\x00\x01\x0B", ""),
+            utils::detect_media_type(b"\x00\x00\x01\x0B", &dummy_url),
             "video/mpeg"
         );
     }
 
     #[test]
     fn video_quicktime() {
-        assert_eq!(utils::detect_media_type(b"....moov", ""), "video/quicktime");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(
+            utils::detect_media_type(b"....moov", &dummy_url),
+            "video/quicktime"
+        );
     }
 
     #[test]
     fn video_webm() {
+        let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            utils::detect_media_type(b"\x1A\x45\xDF\xA3", ""),
+            utils::detect_media_type(b"\x1A\x45\xDF\xA3", &dummy_url),
             "video/webm"
         );
     }
@@ -146,10 +186,16 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
+    use reqwest::Url;
+
     use crate::utils;
 
     #[test]
     fn unknown_media_type() {
-        assert_eq!(utils::detect_media_type(b"abcdef0123456789", ""), "");
+        let dummy_url: Url = Url::parse("data:,").unwrap();
+        assert_eq!(
+            utils::detect_media_type(b"abcdef0123456789", &dummy_url),
+            ""
+        );
     }
 }

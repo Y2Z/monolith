@@ -7,12 +7,23 @@
 
 #[cfg(test)]
 mod passing {
+    use reqwest::Url;
+
     use crate::url;
+
+    #[test]
+    fn preserve_original() {
+        let u: Url = Url::parse("https://somewhere.com/font.eot#iefix").unwrap();
+
+        url::clean_url(u.clone());
+
+        assert_eq!(u.as_str(), "https://somewhere.com/font.eot#iefix");
+    }
 
     #[test]
     fn removes_fragment() {
         assert_eq!(
-            url::clean_url("https://somewhere.com/font.eot#iefix"),
+            url::clean_url(Url::parse("https://somewhere.com/font.eot#iefix").unwrap()).as_str(),
             "https://somewhere.com/font.eot"
         );
     }
@@ -20,31 +31,31 @@ mod passing {
     #[test]
     fn removes_empty_fragment() {
         assert_eq!(
-            url::clean_url("https://somewhere.com/font.eot#"),
+            url::clean_url(Url::parse("https://somewhere.com/font.eot#").unwrap()).as_str(),
             "https://somewhere.com/font.eot"
         );
     }
 
     #[test]
-    fn removes_empty_query_and_empty_fragment() {
+    fn removes_empty_fragment_and_keeps_empty_query() {
         assert_eq!(
-            url::clean_url("https://somewhere.com/font.eot?#"),
-            "https://somewhere.com/font.eot"
+            url::clean_url(Url::parse("https://somewhere.com/font.eot?#").unwrap()).as_str(),
+            "https://somewhere.com/font.eot?"
         );
     }
 
     #[test]
-    fn removes_empty_query_amp_and_empty_fragment() {
+    fn removesempty_fragment_and_keeps_empty_query() {
         assert_eq!(
-            url::clean_url("https://somewhere.com/font.eot?a=b&#"),
-            "https://somewhere.com/font.eot?a=b"
+            url::clean_url(Url::parse("https://somewhere.com/font.eot?a=b&#").unwrap()).as_str(),
+            "https://somewhere.com/font.eot?a=b&"
         );
     }
 
     #[test]
     fn keeps_credentials() {
         assert_eq!(
-            url::clean_url("https://cookie:monster@gibson.internet/"),
+            url::clean_url(Url::parse("https://cookie:monster@gibson.internet/").unwrap()).as_str(),
             "https://cookie:monster@gibson.internet/"
         );
     }

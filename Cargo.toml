@@ -39,4 +39,3 @@ features = ["default-tls", "blocking", "gzip"]
 
 [dev-dependencies]
 assert_cmd = "1.0.2"
-tempfile = "3.2.0"

@@ -8,6 +8,7 @@
 #[cfg(test)]
 mod passing {
     use reqwest::blocking::Client;
+    use reqwest::Url;
     use std::collections::HashMap;
 
     use crate::html;
@@ -21,7 +22,14 @@ mod passing {
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
+        let embedded_css = html::embed_srcset(
+            cache,
+            &client,
+            &Url::parse("data:,").unwrap(),
+            &srcset_value,
+            &options,
+            0,
+        );
 
         assert_eq!(
             embedded_css,
@@ -42,7 +50,14 @@ mod passing {
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
+        let embedded_css = html::embed_srcset(
+            cache,
+            &client,
+            &Url::parse("data:,").unwrap(),
+            &srcset_value,
+            &options,
+            0,
+        );
 
         assert_eq!(
             embedded_css,
@@ -58,7 +73,14 @@ mod passing {
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
+        let embedded_css = html::embed_srcset(
+            cache,
+            &client,
+            &Url::parse("data:,").unwrap(),
+            &srcset_value,
+            &options,
+            0,
+        );
 
         assert_eq!(
             embedded_css,
@@ -74,7 +96,14 @@ mod passing {
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
+        let embedded_css = html::embed_srcset(
+            cache,
+            &client,
+            &Url::parse("data:,").unwrap(),
+            &srcset_value,
+            &options,
+            0,
+        );
 
         assert_eq!(
             embedded_css,
@@ -98,6 +127,7 @@ mod passing {
 #[cfg(test)]
 mod failing {
     use reqwest::blocking::Client;
+    use reqwest::Url;
     use std::collections::HashMap;
 
     use crate::html;
@@ -111,7 +141,14 @@ mod failing {
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(cache, &client, "", &srcset_value, &options, 0);
+        let embedded_css = html::embed_srcset(
+            cache,
+            &client,
+            &Url::parse("data:,").unwrap(),
+            &srcset_value,
+            &options,
+            0,
+        );
 
         assert_eq!(
             embedded_css,
