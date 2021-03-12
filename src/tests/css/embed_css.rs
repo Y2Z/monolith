@@ -8,6 +8,7 @@
 #[cfg(test)]
 mod passing {
     use reqwest::blocking::Client;
+    use reqwest::Url;
     use std::collections::HashMap;
 
     use crate::css;
@@ -17,26 +18,24 @@ mod passing {
     fn empty_input() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("data:,").unwrap();
         let options = Options::default();
 
-        assert_eq!(css::embed_css(cache, &client, "", "", &options, 0), "");
+        assert_eq!(
+            css::embed_css(cache, &client, &document_url, "", &options, 0),
+            ""
+        );
     }
 
     #[test]
     fn trim_if_empty() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let options = Options::default();
 
         assert_eq!(
-            css::embed_css(
-                cache,
-                &client,
-                "https://doesntmatter.local/",
-                "\t     \t   ",
-                &options,
-                0,
-            ),
+            css::embed_css(cache, &client, &document_url, "\t     \t   ", &options, 0,),
             ""
         );
     }
@@ -45,6 +44,7 @@ mod passing {
     fn style_exclude_unquoted_images() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
@@ -58,14 +58,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(
-                cache,
-                &client,
-                "https://doesntmatter.local/",
-                &STYLE,
-                &options,
-                0,
-            ),
+            css::embed_css(cache, &client, &document_url, &STYLE, &options, 0,),
             format!(
                 "/* border: none;*/\
                 background-image: url('{empty_image}'); \
@@ -83,6 +76,7 @@ mod passing {
     fn style_exclude_single_quoted_images() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("data:,").unwrap();
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
@@ -96,7 +90,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(cache, &client, "", &STYLE, &options, 0),
+            css::embed_css(cache, &client, &document_url, &STYLE, &options, 0),
             format!(
                 "/* border: none;*/\
                 background-image: url('{empty_image}'); \
@@ -114,6 +108,7 @@ mod passing {
     fn style_block() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("file:///").unwrap();
         let mut options = Options::default();
         options.silent = true;
 
@@ -126,7 +121,7 @@ mod passing {
             html > body {}";
 
         assert_eq!(
-            css::embed_css(cache, &client, "file:///", &CSS, &options, 0),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0),
             CSS
         );
     }
@@ -135,6 +130,7 @@ mod passing {
     fn attribute_selectors() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
         options.silent = true;
 
@@ -143,38 +139,42 @@ mod passing {
                 /* Attribute exists */
             }
 
-            [data-value='foo'] {
+            [data-value=\"foo\"] {
                 /* Attribute has this exact value */
             }
 
-            [data-value*='foo'] {
+            [data-value*=\"foo\"] {
                 /* Attribute value contains this value somewhere in it */
             }
 
-            [data-value~='foo'] {
+            [data-value~=\"foo\"] {
                 /* Attribute has this value in a space-separated list somewhere */
             }
 
-            [data-value^='foo'] {
+            [data-value^=\"foo\"] {
                 /* Attribute value starts with this */
             }
 
-            [data-value|='foo'] {
+            [data-value|=\"foo\"] {
                 /* Attribute value starts with this in a dash-separated list */
             }
 
-            [data-value$='foo'] {
+            [data-value$=\"foo\"] {
                 /* Attribute value ends with this */
             }
             ";
 
-        assert_eq!(css::embed_css(cache, &client, "", &CSS, &options, 0), CSS);
+        assert_eq!(
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0),
+            CSS
+        );
     }
 
     #[test]
     fn import_string() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
         options.silent = true;
 
@@ -187,16 +187,9 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(
-                cache,
-                &client,
-                "https://doesntmatter.local/",
-                &CSS,
-                &options,
-                0,
-            ),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0,),
             "\
-            @charset 'UTF-8';\n\
+            @charset \"UTF-8\";\n\
             \n\
             @import 'data:text/css;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9';\n\
             \n\
@@ -209,6 +202,7 @@ mod passing {
     fn hash_urls() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
         options.silent = true;
 
@@ -223,14 +217,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(
-                cache,
-                &client,
-                "https://doesntmatter.local/",
-                &CSS,
-                &options,
-                0,
-            ),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0,),
             CSS
         );
     }
@@ -239,6 +226,7 @@ mod passing {
     fn transform_percentages_and_degrees() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
         options.silent = true;
 
@@ -251,14 +239,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(
-                cache,
-                &client,
-                "https://doesntmatter.local/",
-                &CSS,
-                &options,
-                0,
-            ),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0,),
             CSS
         );
     }
@@ -267,6 +248,7 @@ mod passing {
     fn unusual_indents() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
         options.silent = true;
 
@@ -281,14 +263,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(
-                cache,
-                &client,
-                "https://doesntmatter.local/",
-                &CSS,
-                &options,
-                0,
-            ),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0,),
             CSS
         );
     }
@@ -297,6 +272,7 @@ mod passing {
     fn exclude_fonts() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
         options.no_fonts = true;
         options.silent = true;
@@ -320,30 +296,47 @@ mod passing {
                 font-family: 'My Font' Verdana\n\
             }\n\
             ";
-
         const CSS_OUT: &str = " \
             \n\
             \n\
             #identifier {\n    \
-                font-family: 'My Font' Arial\n\
+                font-family: \"My Font\" Arial\n\
             }\n\
             \n \
             \n\
             \n\
             div {\n    \
-                font-family: 'My Font' Verdana\n\
+                font-family: \"My Font\" Verdana\n\
             }\n\
             ";
 
         assert_eq!(
-            css::embed_css(
-                cache,
-                &client,
-                "https://doesntmatter.local/",
-                &CSS,
-                &options,
-                0,
-            ),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0,),
+            CSS_OUT
+        );
+    }
+
+    #[test]
+    fn content() {
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+        let document_url: Url = Url::parse("data:,").unwrap();
+        let mut options = Options::default();
+        options.silent = true;
+
+        const CSS: &str = "\
+            #language a[href=\"#translations\"]:before {\n\
+                content: url(data:,) \"\\A\";\n\
+                white-space: pre }\n\
+            ";
+        const CSS_OUT: &str = "\
+            #language a[href=\"#translations\"]:before {\n\
+                content: url('data:;base64,') \"\\a \";\n\
+                white-space: pre }\n\
+            ";
+
+        assert_eq!(
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0,),
             CSS_OUT
         );
     }

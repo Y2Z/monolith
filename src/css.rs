@@ -1,9 +1,12 @@
-use cssparser::{ParseError, Parser, ParserInput, SourcePosition, Token};
+use cssparser::{
+    serialize_identifier, serialize_string, ParseError, Parser, ParserInput, SourcePosition, Token,
+};
 use reqwest::blocking::Client;
 use std::collections::HashMap;
+use url::Url;
 
 use crate::opts::Options;
-use crate::url::{data_to_data_url, get_url_fragment, is_http_url, resolve_url, url_with_fragment};
+use crate::url::{data_to_data_url, resolve_url};
 use crate::utils::retrieve_asset;
 
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
@@ -26,13 +29,30 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     "suffix",
     "symbols",
 ];
-const CSS_SPECIAL_CHARS: &'static str = "~!@$%^&*()+=,./'\";:?><[]{}|`#";
 
-pub fn is_image_url_prop(prop_name: &str) -> bool {
-    CSS_PROPS_WITH_IMAGE_URLS
-        .iter()
-        .find(|p| prop_name.eq_ignore_ascii_case(p))
-        .is_some()
+pub fn embed_css(
+    cache: &mut HashMap<String, Vec<u8>>,
+    client: &Client,
+    document_url: &Url,
+    css: &str,
+    options: &Options,
+    depth: u32,
+) -> String {
+    let mut input = ParserInput::new(&css);
+    let mut parser = Parser::new(&mut input);
+
+    process_css(
+        cache,
+        client,
+        document_url,
+        &mut parser,
+        options,
+        depth,
+        "",
+        "",
+        "",
+    )
+    .unwrap()
 }
 
 pub fn enquote(input: String, double: bool) -> String {
@@ -43,22 +63,29 @@ pub fn enquote(input: String, double: bool) -> String {
     }
 }
 
-pub fn escape(value: &str) -> String {
-    let mut res = str!(&value);
-
-    res = res.replace("\\", "\\\\");
-
-    for c in CSS_SPECIAL_CHARS.chars() {
-        res = res.replace(c, format!("\\{}", c).as_str());
-    }
-
+pub fn format_ident(ident: &str) -> String {
+    let mut res: String = String::new();
+    let _ = serialize_identifier(ident, &mut res);
     res
+}
+
+pub fn format_quoted_string(string: &str) -> String {
+    let mut res: String = String::new();
+    let _ = serialize_string(string, &mut res);
+    res
+}
+
+pub fn is_image_url_prop(prop_name: &str) -> bool {
+    CSS_PROPS_WITH_IMAGE_URLS
+        .iter()
+        .find(|p| prop_name.eq_ignore_ascii_case(p))
+        .is_some()
 }
 
 pub fn process_css<'a>(
     cache: &mut HashMap<String, Vec<u8>>,
     client: &Client,
-    parent_url: &str,
+    document_url: &Url,
     parser: &mut Parser,
     options: &Options,
     depth: u32,
@@ -112,7 +139,7 @@ pub fn process_css<'a>(
                         process_css(
                             cache,
                             client,
-                            parent_url,
+                            document_url,
                             parser,
                             options,
                             depth,
@@ -143,7 +170,7 @@ pub fn process_css<'a>(
             Token::Ident(ref value) => {
                 curr_rule = str!();
                 curr_prop = str!(value);
-                result.push_str(&escape(value));
+                result.push_str(&format_ident(value));
             }
             // @import, @font-face, @charset, @media...
             Token::AtKeyword(ref value) => {
@@ -164,23 +191,22 @@ pub fn process_css<'a>(
                     curr_rule = str!();
 
                     // Skip empty import values
-                    if value.len() < 1 {
+                    if value.len() == 0 {
                         result.push_str("''");
                         continue;
                     }
 
-                    let import_full_url = resolve_url(&parent_url, value).unwrap_or_default();
-                    let import_url_fragment = get_url_fragment(import_full_url.clone());
+                    let import_full_url: Url = resolve_url(&document_url, value);
                     match retrieve_asset(
                         cache,
                         client,
-                        &parent_url,
+                        &document_url,
                         &import_full_url,
                         options,
                         depth + 1,
                     ) {
                         Ok((import_contents, import_final_url, _import_media_type)) => {
-                            let import_data_url = data_to_data_url(
+                            let mut import_data_url = data_to_data_url(
                                 "text/css",
                                 embed_css(
                                     cache,
@@ -193,63 +219,58 @@ pub fn process_css<'a>(
                                 .as_bytes(),
                                 &import_final_url,
                             );
-                            let assembled_url: String = url_with_fragment(
-                                import_data_url.as_str(),
-                                import_url_fragment.as_str(),
-                            );
-                            result.push_str(enquote(assembled_url, false).as_str());
+                            import_data_url.set_fragment(import_full_url.fragment());
+                            result.push_str(enquote(import_data_url.to_string(), false).as_str());
                         }
                         Err(_) => {
                             // Keep remote reference if unable to retrieve the asset
-                            if is_http_url(import_full_url.clone()) {
-                                let assembled_url: String = url_with_fragment(
-                                    import_full_url.as_str(),
-                                    import_url_fragment.as_str(),
-                                );
-                                result.push_str(enquote(assembled_url, false).as_str());
+                            if import_full_url.scheme() == "http"
+                                || import_full_url.scheme() == "https"
+                            {
+                                result
+                                    .push_str(enquote(import_full_url.to_string(), false).as_str());
                             }
                         }
                     }
                 } else {
                     if func_name == "url" {
                         // Skip empty url()'s
-                        if value.len() < 1 {
+                        if value.len() == 0 {
                             continue;
                         }
 
                         if options.no_images && is_image_url_prop(curr_prop.as_str()) {
                             result.push_str(enquote(str!(empty_image!()), false).as_str());
                         } else {
-                            let resolved_url = resolve_url(&parent_url, value).unwrap_or_default();
-                            let url_fragment = get_url_fragment(resolved_url.clone());
+                            let resolved_url: Url = resolve_url(&document_url, value);
                             match retrieve_asset(
                                 cache,
                                 client,
-                                &parent_url,
+                                &document_url,
                                 &resolved_url,
                                 options,
                                 depth + 1,
                             ) {
                                 Ok((data, final_url, media_type)) => {
-                                    let data_url = data_to_data_url(&media_type, &data, &final_url);
-                                    let assembled_url: String =
-                                        url_with_fragment(data_url.as_str(), url_fragment.as_str());
-                                    result.push_str(enquote(assembled_url, false).as_str());
+                                    let mut data_url =
+                                        data_to_data_url(&media_type, &data, &final_url);
+                                    data_url.set_fragment(resolved_url.fragment());
+                                    result.push_str(enquote(data_url.to_string(), false).as_str());
                                 }
                                 Err(_) => {
                                     // Keep remote reference if unable to retrieve the asset
-                                    if is_http_url(resolved_url.clone()) {
-                                        let assembled_url: String = url_with_fragment(
-                                            resolved_url.as_str(),
-                                            url_fragment.as_str(),
+                                    if resolved_url.scheme() == "http"
+                                        || resolved_url.scheme() == "https"
+                                    {
+                                        result.push_str(
+                                            enquote(resolved_url.to_string(), false).as_str(),
                                         );
-                                        result.push_str(enquote(assembled_url, false).as_str());
                                     }
                                 }
                             }
                         }
                     } else {
-                        result.push_str(enquote(str!(value), false).as_str());
+                        result.push_str(format_quoted_string(value).as_str());
                     }
                 }
             }
@@ -290,8 +311,9 @@ pub fn process_css<'a>(
             Token::IDHash(ref value) => {
                 curr_rule = str!();
                 result.push_str("#");
-                result.push_str(&escape(value));
+                result.push_str(&format_ident(value));
             }
+            // url()
             Token::UnquotedUrl(ref value) => {
                 let is_import: bool = curr_rule == "import";
 
@@ -313,12 +335,17 @@ pub fn process_css<'a>(
 
                 result.push_str("url(");
                 if is_import {
-                    let full_url = resolve_url(&parent_url, value).unwrap_or_default();
-                    let url_fragment = get_url_fragment(full_url.clone());
-                    match retrieve_asset(cache, client, &parent_url, &full_url, options, depth + 1)
-                    {
+                    let full_url: Url = resolve_url(&document_url, value);
+                    match retrieve_asset(
+                        cache,
+                        client,
+                        &document_url,
+                        &full_url,
+                        options,
+                        depth + 1,
+                    ) {
                         Ok((css, final_url, _media_type)) => {
-                            let data_url = data_to_data_url(
+                            let mut data_url = data_to_data_url(
                                 "text/css",
                                 embed_css(
                                     cache,
@@ -331,16 +358,13 @@ pub fn process_css<'a>(
                                 .as_bytes(),
                                 &final_url,
                             );
-                            let assembled_url: String =
-                                url_with_fragment(data_url.as_str(), url_fragment.as_str());
-                            result.push_str(enquote(assembled_url, false).as_str());
+                            data_url.set_fragment(full_url.fragment());
+                            result.push_str(enquote(data_url.to_string(), false).as_str());
                         }
                         Err(_) => {
                             // Keep remote reference if unable to retrieve the asset
-                            if is_http_url(full_url.clone()) {
-                                let assembled_url: String =
-                                    url_with_fragment(full_url.as_str(), url_fragment.as_str());
-                                result.push_str(enquote(assembled_url, false).as_str());
+                            if full_url.scheme() == "http" || full_url.scheme() == "https" {
+                                result.push_str(enquote(full_url.to_string(), false).as_str());
                             }
                         }
                     }
@@ -348,28 +372,24 @@ pub fn process_css<'a>(
                     if is_image_url_prop(curr_prop.as_str()) && options.no_images {
                         result.push_str(enquote(str!(empty_image!()), false).as_str());
                     } else {
-                        let full_url = resolve_url(&parent_url, value).unwrap_or_default();
-                        let url_fragment = get_url_fragment(full_url.clone());
+                        let full_url: Url = resolve_url(&document_url, value);
                         match retrieve_asset(
                             cache,
                             client,
-                            &parent_url,
+                            &document_url,
                             &full_url,
                             options,
                             depth + 1,
                         ) {
                             Ok((data, final_url, media_type)) => {
-                                let data_url = data_to_data_url(&media_type, &data, &final_url);
-                                let assembled_url: String =
-                                    url_with_fragment(data_url.as_str(), url_fragment.as_str());
-                                result.push_str(enquote(assembled_url, false).as_str());
+                                let mut data_url = data_to_data_url(&media_type, &data, &final_url);
+                                data_url.set_fragment(full_url.fragment());
+                                result.push_str(enquote(data_url.to_string(), false).as_str());
                             }
                             Err(_) => {
                                 // Keep remote reference if unable to retrieve the asset
-                                if is_http_url(full_url.clone()) {
-                                    let assembled_url: String =
-                                        url_with_fragment(full_url.as_str(), url_fragment.as_str());
-                                    result.push_str(enquote(assembled_url, false).as_str());
+                                if full_url.scheme() == "http" || full_url.scheme() == "https" {
+                                    result.push_str(enquote(full_url.to_string(), false).as_str());
                                 }
                             }
                         }
@@ -377,6 +397,7 @@ pub fn process_css<'a>(
                 }
                 result.push_str(")");
             }
+            // =
             Token::Delim(ref value) => result.push_str(&value.to_string()),
             Token::Function(ref name) => {
                 let function_name: &str = &name.clone();
@@ -388,7 +409,7 @@ pub fn process_css<'a>(
                         process_css(
                             cache,
                             client,
-                            parent_url,
+                            document_url,
                             parser,
                             options,
                             depth,
@@ -412,29 +433,4 @@ pub fn process_css<'a>(
     }
 
     Ok(result)
-}
-
-pub fn embed_css(
-    cache: &mut HashMap<String, Vec<u8>>,
-    client: &Client,
-    parent_url: &str,
-    css: &str,
-    options: &Options,
-    depth: u32,
-) -> String {
-    let mut input = ParserInput::new(&css);
-    let mut parser = Parser::new(&mut input);
-
-    process_css(
-        cache,
-        client,
-        parent_url,
-        &mut parser,
-        options,
-        depth,
-        "",
-        "",
-        "",
-    )
-    .unwrap()
 }

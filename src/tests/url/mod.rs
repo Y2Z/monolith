@@ -1,12 +1,7 @@
 mod clean_url;
 mod data_to_data_url;
-mod decode_url;
-mod file_url_to_fs_path;
-mod get_url_fragment;
-mod is_data_url;
-mod is_file_url;
-mod is_http_url;
+mod is_url_and_has_protocol;
 mod parse_data_url;
+mod percent_decode;
+mod percent_encode;
 mod resolve_url;
-mod url_has_protocol;
-mod url_with_fragment;

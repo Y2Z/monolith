@@ -17,10 +17,7 @@ use std::default::Default;
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::opts::Options;
-use crate::url::{
-    data_to_data_url, get_url_fragment, is_http_url, resolve_url, url_has_protocol,
-    url_with_fragment,
-};
+use crate::url::{clean_url, data_to_data_url, is_url_and_has_protocol, resolve_url};
 use crate::utils::retrieve_asset;
 
 struct SrcSetItem<'a> {
@@ -112,41 +109,54 @@ pub fn compose_csp(options: &Options) -> String {
     string_list.join(" ")
 }
 
-pub fn create_metadata_tag(url: &str) -> String {
+pub fn create_metadata_tag(url: &Url) -> String {
     let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    let mut clean_url: Url = clean_url(url.clone());
 
-    // Safe to unwrap (we just put this through an HTTP request)
-    match Url::parse(url) {
-        Ok(mut clean_url) => {
-            clean_url.set_fragment(None);
-
-            // Prevent credentials from getting into metadata
-            if is_http_url(url) {
-                // Only HTTP(S) URLs may feature credentials
-                clean_url.set_username("").unwrap();
-                clean_url.set_password(None).unwrap();
-            }
-
-            format!(
-                "<!-- Saved from {} at {} using {} v{} -->",
-                if is_http_url(url) {
-                    &clean_url.as_str()
-                } else {
-                    "local source"
-                },
-                timestamp,
-                env!("CARGO_PKG_NAME"),
-                env!("CARGO_PKG_VERSION"),
-            )
-        }
-        Err(_) => str!(),
+    // Prevent credentials from getting into metadata
+    if clean_url.scheme() == "http" || clean_url.scheme() == "https" {
+        // Only HTTP(S) URLs may feature credentials
+        clean_url.set_username("").unwrap();
+        clean_url.set_password(None).unwrap();
     }
+
+    format!(
+        "<!-- Saved from {} at {} using {} v{} -->",
+        if clean_url.scheme() == "http" || clean_url.scheme() == "https" {
+            &clean_url.as_str()
+        } else {
+            "local source"
+        },
+        timestamp,
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+    )
+}
+
+pub fn determine_link_node_type(node: &Handle) -> &str {
+    let mut link_type: &str = "unknown";
+
+    if let Some(link_attr_rel_value) = get_node_attr(node, "rel") {
+        if is_icon(&link_attr_rel_value) {
+            link_type = "icon";
+        } else if link_attr_rel_value.eq_ignore_ascii_case("stylesheet")
+            || link_attr_rel_value.eq_ignore_ascii_case("alternate stylesheet")
+        {
+            link_type = "stylesheet";
+        } else if link_attr_rel_value.eq_ignore_ascii_case("preload") {
+            link_type = "preload";
+        } else if link_attr_rel_value.eq_ignore_ascii_case("dns-prefetch") {
+            link_type = "dns-prefetch";
+        }
+    }
+
+    link_type
 }
 
 pub fn embed_srcset(
     cache: &mut HashMap<String, Vec<u8>>,
     client: &Client,
-    parent_url: &str,
+    document_url: &Url,
     srcset: &str,
     options: &Options,
     depth: u32,
@@ -169,30 +179,26 @@ pub fn embed_srcset(
         if options.no_images {
             result.push_str(empty_image!());
         } else {
-            let image_full_url = resolve_url(&parent_url, part.path).unwrap_or_default();
-            let image_url_fragment = get_url_fragment(image_full_url.clone());
+            let image_full_url: Url = resolve_url(&document_url, part.path);
             match retrieve_asset(
                 cache,
                 client,
-                &parent_url,
+                &document_url,
                 &image_full_url,
                 options,
                 depth + 1,
             ) {
                 Ok((image_data, image_final_url, image_media_type)) => {
-                    let image_data_url =
+                    let mut image_data_url =
                         data_to_data_url(&image_media_type, &image_data, &image_final_url);
                     // Append retreved asset as a data URL
-                    let assembled_url: String =
-                        url_with_fragment(image_data_url.as_str(), image_url_fragment.as_str());
-                    result.push_str(assembled_url.as_ref());
+                    image_data_url.set_fragment(image_full_url.fragment());
+                    result.push_str(image_data_url.as_ref());
                 }
                 Err(_) => {
                     // Keep remote reference if unable to retrieve the asset
-                    if is_http_url(image_full_url.clone()) {
-                        let assembled_url: String =
-                            url_with_fragment(image_full_url.as_str(), image_url_fragment.as_str());
-                        result.push_str(assembled_url.as_ref());
+                    if image_full_url.scheme() == "http" || image_full_url.scheme() == "https" {
+                        result.push_str(image_full_url.as_ref());
                     } else {
                         // Avoid breaking the structure in case if not an HTTP(S) URL
                         result.push_str(empty_image!());
@@ -454,9 +460,9 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
                     ],
                     Default::default(),
                 );
-                // Note: the CSP meta-tag has to be prepended, never appended,
-                //       since there already may be one defined in the original document,
-                //       and browsers don't allow re-defining them (for obvious reasons)
+                // The CSP meta-tag has to be prepended, never appended,
+                //  since there already may be one defined in the original document,
+                //   and browsers don't allow re-defining them (for obvious reasons)
                 head.children.borrow_mut().reverse();
                 head.children.borrow_mut().push(meta.clone());
                 head.children.borrow_mut().reverse();
@@ -471,10 +477,117 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
     result
 }
 
+pub fn retrieve_and_embed_asset(
+    cache: &mut HashMap<String, Vec<u8>>,
+    client: &Client,
+    document_url: &Url,
+    node: &Handle,
+    attr_name: &str,
+    attr_value: &str,
+    options: &Options,
+    depth: u32,
+) {
+    let resolved_url: Url = resolve_url(document_url, attr_value.clone());
+
+    match retrieve_asset(
+        cache,
+        client,
+        &document_url.clone(),
+        &resolved_url,
+        options,
+        depth + 1,
+    ) {
+        Ok((data, final_url, mut media_type)) => {
+            // Check integrity if it's a LINK or SCRIPT tag
+            let node_name: &str = get_node_name(&node).unwrap();
+            let mut ok_to_include: bool = true;
+
+            if node_name == "link" || node_name == "script" {
+                let node_integrity_attr_value: Option<String> = get_node_attr(node, "integrity");
+
+                // Check integrity
+                if let Some(node_integrity_attr_value) = node_integrity_attr_value {
+                    if !node_integrity_attr_value.is_empty() {
+                        ok_to_include = check_integrity(&data, &node_integrity_attr_value);
+                    }
+                }
+
+                // Wipe integrity attribute
+                set_node_attr(node, "integrity", None);
+            }
+
+            if ok_to_include {
+                if node_name == "link" {
+                    let link_type: &str = determine_link_node_type(node);
+                    // CSS LINK nodes requires special treatment
+                    if link_type == "stylesheet" {
+                        let css: String = embed_css(
+                            cache,
+                            client,
+                            &final_url,
+                            &String::from_utf8_lossy(&data),
+                            options,
+                            depth + 1,
+                        );
+                        let css_data_url = data_to_data_url("text/css", css.as_bytes(), &final_url);
+
+                        set_node_attr(&node, attr_name, Some(css_data_url.to_string()));
+
+                        return; // Do not fall through
+                    }
+                } else if node_name == "frame" || node_name == "iframe" {
+                    let frame_dom = html_to_dom(&String::from_utf8_lossy(&data));
+                    walk_and_embed_assets(
+                        cache,
+                        client,
+                        &final_url,
+                        &frame_dom.document,
+                        &options,
+                        depth + 1,
+                    );
+
+                    let mut frame_data: Vec<u8> = Vec::new();
+                    serialize(
+                        &mut frame_data,
+                        &frame_dom.document,
+                        SerializeOpts::default(),
+                    )
+                    .unwrap();
+
+                    let mut frame_data_url = data_to_data_url(&media_type, &frame_data, &final_url);
+
+                    frame_data_url.set_fragment(resolved_url.fragment());
+
+                    set_node_attr(node, attr_name, Some(frame_data_url.to_string()));
+
+                    return; // Do not fall through
+                }
+
+                // Everything else
+                if node_name == "script" {
+                    media_type = "application/javascript".to_string();
+                }
+                let mut data_url = data_to_data_url(&media_type, &data, &final_url);
+                data_url.set_fragment(resolved_url.fragment());
+                set_node_attr(node, attr_name, Some(data_url.to_string()));
+            }
+        }
+        Err(_) => {
+            if resolved_url.scheme() == "http" || resolved_url.scheme() == "https" {
+                // Keep remote reference if unable to retrieve the asset
+                set_node_attr(node, attr_name, Some(resolved_url.to_string()));
+            } else {
+                // Exclude non-remote URLs
+                set_node_attr(node, attr_name, None);
+            }
+        }
+    }
+}
+
 pub fn walk_and_embed_assets(
     cache: &mut HashMap<String, Vec<u8>>,
     client: &Client,
-    url: &str,
+    document_url: &Url,
     node: &Handle,
     options: &Options,
     depth: u32,
@@ -483,7 +596,7 @@ pub fn walk_and_embed_assets(
         NodeData::Document => {
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(cache, client, &url, child, options, depth);
+                walk_and_embed_assets(cache, client, &document_url, child, options, depth);
             }
         }
         NodeData::Element {
@@ -524,198 +637,65 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "link" => {
-                    // Read and remember integrity attribute value of this LINK node
-                    let link_attr_integrity_value: Option<String> =
-                        get_node_attr(node, "integrity");
+                    let link_type: &str = determine_link_node_type(node);
 
-                    // Remove integrity attribute from the LINK node
-                    if link_attr_integrity_value != None {
-                        set_node_attr(node, "integrity", None);
-                    }
-
-                    enum LinkType {
-                        Icon,
-                        Stylesheet,
-                        Preload,
-                        DnsPrefetch,
-                        Unknown,
-                    }
-
-                    let mut link_type = LinkType::Unknown;
-                    if let Some(link_attr_rel_value) = get_node_attr(node, "rel") {
-                        if is_icon(&link_attr_rel_value) {
-                            link_type = LinkType::Icon;
-                        } else if link_attr_rel_value.eq_ignore_ascii_case("stylesheet")
-                            || link_attr_rel_value.eq_ignore_ascii_case("alternate stylesheet")
-                        {
-                            link_type = LinkType::Stylesheet;
-                        } else if link_attr_rel_value.eq_ignore_ascii_case("preload") {
-                            link_type = LinkType::Preload;
-                        } else if link_attr_rel_value.eq_ignore_ascii_case("dns-prefetch") {
-                            link_type = LinkType::DnsPrefetch;
-                        }
-                    }
-                    // Shadow the variable (to make it non-mutable)
-                    let link_type = link_type;
-
-                    match link_type {
-                        LinkType::Icon => {
-                            // Find and resolve this LINK node's href attribute
-                            if let Some(link_attr_href_value) = get_node_attr(node, "href") {
-                                if !options.no_images && !link_attr_href_value.is_empty() {
-                                    let link_href_full_url =
-                                        resolve_url(&url, link_attr_href_value).unwrap_or_default();
-                                    let link_href_url_fragment =
-                                        get_url_fragment(link_href_full_url.clone());
-                                    match retrieve_asset(
-                                        cache,
-                                        client,
-                                        &url,
-                                        &link_href_full_url,
-                                        options,
-                                        depth + 1,
-                                    ) {
-                                        Ok((
-                                            link_href_data,
-                                            link_href_final_url,
-                                            link_href_media_type,
-                                        )) => {
-                                            let mut ok_to_include = true;
-
-                                            // Check integrity
-                                            if let Some(link_attr_integrity_value) =
-                                                link_attr_integrity_value
-                                            {
-                                                if !link_attr_integrity_value.is_empty() {
-                                                    ok_to_include = check_integrity(
-                                                        &link_href_data,
-                                                        &link_attr_integrity_value,
-                                                    );
-                                                }
-                                            }
-
-                                            if ok_to_include {
-                                                let link_href_data_url = data_to_data_url(
-                                                    &link_href_media_type,
-                                                    &link_href_data,
-                                                    &link_href_final_url,
-                                                );
-                                                // Add new data URL href attribute
-                                                let assembled_url: String = url_with_fragment(
-                                                    link_href_data_url.as_str(),
-                                                    link_href_url_fragment.as_str(),
-                                                );
-                                                set_node_attr(&node, "href", Some(assembled_url));
-                                            }
-                                        }
-                                        Err(_) => {
-                                            // Keep remote reference if unable to retrieve the asset
-                                            if is_http_url(link_href_full_url.clone()) {
-                                                let assembled_url: String = url_with_fragment(
-                                                    link_href_full_url.as_str(),
-                                                    link_href_url_fragment.as_str(),
-                                                );
-                                                set_node_attr(node, "href", Some(assembled_url));
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    set_node_attr(node, "href", None);
-                                }
-                            }
-                        }
-                        LinkType::Stylesheet => {
-                            // Find and resolve this LINK node's href attribute
-                            if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                    if link_type == "icon" {
+                        // Find and resolve this LINK node's href attribute
+                        if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                            if !options.no_images && !link_attr_href_value.is_empty() {
+                                retrieve_and_embed_asset(
+                                    cache,
+                                    client,
+                                    &document_url,
+                                    node,
+                                    "href",
+                                    &link_attr_href_value,
+                                    options,
+                                    depth,
+                                );
+                            } else {
                                 set_node_attr(node, "href", None);
-
-                                if !options.no_css && !link_attr_href_value.is_empty() {
-                                    let link_href_full_url =
-                                        resolve_url(&url, link_attr_href_value).unwrap_or_default();
-                                    match retrieve_asset(
+                            }
+                        }
+                    } else if link_type == "stylesheet" {
+                        // Find and resolve this LINK node's href attribute
+                        if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                            if options.no_css {
+                                set_node_attr(node, "href", None);
+                            } else {
+                                if !link_attr_href_value.is_empty() {
+                                    retrieve_and_embed_asset(
                                         cache,
                                         client,
-                                        &url,
-                                        &link_href_full_url,
+                                        &document_url,
+                                        node,
+                                        "href",
+                                        &link_attr_href_value,
                                         options,
-                                        depth + 1,
-                                    ) {
-                                        Ok((
-                                            link_href_data,
-                                            link_href_final_url,
-                                            _link_href_media_type,
-                                        )) => {
-                                            let mut ok_to_include = true;
-
-                                            // Check integrity
-                                            if let Some(link_attr_integrity_value) =
-                                                link_attr_integrity_value
-                                            {
-                                                if !link_attr_integrity_value.is_empty() {
-                                                    ok_to_include = check_integrity(
-                                                        &link_href_data,
-                                                        &link_attr_integrity_value,
-                                                    );
-                                                }
-                                            }
-
-                                            if ok_to_include {
-                                                let css: String = embed_css(
-                                                    cache,
-                                                    client,
-                                                    &link_href_final_url,
-                                                    &String::from_utf8_lossy(&link_href_data),
-                                                    options,
-                                                    depth + 1,
-                                                );
-                                                let link_href_data_url = data_to_data_url(
-                                                    "text/css",
-                                                    css.as_bytes(),
-                                                    &link_href_final_url,
-                                                );
-                                                // Add new data URL href attribute
-                                                set_node_attr(
-                                                    &node,
-                                                    "href",
-                                                    Some(link_href_data_url),
-                                                );
-                                            }
-                                        }
-                                        Err(_) => {
-                                            // Keep remote reference if unable to retrieve the asset
-                                            if is_http_url(link_href_full_url.clone()) {
-                                                set_node_attr(
-                                                    &node,
-                                                    "href",
-                                                    Some(link_href_full_url),
-                                                );
-                                            }
-                                        }
-                                    }
+                                        depth,
+                                    );
                                 }
                             }
                         }
-                        LinkType::Preload | LinkType::DnsPrefetch => {
-                            // Since all resources are embedded as data URLs, preloading and prefetching are not necessary
-                            set_node_attr(node, "rel", None);
-                        }
-                        LinkType::Unknown => {
-                            // Make sure that all other LINKs' href attributes are full URLs
-                            if let Some(link_attr_href_value) = get_node_attr(node, "href") {
-                                let href_full_url =
-                                    resolve_url(&url, link_attr_href_value).unwrap_or_default();
-                                set_node_attr(node, "href", Some(href_full_url));
-                            }
+                    } else if link_type == "preload" || link_type == "dns-prefetch" {
+                        // Since all resources are embedded as data URLs, preloading and prefetching are not necessary
+                        set_node_attr(node, "rel", None);
+                    } else {
+                        // Make sure that all other LINKs' href attributes are full URLs
+                        if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                            let href_full_url: Url =
+                                resolve_url(&document_url, &link_attr_href_value);
+                            set_node_attr(node, "href", Some(href_full_url.to_string()));
                         }
                     }
                 }
                 "base" => {
-                    if is_http_url(url) {
+                    if document_url.scheme() == "http" || document_url.scheme() == "https" {
                         // Ensure the BASE node doesn't have a relative URL
                         if let Some(base_attr_href_value) = get_node_attr(node, "href") {
-                            let href_full_url =
-                                resolve_url(&url, base_attr_href_value).unwrap_or_default();
-                            set_node_attr(node, "href", Some(href_full_url));
+                            let href_full_url: Url =
+                                resolve_url(document_url, &base_attr_href_value);
+                            set_node_attr(node, "href", Some(href_full_url.to_string()));
                         }
                     }
                 }
@@ -726,46 +706,16 @@ pub fn walk_and_embed_assets(
                         set_node_attr(node, "background", None);
 
                         if !options.no_images && !body_attr_background_value.is_empty() {
-                            let background_full_url =
-                                resolve_url(&url, body_attr_background_value).unwrap_or_default();
-                            let background_url_fragment =
-                                get_url_fragment(background_full_url.clone());
-                            match retrieve_asset(
+                            retrieve_and_embed_asset(
                                 cache,
                                 client,
-                                &url,
-                                &background_full_url,
+                                document_url,
+                                node,
+                                "background",
+                                &body_attr_background_value,
                                 options,
-                                depth + 1,
-                            ) {
-                                Ok((
-                                    background_data,
-                                    background_final_url,
-                                    background_media_type,
-                                )) => {
-                                    let background_data_url = data_to_data_url(
-                                        &background_media_type,
-                                        &background_data,
-                                        &background_final_url,
-                                    );
-                                    // Convert background attribute to data URL
-                                    let assembled_url: String = url_with_fragment(
-                                        background_data_url.as_str(),
-                                        background_url_fragment.as_str(),
-                                    );
-                                    set_node_attr(node, "background", Some(assembled_url));
-                                }
-                                Err(_) => {
-                                    // Keep remote reference if unable to retrieve the asset
-                                    if is_http_url(background_full_url.clone()) {
-                                        let assembled_url: String = url_with_fragment(
-                                            background_full_url.as_str(),
-                                            background_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "background", Some(assembled_url));
-                                    }
-                                }
-                            }
+                                depth,
+                            );
                         }
                     }
                 }
@@ -793,63 +743,39 @@ pub fn walk_and_embed_assets(
                             set_node_attr(node, "src", Some(str!()));
                         } else {
                             // Add data URL src attribute
-                            let img_full_url = resolve_url(
-                                &url,
-                                if !img_attr_data_src_value
-                                    .clone()
-                                    .unwrap_or_default()
-                                    .is_empty()
-                                {
-                                    img_attr_data_src_value.unwrap_or_default()
-                                } else {
-                                    img_attr_src_value.unwrap_or_default()
-                                },
-                            )
-                            .unwrap_or_default();
-                            let img_url_fragment = get_url_fragment(img_full_url.clone());
-
-                            match retrieve_asset(
+                            let img_full_url: String = if !img_attr_data_src_value
+                                .clone()
+                                .unwrap_or_default()
+                                .is_empty()
+                            {
+                                img_attr_data_src_value.unwrap_or_default()
+                            } else {
+                                img_attr_src_value.unwrap_or_default()
+                            };
+                            retrieve_and_embed_asset(
                                 cache,
                                 client,
-                                &url,
+                                document_url,
+                                node,
+                                "src",
                                 &img_full_url,
                                 options,
-                                depth + 1,
-                            ) {
-                                Ok((img_data, img_final_url, img_media_type)) => {
-                                    let img_data_url = data_to_data_url(
-                                        &img_media_type,
-                                        &img_data,
-                                        &img_final_url,
-                                    );
-                                    let assembled_url: String = url_with_fragment(
-                                        img_data_url.as_str(),
-                                        img_url_fragment.as_str(),
-                                    );
-                                    set_node_attr(node, "src", Some(assembled_url));
-                                }
-                                Err(_) => {
-                                    if is_http_url(img_full_url.clone()) {
-                                        // Keep remote reference if unable to retrieve the asset
-                                        let assembled_url: String = url_with_fragment(
-                                            img_full_url.as_str(),
-                                            img_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "src", Some(assembled_url));
-                                    } else {
-                                        // Don't keep original reference if it's not a remote target
-                                        set_node_attr(node, "src", None);
-                                    }
-                                }
-                            }
+                                depth,
+                            );
                         }
                     }
 
                     // Resolve srcset attribute
                     if let Some(img_srcset) = get_node_attr(node, "srcset") {
                         if !img_srcset.is_empty() {
-                            let resolved_srcset: String =
-                                embed_srcset(cache, client, &url, &img_srcset, options, depth);
+                            let resolved_srcset: String = embed_srcset(
+                                cache,
+                                client,
+                                &document_url,
+                                &img_srcset,
+                                options,
+                                depth,
+                            );
                             set_node_attr(node, "srcset", Some(resolved_srcset));
                         }
                     }
@@ -871,46 +797,16 @@ pub fn walk_and_embed_assets(
                                     };
                                     set_node_attr(node, "src", Some(value));
                                 } else {
-                                    let input_image_full_url =
-                                        resolve_url(&url, input_attr_src_value).unwrap_or_default();
-                                    let input_image_url_fragment =
-                                        get_url_fragment(input_image_full_url.clone());
-                                    match retrieve_asset(
+                                    retrieve_and_embed_asset(
                                         cache,
                                         client,
-                                        &url,
-                                        &input_image_full_url,
+                                        document_url,
+                                        node,
+                                        "src",
+                                        &input_attr_src_value,
                                         options,
-                                        depth + 1,
-                                    ) {
-                                        Ok((
-                                            input_image_data,
-                                            input_image_final_url,
-                                            input_image_media_type,
-                                        )) => {
-                                            let input_image_data_url = data_to_data_url(
-                                                &input_image_media_type,
-                                                &input_image_data,
-                                                &input_image_final_url,
-                                            );
-                                            // Add data URL src attribute
-                                            let assembled_url: String = url_with_fragment(
-                                                input_image_data_url.as_str(),
-                                                input_image_url_fragment.as_str(),
-                                            );
-                                            set_node_attr(node, "src", Some(assembled_url));
-                                        }
-                                        Err(_) => {
-                                            // Keep remote reference if unable to retrieve the asset
-                                            if is_http_url(input_image_full_url.clone()) {
-                                                let assembled_url: String = url_with_fragment(
-                                                    input_image_full_url.as_str(),
-                                                    input_image_url_fragment.as_str(),
-                                                );
-                                                set_node_attr(node, "src", Some(assembled_url));
-                                            }
-                                        }
-                                    }
+                                        depth,
+                                    );
                                 }
                             }
                         }
@@ -933,40 +829,16 @@ pub fn walk_and_embed_assets(
                     }
 
                     if !options.no_images && !image_href.is_empty() {
-                        let image_full_url = resolve_url(&url, image_href).unwrap_or_default();
-                        let image_url_fragment = get_url_fragment(image_full_url.clone());
-                        match retrieve_asset(
+                        retrieve_and_embed_asset(
                             cache,
                             client,
-                            &url,
-                            &image_full_url,
+                            document_url,
+                            node,
+                            "href",
+                            &image_href,
                             options,
-                            depth + 1,
-                        ) {
-                            Ok((image_data, image_final_url, image_media_type)) => {
-                                let image_data_url = data_to_data_url(
-                                    &image_media_type,
-                                    &image_data,
-                                    &image_final_url,
-                                );
-                                // Add new data URL href attribute
-                                let assembled_url: String = url_with_fragment(
-                                    image_data_url.as_str(),
-                                    image_url_fragment.as_str(),
-                                );
-                                set_node_attr(node, "href", Some(assembled_url));
-                            }
-                            Err(_) => {
-                                // Keep remote reference if unable to retrieve the asset
-                                if is_http_url(image_full_url.clone()) {
-                                    let assembled_url: String = url_with_fragment(
-                                        image_full_url.as_str(),
-                                        image_url_fragment.as_str(),
-                                    );
-                                    set_node_attr(node, "href", Some(assembled_url));
-                                }
-                            }
-                        }
+                            depth,
+                        );
                     }
                 }
                 "source" => {
@@ -978,87 +850,31 @@ pub fn walk_and_embed_assets(
                             if options.no_audio {
                                 set_node_attr(node, "src", None);
                             } else {
-                                let src_full_url: String =
-                                    resolve_url(&url, source_attr_src_value.clone())
-                                        .unwrap_or_else(|_| source_attr_src_value.to_string());
-                                let src_url_fragment = get_url_fragment(src_full_url.clone());
-                                match retrieve_asset(
+                                retrieve_and_embed_asset(
                                     cache,
                                     client,
-                                    &url,
-                                    &src_full_url,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    &source_attr_src_value,
                                     options,
-                                    depth + 1,
-                                ) {
-                                    Ok((src_data, src_final_url, src_media_type)) => {
-                                        let src_data_url = data_to_data_url(
-                                            &src_media_type,
-                                            &src_data,
-                                            &src_final_url,
-                                        );
-                                        let assembled_url: String = url_with_fragment(
-                                            src_data_url.as_str(),
-                                            src_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "src", Some(assembled_url));
-                                    }
-                                    Err(_) => {
-                                        if is_http_url(src_full_url.clone()) {
-                                            // Keep remote reference if unable to retrieve the asset
-                                            let assembled_url: String = url_with_fragment(
-                                                src_full_url.as_str(),
-                                                src_url_fragment.as_str(),
-                                            );
-                                            set_node_attr(node, "src", Some(assembled_url));
-                                        } else {
-                                            // Exclude non-remote URLs
-                                            set_node_attr(node, "src", None);
-                                        }
-                                    }
-                                }
+                                    depth,
+                                );
                             }
                         } else if parent_node_name == "video" {
                             if options.no_video {
                                 set_node_attr(node, "src", None);
                             } else {
-                                let src_full_url: String =
-                                    resolve_url(&url, source_attr_src_value.clone())
-                                        .unwrap_or_else(|_| source_attr_src_value.to_string());
-                                let src_url_fragment = get_url_fragment(src_full_url.clone());
-                                match retrieve_asset(
+                                retrieve_and_embed_asset(
                                     cache,
                                     client,
-                                    &url,
-                                    &src_full_url,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    &source_attr_src_value,
                                     options,
-                                    depth + 1,
-                                ) {
-                                    Ok((src_data, src_final_url, src_media_type)) => {
-                                        let src_data_url = data_to_data_url(
-                                            &src_media_type,
-                                            &src_data,
-                                            &src_final_url,
-                                        );
-                                        let assembled_url: String = url_with_fragment(
-                                            src_data_url.as_str(),
-                                            src_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "src", Some(assembled_url));
-                                    }
-                                    Err(_) => {
-                                        if is_http_url(src_full_url.clone()) {
-                                            // Keep remote reference if unable to retrieve the asset
-                                            let assembled_url: String = url_with_fragment(
-                                                src_full_url.as_str(),
-                                                src_url_fragment.as_str(),
-                                            );
-                                            set_node_attr(node, "src", Some(assembled_url));
-                                        } else {
-                                            // Exclude non-remote URLs
-                                            set_node_attr(node, "src", None);
-                                        }
-                                    }
-                                }
+                                    depth,
+                                );
                             }
                         }
                     }
@@ -1072,7 +888,7 @@ pub fn walk_and_embed_assets(
                                     let resolved_srcset: String = embed_srcset(
                                         cache,
                                         client,
-                                        &url,
+                                        &document_url,
                                         &source_attr_srcset_value,
                                         options,
                                         depth,
@@ -1085,34 +901,29 @@ pub fn walk_and_embed_assets(
                 }
                 "a" | "area" => {
                     if let Some(anchor_attr_href_value) = get_node_attr(node, "href") {
-                        if options.no_js
-                            && anchor_attr_href_value
-                                .clone()
-                                .trim()
-                                .starts_with("javascript:")
+                        if anchor_attr_href_value
+                            .clone()
+                            .trim()
+                            .starts_with("javascript:")
                         {
-                            // Replace with empty JS call to preserve original behavior
-                            set_node_attr(node, "href", Some(str!("javascript:;")));
+                            if options.no_js {
+                                // Replace with empty JS call to preserve original behavior
+                                set_node_attr(node, "href", Some(str!("javascript:;")));
+                            }
                         } else if anchor_attr_href_value.clone().starts_with('#')
-                            || url_has_protocol(anchor_attr_href_value.clone())
+                            || is_url_and_has_protocol(&anchor_attr_href_value.clone())
                         {
-                            // Don't touch email links or hrefs which begin with a hash
+                            // Don't touch mailto: links or hrefs which begin with a hash sign
                         } else {
-                            let href_full_url =
-                                resolve_url(&url, anchor_attr_href_value).unwrap_or_default();
-                            set_node_attr(node, "href", Some(href_full_url));
+                            let href_full_url: Url =
+                                resolve_url(document_url, &anchor_attr_href_value);
+                            set_node_attr(node, "href", Some(href_full_url.to_string()));
                         }
                     }
                 }
                 "script" => {
                     // Read values of integrity and src attributes
-                    let script_attr_integrity: Option<String> = get_node_attr(node, "integrity");
                     let script_attr_src: Option<String> = get_node_attr(node, "src");
-
-                    // Wipe integrity attribute
-                    if script_attr_integrity != None {
-                        set_node_attr(node, "integrity", None);
-                    }
 
                     if options.no_js {
                         // Empty inner content
@@ -1122,52 +933,16 @@ pub fn walk_and_embed_assets(
                             set_node_attr(node, "src", None);
                         }
                     } else if !script_attr_src.clone().unwrap_or_default().is_empty() {
-                        let script_full_url =
-                            resolve_url(&url, script_attr_src.unwrap_or_default())
-                                .unwrap_or_default();
-                        match retrieve_asset(
+                        retrieve_and_embed_asset(
                             cache,
                             client,
-                            &url,
-                            &script_full_url,
+                            document_url,
+                            node,
+                            "src",
+                            &script_attr_src.unwrap_or_default(),
                             options,
-                            depth + 1,
-                        ) {
-                            Ok((script_data, script_final_url, _script_media_type)) => {
-                                let mut ok_to_include = true;
-
-                                // Check integrity
-                                if let Some(script_attr_integrity_value) = script_attr_integrity {
-                                    if !script_attr_integrity_value.is_empty() {
-                                        ok_to_include = check_integrity(
-                                            &script_data,
-                                            &script_attr_integrity_value,
-                                        );
-                                    }
-                                }
-
-                                if ok_to_include {
-                                    // Only embed if we're able to validate integrity
-                                    let script_data_url = data_to_data_url(
-                                        "application/javascript",
-                                        &script_data,
-                                        &script_final_url,
-                                    );
-                                    set_node_attr(node, "src", Some(script_data_url));
-                                } else {
-                                    set_node_attr(node, "src", None);
-                                }
-                            }
-                            Err(_) => {
-                                if is_http_url(script_full_url.clone()) {
-                                    // Keep remote reference if unable to retrieve the asset
-                                    set_node_attr(node, "src", Some(script_full_url));
-                                } else {
-                                    // Remove src attribute if target is not remote
-                                    set_node_attr(node, "src", None);
-                                }
-                            }
-                        };
+                            depth,
+                        );
                     }
                 }
                 "style" => {
@@ -1181,7 +956,7 @@ pub fn walk_and_embed_assets(
                                 let replacement = embed_css(
                                     cache,
                                     client,
-                                    &url,
+                                    &document_url,
                                     tendril.as_ref(),
                                     options,
                                     depth,
@@ -1195,11 +970,9 @@ pub fn walk_and_embed_assets(
                 "form" => {
                     if let Some(form_attr_action_value) = get_node_attr(node, "action") {
                         // Modify action property to ensure it's a full URL
-                        if !is_http_url(form_attr_action_value.clone()) {
-                            let form_action_full_url =
-                                resolve_url(&url, form_attr_action_value).unwrap_or_default();
-                            set_node_attr(node, "action", Some(form_action_full_url));
-                        }
+                        let form_action_full_url: Url =
+                            resolve_url(document_url, &form_attr_action_value);
+                        set_node_attr(node, "action", Some(form_action_full_url.to_string()));
                     }
                 }
                 "frame" | "iframe" => {
@@ -1208,154 +981,57 @@ pub fn walk_and_embed_assets(
                             // Empty the src attribute
                             set_node_attr(node, "src", Some(str!()));
                         } else {
-                            let frame_src = frame_attr_src_value.trim();
-
                             // Ignore (i)frames with empty source (they cause infinite loops)
-                            if !frame_src.is_empty() {
-                                let frame_full_url =
-                                    resolve_url(&url, frame_src).unwrap_or_default();
-                                let frame_url_fragment = get_url_fragment(frame_full_url.clone());
-                                match retrieve_asset(
+                            if !frame_attr_src_value.trim().is_empty() {
+                                retrieve_and_embed_asset(
                                     cache,
                                     client,
-                                    &url,
-                                    &frame_full_url,
+                                    &document_url,
+                                    node,
+                                    "href",
+                                    &frame_attr_src_value,
                                     options,
-                                    depth + 1,
-                                ) {
-                                    Ok((frame_data, frame_final_url, frame_media_type)) => {
-                                        let frame_dom =
-                                            html_to_dom(&String::from_utf8_lossy(&frame_data));
-                                        walk_and_embed_assets(
-                                            cache,
-                                            client,
-                                            &frame_final_url,
-                                            &frame_dom.document,
-                                            &options,
-                                            depth + 1,
-                                        );
-                                        let mut frame_data: Vec<u8> = Vec::new();
-                                        serialize(
-                                            &mut frame_data,
-                                            &frame_dom.document,
-                                            SerializeOpts::default(),
-                                        )
-                                        .unwrap();
-                                        let frame_data_url = data_to_data_url(
-                                            &frame_media_type,
-                                            &frame_data,
-                                            &frame_final_url,
-                                        );
-                                        let assembled_url: String = url_with_fragment(
-                                            frame_data_url.as_str(),
-                                            frame_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "src", Some(assembled_url));
-                                    }
-                                    Err(_) => {
-                                        // Keep remote reference if unable to retrieve the asset
-                                        if is_http_url(frame_full_url.clone()) {
-                                            let assembled_url: String = url_with_fragment(
-                                                frame_full_url.as_str(),
-                                                frame_url_fragment.as_str(),
-                                            );
-                                            set_node_attr(node, "src", Some(assembled_url));
-                                        }
-                                    }
-                                }
+                                    depth,
+                                );
                             }
                         }
                     }
                 }
                 "audio" => {
+                    // Embed audio source
                     if let Some(audio_attr_src_value) = get_node_attr(node, "src") {
                         if options.no_audio {
                             set_node_attr(node, "src", None);
                         } else {
-                            let src_full_url: String =
-                                resolve_url(&url, audio_attr_src_value.clone())
-                                    .unwrap_or_else(|_| audio_attr_src_value.to_string());
-                            let src_url_fragment = get_url_fragment(src_full_url.clone());
-                            match retrieve_asset(
+                            retrieve_and_embed_asset(
                                 cache,
                                 client,
-                                &url,
-                                &src_full_url,
+                                document_url,
+                                node,
+                                "src",
+                                &audio_attr_src_value,
                                 options,
-                                depth + 1,
-                            ) {
-                                Ok((src_data, src_final_url, src_media_type)) => {
-                                    let src_data_url = data_to_data_url(
-                                        &src_media_type,
-                                        &src_data,
-                                        &src_final_url,
-                                    );
-                                    let assembled_url: String = url_with_fragment(
-                                        src_data_url.as_str(),
-                                        src_url_fragment.as_str(),
-                                    );
-                                    set_node_attr(node, "src", Some(assembled_url));
-                                }
-                                Err(_) => {
-                                    if is_http_url(src_full_url.clone()) {
-                                        // Keep remote reference if unable to retrieve the asset
-                                        let assembled_url: String = url_with_fragment(
-                                            src_full_url.as_str(),
-                                            src_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "src", Some(assembled_url));
-                                    } else {
-                                        // Exclude non-remote URLs
-                                        set_node_attr(node, "src", None);
-                                    }
-                                }
-                            }
+                                depth,
+                            );
                         }
                     }
                 }
                 "video" => {
+                    // Embed video source
                     if let Some(video_attr_src_value) = get_node_attr(node, "src") {
                         if options.no_video {
                             set_node_attr(node, "src", None);
                         } else {
-                            let src_full_url: String =
-                                resolve_url(&url, video_attr_src_value.clone())
-                                    .unwrap_or_else(|_| video_attr_src_value.to_string());
-                            let src_url_fragment = get_url_fragment(src_full_url.clone());
-                            match retrieve_asset(
+                            retrieve_and_embed_asset(
                                 cache,
                                 client,
-                                &url,
-                                &src_full_url,
+                                document_url,
+                                node,
+                                "src",
+                                &video_attr_src_value,
                                 options,
-                                depth + 1,
-                            ) {
-                                Ok((src_data, src_final_url, src_media_type)) => {
-                                    let src_data_url = data_to_data_url(
-                                        &src_media_type,
-                                        &src_data,
-                                        &src_final_url,
-                                    );
-                                    let assembled_url: String = url_with_fragment(
-                                        src_data_url.as_str(),
-                                        src_url_fragment.as_str(),
-                                    );
-                                    set_node_attr(node, "src", Some(assembled_url));
-                                }
-                                Err(_) => {
-                                    if is_http_url(src_full_url.clone()) {
-                                        // Keep remote reference if unable to retrieve the asset
-                                        let assembled_url: String = url_with_fragment(
-                                            src_full_url.as_str(),
-                                            src_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "src", Some(assembled_url));
-                                    } else {
-                                        // Exclude non-remote URLs
-                                        set_node_attr(node, "src", None);
-                                    }
-                                }
-                            }
+                                depth,
+                            );
                         }
                     }
 
@@ -1366,48 +1042,16 @@ pub fn walk_and_embed_assets(
                             if options.no_images {
                                 set_node_attr(node, "poster", Some(str!(empty_image!())));
                             } else {
-                                let video_poster_full_url =
-                                    resolve_url(&url, video_attr_poster_value).unwrap_or_default();
-                                let video_poster_url_fragment =
-                                    get_url_fragment(video_poster_full_url.clone());
-                                match retrieve_asset(
+                                retrieve_and_embed_asset(
                                     cache,
                                     client,
-                                    &url,
-                                    &video_poster_full_url,
+                                    document_url,
+                                    node,
+                                    "poster",
+                                    &video_attr_poster_value,
                                     options,
-                                    depth + 1,
-                                ) {
-                                    Ok((
-                                        video_poster_data,
-                                        video_poster_final_url,
-                                        video_poster_media_type,
-                                    )) => {
-                                        let video_poster_data_url = data_to_data_url(
-                                            &video_poster_media_type,
-                                            &video_poster_data,
-                                            &video_poster_final_url,
-                                        );
-                                        let assembled_url: String = url_with_fragment(
-                                            video_poster_data_url.as_str(),
-                                            video_poster_url_fragment.as_str(),
-                                        );
-                                        set_node_attr(node, "poster", Some(assembled_url));
-                                    }
-                                    Err(_) => {
-                                        if is_http_url(video_poster_full_url.clone()) {
-                                            // Keep remote reference if unable to retrieve the asset
-                                            let assembled_url: String = url_with_fragment(
-                                                video_poster_full_url.as_str(),
-                                                video_poster_url_fragment.as_str(),
-                                            );
-                                            set_node_attr(node, "poster", Some(assembled_url));
-                                        } else {
-                                            // Get rid of poster attribute if the URL is not remote
-                                            set_node_attr(node, "poster", None);
-                                        }
-                                    }
-                                }
+                                    depth,
+                                );
                             }
                         }
                     }
@@ -1424,7 +1068,7 @@ pub fn walk_and_embed_assets(
                                 walk_and_embed_assets(
                                     cache,
                                     client,
-                                    &url,
+                                    &document_url,
                                     &noscript_contents_dom.document,
                                     &options,
                                     depth,
@@ -1458,12 +1102,19 @@ pub fn walk_and_embed_assets(
             } else {
                 // Embed URLs found within the style attribute of this node
                 if let Some(node_attr_style_value) = get_node_attr(node, "style") {
-                    let embedded_style =
-                        embed_css(cache, client, &url, &node_attr_style_value, options, depth);
+                    let embedded_style = embed_css(
+                        cache,
+                        client,
+                        &document_url,
+                        &node_attr_style_value,
+                        options,
+                        depth,
+                    );
                     set_node_attr(node, "style", Some(embedded_style));
                 }
             }
 
+            // Strip all JS from document
             if options.no_js {
                 let attrs_mut = &mut attrs.borrow_mut();
                 // Get rid of JS event attributes
@@ -1481,7 +1132,7 @@ pub fn walk_and_embed_assets(
 
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(cache, client, &url, child, options, depth);
+                walk_and_embed_assets(cache, client, &document_url, child, options, depth);
             }
         }
         _ => {

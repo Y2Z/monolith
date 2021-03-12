@@ -220,7 +220,7 @@ mod passing {
         // STDOUT should contain HTML with no JS in it
         assert_eq!(
             std::str::from_utf8(&out.stdout).unwrap(),
-            "<html><head><script></script></head><body></body></html>\n"
+            "<html><head><script src=\"data:application/javascript;base64,\"></script></head><body></body></html>\n"
         );
 
         // STDERR should be empty
