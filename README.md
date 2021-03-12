@@ -75,6 +75,7 @@ or
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-M`: Don't add timestamp and URL information
+ - `-n`: Extract contents of NOSCRIPT tags
  - `-o`: Write output to `file`
  - `-s`: Be quiet
  - `-t`: Adjust `network request timeout`
