@@ -38,6 +38,10 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
     $ cd /usr/ports/www/monolith/
     $ make install clean
 
+#### Using [pkgsrc](https://pkgsrc.se/www/monolith) (NetBSD, OpenBSD, Haiku, etc)
+    $ cd /usr/pkgsrc/www/monolith
+    $ make install clean
+
 #### Using [pre-built binaries](https://github.com/Y2Z/monolith/releases) (Windows, ARM-based devices, etc)
 Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
 
