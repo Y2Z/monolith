@@ -474,6 +474,11 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
         result = String::from_utf8(buf).unwrap();
     }
 
+    if options.unwrap_noscript {
+        let noscript_re = Regex::new(r"<(?P<c>/?noscript)>").unwrap();
+        result = noscript_re.replace_all(&result, "<!--$c-->").to_string();
+    }
+
     result
 }
 
@@ -1060,11 +1065,11 @@ pub fn walk_and_embed_assets(
                     for child_node in node.children.borrow_mut().iter_mut() {
                         match child_node.data {
                             NodeData::Text { ref contents } => {
-                                // Get contents of the NOSCRIPT node
+                                // Get contents of NOSCRIPT node
                                 let mut noscript_contents = contents.borrow_mut();
-                                // Parse contents of the NOSCRIPT node
+                                // Parse contents of NOSCRIPT node as DOM
                                 let noscript_contents_dom: RcDom = html_to_dom(&noscript_contents);
-                                // Embed assets within the NOSCRIPT node
+                                // Embed assets of NOSCRIPT node contents
                                 walk_and_embed_assets(
                                     cache,
                                     client,
@@ -1075,7 +1080,7 @@ pub fn walk_and_embed_assets(
                                 );
                                 // Get rid of original contents
                                 noscript_contents.clear();
-                                // Insert HTML containing embedded assets into the NOSCRIPT node
+                                // Insert HTML containing embedded assets back into NOSCRIPT node
                                 if let Some(html) =
                                     get_child_node_by_name(&noscript_contents_dom.document, "html")
                                 {

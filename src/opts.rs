@@ -21,6 +21,7 @@ pub struct Options {
     pub no_video: bool,
     pub target: String,
     pub no_color: bool,
+    pub unwrap_noscript: bool,
 }
 
 const ASCII: &'static str = " \
@@ -55,6 +56,9 @@ impl Options {
             .args_from_usage("-j, --no-js 'Removes JavaScript'")
             .args_from_usage("-k, --insecure 'Allows invalid X.509 (TLS) certificates'")
             .args_from_usage("-M, --no-metadata 'Excludes timestamp and source information'")
+            .args_from_usage(
+                "-n, --unwrap-noscript 'Replaces NOSCRIPT elements with their contents'",
+            )
             .args_from_usage("-o, --output=[document.html] 'Writes output to <file>'")
             .args_from_usage("-s, --silent 'Suppresses verbosity'")
             .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
@@ -100,6 +104,7 @@ impl Options {
         } else {
             options.user_agent = Some(DEFAULT_USER_AGENT.to_string());
         }
+        options.unwrap_noscript = app.is_present("unwrap-noscript");
         options.no_video = app.is_present("no-video");
 
         options.no_color =
