@@ -12,7 +12,7 @@ pub fn clean_url(url: Url) -> Url {
     url
 }
 
-pub fn data_to_data_url(media_type: &str, data: &[u8], final_asset_url: &Url) -> Url {
+pub fn create_data_url(media_type: &str, data: &[u8], final_asset_url: &Url) -> Url {
     let media_type: String = if media_type.is_empty() {
         detect_media_type(data, &final_asset_url)
     } else {

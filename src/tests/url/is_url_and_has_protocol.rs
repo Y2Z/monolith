@@ -49,6 +49,11 @@ mod passing {
     }
 
     #[test]
+    fn file() {
+        assert!(url::is_url_and_has_protocol("file:///tmp/image.png"));
+    }
+
+    #[test]
     fn mailto_uppercase() {
         assert!(url::is_url_and_has_protocol(
             "MAILTO:somebody@somewhere.com?subject=hello"
@@ -58,6 +63,11 @@ mod passing {
     #[test]
     fn empty_data_url() {
         assert!(url::is_url_and_has_protocol("data:text/html,"));
+    }
+
+    #[test]
+    fn empty_data_url_surrounded_by_spaces() {
+        assert!(url::is_url_and_has_protocol(" data:text/html, "));
     }
 }
 
@@ -74,25 +84,27 @@ mod failing {
 
     #[test]
     fn url_with_no_protocol() {
-        assert!(!url::is_url_and_has_protocol(
-            "//some-hostname.com/some-file.html"
-        ));
+        assert_eq!(
+            url::is_url_and_has_protocol("//some-hostname.com/some-file.html"),
+            false
+        );
     }
 
     #[test]
     fn relative_path() {
-        assert!(!url::is_url_and_has_protocol(
-            "some-hostname.com/some-file.html"
-        ));
+        assert_eq!(
+            url::is_url_and_has_protocol("some-hostname.com/some-file.html"),
+            false
+        );
     }
 
     #[test]
     fn relative_to_root_path() {
-        assert!(!url::is_url_and_has_protocol("/some-file.html"));
+        assert_eq!(url::is_url_and_has_protocol("/some-file.html"), false);
     }
 
     #[test]
     fn empty_string() {
-        assert!(!url::is_url_and_has_protocol(""));
+        assert_eq!(url::is_url_and_has_protocol(""), false);
     }
 }

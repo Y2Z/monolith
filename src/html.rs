@@ -17,7 +17,7 @@ use std::default::Default;
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::opts::Options;
-use crate::url::{clean_url, data_to_data_url, is_url_and_has_protocol, resolve_url};
+use crate::url::{clean_url, create_data_url, is_url_and_has_protocol, resolve_url};
 use crate::utils::retrieve_asset;
 
 struct SrcSetItem<'a> {
@@ -190,7 +190,7 @@ pub fn embed_srcset(
             ) {
                 Ok((image_data, image_final_url, image_media_type)) => {
                     let mut image_data_url =
-                        data_to_data_url(&image_media_type, &image_data, &image_final_url);
+                        create_data_url(&image_media_type, &image_data, &image_final_url);
                     // Append retreved asset as a data URL
                     image_data_url.set_fragment(image_full_url.fragment());
                     result.push_str(image_data_url.as_ref());
@@ -534,7 +534,7 @@ pub fn retrieve_and_embed_asset(
                             options,
                             depth + 1,
                         );
-                        let css_data_url = data_to_data_url("text/css", css.as_bytes(), &final_url);
+                        let css_data_url = create_data_url("text/css", css.as_bytes(), &final_url);
 
                         set_node_attr(&node, attr_name, Some(css_data_url.to_string()));
 
@@ -559,7 +559,7 @@ pub fn retrieve_and_embed_asset(
                     )
                     .unwrap();
 
-                    let mut frame_data_url = data_to_data_url(&media_type, &frame_data, &final_url);
+                    let mut frame_data_url = create_data_url(&media_type, &frame_data, &final_url);
 
                     frame_data_url.set_fragment(resolved_url.fragment());
 
@@ -572,7 +572,7 @@ pub fn retrieve_and_embed_asset(
                 if node_name == "script" {
                     media_type = "application/javascript".to_string();
                 }
-                let mut data_url = data_to_data_url(&media_type, &data, &final_url);
+                let mut data_url = create_data_url(&media_type, &data, &final_url);
                 data_url.set_fragment(resolved_url.fragment());
                 set_node_attr(node, attr_name, Some(data_url.to_string()));
             }

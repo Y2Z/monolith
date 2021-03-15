@@ -12,6 +12,34 @@ mod passing {
     use crate::url;
 
     #[test]
+    fn basic_httsp_relative() {
+        assert_eq!(
+            url::resolve_url(
+                &Url::parse("https://www.kernel.org").unwrap(),
+                "category/signatures.html"
+            )
+            .as_str(),
+            Url::parse("https://www.kernel.org/category/signatures.html")
+                .unwrap()
+                .as_str()
+        );
+    }
+
+    #[test]
+    fn basic_httsp_absolute() {
+        assert_eq!(
+            url::resolve_url(
+                &Url::parse("https://www.kernel.org").unwrap(),
+                "/category/signatures.html"
+            )
+            .as_str(),
+            Url::parse("https://www.kernel.org/category/signatures.html")
+                .unwrap()
+                .as_str()
+        );
+    }
+
+    #[test]
     fn from_https_to_level_up_relative() {
         assert_eq!(
             url::resolve_url(
@@ -50,7 +78,7 @@ mod passing {
     }
 
     #[test]
-    fn from_https_url_to_relative_root_path() {
+    fn from_https_url_to_absolute_path() {
         assert_eq!(
             url::resolve_url(
                 &Url::parse("https://www.kernel.org/category/signatures.html").unwrap(),
@@ -148,22 +176,28 @@ mod passing {
         );
     }
 
-    // #[test]
-    // fn resolve_from_file_url_to_file_url() {
-    //     assert_eq!(
-    //         if cfg!(windows) {
-    //             url::resolve_url(&Url::parse("file:///c:/index.html").unwrap(), "file:///c:/image.png").as_str()
-    //         } else {
-    //             url::resolve_url(&Url::parse("file:///tmp/index.html").unwrap(), "file:///tmp/image.png")
-    //                 .as_str()
-    //         },
-    //         if cfg!(windows) {
-    //             "file:///c:/image.png"
-    //         } else {
-    //             "file:///tmp/image.png"
-    //         }
-    //     );
-    // }
+    #[test]
+    fn resolve_from_file_url_to_file_url() {
+        if cfg!(windows) {
+            assert_eq!(
+                url::resolve_url(
+                    &Url::parse("file:///c:/index.html").unwrap(),
+                    "file:///c:/image.png"
+                )
+                .as_str(),
+                "file:///c:/image.png"
+            );
+        } else {
+            assert_eq!(
+                url::resolve_url(
+                    &Url::parse("file:///tmp/index.html").unwrap(),
+                    "file:///tmp/image.png"
+                )
+                .as_str(),
+                "file:///tmp/image.png"
+            );
+        }
+    }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗

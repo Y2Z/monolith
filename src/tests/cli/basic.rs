@@ -71,7 +71,7 @@ mod passing {
         // STDOUT should contain embedded CSS url()'s
         assert_eq!(
             std::str::from_utf8(&out.stdout).unwrap(),
-            "<html><head><style>\n\n    @charset \"UTF-8\";\n\n    @import \'data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\';\n\n    @import url(\'data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\');\n\n    @import url(\'data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\');\n\n</style>\n</head><body></body></html>\n"
+            "<html><head><style>\n\n    @charset \"UTF-8\";\n\n    @import \"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\";\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n</style>\n</head><body></body></html>\n"
         );
 
         // STDERR should list files that got retrieved

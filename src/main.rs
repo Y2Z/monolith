@@ -13,7 +13,7 @@ use monolith::html::{
     stringify_document, walk_and_embed_assets,
 };
 use monolith::opts::Options;
-use monolith::url::{data_to_data_url, parse_data_url, resolve_url};
+use monolith::url::{create_data_url, parse_data_url, resolve_url};
 use monolith::utils::retrieve_asset;
 
 mod macros;
@@ -266,7 +266,7 @@ fn main() {
             0,
         ) {
             Ok((data, final_url, media_type)) => {
-                let favicon_data_url: Url = data_to_data_url(&media_type, &data, &final_url);
+                let favicon_data_url: Url = create_data_url(&media_type, &data, &final_url);
                 dom = add_favicon(&dom.document, favicon_data_url.to_string());
             }
             Err(_) => {
