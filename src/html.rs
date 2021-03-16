@@ -826,6 +826,7 @@ pub fn walk_and_embed_assets(
                             set_node_attr(node, "href", None);
                         }
                     }
+
                     if let Some(image_attr_xlink_href_value) = get_node_attr(node, "xlink:href") {
                         image_href = image_attr_xlink_href_value;
                         if options.no_images {

@@ -12,10 +12,10 @@ mod passing {
     use std::process::Command;
 
     #[test]
-    fn change_encoding_to_utf_8() -> Result<(), Box<dyn std::error::Error>> {
+    fn change_encoding_to_utf_8() {
         let cwd = env::current_dir().unwrap();
         let cwd_normalized: String = str!(cwd.to_str().unwrap()).replace("\\", "/");
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg(if cfg!(windows) {
@@ -45,7 +45,5 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 }

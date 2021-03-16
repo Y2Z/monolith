@@ -15,8 +15,8 @@ mod passing {
     use url::Url;
 
     #[test]
-    fn parse_noscript_contents() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn parse_noscript_contents() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let path_html: &Path = Path::new("src/tests/data/noscript/index.html");
         let path_svg: &Path = Path::new("src/tests/data/noscript/image.svg");
 
@@ -47,13 +47,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn unwrap_noscript_contents() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn unwrap_noscript_contents() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let path_html: &Path = Path::new("src/tests/data/noscript/index.html");
         let path_svg: &Path = Path::new("src/tests/data/noscript/image.svg");
 
@@ -84,13 +82,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn unwrap_noscript_contents_nested() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn unwrap_noscript_contents_nested() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let path_html: &Path = Path::new("src/tests/data/noscript/nested.html");
         let path_svg: &Path = Path::new("src/tests/data/noscript/image.svg");
 
@@ -121,13 +117,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn unwrap_noscript_contents_with_script() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn unwrap_noscript_contents_with_script() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let path_html: &Path = Path::new("src/tests/data/noscript/script.html");
         let path_svg: &Path = Path::new("src/tests/data/noscript/image.svg");
 
@@ -158,7 +152,5 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 }
