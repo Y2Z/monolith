@@ -103,6 +103,7 @@ Please open an issue if something is wrong, that helps make this project better.
  - `Pagesaver`: https://github.com/distributed-mind/pagesaver
  - `Personal WayBack Machine`: https://github.com/popey/pwbm
  - `Hako`: https://github.com/dmpop/hako
+ - `Monk`: https://gitlab.com/fisherdarling/monk
 
 ---------------------------------------------------
 
