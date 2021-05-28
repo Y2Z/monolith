@@ -66,6 +66,7 @@ pub fn enquote(input: String, double: bool) -> String {
 pub fn format_ident(ident: &str) -> String {
     let mut res: String = String::new();
     let _ = serialize_identifier(ident, &mut res);
+    res = res.trim_end().to_string();
     res
 }
 
