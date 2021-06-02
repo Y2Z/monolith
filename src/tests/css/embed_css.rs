@@ -340,4 +340,31 @@ mod passing {
             CSS_OUT
         );
     }
+
+    #[test]
+    fn ie_css_hack() {
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+        let document_url: Url = Url::parse("data:,").unwrap();
+        let mut options = Options::default();
+        options.silent = true;
+
+        const CSS: &str = "\
+            div#p>svg>foreignObject>section:not(\\9) {\n\
+                width: 300px;\n\
+                width: 500px\\9;\n\
+            }\n\
+            ";
+        const CSS_OUT: &str = "\
+            div#p>svg>foreignObject>section:not(\\9) {\n\
+                width: 300px;\n\
+                width: 500px\t;\n\
+            }\n\
+            ";
+
+        assert_eq!(
+            css::embed_css(cache, &client, &document_url, &CSS, &options, 0,),
+            CSS_OUT
+        );
+    }
 }
