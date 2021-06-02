@@ -30,7 +30,14 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             std::str::from_utf8(&out.stdout).unwrap(),
-            "<html><head>\n        <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n    </head>\n    <body>\n        © Some Company\n    \n\n</body></html>\n"
+            "<html>\
+                <head>\n        \
+                    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n    \
+                </head>\n    \
+                <body>\n        \
+                    © Some Company\n    \
+                \n\n</body>\
+            </html>\n"
         );
 
         // STDERR should contain only the target file

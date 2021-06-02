@@ -88,7 +88,7 @@ mod passing {
     }
 
     #[test]
-    fn remove_existing_when_empty_provided() {
+    fn set_existing_to_empty_when_empty_provided() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")

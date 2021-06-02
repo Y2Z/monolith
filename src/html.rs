@@ -474,8 +474,9 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
         result = String::from_utf8(buf).unwrap();
     }
 
+    // Unwrap NOSCRIPT elements
     if options.unwrap_noscript {
-        let noscript_re = Regex::new(r"<(?P<c>/?noscript)>").unwrap();
+        let noscript_re = Regex::new(r"<(?P<c>/?noscript[^>]*)>").unwrap();
         result = noscript_re.replace_all(&result, "<!--$c-->").to_string();
     }
 
@@ -503,44 +504,39 @@ pub fn retrieve_and_embed_asset(
         depth + 1,
     ) {
         Ok((data, final_url, mut media_type)) => {
-            // Check integrity if it's a LINK or SCRIPT tag
             let node_name: &str = get_node_name(&node).unwrap();
+
+            // Check integrity if it's a LINK or SCRIPT element
             let mut ok_to_include: bool = true;
-
             if node_name == "link" || node_name == "script" {
-                let node_integrity_attr_value: Option<String> = get_node_attr(node, "integrity");
-
                 // Check integrity
-                if let Some(node_integrity_attr_value) = node_integrity_attr_value {
+                if let Some(node_integrity_attr_value) = get_node_attr(node, "integrity") {
                     if !node_integrity_attr_value.is_empty() {
                         ok_to_include = check_integrity(&data, &node_integrity_attr_value);
                     }
-                }
 
-                // Wipe integrity attribute
-                set_node_attr(node, "integrity", None);
+                    // Wipe the integrity attribute
+                    set_node_attr(node, "integrity", None);
+                }
             }
 
             if ok_to_include {
-                if node_name == "link" {
-                    let link_type: &str = determine_link_node_type(node);
-                    // CSS LINK nodes requires special treatment
-                    if link_type == "stylesheet" {
-                        let css: String = embed_css(
-                            cache,
-                            client,
-                            &final_url,
-                            &String::from_utf8_lossy(&data),
-                            options,
-                            depth + 1,
-                        );
-                        let css_data_url = create_data_url("text/css", css.as_bytes(), &final_url);
+                if node_name == "link" && determine_link_node_type(node) == "stylesheet" {
+                    // Stylesheet LINK elements require special treatment
+                    let css: String = embed_css(
+                        cache,
+                        client,
+                        &final_url,
+                        &String::from_utf8_lossy(&data),
+                        options,
+                        depth + 1,
+                    );
 
-                        set_node_attr(&node, attr_name, Some(css_data_url.to_string()));
-
-                        return; // Do not fall through
-                    }
+                    // Create and embed data URL
+                    let css_data_url = create_data_url("text/css", css.as_bytes(), &final_url);
+                    set_node_attr(&node, attr_name, Some(css_data_url.to_string()));
                 } else if node_name == "frame" || node_name == "iframe" {
+                    // (I)FRAMEs are also quite different from conventional resources
                     let frame_dom = html_to_dom(&String::from_utf8_lossy(&data));
                     walk_and_embed_assets(
                         cache,
@@ -559,30 +555,38 @@ pub fn retrieve_and_embed_asset(
                     )
                     .unwrap();
 
+                    // Create and embed data URL
                     let mut frame_data_url = create_data_url(&media_type, &frame_data, &final_url);
-
                     frame_data_url.set_fragment(resolved_url.fragment());
-
                     set_node_attr(node, attr_name, Some(frame_data_url.to_string()));
+                } else {
+                    // Every other type of element gets processed here
 
-                    return; // Do not fall through
-                }
+                    // Parse media type for SCRIPT elements
+                    if node_name == "script" {
+                        if let Some(_) = get_node_attr(node, "src") {
+                            if let Some(script_node_type_attr_value) = get_node_attr(node, "type") {
+                                media_type = script_node_type_attr_value.to_string();
+                            } else {
+                                // Fallback to default one if it's not specified
+                                media_type = "application/javascript".to_string();
+                            }
+                        }
+                    }
 
-                // Everything else
-                if node_name == "script" {
-                    media_type = "application/javascript".to_string();
+                    // Create and embed data URL
+                    let mut data_url = create_data_url(&media_type, &data, &final_url);
+                    data_url.set_fragment(resolved_url.fragment());
+                    set_node_attr(node, attr_name, Some(data_url.to_string()));
                 }
-                let mut data_url = create_data_url(&media_type, &data, &final_url);
-                data_url.set_fragment(resolved_url.fragment());
-                set_node_attr(node, attr_name, Some(data_url.to_string()));
             }
         }
         Err(_) => {
             if resolved_url.scheme() == "http" || resolved_url.scheme() == "https" {
-                // Keep remote reference if unable to retrieve the asset
+                // Keep remote references if unable to retrieve the asset
                 set_node_attr(node, attr_name, Some(resolved_url.to_string()));
             } else {
-                // Exclude non-remote URLs
+                // Remove local references if they can't be successfully embedded as data URLs
                 set_node_attr(node, attr_name, None);
             }
         }
@@ -645,7 +649,7 @@ pub fn walk_and_embed_assets(
                     let link_type: &str = determine_link_node_type(node);
 
                     if link_type == "icon" {
-                        // Find and resolve this LINK node's href attribute
+                        // Find and resolve LINK's href attribute
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
                             if !options.no_images && !link_attr_href_value.is_empty() {
                                 retrieve_and_embed_asset(
@@ -663,10 +667,12 @@ pub fn walk_and_embed_assets(
                             }
                         }
                     } else if link_type == "stylesheet" {
-                        // Find and resolve this LINK node's href attribute
+                        // Resolve LINK's href attribute
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
                             if options.no_css {
                                 set_node_attr(node, "href", None);
+                                // Wipe integrity attribute
+                                set_node_attr(node, "integrity", None);
                             } else {
                                 if !link_attr_href_value.is_empty() {
                                     retrieve_and_embed_asset(
@@ -916,14 +922,15 @@ pub fn walk_and_embed_assets(
                                 // Replace with empty JS call to preserve original behavior
                                 set_node_attr(node, "href", Some(str!("javascript:;")));
                             }
-                        } else if anchor_attr_href_value.clone().starts_with('#')
-                            || is_url_and_has_protocol(&anchor_attr_href_value.clone())
-                        {
-                            // Don't touch mailto: links or hrefs which begin with a hash sign
                         } else {
-                            let href_full_url: Url =
-                                resolve_url(document_url, &anchor_attr_href_value);
-                            set_node_attr(node, "href", Some(href_full_url.to_string()));
+                            // Don't touch mailto: links or hrefs which begin with a hash sign
+                            if !anchor_attr_href_value.clone().starts_with('#')
+                                && !is_url_and_has_protocol(&anchor_attr_href_value.clone())
+                            {
+                                let href_full_url: Url =
+                                    resolve_url(document_url, &anchor_attr_href_value);
+                                set_node_attr(node, "href", Some(href_full_url.to_string()));
+                            }
                         }
                     }
                 }
@@ -937,6 +944,8 @@ pub fn walk_and_embed_assets(
                         // Remove src attribute
                         if script_attr_src != None {
                             set_node_attr(node, "src", None);
+                            // Wipe integrity attribute
+                            set_node_attr(node, "integrity", None);
                         }
                     } else if !script_attr_src.clone().unwrap_or_default().is_empty() {
                         retrieve_and_embed_asset(
@@ -1081,7 +1090,7 @@ pub fn walk_and_embed_assets(
                                 );
                                 // Get rid of original contents
                                 noscript_contents.clear();
-                                // Insert HTML containing embedded assets back into NOSCRIPT node
+                                // Insert HTML containing embedded assets into NOSCRIPT node
                                 if let Some(html) =
                                     get_child_node_by_name(&noscript_contents_dom.document, "html")
                                 {
