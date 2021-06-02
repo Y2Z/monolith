@@ -80,12 +80,8 @@ mod passing {
                 {file_url_css}\n \
                 {file_url_css}\n\
                 ",
-                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap())
-                    .unwrap()
-                    .into_string(),
-                file_url_css = Url::from_file_path(fs::canonicalize(&path_css).unwrap())
-                    .unwrap()
-                    .into_string(),
+                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
+                file_url_css = Url::from_file_path(fs::canonicalize(&path_css).unwrap()).unwrap(),
             )
         );
 

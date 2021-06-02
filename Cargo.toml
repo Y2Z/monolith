@@ -22,20 +22,20 @@ include = [
 license = "CC0-1.0"
 
 [dependencies]
-atty = "0.2" # Used for highlighting network errors
+atty = "0.2.14" # Used for highlighting network errors
 base64 = "0.13.0"
 chrono = "0.4.19" # Used for formatting creation timestamp
 clap = "2.33.3"
 cssparser = "0.28.1"
 html5ever = "0.24.1"
-regex = "1.4.3" # Used for parsing srcset
-sha2 = "0.9.2" # Used for calculating checksums during integrity checks
-url = "2.2.0"
+regex = "1.5.4" # Used for parsing srcset and NOSCRIPT
+sha2 = "0.9.5" # Used for calculating checksums during integrity checks
+url = "2.2.2"
 
 [dependencies.reqwest]
-version = "0.11.0"
+version = "0.11.3"
 default-features = false
 features = ["default-tls", "blocking", "gzip"]
 
 [dev-dependencies]
-assert_cmd = "1.0.2"
+assert_cmd = "1.0.4"
