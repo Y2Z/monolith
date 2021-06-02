@@ -15,8 +15,8 @@ mod passing {
     use url::Url;
 
     #[test]
-    fn local_file_target_input_relative_target_path() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn local_file_target_input_relative_target_path() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let cwd_normalized: String =
             str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
         let out = cmd
@@ -65,13 +65,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn local_file_target_input_absolute_target_path() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn local_file_target_input_absolute_target_path() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let path_html: &Path = Path::new("src/tests/data/basic/local-file.html");
 
         let out = cmd
@@ -107,21 +105,17 @@ mod passing {
             std::str::from_utf8(&out.stderr).unwrap(),
             format!(
                 "{file_url_html}\n",
-                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap())
-                    .unwrap()
-                    .into_string(),
+                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
             )
         );
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn local_file_url_target_input() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn local_file_url_target_input() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let cwd_normalized: String =
             str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
@@ -177,14 +171,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn embed_file_url_local_asset_within_style_attribute() -> Result<(), Box<dyn std::error::Error>>
-    {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn embed_file_url_local_asset_within_style_attribute() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let path_html: &Path = Path::new("src/tests/data/svg/index.html");
         let path_svg: &Path = Path::new("src/tests/data/svg/image.svg");
 
@@ -193,7 +184,7 @@ mod passing {
         // STDOUT should contain HTML with date URL for background-image in it
         assert_eq!(
             std::str::from_utf8(&out.stdout).unwrap(),
-            "<html><head></head><body><div style=\"background-image: url('data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=')\"></div>\n</body></html>\n"
+            "<html><head></head><body><div style=\"background-image: url(&quot;data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=&quot;)\"></div>\n</body></html>\n"
         );
 
         // STDERR should list files that got retrieved
@@ -204,24 +195,18 @@ mod passing {
                 {file_url_html}\n \
                 {file_url_svg}\n\
                 ",
-                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap())
-                    .unwrap()
-                    .into_string(),
-                file_url_svg = Url::from_file_path(fs::canonicalize(&path_svg).unwrap())
-                    .unwrap()
-                    .into_string(),
+                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
+                file_url_svg = Url::from_file_path(fs::canonicalize(&path_svg).unwrap()).unwrap(),
             )
         );
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn discard_integrity_for_local_files() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn discard_integrity_for_local_files() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let cwd_normalized: String =
             str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
@@ -280,7 +265,5 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 }

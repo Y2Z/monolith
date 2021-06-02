@@ -79,11 +79,11 @@ or
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-M`: Don't add timestamp and URL information
- - `-n`: Extract contents of NOSCRIPT tags
+ - `-n`: Extract contents of NOSCRIPT elements
  - `-o`: Write output to `file`
  - `-s`: Be quiet
  - `-t`: Adjust `network request timeout`
- - `-u`: Provide `custom User-Agent`
+ - `-u`: Provide custom `User-Agent`
  - `-v`: Exclude videos
 
 ---------------------------------------------------
@@ -99,20 +99,16 @@ Please open an issue if something is wrong, that helps make this project better.
 ---------------------------------------------------
 
 ## Related projects
- - `Monolith Chrome Extension`: https://github.com/rhysd/monolith-of-web
- - `Pagesaver`: https://github.com/distributed-mind/pagesaver
- - `Personal WayBack Machine`: https://github.com/popey/pwbm
- - `Hako`: https://github.com/dmpop/hako
- - `Monk`: https://gitlab.com/fisherdarling/monk
+ - Monolith Chrome Extension: https://github.com/rhysd/monolith-of-web
+ - Pagesaver: https://github.com/distributed-mind/pagesaver
+ - Personal WayBack Machine: https://github.com/popey/pwbm
+ - Hako: https://github.com/dmpop/hako
+ - Monk: https://gitlab.com/fisherdarling/monk
 
 ---------------------------------------------------
 
 ## License
 
-<a href="https://creativecommons.org/publicdomain/zero/1.0/">
-    <img src="https://i.creativecommons.org/p/zero/1.0/88x31.png" alt="CC0-1.0" />
-</a>
-<br />
 To the extent possible under law, the author(s) have dedicated all copyright related and neighboring rights to this software to the public domain worldwide.
 This software is distributed without any warranty.
 

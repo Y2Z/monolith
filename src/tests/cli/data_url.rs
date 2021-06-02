@@ -12,28 +12,8 @@ mod passing {
     use std::process::Command;
 
     #[test]
-    fn bad_input_data_url() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
-        let out = cmd.arg("data:,Hello%2C%20World!").output().unwrap();
-
-        // STDOUT should contain HTML
-        assert_eq!(std::str::from_utf8(&out.stdout).unwrap(), "");
-
-        // STDERR should contain error description
-        assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
-            "Unsupported data URL media type\n"
-        );
-
-        // The exit code should be 1
-        out.assert().code(1);
-
-        Ok(())
-    }
-
-    #[test]
-    fn isolate_data_url() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn isolate_data_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-I")
@@ -54,13 +34,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn remove_css_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn remove_css_from_data_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-c")
@@ -82,13 +60,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn remove_fonts_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn remove_fonts_from_data_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-F")
@@ -110,13 +86,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn remove_frames_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn remove_frames_from_data_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-f")
@@ -137,13 +111,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn remove_images_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn remove_images_from_data_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-i")
@@ -173,13 +145,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn remove_js_from_data_url() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn remove_js_from_data_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-j")
@@ -203,14 +173,43 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
+    }
+}
 
-        Ok(())
+//  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
+//  ██╔════╝██╔══██╗██║██║     ██║████╗  ██║██╔════╝
+//  █████╗  ███████║██║██║     ██║██╔██╗ ██║██║  ███╗
+//  ██╔══╝  ██╔══██║██║██║     ██║██║╚██╗██║██║   ██║
+//  ██║     ██║  ██║██║███████╗██║██║ ╚████║╚██████╔╝
+//  ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝
+
+#[cfg(test)]
+mod failing {
+    use assert_cmd::prelude::*;
+    use std::env;
+    use std::process::Command;
+
+    #[test]
+    fn bad_input_data_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let out = cmd.arg("data:,Hello%2C%20World!").output().unwrap();
+
+        // STDOUT should contain HTML
+        assert_eq!(std::str::from_utf8(&out.stdout).unwrap(), "");
+
+        // STDERR should contain error description
+        assert_eq!(
+            std::str::from_utf8(&out.stderr).unwrap(),
+            "Unsupported data URL media type\n"
+        );
+
+        // The exit code should be 1
+        out.assert().code(1);
     }
 
     #[test]
-    fn security_disallow_local_assets_within_data_url_targets(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn security_disallow_local_assets_within_data_url_targets() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("data:text/html,%3Cscript%20src=\"src/tests/data/basic/local-script.js\"%3E%3C/script%3E")
@@ -228,7 +227,5 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 }

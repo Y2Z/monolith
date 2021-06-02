@@ -61,8 +61,8 @@ mod passing {
             css::embed_css(cache, &client, &document_url, &STYLE, &options, 0,),
             format!(
                 "/* border: none;*/\
-                background-image: url('{empty_image}'); \
-                list-style: url('{empty_image}');\
+                background-image: url(\"{empty_image}\"); \
+                list-style: url(\"{empty_image}\");\
                 width:99.998%; \
                 margin-top: -20px; \
                 line-height: -1; \
@@ -93,8 +93,8 @@ mod passing {
             css::embed_css(cache, &client, &document_url, &STYLE, &options, 0),
             format!(
                 "/* border: none;*/\
-                background-image: url('{empty_image}'); \
-                list-style: url('{empty_image}');\
+                background-image: url(\"{empty_image}\"); \
+                list-style: url(\"{empty_image}\");\
                 width:99.998%; \
                 margin-top: -20px; \
                 line-height: -1; \
@@ -115,7 +115,7 @@ mod passing {
         const CSS: &str = "\
             #id.class-name:not(:nth-child(3n+0)) {\n  \
             // border: none;\n  \
-            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');\n\
+            background-image: url(\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=\");\n\
             }\n\
             \n\
             html > body {}";
@@ -191,9 +191,9 @@ mod passing {
             "\
             @charset \"UTF-8\";\n\
             \n\
-            @import 'data:text/css;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9';\n\
+            @import \"data:text/css;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9\";\n\
             \n\
-            @import url('data:text/css;base64,aHRtbHtjb2xvcjojZmZmfQ==')\n\
+            @import url(\"data:text/css;base64,aHRtbHtjb2xvcjojZmZmfQ==\")\n\
             "
         );
     }
@@ -331,7 +331,7 @@ mod passing {
             ";
         const CSS_OUT: &str = "\
             #language a[href=\"#translations\"]:before {\n\
-                content: url('data:;base64,') \"\\a \";\n\
+                content: url(\"data:;base64,\") \"\\a \";\n\
                 white-space: pre }\n\
             ";
 

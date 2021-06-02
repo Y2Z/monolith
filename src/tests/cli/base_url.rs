@@ -12,8 +12,8 @@ mod passing {
     use std::process::Command;
 
     #[test]
-    fn add_new_when_provided() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn add_new_when_provided() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-b")
@@ -35,13 +35,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn keep_existing_when_none_provided() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn keep_existing_when_none_provided() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("data:text/html,<base href=\"http://localhost:8000/\" />Hello%2C%20World!")
@@ -61,13 +59,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn override_existing_when_provided() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn override_existing_when_provided() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-b")
@@ -89,13 +85,11 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn remove_existing_when_empty_provided() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn set_existing_to_empty_when_empty_provided() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
             .arg("-b")
@@ -117,7 +111,5 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 }

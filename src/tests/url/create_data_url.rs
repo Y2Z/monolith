@@ -15,7 +15,7 @@ mod passing {
     fn encode_string_with_specific_media_type() {
         let mime = "application/javascript";
         let data = "var word = 'hello';\nalert(word);\n";
-        let data_url = url::data_to_data_url(mime, data.as_bytes(), &Url::parse("data:,").unwrap());
+        let data_url = url::create_data_url(mime, data.as_bytes(), &Url::parse("data:,").unwrap());
 
         assert_eq!(
             data_url.as_str(),
@@ -26,7 +26,7 @@ mod passing {
     #[test]
     fn encode_append_fragment() {
         let data = "<svg></svg>\n";
-        let data_url = url::data_to_data_url(
+        let data_url = url::create_data_url(
             "image/svg+xml",
             data.as_bytes(),
             &Url::parse("data:,").unwrap(),

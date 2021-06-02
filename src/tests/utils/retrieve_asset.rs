@@ -36,8 +36,8 @@ mod passing {
         )
         .unwrap();
         assert_eq!(
-            url::data_to_data_url(&media_type, &data, &final_url),
-            url::data_to_data_url(
+            url::create_data_url(&media_type, &data, &final_url),
+            url::create_data_url(
                 "text/html",
                 "target".as_bytes(),
                 &Url::parse("data:text/html;base64,c291cmNl").unwrap()
@@ -45,7 +45,7 @@ mod passing {
         );
         assert_eq!(
             final_url,
-            url::data_to_data_url(
+            url::create_data_url(
                 "text/html",
                 "target".as_bytes(),
                 &Url::parse("data:text/html;base64,c291cmNl").unwrap()
@@ -85,7 +85,7 @@ mod passing {
             0,
         )
         .unwrap();
-        assert_eq!(url::data_to_data_url("application/javascript", &data, &final_url), Url::parse("data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==").unwrap());
+        assert_eq!(url::create_data_url("application/javascript", &data, &final_url), Url::parse("data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==").unwrap());
         assert_eq!(
             final_url,
             Url::parse(&format!(

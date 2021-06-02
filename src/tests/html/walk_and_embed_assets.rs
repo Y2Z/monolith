@@ -87,10 +87,12 @@ mod passing {
 
     #[test]
     fn no_css() {
-        let html = "<link rel=\"stylesheet\" href=\"main.css\">\
-                    <link rel=\"alternate stylesheet\" href=\"main.css\">\
-                    <style>html{background-color: #000;}</style>\
-                    <div style=\"display: none;\"></div>";
+        let html = "\
+            <link rel=\"stylesheet\" href=\"main.css\">\
+            <link rel=\"alternate stylesheet\" href=\"main.css\">\
+            <style>html{background-color: #000;}</style>\
+            <div style=\"display: none;\"></div>\
+        ";
         let dom = html::html_to_dom(&html);
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
@@ -108,16 +110,18 @@ mod passing {
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html>\
-            <head>\
-            <link rel=\"stylesheet\">\
-            <link rel=\"alternate stylesheet\">\
-            <style></style>\
-            </head>\
-            <body>\
-            <div></div>\
-            </body>\
-            </html>"
+            "\
+            <html>\
+                <head>\
+                    <link rel=\"stylesheet\">\
+                    <link rel=\"alternate stylesheet\">\
+                    <style></style>\
+                </head>\
+                <body>\
+                    <div></div>\
+                </body>\
+            </html>\
+            "
         );
     }
 
@@ -203,7 +207,15 @@ mod passing {
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head></head><frameset><frame src=\"\"></frameset></html>"
+            "\
+            <html>\
+                <head>\
+                </head>\
+                <frameset>\
+                    <frame src=\"\">\
+                </frameset>\
+            </html>\
+            "
         );
     }
 
@@ -227,16 +239,25 @@ mod passing {
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head></head><body><iframe src=\"\"></iframe></body></html>"
+            "\
+            <html>\
+                <head></head>\
+                <body>\
+                    <iframe src=\"\"></iframe>\
+                </body>\
+            </html>\
+            "
         );
     }
 
     #[test]
     fn no_js() {
-        let html = "<div onClick=\"void(0)\">\
-                        <script src=\"http://localhost/assets/some.js\"></script>\
-                        <script>alert(1)</script>\
-                    </div>";
+        let html = "\
+            <div onClick=\"void(0)\">\
+                <script src=\"http://localhost/assets/some.js\"></script>\
+                <script>alert(1)</script>\
+            </div>\
+        ";
         let dom = html::html_to_dom(&html);
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
@@ -254,52 +275,141 @@ mod passing {
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head></head><body><div><script></script>\
-            <script></script></div></body></html>"
+            "\
+            <html>\
+                <head></head>\
+                <body>\
+                    <div>\
+                        <script></script>\
+                        <script></script>\
+                    </div>\
+                </body>\
+            </html>\
+            "
         );
     }
 
-    // #[test]
-    // fn discards_integrity() {
-    //     let html = "<title>No integrity</title>\
-    //                 <link integrity=\"sha384-...\" rel=\"something\"/>\
-    //                 <script integrity=\"sha384-...\" src=\"some.js\"></script>";
-    //     let dom = html::html_to_dom(&html);
-    //     let url: Url = Url::parse("http://localhost").unwrap();
-    //     let cache = &mut HashMap::new();
+    #[test]
+    fn keeps_integrity_for_linked_assets() {
+        let html = "<title>Has integrity</title>\
+                    <link integrity=\"sha384-12345\" rel=\"something\" href=\"https://some-site.com/some-file.ext\" />";
+        let dom = html::html_to_dom(&html);
+        let url: Url = Url::parse("http://localhost").unwrap();
+        let cache = &mut HashMap::new();
 
-    //     let mut options = Options::default();
-    //     options.no_css = true;
-    //     options.no_frames = true;
-    //     options.no_js = true;
-    //     options.no_images = true;
-    //     options.silent = true;
+        let mut options = Options::default();
+        options.silent = true;
 
-    //     let client = Client::new();
+        let client = Client::new();
 
-    //     html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
 
-    //     let mut buf: Vec<u8> = Vec::new();
-    //     serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
 
-    //     assert_eq!(
-    //         buf.iter().map(|&c| c as char).collect::<String>(),
-    //         "<html>\
-    //             <head><title>No integrity</title><link rel=\"something\"><script></script></head>\
-    //             <body></body>\
-    //         </html>"
-    //     );
-    // }
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "\
+            <html>\
+                <head>\
+                    <title>Has integrity</title>\
+                    <link integrity=\"sha384-12345\" rel=\"something\" href=\"https://some-site.com/some-file.ext\">\
+                </head>\
+                <body></body>\
+            </html>\
+            "
+        );
+    }
+
+    #[test]
+    fn discards_integrity_for_linked_assets_nojs_nocss() {
+        let html = "\
+            <title>No integrity</title>\
+            <link integrity=\"\" rel=\"stylesheet\" href=\"data:;\"/>\
+            <script integrity=\"\" src=\"some.js\"></script>\
+        ";
+        let dom = html::html_to_dom(&html);
+        let url: Url = Url::parse("http://localhost").unwrap();
+        let cache = &mut HashMap::new();
+
+        let mut options = Options::default();
+        options.no_css = true;
+        options.no_js = true;
+        options.silent = true;
+
+        let client = Client::new();
+
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "\
+            <html>\
+                <head>\
+                    <title>No integrity</title>\
+                    <link rel=\"stylesheet\">\
+                    <script></script>\
+                </head>\
+                <body></body>\
+            </html>\
+            "
+        );
+    }
+
+    #[test]
+    fn discards_integrity_for_embedded_assets() {
+        let html = "\
+            <title>No integrity</title>\
+            <link integrity=\"sha384-123\" rel=\"something\" href=\"data:;\"/>\
+            <script integrity=\"sha384-456\" src=\"some.js\"></script>\
+        ";
+        let dom = html::html_to_dom(&html);
+        let url: Url = Url::parse("http://localhost").unwrap();
+        let cache = &mut HashMap::new();
+
+        let mut options = Options::default();
+        options.no_css = true;
+        options.no_js = true;
+        options.silent = true;
+
+        let client = Client::new();
+
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "\
+            <html>\
+                <head>\
+                    <title>No integrity</title>\
+                    <link integrity=\"sha384-123\" rel=\"something\" href=\"data:;\">\
+                    <script></script>\
+                </head>\
+                <body>\
+                </body>\
+            </html>\
+            "
+        );
+    }
 
     #[test]
     fn removes_unwanted_meta_tags() {
-        let html = "<html>\
-            <head>\
-                <meta http-equiv=\"Refresh\" value=\"20\"/>\
-                <meta http-equiv=\"Location\" value=\"https://freebsd.org\"/>\
-            </head>\
-            <body></body>\
-        </html>";
+        let html = "\
+            <html>\
+                <head>\
+                    <meta http-equiv=\"Refresh\" value=\"20\"/>\
+                    <meta http-equiv=\"Location\" value=\"https://freebsd.org\"/>\
+                </head>\
+                <body>\
+                </body>\
+            </html>\
+        ";
         let dom = html::html_to_dom(&html);
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
@@ -320,19 +430,22 @@ mod passing {
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html>\
+            "\
+            <html>\
                 <head>\
                     <meta http-equiv=\"disabled by monolith (Refresh)\" value=\"20\">\
                     <meta http-equiv=\"disabled by monolith (Location)\" value=\"https://freebsd.org\">\
                 </head>\
-                <body></body>\
+                <body>\
+                </body>\
             </html>"
         );
     }
 
     #[test]
     fn processes_noscript_tags() {
-        let html = "<html>\
+        let html = "\
+        <html>\
             <body>\
                 <noscript>\
                     <img src=\"image.png\" />\
@@ -357,7 +470,8 @@ mod passing {
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
             format!(
-                "<html>\
+                "\
+                <html>\
                     <head>\
                     </head>\
                     <body>\
@@ -368,6 +482,36 @@ mod passing {
                 </html>",
                 empty_image!(),
             )
+        );
+    }
+
+    #[test]
+    fn preserves_script_type_json() {
+        let html = "<script id=\"data\" type=\"application/json\">{\"mono\":\"lith\"}</script>";
+        let dom = html::html_to_dom(&html);
+        let url: Url = Url::parse("http://localhost").unwrap();
+        let cache = &mut HashMap::new();
+
+        let mut options = Options::default();
+        options.silent = true;
+
+        let client = Client::new();
+
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+
+        assert_eq!(
+            buf.iter().map(|&c| c as char).collect::<String>(),
+            "\
+            <html>\
+                <head>\
+                    <script id=\"data\" type=\"application/json\">{\"mono\":\"lith\"}</script>\
+                </head>\
+                <body>\
+                </body>\
+            </html>"
         );
     }
 }

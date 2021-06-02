@@ -15,8 +15,8 @@ mod passing {
     use url::Url;
 
     #[test]
-    fn print_version() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn print_version() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd.arg("-V").output().unwrap();
 
         // STDOUT should contain program name and version
@@ -30,12 +30,10 @@ mod passing {
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 
     #[test]
-    fn stdin_target_input() -> Result<(), Box<dyn std::error::Error>> {
+    fn stdin_target_input() {
         let mut echo = Command::new("echo")
             .arg("Hello from STDIN")
             .stdout(Stdio::piped())
@@ -44,22 +42,20 @@ mod passing {
         let echo_out = echo.stdout.take().unwrap();
         echo.wait().unwrap();
 
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         cmd.stdin(echo_out);
         let out = cmd.arg("-M").arg("-").output().unwrap();
 
-        // STDOUT should contain HTML from STDIN
+        // STDOUT should contain HTML created out of STDIN
         assert_eq!(
             std::str::from_utf8(&out.stdout).unwrap(),
             "<html><head></head><body>Hello from STDIN\n</body></html>\n"
         );
-
-        Ok(())
     }
 
     #[test]
-    fn css_import_string() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn css_import_string() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let path_html: &Path = Path::new("src/tests/data/css/index.html");
         let path_css: &Path = Path::new("src/tests/data/css/style.css");
 
@@ -71,7 +67,7 @@ mod passing {
         // STDOUT should contain embedded CSS url()'s
         assert_eq!(
             std::str::from_utf8(&out.stdout).unwrap(),
-            "<html><head><style>\n\n    @charset \"UTF-8\";\n\n    @import \'data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\';\n\n    @import url(\'data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\');\n\n    @import url(\'data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\');\n\n</style>\n</head><body></body></html>\n"
+            "<html><head><style>\n\n    @charset \"UTF-8\";\n\n    @import \"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\";\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n</style>\n</head><body></body></html>\n"
         );
 
         // STDERR should list files that got retrieved
@@ -84,19 +80,13 @@ mod passing {
                 {file_url_css}\n \
                 {file_url_css}\n\
                 ",
-                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap())
-                    .unwrap()
-                    .into_string(),
-                file_url_css = Url::from_file_path(fs::canonicalize(&path_css).unwrap())
-                    .unwrap()
-                    .into_string(),
+                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
+                file_url_css = Url::from_file_path(fs::canonicalize(&path_css).unwrap()).unwrap(),
             )
         );
 
         // The exit code should be 0
         out.assert().code(0);
-
-        Ok(())
     }
 }
 
@@ -114,8 +104,8 @@ mod failing {
     use std::process::Command;
 
     #[test]
-    fn bad_input_empty_target() -> Result<(), Box<dyn std::error::Error>> {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME"))?;
+    fn bad_input_empty_target() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd.arg("").output().unwrap();
 
         // STDOUT should be empty
@@ -129,7 +119,5 @@ mod failing {
 
         // The exit code should be 1
         out.assert().code(1);
-
-        Ok(())
     }
 }
