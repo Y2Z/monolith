@@ -12,7 +12,8 @@ pub fn clean_url(url: Url) -> Url {
     url
 }
 
-pub fn create_data_url(media_type: &str, data: &[u8], final_asset_url: &Url) -> Url {
+pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset_url: &Url) -> Url {
+    // TODO: move this block out of this function
     let media_type: String = if media_type.is_empty() {
         detect_media_type(data, &final_asset_url)
     } else {
@@ -21,7 +22,14 @@ pub fn create_data_url(media_type: &str, data: &[u8], final_asset_url: &Url) -> 
 
     let mut data_url: Url = Url::parse("data:,").unwrap();
 
-    data_url.set_path(format!("{};base64,{}", media_type, base64::encode(data)).as_str());
+    let c: String =
+        if !charset.trim().is_empty() && !charset.trim().eq_ignore_ascii_case("US-ASCII") {
+            format!(";charset={}", charset.trim())
+        } else {
+            str!()
+        };
+
+    data_url.set_path(format!("{}{};base64,{}", media_type, c, base64::encode(data)).as_str());
 
     data_url
 }

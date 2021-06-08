@@ -202,10 +202,11 @@ pub fn process_css<'a>(
                             import_contents,
                             import_final_url,
                             import_media_type,
-                            _import_charset,
+                            import_charset,
                         )) => {
                             let mut import_data_url = create_data_url(
                                 &import_media_type,
+                                &import_charset,
                                 embed_css(
                                     cache,
                                     client,
@@ -252,9 +253,9 @@ pub fn process_css<'a>(
                                 options,
                                 depth + 1,
                             ) {
-                                Ok((data, final_url, media_type, _charset)) => {
+                                Ok((data, final_url, media_type, charset)) => {
                                     let mut data_url =
-                                        create_data_url(&media_type, &data, &final_url);
+                                        create_data_url(&media_type, &charset, &data, &final_url);
                                     data_url.set_fragment(resolved_url.fragment());
                                     result.push_str(
                                         format_quoted_string(&data_url.to_string()).as_str(),
@@ -348,9 +349,10 @@ pub fn process_css<'a>(
                         options,
                         depth + 1,
                     ) {
-                        Ok((css, final_url, media_type, _charset)) => {
+                        Ok((css, final_url, media_type, charset)) => {
                             let mut data_url = create_data_url(
                                 &media_type,
+                                &charset,
                                 embed_css(
                                     cache,
                                     client,
@@ -386,8 +388,9 @@ pub fn process_css<'a>(
                             options,
                             depth + 1,
                         ) {
-                            Ok((data, final_url, media_type, _charset)) => {
-                                let mut data_url = create_data_url(&media_type, &data, &final_url);
+                            Ok((data, final_url, media_type, charset)) => {
+                                let mut data_url =
+                                    create_data_url(&media_type, &charset, &data, &final_url);
                                 data_url.set_fragment(full_url.fragment());
                                 result
                                     .push_str(format_quoted_string(&data_url.to_string()).as_str());
