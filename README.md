@@ -71,6 +71,7 @@ or
  - `-a`: Exclude audio sources
  - `-b`: Use custom `base URL`
  - `-c`: Exclude CSS
+ - `-C`: Save document using custom `charset`
  - `-e`: Ignore network errors
  - `-f`: Omit frames
  - `-F`: Exclude web fonts
@@ -80,7 +81,7 @@ or
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-M`: Don't add timestamp and URL information
  - `-n`: Extract contents of NOSCRIPT elements
- - `-o`: Write output to `file`
+ - `-o`: Write output to `file`, use “-” for STDOUT
  - `-s`: Be quiet
  - `-t`: Adjust `network request timeout`
  - `-u`: Provide custom `User-Agent`

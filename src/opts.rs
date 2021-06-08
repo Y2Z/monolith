@@ -6,6 +6,7 @@ pub struct Options {
     pub no_audio: bool,
     pub base_url: Option<String>,
     pub no_css: bool,
+    pub charset: Option<String>,
     pub ignore_errors: bool,
     pub no_frames: bool,
     pub no_fonts: bool,
@@ -48,6 +49,7 @@ impl Options {
             .args_from_usage("-a, --no-audio 'Removes audio sources'")
             .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
+            .args_from_usage("-C, --charset=[UTF-8] 'Enforces custom encoding'")
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
             .args_from_usage("-F, --no-fonts 'Removes fonts'")
@@ -59,7 +61,9 @@ impl Options {
             .args_from_usage(
                 "-n, --unwrap-noscript 'Replaces NOSCRIPT elements with their contents'",
             )
-            .args_from_usage("-o, --output=[document.html] 'Writes output to <file>'")
+            .args_from_usage(
+                "-o, --output=[document.html] 'Writes output to <file>, use - for STDOUT'",
+            )
             .args_from_usage("-s, --silent 'Suppresses verbosity'")
             .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
             .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
@@ -69,7 +73,7 @@ impl Options {
                     .required(true)
                     .takes_value(true)
                     .index(1)
-                    .help("URL or file path, use - for stdin"),
+                    .help("URL or file path, use - for STDIN"),
             )
             .get_matches();
         let mut options: Options = Options::default();
@@ -84,6 +88,9 @@ impl Options {
             options.base_url = Some(str!(base_url));
         }
         options.no_css = app.is_present("no-css");
+        if let Some(charset) = app.value_of("charset") {
+            options.charset = Some(str!(charset));
+        }
         options.ignore_errors = app.is_present("ignore-errors");
         options.no_frames = app.is_present("no-frames");
         options.no_fonts = app.is_present("no-fonts");

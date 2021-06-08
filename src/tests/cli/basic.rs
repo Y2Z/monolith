@@ -15,6 +15,21 @@ mod passing {
     use url::Url;
 
     #[test]
+    fn print_help_information() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let out = cmd.arg("-h").output().unwrap();
+
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
+        // STDOUT should contain program name, version, and usage information
+        // TODO
+
+        // Exit code should be 0
+        out.assert().code(0);
+    }
+
+    #[test]
     fn print_version() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd.arg("-V").output().unwrap();

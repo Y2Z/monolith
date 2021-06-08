@@ -16,6 +16,7 @@ mod passing {
         assert_eq!(options.no_audio, false);
         assert_eq!(options.base_url, None);
         assert_eq!(options.no_css, false);
+        assert_eq!(options.charset, None);
         assert_eq!(options.no_frames, false);
         assert_eq!(options.no_fonts, false);
         assert_eq!(options.no_images, false);
