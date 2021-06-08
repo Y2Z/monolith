@@ -1094,7 +1094,7 @@ pub fn walk_and_embed_assets(
                                     client,
                                     &document_url,
                                     node,
-                                    "href",
+                                    "src",
                                     &frame_attr_src_value,
                                     options,
                                     depth,
