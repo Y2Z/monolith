@@ -19,7 +19,7 @@ mod passing {
     <body>
     </body>
 </html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
 
         assert_eq!(
             html::get_base_url(&dom.document),
@@ -38,7 +38,7 @@ mod passing {
     <body>
     </body>
 </html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
 
         assert_eq!(
             html::get_base_url(&dom.document),
@@ -67,7 +67,7 @@ mod failing {
     <body>
     </body>
 </html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
 
         assert_eq!(html::get_base_url(&dom.document), None);
     }
@@ -82,7 +82,7 @@ mod failing {
     <body>
     </body>
 </html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
 
         assert_eq!(html::get_base_url(&dom.document), None);
     }
@@ -97,7 +97,7 @@ mod failing {
     <body>
     </body>
 </html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
 
         assert_eq!(html::get_base_url(&dom.document), Some(str!()));
     }

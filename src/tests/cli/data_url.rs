@@ -21,18 +21,18 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain isolated HTML
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head>\
             <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:;\"></meta>\
             </head><body>Hello, World!</body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -46,19 +46,19 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain HTML with no CSS
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head>\
             <meta http-equiv=\"Content-Security-Policy\" content=\"style-src 'none';\"></meta>\
             <style></style>\
             </head><body>Hello</body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -72,19 +72,19 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain HTML with no web fonts
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head>\
             <meta http-equiv=\"Content-Security-Policy\" content=\"font-src 'none';\"></meta>\
             <style></style>\
             </head><body>Hi</body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -98,18 +98,18 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain HTML with no iframes
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head>\
             <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none'; child-src 'none';\"></meta>\
             </head><body><iframe src=\"\"></iframe>Hi</body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -123,9 +123,12 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain HTML with no images
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             format!(
                 "<html>\
                 <head>\
@@ -140,10 +143,7 @@ mod passing {
             )
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -157,9 +157,12 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain HTML with no JS
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html>\
             <head>\
             <meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'none';\"></meta>\
@@ -168,10 +171,7 @@ mod passing {
             </html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 }
@@ -194,16 +194,16 @@ mod failing {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd.arg("data:,Hello%2C%20World!").output().unwrap();
 
-        // STDOUT should contain HTML
-        assert_eq!(std::str::from_utf8(&out.stdout).unwrap(), "");
-
         // STDERR should contain error description
         assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
-            "Unsupported data URL media type\n"
+            String::from_utf8_lossy(&out.stderr),
+            "Unsupported document media type\n"
         );
 
-        // The exit code should be 1
+        // STDOUT should contain HTML
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "");
+
+        // Exit code should be 1
         out.assert().code(1);
     }
 
@@ -216,16 +216,16 @@ mod failing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain HTML with no JS in it
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head><script src=\"data:application/javascript;base64,\"></script></head><body></body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 }

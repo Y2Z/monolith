@@ -13,11 +13,11 @@ mod passing {
     #[test]
     fn div_as_root_element() {
         let html = "<div><script src=\"some.js\"></script></div>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let options = Options::default();
 
         assert_eq!(
-            html::stringify_document(&dom.document, &options),
+            String::from_utf8_lossy(&html::serialize_document(dom, str!(), &options)),
             "<html><head></head><body><div><script src=\"some.js\"></script></div></body></html>"
         );
     }
@@ -28,15 +28,16 @@ mod passing {
                     <link rel=\"something\" href=\"some.css\" />\
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                     <div><script src=\"some.js\"></script></div>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let mut options = Options::default();
         options.isolate = true;
 
         assert_eq!(
-            html::stringify_document(
-                &dom.document,
+            String::from_utf8_lossy(&html::serialize_document(
+                dom,
+                str!(),
                 &options
-            ),
+            )),
             "<html>\
                 <head>\
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:;\"></meta>\
@@ -59,12 +60,12 @@ mod passing {
                     <title>Unstyled document</title>\
                     <link rel=\"stylesheet\" href=\"main.css\"/>\
                     <div style=\"display: none;\"></div>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let mut options = Options::default();
         options.no_css = true;
 
         assert_eq!(
-            html::stringify_document(&dom.document, &options),
+            String::from_utf8_lossy(&html::serialize_document(dom, str!(), &options)),
             "<!DOCTYPE html>\
             <html>\
             <head>\
@@ -83,15 +84,16 @@ mod passing {
                     <title>Frameless document</title>\
                     <link rel=\"something\"/>\
                     <div><script src=\"some.js\"></script></div>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let mut options = Options::default();
         options.no_frames = true;
 
         assert_eq!(
-            html::stringify_document(
-                &dom.document,
+            String::from_utf8_lossy(&html::serialize_document(
+                dom,
+                str!(),
                 &options
-            ),
+            )),
             "<!DOCTYPE html>\
                 <html>\
                 <head>\
@@ -115,7 +117,7 @@ mod passing {
                         <img style=\"width: 100%;\" src=\"some.png\" />\
                         <iframe src=\"some.html\"></iframe>\
                     </div>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let mut options = Options::default();
         options.isolate = true;
         options.no_css = true;
@@ -125,10 +127,11 @@ mod passing {
         options.no_images = true;
 
         assert_eq!(
-            html::stringify_document(
-                &dom.document,
+            String::from_utf8_lossy(&html::serialize_document(
+                dom,
+                str!(),
                 &options
-            ),
+            )),
             "<!DOCTYPE html>\
                 <html>\
                     <head>\

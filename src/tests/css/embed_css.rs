@@ -331,7 +331,7 @@ mod passing {
             ";
         const CSS_OUT: &str = "\
             #language a[href=\"#translations\"]:before {\n\
-                content: url(\"data:;base64,\") \"\\a \";\n\
+                content: url(\"data:text/plain;base64,\") \"\\a \";\n\
                 white-space: pre }\n\
             ";
 

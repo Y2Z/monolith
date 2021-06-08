@@ -14,7 +14,7 @@ mod passing {
     #[test]
     fn html_lang_and_body_style() {
         let html = "<!doctype html><html lang=\"en\"><head></head><body></body></html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let mut count = 0;
 
         fn test_walk(node: &Handle, i: &mut i8) {
@@ -67,7 +67,7 @@ mod passing {
     #[test]
     fn body_background() {
         let html = "<!doctype html><html lang=\"en\"><head></head><body background=\"1\" background=\"2\"></body></html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let mut count = 0;
 
         fn test_walk(node: &Handle, i: &mut i8) {

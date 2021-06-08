@@ -22,18 +22,18 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain newly added base URL
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head>\
             <base href=\"http://localhost:8000/\"></base>\
             </head><body>Hello, World!</body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -46,18 +46,18 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain newly added base URL
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head>\
             <base href=\"http://localhost:8000/\">\
             </head><body>Hello, World!</body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -72,18 +72,18 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain newly added base URL
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head>\
             <base href=\"http://localhost/\">\
             </head><body>Hello, World!</body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -98,18 +98,18 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain newly added base URL
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head>\
             <base href=\"\">\
             </head><body>Hello, World!</body></html>\n"
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 }

@@ -14,7 +14,7 @@ mod passing {
     #[test]
     fn div_two_style_attributes() {
         let html = "<!doctype html><html><head></head><body><DIV STYLE=\"color: blue;\" style=\"display: none;\"></div></body></html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let mut count = 0;
 
         fn test_walk(node: &Handle, i: &mut i8) {

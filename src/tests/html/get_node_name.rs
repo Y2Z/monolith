@@ -14,7 +14,7 @@ mod passing {
     #[test]
     fn parent_node_names() {
         let html = "<!doctype html><html><HEAD></HEAD><body><div><P></P></div></body></html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let mut count = 0;
 
         fn test_walk(node: &Handle, i: &mut i8) {

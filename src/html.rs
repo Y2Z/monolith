@@ -1,5 +1,6 @@
 use base64;
 use chrono::prelude::*;
+use encoding_rs::Encoding;
 use html5ever::interface::QualName;
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
@@ -18,7 +19,7 @@ use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::opts::Options;
 use crate::url::{clean_url, create_data_url, is_url_and_has_protocol, resolve_url};
-use crate::utils::retrieve_asset;
+use crate::utils::{parse_content_type, retrieve_asset};
 
 struct SrcSetItem<'a> {
     path: &'a str,
@@ -31,9 +32,8 @@ pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
     serialize(&mut buf, document, SerializeOpts::default())
         .expect("unable to serialize DOM into buffer");
-    let result = String::from_utf8(buf).unwrap();
 
-    let mut dom = html_to_dom(&result);
+    let mut dom = html_to_dom(&buf, "utf-8".to_string());
     let doc = dom.get_document();
     if let Some(html) = get_child_node_by_name(&doc, "html") {
         if let Some(head) = get_child_node_by_name(&html, "head") {
@@ -115,7 +115,7 @@ pub fn create_metadata_tag(url: &Url) -> String {
 
     // Prevent credentials from getting into metadata
     if clean_url.scheme() == "http" || clean_url.scheme() == "https" {
-        // Only HTTP(S) URLs may feature credentials
+        // Only HTTP(S) URLs can contain credentials
         clean_url.set_username("").unwrap();
         clean_url.set_password(None).unwrap();
     }
@@ -188,7 +188,8 @@ pub fn embed_srcset(
                 options,
                 depth + 1,
             ) {
-                Ok((image_data, image_final_url, image_media_type)) => {
+                Ok((image_data, image_final_url, image_media_type, _image_charset)) => {
+                    // TODO: use image_charset
                     let mut image_data_url =
                         create_data_url(&image_media_type, &image_data, &image_final_url);
                     // Append retreved asset as a data URL
@@ -253,12 +254,72 @@ pub fn find_base_node(node: &Handle) -> Option<Handle> {
     None
 }
 
+pub fn find_meta_charset_or_content_type_node(node: &Handle) -> Option<Handle> {
+    match node.data {
+        NodeData::Document => {
+            // Dig deeper
+            for child in node.children.borrow().iter() {
+                if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(child) {
+                    return Some(meta_charset_node);
+                }
+            }
+        }
+        NodeData::Element { ref name, .. } => {
+            match name.local.as_ref() {
+                "head" => {
+                    if let Some(meta_node) = get_child_node_by_name(node, "meta") {
+                        if let Some(_) = get_node_attr(&meta_node, "charset") {
+                            return Some(meta_node);
+                        } else if let Some(meta_node_http_equiv_attr_value) =
+                            get_node_attr(&meta_node, "http-equiv")
+                        {
+                            if meta_node_http_equiv_attr_value.eq_ignore_ascii_case("content-type")
+                            {
+                                return Some(meta_node);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            // Dig deeper
+            for child in node.children.borrow().iter() {
+                if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(child) {
+                    return Some(meta_charset_node);
+                }
+            }
+        }
+        _ => {}
+    }
+
+    None
+}
+
 pub fn get_base_url(handle: &Handle) -> Option<String> {
     if let Some(base_node) = find_base_node(handle) {
         get_node_attr(&base_node, "href")
     } else {
         None
     }
+}
+
+pub fn get_charset(node: &Handle) -> Option<String> {
+    if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(node) {
+        if let Some(meta_charset_node_attr_value) = get_node_attr(&meta_charset_node, "charset") {
+            // Processing <meta charset="..." />
+            return Some(meta_charset_node_attr_value);
+        } else if let Some(meta_content_type_node_attr_value) =
+            get_node_attr(&meta_charset_node, "content")
+        {
+            // Processing <meta http-equiv="content-type" content="text/html; charset=..." />
+            let (_media_type, charset, _is_base64) =
+                parse_content_type(&meta_content_type_node_attr_value);
+            return Some(charset);
+        }
+    }
+
+    return None;
 }
 
 pub fn get_child_node_by_name(parent: &Handle, node_name: &str) -> Option<Handle> {
@@ -273,13 +334,6 @@ pub fn get_child_node_by_name(parent: &Handle, node_name: &str) -> Option<Handle
     }
 }
 
-pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
-    match &node.data {
-        NodeData::Element { ref name, .. } => Some(name.local.as_ref()),
-        _ => None,
-    }
-}
-
 pub fn get_node_attr(node: &Handle, attr_name: &str) -> Option<String> {
     match &node.data {
         NodeData::Element { ref attrs, .. } => {
@@ -290,6 +344,13 @@ pub fn get_node_attr(node: &Handle, attr_name: &str) -> Option<String> {
             }
             None
         }
+        _ => None,
+    }
+}
+
+pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
+    match &node.data {
+        NodeData::Element { ref name, .. } => Some(name.local.as_ref()),
         _ => None,
     }
 }
@@ -340,10 +401,19 @@ pub fn has_favicon(handle: &Handle) -> bool {
     found_favicon
 }
 
-pub fn html_to_dom(data: &str) -> RcDom {
+pub fn html_to_dom(data: &Vec<u8>, document_encoding: String) -> RcDom {
+    let s: String;
+
+    if let Some(encoding) = Encoding::for_label(document_encoding.as_bytes()) {
+        let (string, _, _) = encoding.decode(&data);
+        s = string.to_string();
+    } else {
+        s = String::from_utf8_lossy(&data).to_string();
+    }
+
     parse_document(RcDom::default(), Default::default())
         .from_utf8()
-        .read_from(&mut data.as_bytes())
+        .read_from(&mut s.as_bytes())
         .unwrap()
 }
 
@@ -355,9 +425,8 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
     serialize(&mut buf, document, SerializeOpts::default())
         .expect("unable to serialize DOM into buffer");
-    let result = String::from_utf8(buf).unwrap();
 
-    let mut dom = html_to_dom(&result);
+    let mut dom = html_to_dom(&buf, "utf-8".to_string());
     let doc = dom.get_document();
     if let Some(html_node) = get_child_node_by_name(&doc, "html") {
         if let Some(head_node) = get_child_node_by_name(&html_node, "head") {
@@ -376,6 +445,41 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
 
                 // Insert newly created BASE node into HEAD
                 head_node.children.borrow_mut().push(base_node.clone());
+            }
+        }
+    }
+
+    dom
+}
+
+pub fn set_charset(mut dom: RcDom, desired_charset: String) -> RcDom {
+    if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(&dom.document) {
+        if let Some(_) = get_node_attr(&meta_charset_node, "charset") {
+            set_node_attr(&meta_charset_node, "charset", Some(desired_charset));
+        } else if let Some(_) = get_node_attr(&meta_charset_node, "content") {
+            set_node_attr(
+                &meta_charset_node,
+                "content",
+                Some(format!("text/html;charset={}", desired_charset)),
+            );
+        }
+    } else {
+        let meta_charset_node = dom.create_element(
+            QualName::new(None, ns!(), local_name!("meta")),
+            vec![Attribute {
+                name: QualName::new(None, ns!(), local_name!("charset")),
+                value: format_tendril!("{}", desired_charset),
+            }],
+            Default::default(),
+        );
+
+        // Insert newly created META charset node into HEAD
+        if let Some(html_node) = get_child_node_by_name(&dom.document, "html") {
+            if let Some(head_node) = get_child_node_by_name(&html_node, "head") {
+                head_node
+                    .children
+                    .borrow_mut()
+                    .push(meta_charset_node.clone());
             }
         }
     }
@@ -423,16 +527,10 @@ pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>)
     };
 }
 
-pub fn stringify_document(handle: &Handle, options: &Options) -> String {
+pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &Options) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
-    serialize(&mut buf, handle, SerializeOpts::default())
-        .expect("Unable to serialize DOM into buffer");
+    let doc = dom.get_document();
 
-    let mut result = String::from_utf8(buf).unwrap();
-
-    // We can't make it isolate the page right away since it may have no HEAD element,
-    // ergo we have to serialize, parse the DOM again, insert the CSP meta tag, and then
-    // finally serialize and return the resulting string
     if options.isolate
         || options.no_css
         || options.no_fonts
@@ -441,9 +539,6 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
         || options.no_images
     {
         // Take care of CSP
-        let mut buf: Vec<u8> = Vec::new();
-        let mut dom = html_to_dom(&result);
-        let doc = dom.get_document();
         if let Some(html) = get_child_node_by_name(&doc, "html") {
             if let Some(head) = get_child_node_by_name(&html, "head") {
                 let meta = dom.create_element(
@@ -468,19 +563,27 @@ pub fn stringify_document(handle: &Handle, options: &Options) -> String {
                 head.children.borrow_mut().reverse();
             }
         }
-
-        serialize(&mut buf, &doc, SerializeOpts::default())
-            .expect("Unable to serialize DOM into buffer");
-        result = String::from_utf8(buf).unwrap();
     }
+
+    serialize(&mut buf, &doc, SerializeOpts::default())
+        .expect("Unable to serialize DOM into buffer");
 
     // Unwrap NOSCRIPT elements
     if options.unwrap_noscript {
+        let s: &str = &String::from_utf8_lossy(&buf);
         let noscript_re = Regex::new(r"<(?P<c>/?noscript[^>]*)>").unwrap();
-        result = noscript_re.replace_all(&result, "<!--$c-->").to_string();
+        buf = noscript_re.replace_all(&s, "<!--$c-->").as_bytes().to_vec();
     }
 
-    result
+    if !document_encoding.is_empty() {
+        if let Some(encoding) = Encoding::for_label(document_encoding.as_bytes()) {
+            let s: &str = &String::from_utf8_lossy(&buf);
+            let (data, _, _) = encoding.encode(s);
+            buf = data.to_vec();
+        }
+    }
+
+    buf
 }
 
 pub fn retrieve_and_embed_asset(
@@ -503,7 +606,7 @@ pub fn retrieve_and_embed_asset(
         options,
         depth + 1,
     ) {
-        Ok((data, final_url, mut media_type)) => {
+        Ok((data, final_url, mut media_type, _charset)) => {
             let node_name: &str = get_node_name(&node).unwrap();
 
             // Check integrity if it's a LINK or SCRIPT element
@@ -537,7 +640,7 @@ pub fn retrieve_and_embed_asset(
                     set_node_attr(&node, attr_name, Some(css_data_url.to_string()));
                 } else if node_name == "frame" || node_name == "iframe" {
                     // (I)FRAMEs are also quite different from conventional resources
-                    let frame_dom = html_to_dom(&String::from_utf8_lossy(&data));
+                    let frame_dom = html_to_dom(&data, "utf-8".to_string());
                     walk_and_embed_assets(
                         cache,
                         client,
@@ -556,6 +659,7 @@ pub fn retrieve_and_embed_asset(
                     .unwrap();
 
                     // Create and embed data URL
+                    // TODO: use charset
                     let mut frame_data_url = create_data_url(&media_type, &frame_data, &final_url);
                     frame_data_url.set_fragment(resolved_url.fragment());
                     set_node_attr(node, attr_name, Some(frame_data_url.to_string()));
@@ -629,20 +733,7 @@ pub fn walk_and_embed_assets(
                                     meta_attr_http_equiv_value
                                 )),
                             );
-                        } else if meta_attr_http_equiv_value.eq_ignore_ascii_case("Content-Type") {
-                            // Enforce charset to be set to UTF-8
-                            if let Some(_attr_value) = get_node_attr(node, "content") {
-                                set_node_attr(
-                                    &node,
-                                    "content",
-                                    Some(str!("text/html; charset=utf-8")),
-                                );
-                            }
                         }
-                    } else if let Some(_meta_attr_http_equiv_value) = get_node_attr(node, "charset")
-                    {
-                        // Enforce charset to be set to UTF-8
-                        set_node_attr(&node, "charset", Some(str!("utf-8")));
                     }
                 }
                 "link" => {
@@ -1078,7 +1169,8 @@ pub fn walk_and_embed_assets(
                                 // Get contents of NOSCRIPT node
                                 let mut noscript_contents = contents.borrow_mut();
                                 // Parse contents of NOSCRIPT node as DOM
-                                let noscript_contents_dom: RcDom = html_to_dom(&noscript_contents);
+                                let noscript_contents_dom: RcDom =
+                                    html_to_dom(&noscript_contents.as_bytes().to_vec(), str!());
                                 // Embed assets of NOSCRIPT node contents
                                 walk_and_embed_assets(
                                     cache,
@@ -1098,7 +1190,7 @@ pub fn walk_and_embed_assets(
                                         let mut buf: Vec<u8> = Vec::new();
                                         serialize(&mut buf, &body, SerializeOpts::default())
                                             .expect("Unable to serialize DOM into buffer");
-                                        let result = String::from_utf8(buf).unwrap();
+                                        let result = String::from_utf8_lossy(&buf);
                                         noscript_contents.push_slice(&result);
                                     }
                                 }

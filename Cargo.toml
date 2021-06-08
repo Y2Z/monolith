@@ -27,6 +27,7 @@ base64 = "0.13.0"
 chrono = "0.4.19" # Used for formatting creation timestamp
 clap = "2.33.3"
 cssparser = "0.28.1"
+encoding_rs = "0.8.28"
 html5ever = "0.24.1"
 regex = "1.5.4" # Used for parsing srcset and NOSCRIPT
 sha2 = "0.9.5" # Used for calculating checksums during integrity checks
