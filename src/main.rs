@@ -210,15 +210,23 @@ fn main() {
         process::exit(1);
     }
 
-    // Initial parse to read document's charset from META tag
+    // Initial parse
     dom = html_to_dom(&data, document_encoding.clone());
+
+    // TODO: investigate if charset from filesystem/data URL/HTTP headers
+    //       has power over what's specified in HTML
 
     // Attempt to determine document's charset
     if let Some(charset) = get_charset(&dom.document) {
         if !charset.is_empty() {
-            // TODO && label(charset) != UTF_8
-            document_encoding = charset;
-            dom = html_to_dom(&data, document_encoding.clone());
+            // Check if the charset specified inside HTML is valid
+            if let Some(encoding) = Encoding::for_label(charset.as_bytes()) {
+                // No point in parsing HTML again with the same encoding as before
+                if encoding.name() != "UTF-8" {
+                    document_encoding = charset;
+                    dom = html_to_dom(&data, document_encoding.clone());
+                }
+            }
         }
     }
 
