@@ -1,6 +1,6 @@
 [package]
 name = "monolith"
-version = "2.5.0"
+version = "2.6.0"
 authors = [
     "Sunshine <sunshine@uberspace.net>",
     "Mahdi Robatipoor <mahdi.robatipoor@gmail.com>",
@@ -39,4 +39,4 @@ default-features = false
 features = ["default-tls", "blocking", "gzip"]
 
 [dev-dependencies]
-assert_cmd = "1.0.4"
+assert_cmd = "1.0.5"
