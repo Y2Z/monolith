@@ -28,4 +28,9 @@ mod passing {
     fn three() {
         assert_eq!(utils::indent(3), "   ");
     }
+
+    #[test]
+    fn four() {
+        assert_eq!(utils::indent(4), "    ");
+    }
 }

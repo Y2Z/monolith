@@ -198,9 +198,14 @@ pub fn process_css<'a>(
                         options,
                         depth + 1,
                     ) {
-                        Ok((import_contents, import_final_url, _import_media_type)) => {
+                        Ok((
+                            import_contents,
+                            import_final_url,
+                            import_media_type,
+                            _import_charset,
+                        )) => {
                             let mut import_data_url = create_data_url(
-                                "text/css",
+                                &import_media_type,
                                 embed_css(
                                     cache,
                                     client,
@@ -247,7 +252,7 @@ pub fn process_css<'a>(
                                 options,
                                 depth + 1,
                             ) {
-                                Ok((data, final_url, media_type)) => {
+                                Ok((data, final_url, media_type, _charset)) => {
                                     let mut data_url =
                                         create_data_url(&media_type, &data, &final_url);
                                     data_url.set_fragment(resolved_url.fragment());
@@ -343,9 +348,9 @@ pub fn process_css<'a>(
                         options,
                         depth + 1,
                     ) {
-                        Ok((css, final_url, _media_type)) => {
+                        Ok((css, final_url, media_type, _charset)) => {
                             let mut data_url = create_data_url(
-                                "text/css",
+                                &media_type,
                                 embed_css(
                                     cache,
                                     client,
@@ -381,7 +386,7 @@ pub fn process_css<'a>(
                             options,
                             depth + 1,
                         ) {
-                            Ok((data, final_url, media_type)) => {
+                            Ok((data, final_url, media_type, _charset)) => {
                                 let mut data_url = create_data_url(&media_type, &data, &final_url);
                                 data_url.set_fragment(full_url.fragment());
                                 result

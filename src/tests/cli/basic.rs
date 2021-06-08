@@ -19,16 +19,16 @@ mod passing {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd.arg("-V").output().unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain program name and version
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             format!("{} {}\n", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
         );
 
-        // STDERR should be empty
-        assert_eq!(std::str::from_utf8(&out.stderr).unwrap(), "");
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -46,11 +46,17 @@ mod passing {
         cmd.stdin(echo_out);
         let out = cmd.arg("-M").arg("-").output().unwrap();
 
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
+
         // STDOUT should contain HTML created out of STDIN
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "<html><head></head><body>Hello from STDIN\n</body></html>\n"
         );
+
+        // Exit code should be 0
+        out.assert().code(0);
     }
 
     #[test]
@@ -64,15 +70,9 @@ mod passing {
 
         let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
 
-        // STDOUT should contain embedded CSS url()'s
-        assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
-            "<html><head><style>\n\n    @charset \"UTF-8\";\n\n    @import \"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\";\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n</style>\n</head><body></body></html>\n"
-        );
-
         // STDERR should list files that got retrieved
         assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
+            String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
                 {file_url_html}\n \
@@ -85,7 +85,13 @@ mod passing {
             )
         );
 
-        // The exit code should be 0
+        // STDOUT should contain embedded CSS url()'s
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "<html><head><style>\n\n    @charset \"UTF-8\";\n\n    @import \"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\";\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n</style>\n</head><body></body></html>\n"
+        );
+
+        // Exit code should be 0
         out.assert().code(0);
     }
 }
@@ -108,16 +114,16 @@ mod failing {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd.arg("").output().unwrap();
 
-        // STDOUT should be empty
-        assert_eq!(std::str::from_utf8(&out.stdout).unwrap(), "");
-
         // STDERR should contain error description
         assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
+            String::from_utf8_lossy(&out.stderr),
             "No target specified\n"
         );
 
-        // The exit code should be 1
+        // STDOUT should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "");
+
+        // Exit code should be 1
         out.assert().code(1);
     }
 }

@@ -1,7 +1,7 @@
 use base64;
 use url::{form_urlencoded, Url};
 
-use crate::utils::detect_media_type;
+use crate::utils::{detect_media_type, parse_content_type};
 
 pub fn clean_url(url: Url) -> Url {
     let mut url = url.clone();
@@ -37,42 +37,26 @@ pub fn is_url_and_has_protocol(input: &str) -> bool {
     }
 }
 
-pub fn parse_data_url(url: &Url) -> (String, Vec<u8>) {
+pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
     let path: String = url.path().to_string();
     let comma_loc: usize = path.find(',').unwrap_or(path.len());
 
-    let meta_data: String = path.chars().take(comma_loc).collect();
-    let raw_data: String = path.chars().skip(comma_loc + 1).collect();
+    // Split data URL into meta data and raw data
+    let content_type: String = path.chars().take(comma_loc).collect();
+    let data: String = path.chars().skip(comma_loc + 1).collect();
 
-    let text: String = percent_decode(raw_data);
+    // Parse meta data
+    let (media_type, charset, is_base64) = parse_content_type(&content_type);
 
-    let meta_data_items: Vec<&str> = meta_data.split(';').collect();
-    let mut media_type: String = str!();
-    let mut encoding: &str = "";
-
-    let mut i: i8 = 0;
-    for item in &meta_data_items {
-        if i == 0 {
-            media_type = str!(item);
-        } else {
-            if item.eq_ignore_ascii_case("base64")
-                || item.eq_ignore_ascii_case("utf8")
-                || item.eq_ignore_ascii_case("charset=UTF-8")
-            {
-                encoding = item;
-            }
-        }
-
-        i = i + 1;
-    }
-
-    let data: Vec<u8> = if encoding.eq_ignore_ascii_case("base64") {
+    // Parse raw data into vector of bytes
+    let text: String = percent_decode(data);
+    let blob: Vec<u8> = if is_base64 {
         base64::decode(&text).unwrap_or(vec![])
     } else {
         text.as_bytes().to_vec()
     };
 
-    (media_type, data)
+    (media_type, charset, blob)
 }
 
 pub fn percent_decode(input: String) -> String {

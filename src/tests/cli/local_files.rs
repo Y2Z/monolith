@@ -10,7 +10,7 @@ mod passing {
     use assert_cmd::prelude::*;
     use std::env;
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, MAIN_SEPARATOR};
     use std::process::Command;
     use url::Url;
 
@@ -21,18 +21,33 @@ mod passing {
             str!(env::current_dir().unwrap().to_str().unwrap()).replace("\\", "/");
         let out = cmd
             .arg("-M")
-            .arg(if cfg!(windows) {
-                "src\\tests\\data\\basic\\local-file.html"
-            } else {
-                "src/tests/data/basic/local-file.html"
-            })
+            .arg(format!(
+                "src{s}tests{s}data{s}basic{s}local-file.html",
+                s = MAIN_SEPARATOR
+            ))
             .output()
             .unwrap();
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
 
+        // STDERR should contain list of retrieved file URLs, two missing
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                "\
+                {file}{cwd}/src/tests/data/basic/local-file.html\n \
+                {file}{cwd}/src/tests/data/basic/local-style.css\n \
+                {file}{cwd}/src/tests/data/basic/local-style-does-not-exist.css (not found)\n \
+                {file}{cwd}/src/tests/data/basic/monolith.png (not found)\n \
+                {file}{cwd}/src/tests/data/basic/local-script.js\n\
+                ",
+                file = file_url_protocol,
+                cwd = cwd_normalized
+            )
+        );
+
         // STDOUT should contain HTML from the local file
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             "\
             <!DOCTYPE html><html lang=\"en\"><head>\n  \
             <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  \
@@ -47,23 +62,7 @@ mod passing {
             "
         );
 
-        // STDERR should contain list of retrieved file URLs, two missing
-        assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
-            format!(
-                "\
-                {file}{cwd}/src/tests/data/basic/local-file.html\n \
-                {file}{cwd}/src/tests/data/basic/local-style.css\n \
-                {file}{cwd}/src/tests/data/basic/local-style-does-not-exist.css (not found)\n \
-                {file}{cwd}/src/tests/data/basic/monolith.png (not found)\n \
-                {file}{cwd}/src/tests/data/basic/local-script.js\n\
-                ",
-                file = file_url_protocol,
-                cwd = cwd_normalized
-            )
-        );
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -79,9 +78,18 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should contain only the target file
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                "{file_url_html}\n",
+                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
+            )
+        );
+
         // STDOUT should contain HTML from the local file
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             format!(
                 "\
                 <!DOCTYPE html><html lang=\"en\"><head>\
@@ -100,16 +108,7 @@ mod passing {
             )
         );
 
-        // STDERR should contain only the target file
-        assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
-            format!(
-                "{file_url_html}\n",
-                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
-            )
-        );
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -122,25 +121,27 @@ mod passing {
         let out = cmd
             .arg("-M")
             .arg("-cji")
-            .arg(if cfg!(windows) {
-                format!(
-                    "{file}{cwd}/src/tests/data/basic/local-file.html",
-                    file = file_url_protocol,
-                    cwd = cwd_normalized,
-                )
-            } else {
-                format!(
-                    "{file}{cwd}/src/tests/data/basic/local-file.html",
-                    file = file_url_protocol,
-                    cwd = cwd_normalized,
-                )
-            })
+            .arg(format!(
+                "{file}{cwd}/src/tests/data/basic/local-file.html",
+                file = file_url_protocol,
+                cwd = cwd_normalized,
+            ))
             .output()
             .unwrap();
 
+        // STDERR should contain list of retrieved file URLs
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                "{file}{cwd}/src/tests/data/basic/local-file.html\n",
+                file = file_url_protocol,
+                cwd = cwd_normalized,
+            )
+        );
+
         // STDOUT should contain HTML from the local file
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             format!(
                 "\
                 <!DOCTYPE html><html lang=\"en\"><head>\
@@ -159,17 +160,7 @@ mod passing {
             )
         );
 
-        // STDERR should contain list of retrieved file URLs
-        assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
-            format!(
-                "{file}{cwd}/src/tests/data/basic/local-file.html\n",
-                file = file_url_protocol,
-                cwd = cwd_normalized,
-            )
-        );
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -181,15 +172,9 @@ mod passing {
 
         let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
 
-        // STDOUT should contain HTML with date URL for background-image in it
-        assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
-            "<html><head></head><body><div style=\"background-image: url(&quot;data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=&quot;)\"></div>\n</body></html>\n"
-        );
-
         // STDERR should list files that got retrieved
         assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
+            String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
                 {file_url_html}\n \
@@ -200,7 +185,13 @@ mod passing {
             )
         );
 
-        // The exit code should be 0
+        // STDOUT should contain HTML with date URL for background-image in it
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "<html><head></head><body><div style=\"background-image: url(&quot;data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=&quot;)\"></div>\n</body></html>\n"
+        );
+
+        // Exit code should be 0
         out.assert().code(0);
     }
 
@@ -229,9 +220,25 @@ mod passing {
             .output()
             .unwrap();
 
+        // STDERR should contain list of retrieved file URLs
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                "\
+                {file}{cwd}/src/tests/data/integrity/index.html\n \
+                {file}{cwd}/src/tests/data/integrity/style.css\n \
+                {file}{cwd}/src/tests/data/integrity/style.css\n \
+                {file}{cwd}/src/tests/data/integrity/script.js\n \
+                {file}{cwd}/src/tests/data/integrity/script.js\n\
+                ",
+                file = file_url_protocol,
+                cwd = cwd_normalized,
+            )
+        );
+
         // STDOUT should contain HTML from the local file; integrity attributes should be missing
         assert_eq!(
-            std::str::from_utf8(&out.stdout).unwrap(),
+            String::from_utf8_lossy(&out.stdout),
             format!(
                 "\
                 <!DOCTYPE html><html lang=\"en\"><head>\
@@ -247,23 +254,7 @@ mod passing {
             )
         );
 
-        // STDERR should contain list of retrieved file URLs
-        assert_eq!(
-            std::str::from_utf8(&out.stderr).unwrap(),
-            format!(
-                "\
-                {file}{cwd}/src/tests/data/integrity/index.html\n \
-                {file}{cwd}/src/tests/data/integrity/style.css\n \
-                {file}{cwd}/src/tests/data/integrity/style.css\n \
-                {file}{cwd}/src/tests/data/integrity/script.js\n \
-                {file}{cwd}/src/tests/data/integrity/script.js\n\
-                ",
-                file = file_url_protocol,
-                cwd = cwd_normalized,
-            )
-        );
-
-        // The exit code should be 0
+        // Exit code should be 0
         out.assert().code(0);
     }
 }

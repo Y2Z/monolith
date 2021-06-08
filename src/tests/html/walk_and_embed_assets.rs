@@ -20,7 +20,7 @@ mod passing {
         let cache = &mut HashMap::new();
 
         let html: &str = "<div><P></P></div>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let mut options = Options::default();
@@ -42,7 +42,7 @@ mod passing {
     #[test]
     fn ensure_no_recursive_iframe() {
         let html = "<div><P></P><iframe src=\"\"></iframe></div>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -65,7 +65,7 @@ mod passing {
     #[test]
     fn ensure_no_recursive_frame() {
         let html = "<frameset><frame src=\"\"></frameset>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -93,7 +93,7 @@ mod passing {
             <style>html{background-color: #000;}</style>\
             <div style=\"display: none;\"></div>\
         ";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -129,7 +129,7 @@ mod passing {
     fn no_images() {
         let html = "<link rel=\"icon\" href=\"favicon.ico\">\
                     <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -166,7 +166,7 @@ mod passing {
     fn no_body_background_images() {
         let html =
             "<body background=\"no/such/image.png\" background=\"no/such/image2.png\"></body>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -190,7 +190,7 @@ mod passing {
     #[test]
     fn no_frames() {
         let html = "<frameset><frame src=\"http://trackbook.com\"></frameset>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -222,7 +222,7 @@ mod passing {
     #[test]
     fn no_iframes() {
         let html = "<iframe src=\"http://trackbook.com\"></iframe>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -258,7 +258,7 @@ mod passing {
                 <script>alert(1)</script>\
             </div>\
         ";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -293,7 +293,7 @@ mod passing {
     fn keeps_integrity_for_linked_assets() {
         let html = "<title>Has integrity</title>\
                     <link integrity=\"sha384-12345\" rel=\"something\" href=\"https://some-site.com/some-file.ext\" />";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -328,7 +328,7 @@ mod passing {
             <link integrity=\"\" rel=\"stylesheet\" href=\"data:;\"/>\
             <script integrity=\"\" src=\"some.js\"></script>\
         ";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -366,7 +366,7 @@ mod passing {
             <link integrity=\"sha384-123\" rel=\"something\" href=\"data:;\"/>\
             <script integrity=\"sha384-456\" src=\"some.js\"></script>\
         ";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -410,7 +410,7 @@ mod passing {
                 </body>\
             </html>\
         ";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -452,7 +452,7 @@ mod passing {
                 </noscript>\
             </body>\
         </html>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 
@@ -488,7 +488,7 @@ mod passing {
     #[test]
     fn preserves_script_type_json() {
         let html = "<script id=\"data\" type=\"application/json\">{\"mono\":\"lith\"}</script>";
-        let dom = html::html_to_dom(&html);
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
 

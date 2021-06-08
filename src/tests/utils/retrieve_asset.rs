@@ -26,7 +26,7 @@ mod passing {
 
         // If both source and target are data URLs,
         //  ensure the result contains target data URL
-        let (data, final_url, media_type) = utils::retrieve_asset(
+        let (data, final_url, media_type, charset) = utils::retrieve_asset(
             cache,
             &client,
             &Url::parse("data:text/html;base64,c291cmNl").unwrap(),
@@ -35,23 +35,16 @@ mod passing {
             0,
         )
         .unwrap();
+        assert_eq!(&media_type, "text/html");
+        assert_eq!(&charset, "US-ASCII");
         assert_eq!(
             url::create_data_url(&media_type, &data, &final_url),
-            url::create_data_url(
-                "text/html",
-                "target".as_bytes(),
-                &Url::parse("data:text/html;base64,c291cmNl").unwrap()
-            )
+            Url::parse("data:text/html;base64,dGFyZ2V0").unwrap(),
         );
         assert_eq!(
             final_url,
-            url::create_data_url(
-                "text/html",
-                "target".as_bytes(),
-                &Url::parse("data:text/html;base64,c291cmNl").unwrap()
-            )
+            Url::parse("data:text/html;base64,dGFyZ2V0").unwrap(),
         );
-        assert_eq!(&media_type, "text/html");
     }
 
     #[test]
@@ -66,7 +59,7 @@ mod passing {
 
         // Inclusion of local assets from local sources should be allowed
         let cwd = env::current_dir().unwrap();
-        let (data, final_url, _media_type) = utils::retrieve_asset(
+        let (data, final_url, media_type, charset) = utils::retrieve_asset(
             cache,
             &client,
             &Url::parse(&format!(
@@ -85,7 +78,9 @@ mod passing {
             0,
         )
         .unwrap();
-        assert_eq!(url::create_data_url("application/javascript", &data, &final_url), Url::parse("data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==").unwrap());
+        assert_eq!(&media_type, "application/javascript");
+        assert_eq!(&charset, "");
+        assert_eq!(url::create_data_url(&media_type, &data, &final_url), Url::parse("data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==").unwrap());
         assert_eq!(
             final_url,
             Url::parse(&format!(
