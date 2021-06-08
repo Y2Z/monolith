@@ -1,3 +1,4 @@
+use encoding_rs::Encoding;
 use html5ever::rcdom::RcDom;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
@@ -74,6 +75,14 @@ fn main() {
             eprintln!("No target specified");
         }
         process::exit(1);
+    }
+
+    // Check if custom charset is valid
+    if let Some(custom_charset) = options.charset.clone() {
+        if !Encoding::for_label_no_replacement(custom_charset.as_bytes()).is_some() {
+            eprintln!("Unknown encoding: {}", &custom_charset);
+            process::exit(1);
+        }
     }
 
     let target_url: Url;
@@ -201,15 +210,23 @@ fn main() {
         process::exit(1);
     }
 
-    // Initial parse to read document's charset from META tag
+    // Initial parse
     dom = html_to_dom(&data, document_encoding.clone());
+
+    // TODO: investigate if charset from filesystem/data URL/HTTP headers
+    //       has power over what's specified in HTML
 
     // Attempt to determine document's charset
     if let Some(charset) = get_charset(&dom.document) {
         if !charset.is_empty() {
-            // TODO && label(charset) != UTF_8
-            document_encoding = charset;
-            dom = html_to_dom(&data, document_encoding.clone());
+            // Check if the charset specified inside HTML is valid
+            if let Some(encoding) = Encoding::for_label(charset.as_bytes()) {
+                // No point in parsing HTML again with the same encoding as before
+                if encoding.name() != "UTF-8" {
+                    document_encoding = charset;
+                    dom = html_to_dom(&data, document_encoding.clone());
+                }
+            }
         }
     }
 
@@ -296,10 +313,9 @@ fn main() {
         }
     }
 
-    // Enforce UTF-8 encoding for documents that may end up having garbled html entities
-    // due to html5ever forcefully converting them into UTF-8 byte sequences.
-    if document_encoding.eq_ignore_ascii_case("iso-8859-1") {
-        document_encoding = str!("utf-8");
+    // Save using specified charset, if given
+    if let Some(custom_charset) = options.charset.clone() {
+        document_encoding = custom_charset;
         dom = set_charset(dom, document_encoding.clone());
     }
 
