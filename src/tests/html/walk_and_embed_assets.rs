@@ -290,7 +290,7 @@ mod passing {
     }
 
     #[test]
-    fn keeps_integrity_for_linked_assets() {
+    fn keeps_integrity_for_unfamiliar_links() {
         let html = "<title>Has integrity</title>\
                     <link integrity=\"sha384-12345\" rel=\"something\" href=\"https://some-site.com/some-file.ext\" />";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), str!());
@@ -322,7 +322,7 @@ mod passing {
     }
 
     #[test]
-    fn discards_integrity_for_linked_assets_nojs_nocss() {
+    fn discards_integrity_for_known_links_nojs_nocss() {
         let html = "\
             <title>No integrity</title>\
             <link integrity=\"\" rel=\"stylesheet\" href=\"data:;\"/>\
@@ -403,8 +403,8 @@ mod passing {
         let html = "\
             <html>\
                 <head>\
-                    <meta http-equiv=\"Refresh\" value=\"20\"/>\
-                    <meta http-equiv=\"Location\" value=\"https://freebsd.org\"/>\
+                    <meta http-equiv=\"Refresh\" content=\"2\"/>\
+                    <meta http-equiv=\"Location\" content=\"https://freebsd.org\"/>\
                 </head>\
                 <body>\
                 </body>\
@@ -433,8 +433,8 @@ mod passing {
             "\
             <html>\
                 <head>\
-                    <meta http-equiv=\"disabled by monolith (Refresh)\" value=\"20\">\
-                    <meta http-equiv=\"disabled by monolith (Location)\" value=\"https://freebsd.org\">\
+                    <meta content=\"2\">\
+                    <meta content=\"https://freebsd.org\">\
                 </head>\
                 <body>\
                 </body>\

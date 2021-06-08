@@ -606,7 +606,7 @@ pub fn retrieve_and_embed_asset(
         options,
         depth + 1,
     ) {
-        Ok((data, final_url, mut media_type, _charset)) => {
+        Ok((data, final_url, mut media_type, charset)) => {
             let node_name: &str = get_node_name(&node).unwrap();
 
             // Check integrity if it's a LINK or SCRIPT element
@@ -624,23 +624,25 @@ pub fn retrieve_and_embed_asset(
             }
 
             if ok_to_include {
+                let s: String;
+                if let Some(encoding) = Encoding::for_label(charset.as_bytes()) {
+                    let (string, _, _) = encoding.decode(&data);
+                    s = string.to_string();
+                } else {
+                    s = String::from_utf8_lossy(&data).to_string();
+                }
+
                 if node_name == "link" && determine_link_node_type(node) == "stylesheet" {
                     // Stylesheet LINK elements require special treatment
-                    let css: String = embed_css(
-                        cache,
-                        client,
-                        &final_url,
-                        &String::from_utf8_lossy(&data),
-                        options,
-                        depth + 1,
-                    );
+                    let css: String = embed_css(cache, client, &final_url, &s, options, depth + 1);
 
                     // Create and embed data URL
-                    let css_data_url = create_data_url("text/css", css.as_bytes(), &final_url);
+                    // TODO: use charset
+                    let css_data_url = create_data_url(&media_type, css.as_bytes(), &final_url);
                     set_node_attr(&node, attr_name, Some(css_data_url.to_string()));
                 } else if node_name == "frame" || node_name == "iframe" {
                     // (I)FRAMEs are also quite different from conventional resources
-                    let frame_dom = html_to_dom(&data, "utf-8".to_string());
+                    let frame_dom = html_to_dom(&data, charset);
                     walk_and_embed_assets(
                         cache,
                         client,
@@ -679,6 +681,7 @@ pub fn retrieve_and_embed_asset(
                     }
 
                     // Create and embed data URL
+                    // TODO: use charset
                     let mut data_url = create_data_url(&media_type, &data, &final_url);
                     data_url.set_fragment(resolved_url.fragment());
                     set_node_attr(node, attr_name, Some(data_url.to_string()));
@@ -725,14 +728,7 @@ pub fn walk_and_embed_assets(
                             || meta_attr_http_equiv_value.eq_ignore_ascii_case("location")
                         {
                             // Remove http-equiv attributes from META nodes if they're able to control the page
-                            set_node_attr(
-                                &node,
-                                "http-equiv",
-                                Some(format!(
-                                    "disabled by monolith ({})",
-                                    meta_attr_http_equiv_value
-                                )),
-                            );
+                            set_node_attr(&node, "http-equiv", None);
                         }
                     }
                 }
