@@ -86,7 +86,6 @@ fn main() {
     }
 
     let target_url: Url;
-    let mut base_url: Url;
     let mut use_stdin: bool = false;
 
     // Determine exact target URL
@@ -156,20 +155,19 @@ fn main() {
             HeaderValue::from_str(&user_agent).expect("Invalid User-Agent header specified"),
         );
     }
-    let timeout: u64 = if options.timeout > 0 {
-        options.timeout
+    let client = if options.timeout > 0 {
+        Client::builder().timeout(Duration::from_secs(options.timeout))
     } else {
-        std::u64::MAX / 4 // This is pretty close to infinity
-    };
-    let client = Client::builder()
-        .timeout(Duration::from_secs(timeout))
-        .danger_accept_invalid_certs(options.insecure)
-        .default_headers(header_map)
-        .build()
-        .expect("Failed to initialize HTTP client");
+        // No timeout is default
+        Client::builder()
+    }
+    .danger_accept_invalid_certs(options.insecure)
+    .default_headers(header_map)
+    .build()
+    .expect("Failed to initialize HTTP client");
 
-    // At this stage we assume that the base URL is the same as the target URL
-    base_url = target_url.clone();
+    // At first we assume that base URL is the same as target URL
+    let mut base_url: Url = target_url.clone();
 
     let data: Vec<u8>;
     let mut document_encoding: String = str!();
@@ -214,16 +212,16 @@ fn main() {
     dom = html_to_dom(&data, document_encoding.clone());
 
     // TODO: investigate if charset from filesystem/data URL/HTTP headers
-    //       has power over what's specified in HTML
+    //       has say over what's specified in HTML
 
     // Attempt to determine document's charset
-    if let Some(charset) = get_charset(&dom.document) {
-        if !charset.is_empty() {
+    if let Some(html_charset) = get_charset(&dom.document) {
+        if !html_charset.is_empty() {
             // Check if the charset specified inside HTML is valid
-            if let Some(encoding) = Encoding::for_label(charset.as_bytes()) {
+            if let Some(encoding) = Encoding::for_label_no_replacement(html_charset.as_bytes()) {
                 // No point in parsing HTML again with the same encoding as before
                 if encoding.name() != "UTF-8" {
-                    document_encoding = charset;
+                    document_encoding = html_charset;
                     dom = html_to_dom(&data, document_encoding.clone());
                 }
             }
@@ -233,8 +231,8 @@ fn main() {
     // Use custom base URL if specified, read and use what's in the DOM otherwise
     let custom_base_url: String = options.base_url.clone().unwrap_or(str!());
     if custom_base_url.is_empty() {
-        // No custom base URL is specified,
-        // try to see if the document has BASE tag
+        // No custom base URL is specified
+        // Try to see if document has BASE element
         if let Some(existing_base_url) = get_base_url(&dom.document) {
             base_url = resolve_url(&target_url, &existing_base_url);
         }
@@ -253,8 +251,7 @@ fn main() {
                 }
             }
             Err(_) => {
-                // Failed to parse given base URL,
-                // perhaps it's a filesystem path?
+                // Failed to parse given base URL, perhaps it's a filesystem path?
                 if target_url.scheme() == "file" {
                     // Relative paths could work for documents saved from filesystem
                     let path: &Path = Path::new(&custom_base_url);
@@ -322,7 +319,7 @@ fn main() {
     // Serialize DOM tree
     let mut result: Vec<u8> = serialize_document(dom, document_encoding, &options);
 
-    // Add metadata tag
+    // Prepend metadata comment tag
     if !options.no_metadata {
         let mut metadata_comment: String = create_metadata_tag(&target_url);
         metadata_comment += "\n";
