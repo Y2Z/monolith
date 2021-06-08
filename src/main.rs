@@ -299,9 +299,9 @@ fn main() {
             &options,
             0,
         ) {
-            Ok((data, final_url, media_type, _charset)) => {
-                // TODO: use charset
-                let favicon_data_url: Url = create_data_url(&media_type, &data, &final_url);
+            Ok((data, final_url, media_type, charset)) => {
+                let favicon_data_url: Url =
+                    create_data_url(&media_type, &charset, &data, &final_url);
                 dom = add_favicon(&dom.document, favicon_data_url.to_string());
             }
             Err(_) => {

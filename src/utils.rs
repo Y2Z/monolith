@@ -84,9 +84,9 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
             "woff" => "font/woff",
             "woff2" => "font/woff2",
             "xml" => "text/xml",
-            &_ => "application/octet-stream",
+            &_ => "",
         },
-        None => "application/octet-stream",
+        None => "",
     };
 
     mime.to_string()

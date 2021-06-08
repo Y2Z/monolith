@@ -195,7 +195,7 @@ mod failing {
         let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
             utils::detect_media_type(b"abcdef0123456789", &dummy_url),
-            "application/octet-stream"
+            ""
         );
     }
 }
