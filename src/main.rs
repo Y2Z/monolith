@@ -1,7 +1,7 @@
 use encoding_rs::Encoding;
 use html5ever::rcdom::RcDom;
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT, COOKIE};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, prelude::*, Error, Write};
@@ -153,6 +153,12 @@ fn main() {
         header_map.insert(
             USER_AGENT,
             HeaderValue::from_str(&user_agent).expect("Invalid User-Agent header specified"),
+        );
+    }
+    if let Some(cookies) = &options.cookies {
+        header_map.insert(
+            COOKIE,
+            HeaderValue::from_str(&cookies).expect("Invalid cookies specified"),
         );
     }
     let client = if options.timeout > 0 {
