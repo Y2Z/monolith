@@ -155,10 +155,10 @@ fn main() {
             HeaderValue::from_str(&user_agent).expect("Invalid User-Agent header specified"),
         );
     }
-    if let Some(cookies) = &options.cookies {
+    if let Some(cookie) = &options.cookie {
         header_map.insert(
             COOKIE,
-            HeaderValue::from_str(&cookies).expect("Invalid cookies specified"),
+            HeaderValue::from_str(&cookie).expect("Invalid cookie specified"),
         );
     }
     let client = if options.timeout > 0 {

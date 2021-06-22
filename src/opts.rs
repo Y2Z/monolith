@@ -23,7 +23,7 @@ pub struct Options {
     pub target: String,
     pub no_color: bool,
     pub unwrap_noscript: bool,
-    pub cookies: Option<String>,
+    pub cookie: Option<String>,
 }
 
 const ASCII: &'static str = " \
@@ -69,7 +69,7 @@ impl Options {
             .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
             .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
             .args_from_usage("-v, --no-video 'Removes video sources'")
-            .args_from_usage("--cookies, --cookies=[UTF-8] 'Set cookies for HTTP requests. This format is being used: \"name1=value1;name2=value2\"'")
+            .args_from_usage("--cookie, --cookie=[UTF-8] 'Set cookies for HTTP requests. This format is being used: \"name1=value1;name2=value2\"'")
             .arg(
                 Arg::with_name("target")
                     .required(true)
@@ -124,8 +124,8 @@ impl Options {
             }
         }
 
-        if let Some(cookies) = app.value_of("cookies") {
-            options.cookies = Some(str!(cookies));
+        if let Some(cookie) = app.value_of("cookie") {
+            options.cookie = Some(str!(cookie));
         }
 
         options
