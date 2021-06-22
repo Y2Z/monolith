@@ -24,6 +24,7 @@ pub struct Options {
     pub no_color: bool,
     pub unwrap_noscript: bool,
     pub cookie: Option<String>,
+    pub base_auth: Option<String>,
 }
 
 const ASCII: &'static str = " \
@@ -70,6 +71,7 @@ impl Options {
             .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
             .args_from_usage("-v, --no-video 'Removes video sources'")
             .args_from_usage("--cookie, --cookie=[UTF-8] 'Set cookies for HTTP requests. This format is being used: \"name1=value1;name2=value2\"'")
+            .args_from_usage("--base-auth, --base-auth=[UTF-8] 'Execute a base authorization. This format is being used: \"username:password\"'")
             .arg(
                 Arg::with_name("target")
                     .required(true)
@@ -126,6 +128,9 @@ impl Options {
 
         if let Some(cookie) = app.value_of("cookie") {
             options.cookie = Some(str!(cookie));
+        }
+        if let Some(base_auth) = app.value_of("base-auth") {
+            options.base_auth = Some(str!(base_auth))
         }
 
         options

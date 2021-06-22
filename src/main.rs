@@ -1,7 +1,7 @@
 use encoding_rs::Encoding;
 use html5ever::rcdom::RcDom;
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT, COOKIE};
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT, COOKIE, AUTHORIZATION};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, prelude::*, Error, Write};
@@ -159,6 +159,16 @@ fn main() {
         header_map.insert(
             COOKIE,
             HeaderValue::from_str(&cookie).expect("Invalid cookie specified"),
+        );
+    }
+    if let Some(base_auth) = &options.base_auth {
+        if !base_auth.contains(":") {
+            panic!("base-auth doesn't have a colon. The format for base_auth must be 'username:password'.")
+        }
+        let credentials = format!("Basic {}", base64::encode(base_auth));
+        header_map.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&credentials).expect("Invalid base-auth specified"),
         );
     }
     let client = if options.timeout > 0 {
