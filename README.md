@@ -72,6 +72,7 @@ or
  - `-b`: Use custom `base URL`
  - `-c`: Exclude CSS
  - `-C`: Save document using custom `charset`
+ - `-d`: Exclude specified `domains`
  - `-e`: Ignore network errors
  - `-f`: Omit frames
  - `-F`: Exclude web fonts
