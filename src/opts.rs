@@ -7,7 +7,9 @@ pub struct Options {
     pub base_url: Option<String>,
     pub no_css: bool,
     pub charset: Option<String>,
+    pub domains: Option<Vec<String>>,
     pub ignore_errors: bool,
+    pub exclude_domains: bool,
     pub no_frames: bool,
     pub no_fonts: bool,
     pub no_images: bool,
@@ -50,7 +52,11 @@ impl Options {
             .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
             .args_from_usage("-C, --charset=[UTF-8] 'Enforces custom encoding'")
+            .args_from_usage(
+                "-D, --domains=[bad.org,ads.site,0.0.0.0,127.0.0.0:8080] 'Whitelist of domains'",
+            )
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
+            .args_from_usage("-E, --exclude-domains 'Treat list of specified domains as blacklist'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
             .args_from_usage("-F, --no-fonts 'Removes fonts'")
             .args_from_usage("-i, --no-images 'Removes images'")
@@ -91,7 +97,11 @@ impl Options {
         if let Some(charset) = app.value_of("charset") {
             options.charset = Some(charset.to_string());
         }
+        if let Some(domains) = app.value_of("domains") {
+            options.domains = Some(domains.split(",").map(|s| s.to_string()).collect());
+        }
         options.ignore_errors = app.is_present("ignore-errors");
+        options.exclude_domains = app.is_present("exclude-domains");
         options.no_frames = app.is_present("no-frames");
         options.no_fonts = app.is_present("no-fonts");
         options.no_images = app.is_present("no-images");

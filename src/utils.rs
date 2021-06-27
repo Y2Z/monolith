@@ -92,6 +92,36 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
     mime.to_string()
 }
 
+pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> bool {
+    let domain_partials: Vec<&str> = domain.split(".").collect();
+    let domain_to_match_against_partials: Vec<&str> = domain_to_match_against
+        .trim_start_matches(".")
+        .split(".")
+        .collect();
+
+    let mut i: usize = domain_partials.len();
+    let mut j: usize = domain_to_match_against_partials.len();
+
+    if i >= j {
+        while j > 0 {
+            if !domain_partials
+                .get(i - 1)
+                .unwrap()
+                .eq_ignore_ascii_case(&domain_to_match_against_partials.get(j - 1).unwrap())
+            {
+                break;
+            }
+
+            i -= 1;
+            j -= 1;
+        }
+
+        j == 0
+    } else {
+        false
+    }
+}
+
 pub fn indent(level: u32) -> String {
     let mut result: String = String::new();
     let mut l: u32 = level;
@@ -148,7 +178,7 @@ pub fn retrieve_asset(
         let (media_type, charset, data) = parse_data_url(url);
         Ok((data, url.clone(), media_type, charset))
     } else if url.scheme() == "file" {
-        // Check if parent_url is also file:/// (if not, then we don't embed the asset)
+        // Check if parent_url is also a file: URL (if not, then we don't embed the asset)
         if parent_url.scheme() != "file" {
             if !options.silent {
                 eprintln!(
@@ -236,6 +266,15 @@ pub fn retrieve_asset(
                 "".to_string(),
             ))
         } else {
+            if let Some(domains) = &options.domains {
+                if domains
+                    .iter()
+                    .any(|d| domain_is_within_domain(url.host_str().unwrap(), &d.trim()))
+                {
+                    return Err(client.get("").send().unwrap_err());
+                }
+            }
+
             // URL not in cache, we retrieve the file
             match client.get(url.as_str()).send() {
                 Ok(response) => {
