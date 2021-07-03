@@ -219,11 +219,8 @@ fn main() {
         if !html_charset.is_empty() {
             // Check if the charset specified inside HTML is valid
             if let Some(encoding) = Encoding::for_label_no_replacement(html_charset.as_bytes()) {
-                // No point in parsing HTML again with the same encoding as before
-                if encoding.name() != "UTF-8" {
-                    document_encoding = html_charset;
-                    dom = html_to_dom(&data, document_encoding.clone());
-                }
+                document_encoding = html_charset;
+                dom = html_to_dom(&data, encoding.name().to_string());
             }
         }
     }
