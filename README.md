@@ -28,6 +28,9 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 #### Via [Homebrew](https://formulae.brew.sh/formula/monolith) (macOS and GNU/Linux)
     $ brew install monolith
 
+#### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
+    $ sudo port install monolith
+
 #### Using [Snapcraft](https://snapcraft.io/monolith) (GNU/Linux)
     $ snap install monolith
 
