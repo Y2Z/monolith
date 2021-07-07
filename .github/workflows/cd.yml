@@ -30,7 +30,7 @@ jobs:
       uses: actions/checkout@v2
     - name: Prepare cross-platform environment
       run: |
-        sudo mkdir -p /cross-build
+        sudo mkdir /cross-build
         sudo touch /etc/apt/sources.list.d/armhf.list
         echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic main" | sudo tee -a /etc/apt/sources.list.d/armhf.list
         sudo apt-get update
@@ -54,15 +54,15 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
   gnu_linux_aarch64:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-18.04
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
     - name: Prepare cross-platform environment
       run: |
-        sudo mkdir -p /cross-build
+        sudo mkdir /cross-build
         sudo touch /etc/apt/sources.list.d/arm64.list
-        echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal main" | sudo tee -a /etc/apt/sources.list.d/arm64.list
+        echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ bionic main" | sudo tee -a /etc/apt/sources.list.d/arm64.list
         sudo apt-get update
         sudo apt-get install -y gcc-aarch64-linux-gnu libc6-arm64-cross libc6-dev-arm64-cross
         sudo apt-get download libssl1.1:arm64 libssl-dev:arm64
