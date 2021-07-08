@@ -2,7 +2,7 @@
 [![Monolith Build Status for macOS](https://github.com/Y2Z/monolith/workflows/macOS/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AmacOS)
 [![Monolith Build Status for Windows](https://github.com/Y2Z/monolith/workflows/Windows/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AWindows)
 
-```
+```console
  _____     ______________    __________      ___________________    ___
 |     \   /              \  |          |    |                   |  |   |
 |      \_/       __       \_|    __    |    |    ___     ___    |__|   |
