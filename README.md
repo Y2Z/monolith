@@ -23,50 +23,74 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 ## Installation
 
 #### Using [Cargo](https://crates.io/crates/monolith)
-    $ cargo install monolith
+```console
+cargo install monolith
+```
 
 #### Via [Homebrew](https://formulae.brew.sh/formula/monolith) (macOS and GNU/Linux)
-    $ brew install monolith
+```console
+brew install monolith
+```
+
+#### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
+```console
+sudo port install monolith
+```
 
 #### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
     $ sudo port install monolith
 
 #### Using [Snapcraft](https://snapcraft.io/monolith) (GNU/Linux)
-    $ snap install monolith
+```console
+snap install monolith
+```
 
 #### Using [FreeBSD packages](https://svnweb.freebsd.org/ports/head/www/monolith/) (FreeBSD)
-    $ pkg install monolith
+```console
+pkg install monolith
+```
 
 #### Using [FreeBSD ports](https://www.freshports.org/www/monolith/) (FreeBSD)
-    $ cd /usr/ports/www/monolith/
-    $ make install clean
+```console
+cd /usr/ports/www/monolith/
+make install clean
+```
 
 #### Using [pkgsrc](https://pkgsrc.se/www/monolith) (NetBSD, OpenBSD, Haiku, etc)
-    $ cd /usr/pkgsrc/www/monolith
-    $ make install clean
+```console
+cd /usr/pkgsrc/www/monolith
+make install clean
+```
 
 #### Using [pre-built binaries](https://github.com/Y2Z/monolith/releases) (Windows, ARM-based devices, etc)
 Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
 
 #### Using [containers](https://www.docker.com/)
-    $ docker build -t Y2Z/monolith .
-    $ sudo install -b utils/run-in-container.sh /usr/local/bin/monolith
+```console
+docker build -t Y2Z/monolith .
+sudo install -b utils/run-in-container.sh /usr/local/bin/monolith
+```
 
 #### From source
 
 Dependency: `libssl-dev`
 
-    $ git clone https://github.com/Y2Z/monolith.git
-    $ cd monolith
-    $ make install
+```console
+git clone https://github.com/Y2Z/monolith.git
+cd monolith
+make install
+```
 
 ---------------------------------------------------
 
 ## Usage
-    $ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
+```console
+monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
+```
 or
-
-    $ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
+```console
+cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
+```
 
 ---------------------------------------------------
 
