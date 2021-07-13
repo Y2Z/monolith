@@ -7,6 +7,7 @@ pub struct Options {
     pub base_url: Option<String>,
     pub no_css: bool,
     pub charset: Option<String>,
+    pub excluded_domains: Option<Vec<String>>,
     pub ignore_errors: bool,
     pub no_frames: bool,
     pub no_fonts: bool,
@@ -46,28 +47,31 @@ impl Options {
             .version(crate_version!())
             .author(format!("\n{}", crate_authors!("\n")).as_str())
             .about(format!("{}\n{}", ASCII, crate_description!()).as_str())
-            .args_from_usage("-a, --no-audio 'Removes audio sources'")
-            .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
-            .args_from_usage("-c, --no-css 'Removes CSS'")
-            .args_from_usage("-C, --charset=[UTF-8] 'Enforces custom encoding'")
+            .args_from_usage("-a, --no-audio 'Remove audio sources'")
+            .args_from_usage("-b, --base-url=[http://localhost/] 'Set custom base URL'")
+            .args_from_usage("-c, --no-css 'Remove CSS'")
+            .args_from_usage("-C, --charset=[UTF-8] 'Enforce custom encoding'")
+            .args_from_usage(
+                "-d, --exclude-domains=[bad.org,.bad,.b.ad] 'Specify domains to avoid'",
+            )
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
-            .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
-            .args_from_usage("-F, --no-fonts 'Removes fonts'")
-            .args_from_usage("-i, --no-images 'Removes images'")
-            .args_from_usage("-I, --isolate 'Cuts off document from the Internet'")
-            .args_from_usage("-j, --no-js 'Removes JavaScript'")
-            .args_from_usage("-k, --insecure 'Allows invalid X.509 (TLS) certificates'")
-            .args_from_usage("-M, --no-metadata 'Excludes timestamp and source information'")
+            .args_from_usage("-f, --no-frames 'Remove frames and iframes'")
+            .args_from_usage("-F, --no-fonts 'Remove fonts'")
+            .args_from_usage("-i, --no-images 'Remove images'")
+            .args_from_usage("-I, --isolate 'Cut off document from the Internet'")
+            .args_from_usage("-j, --no-js 'Remove JavaScript'")
+            .args_from_usage("-k, --insecure 'Allow invalid X.509 (TLS) certificates'")
+            .args_from_usage("-M, --no-metadata 'Exclude timestamp and source information'")
             .args_from_usage(
-                "-n, --unwrap-noscript 'Replaces NOSCRIPT elements with their contents'",
+                "-n, --unwrap-noscript 'Replace NOSCRIPT elements with their contents'",
             )
             .args_from_usage(
-                "-o, --output=[document.html] 'Writes output to <file>, use - for STDOUT'",
+                "-o, --output=[document.html] 'Write output to file, use - for STDOUT'",
             )
-            .args_from_usage("-s, --silent 'Suppresses verbosity'")
-            .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
-            .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
-            .args_from_usage("-v, --no-video 'Removes video sources'")
+            .args_from_usage("-s, --silent 'Suppress verbosity'")
+            .args_from_usage("-t, --timeout=[60] 'Adjust network request timeout'")
+            .args_from_usage("-u, --user-agent=[Firefox] 'Set custom User-Agent string'")
+            .args_from_usage("-v, --no-video 'Remove video sources'")
             .arg(
                 Arg::with_name("target")
                     .required(true)
@@ -90,6 +94,9 @@ impl Options {
         options.no_css = app.is_present("no-css");
         if let Some(charset) = app.value_of("charset") {
             options.charset = Some(str!(charset));
+        }
+        if let Some(charset) = app.value_of("exclude-domains") {
+            options.excluded_domains = Some(charset.split(",").map(|s| s.to_string()).collect());
         }
         options.ignore_errors = app.is_present("ignore-errors");
         options.no_frames = app.is_present("no-frames");
