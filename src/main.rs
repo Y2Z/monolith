@@ -18,8 +18,6 @@ use monolith::opts::Options;
 use monolith::url::{create_data_url, resolve_url};
 use monolith::utils::retrieve_asset;
 
-mod macros;
-
 enum Output {
     Stdout(io::Stdout),
     File(fs::File),
@@ -67,7 +65,7 @@ pub fn read_stdin() -> Vec<u8> {
 
 fn main() {
     let options = Options::from_args();
-    let mut target: String = str!(&options.target.clone());
+    let mut target: String = options.target.clone();
 
     // Check if target was provided
     if target.len() == 0 {
@@ -170,7 +168,7 @@ fn main() {
     let mut base_url: Url = target_url.clone();
 
     let data: Vec<u8>;
-    let mut document_encoding: String = str!();
+    let mut document_encoding: String = "".to_string();
     let mut dom: RcDom;
 
     // Retrieve target document
@@ -190,7 +188,12 @@ fn main() {
                     process::exit(1);
                 }
 
-                if options.base_url.clone().unwrap_or(str!()).is_empty() {
+                if options
+                    .base_url
+                    .clone()
+                    .unwrap_or("".to_string())
+                    .is_empty()
+                {
                     base_url = final_url;
                 }
 
@@ -226,7 +229,7 @@ fn main() {
     }
 
     // Use custom base URL if specified, read and use what's in the DOM otherwise
-    let custom_base_url: String = options.base_url.clone().unwrap_or(str!());
+    let custom_base_url: String = options.base_url.clone().unwrap_or("".to_string());
     if custom_base_url.is_empty() {
         // No custom base URL is specified
         // Try to see if document has BASE element

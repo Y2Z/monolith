@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use url::Url;
 
 use crate::opts::Options;
-use crate::url::{create_data_url, resolve_url};
+use crate::url::{create_data_url, resolve_url, EMPTY_IMAGE_DATA_URL};
 use crate::utils::retrieve_asset;
 
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
@@ -56,14 +56,14 @@ pub fn embed_css(
 }
 
 pub fn format_ident(ident: &str) -> String {
-    let mut res: String = String::new();
+    let mut res: String = "".to_string();
     let _ = serialize_identifier(ident, &mut res);
     res = res.trim_end().to_string();
     res
 }
 
 pub fn format_quoted_string(string: &str) -> String {
-    let mut res: String = String::new();
+    let mut res: String = "".to_string();
     let _ = serialize_string(string, &mut res);
     res
 }
@@ -86,10 +86,10 @@ pub fn process_css<'a>(
     prop_name: &str,
     func_name: &str,
 ) -> Result<String, ParseError<'a, String>> {
-    let mut result: String = str!();
+    let mut result: String = "".to_string();
 
-    let mut curr_rule: String = str!(rule_name.clone());
-    let mut curr_prop: String = str!(prop_name.clone());
+    let mut curr_rule: String = rule_name.clone().to_string();
+    let mut curr_prop: String = prop_name.clone().to_string();
     let mut token: &Token;
     let mut token_offset: SourcePosition;
 
@@ -105,7 +105,7 @@ pub fn process_css<'a>(
         match *token {
             Token::Comment(_) => {
                 let token_slice = parser.slice_from(token_offset);
-                result.push_str(str!(token_slice).as_str());
+                result.push_str(token_slice);
             }
             Token::Semicolon => result.push_str(";"),
             Token::Colon => result.push_str(":"),
@@ -161,13 +161,13 @@ pub fn process_css<'a>(
             }
             // div...
             Token::Ident(ref value) => {
-                curr_rule = str!();
-                curr_prop = str!(value);
+                curr_rule = "".to_string();
+                curr_prop = value.to_string();
                 result.push_str(&format_ident(value));
             }
             // @import, @font-face, @charset, @media...
             Token::AtKeyword(ref value) => {
-                curr_rule = str!(value);
+                curr_rule = value.to_string();
                 if options.no_fonts && curr_rule == "font-face" {
                     continue;
                 }
@@ -181,7 +181,7 @@ pub fn process_css<'a>(
             Token::QuotedString(ref value) => {
                 if curr_rule == "import" {
                     // Reset current at-rule value
-                    curr_rule = str!();
+                    curr_rule = "".to_string();
 
                     // Skip empty import values
                     if value.len() == 0 {
@@ -242,7 +242,7 @@ pub fn process_css<'a>(
                         }
 
                         if options.no_images && is_image_url_prop(curr_prop.as_str()) {
-                            result.push_str(format_quoted_string(empty_image!()).as_str());
+                            result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                         } else {
                             let resolved_url: Url = resolve_url(&document_url, value);
                             match retrieve_asset(
@@ -297,7 +297,7 @@ pub fn process_css<'a>(
                 if *has_sign && *unit_value >= 0. {
                     result.push_str("+");
                 }
-                result.push_str(str!(unit_value * 100.0).as_str());
+                result.push_str(&(unit_value * 100.0).to_string());
                 result.push_str("%");
             }
             Token::Dimension {
@@ -309,12 +309,12 @@ pub fn process_css<'a>(
                 if *has_sign && *value >= 0. {
                     result.push_str("+");
                 }
-                result.push_str(str!(value).as_str());
-                result.push_str(str!(unit).as_str());
+                result.push_str(&value.to_string());
+                result.push_str(&unit.to_string());
             }
             // #selector, #id...
             Token::IDHash(ref value) => {
-                curr_rule = str!();
+                curr_rule = "".to_string();
                 result.push_str("#");
                 result.push_str(&format_ident(value));
             }
@@ -324,7 +324,7 @@ pub fn process_css<'a>(
 
                 if is_import {
                     // Reset current at-rule value
-                    curr_rule = str!();
+                    curr_rule = "".to_string();
                 }
 
                 // Skip empty url()'s
@@ -377,7 +377,7 @@ pub fn process_css<'a>(
                     }
                 } else {
                     if is_image_url_prop(curr_prop.as_str()) && options.no_images {
-                        result.push_str(format_quoted_string(empty_image!()).as_str());
+                        result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                     } else {
                         let full_url: Url = resolve_url(&document_url, value);
                         match retrieve_asset(
