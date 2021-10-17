@@ -1,6 +1,6 @@
-[![Monolith Build Status for GNU/Linux](https://github.com/Y2Z/monolith/workflows/GNU%2FLinux/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AGNU%2FLinux)
-[![Monolith Build Status for macOS](https://github.com/Y2Z/monolith/workflows/macOS/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AmacOS)
-[![Monolith Build Status for Windows](https://github.com/Y2Z/monolith/workflows/Windows/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AWindows)
+[![monolith build status on GNU/Linux](https://github.com/Y2Z/monolith/workflows/GNU%2FLinux/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AGNU%2FLinux)
+[![monolith build status on macOS](https://github.com/Y2Z/monolith/workflows/macOS/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AmacOS)
+[![monolith build status on Windows](https://github.com/Y2Z/monolith/workflows/Windows/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AWindows)
 
 ```
  _____     ______________    __________      ___________________    ___
@@ -18,7 +18,9 @@ Unlike the conventional “Save page as”, `monolith` not only saves the target
 
 If compared to saving websites with `wget -mpk`, this tool embeds all assets as data URLs and therefore lets browsers render the saved page exactly the way it was on the Internet, even when no network connection is available.
 
+
 ---------------------------------------------------
+
 
 ## Installation
 
@@ -83,7 +85,9 @@ cd monolith
 make install
 ```
 
+
 ---------------------------------------------------
+
 
 ## Usage
 ```console
@@ -94,7 +98,9 @@ or
 cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 ```
 
+
 ---------------------------------------------------
+
 
 ## Options
  - `-a`: Exclude audio sources
@@ -110,23 +116,29 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-M`: Don't add timestamp and URL information
  - `-n`: Extract contents of NOSCRIPT elements
- - `-o`: Write output to `file`, use “-” for STDOUT
+ - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-s`: Be quiet
  - `-t`: Adjust `network request timeout`
  - `-u`: Provide custom `User-Agent`
  - `-v`: Exclude videos
 
+
 ---------------------------------------------------
+
 
 ## Proxies
 Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
 
+
 ---------------------------------------------------
+
 
 ## Contributing
 Please open an issue if something is wrong, that helps make this project better.
 
+
 ---------------------------------------------------
+
 
 ## Related projects
  - Monolith Chrome Extension: https://github.com/rhysd/monolith-of-web
@@ -135,14 +147,18 @@ Please open an issue if something is wrong, that helps make this project better.
  - Hako: https://github.com/dmpop/hako
  - Monk: https://gitlab.com/fisherdarling/monk
 
+
 ---------------------------------------------------
+
 
 ## License
 
 To the extent possible under law, the author(s) have dedicated all copyright related and neighboring rights to this software to the public domain worldwide.
 This software is distributed without any warranty.
 
+
 ---------------------------------------------------
+
 
 <!-- Microtext -->
 <sub>Keep in mind that `monolith` is not aware of your browser’s session</sub>

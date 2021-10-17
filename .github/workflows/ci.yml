@@ -1,3 +1,5 @@
+# CI GitHub Actions workflow for monolith
+
 name: CI
 
 on:
