@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{crate_authors, crate_description, crate_version, App, Arg};
 use std::env;
 
 #[derive(Default)]
@@ -85,11 +85,11 @@ impl Options {
             .to_string();
         options.no_audio = app.is_present("no-audio");
         if let Some(base_url) = app.value_of("base-url") {
-            options.base_url = Some(str!(base_url));
+            options.base_url = Some(base_url.to_string());
         }
         options.no_css = app.is_present("no-css");
         if let Some(charset) = app.value_of("charset") {
-            options.charset = Some(str!(charset));
+            options.charset = Some(charset.to_string());
         }
         options.ignore_errors = app.is_present("ignore-errors");
         options.no_frames = app.is_present("no-frames");
@@ -107,7 +107,7 @@ impl Options {
             .parse::<u64>()
             .unwrap();
         if let Some(user_agent) = app.value_of("user-agent") {
-            options.user_agent = Some(str!(user_agent));
+            options.user_agent = Some(user_agent.to_string());
         } else {
             options.user_agent = Some(DEFAULT_USER_AGENT.to_string());
         }

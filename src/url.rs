@@ -3,6 +3,9 @@ use url::{form_urlencoded, Url};
 
 use crate::utils::{detect_media_type, parse_content_type};
 
+pub const EMPTY_IMAGE_DATA_URL: &'static str = "data:image/png;base64,\
+iVBORw0KGgoAAAANSUhEUgAAAA0AAAANCAQAAADY4iz3AAAAEUlEQVR42mNkwAkYR6UolgIACvgADsuK6xYAAAAASUVORK5CYII=";
+
 pub fn clean_url(url: Url) -> Url {
     let mut url = url.clone();
 
@@ -26,7 +29,7 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
         if !charset.trim().is_empty() && !charset.trim().eq_ignore_ascii_case("US-ASCII") {
             format!(";charset={}", charset.trim())
         } else {
-            str!()
+            "".to_string()
         };
 
     data_url.set_path(format!("{}{};base64,{}", media_type, c, base64::encode(data)).as_str());
@@ -75,9 +78,9 @@ pub fn percent_decode(input: String) -> String {
             [
                 key.to_string(),
                 if val.to_string().len() == 0 {
-                    str!()
+                    "".to_string()
                 } else {
-                    str!('=')
+                    "=".to_string()
                 },
                 val.to_string(),
             ]

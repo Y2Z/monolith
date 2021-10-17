@@ -18,7 +18,9 @@ use std::default::Default;
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::opts::Options;
-use crate::url::{clean_url, create_data_url, is_url_and_has_protocol, resolve_url};
+use crate::url::{
+    clean_url, create_data_url, is_url_and_has_protocol, resolve_url, EMPTY_IMAGE_DATA_URL,
+};
 use crate::utils::{parse_content_type, retrieve_asset};
 
 struct SrcSetItem<'a> {
@@ -173,11 +175,11 @@ pub fn embed_srcset(
         }
     }
 
-    let mut result: String = str!();
+    let mut result: String = "".to_string();
     let mut i: usize = array.len();
     for part in array {
         if options.no_images {
-            result.push_str(empty_image!());
+            result.push_str(EMPTY_IMAGE_DATA_URL);
         } else {
             let image_full_url: Url = resolve_url(&document_url, part.path);
             match retrieve_asset(
@@ -205,7 +207,7 @@ pub fn embed_srcset(
                         result.push_str(image_full_url.as_ref());
                     } else {
                         // Avoid breaking the structure in case if not an HTTP(S) URL
-                        result.push_str(empty_image!());
+                        result.push_str(EMPTY_IMAGE_DATA_URL);
                     }
                 }
             }
@@ -342,7 +344,7 @@ pub fn get_node_attr(node: &Handle, attr_name: &str) -> Option<String> {
         NodeData::Element { ref attrs, .. } => {
             for attr in attrs.borrow().iter() {
                 if &*attr.name.local == attr_name {
-                    return Some(str!(&*attr.value));
+                    return Some(attr.value.to_string());
                 }
             }
             None
@@ -827,10 +829,10 @@ pub fn walk_and_embed_assets(
                     if options.no_images {
                         // Put empty images into src and data-src attributes
                         if img_attr_src_value != None {
-                            set_node_attr(node, "src", Some(str!(empty_image!())));
+                            set_node_attr(node, "src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
                         if img_attr_data_src_value != None {
-                            set_node_attr(node, "data-src", Some(str!(empty_image!())));
+                            set_node_attr(node, "data-src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
                     } else {
                         if img_attr_src_value.clone().unwrap_or_default().is_empty()
@@ -840,7 +842,7 @@ pub fn walk_and_embed_assets(
                                 .is_empty()
                         {
                             // Add empty src attribute
-                            set_node_attr(node, "src", Some(str!()));
+                            set_node_attr(node, "src", Some("".to_string()));
                         } else {
                             // Add data URL src attribute
                             let img_full_url: String = if !img_attr_data_src_value
@@ -891,11 +893,11 @@ pub fn walk_and_embed_assets(
                             if let Some(input_attr_src_value) = get_node_attr(node, "src") {
                                 if options.no_images || input_attr_src_value.is_empty() {
                                     let value = if input_attr_src_value.is_empty() {
-                                        str!()
+                                        ""
                                     } else {
-                                        str!(empty_image!())
+                                        EMPTY_IMAGE_DATA_URL
                                     };
-                                    set_node_attr(node, "src", Some(value));
+                                    set_node_attr(node, "src", Some(value.to_string()));
                                 } else {
                                     retrieve_and_embed_asset(
                                         cache,
@@ -913,7 +915,7 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "image" => {
-                    let mut image_href: String = str!();
+                    let mut image_href: String = "".to_string();
 
                     if let Some(image_attr_href_value) = get_node_attr(node, "href") {
                         image_href = image_attr_href_value;
@@ -984,7 +986,11 @@ pub fn walk_and_embed_assets(
                         if parent_node_name == "picture" {
                             if !source_attr_srcset_value.is_empty() {
                                 if options.no_images {
-                                    set_node_attr(node, "srcset", Some(str!(empty_image!())));
+                                    set_node_attr(
+                                        node,
+                                        "srcset",
+                                        Some(EMPTY_IMAGE_DATA_URL.to_string()),
+                                    );
                                 } else {
                                     let resolved_srcset: String = embed_srcset(
                                         cache,
@@ -1009,7 +1015,7 @@ pub fn walk_and_embed_assets(
                         {
                             if options.no_js {
                                 // Replace with empty JS call to preserve original behavior
-                                set_node_attr(node, "href", Some(str!("javascript:;")));
+                                set_node_attr(node, "href", Some("javascript:;".to_string()));
                             }
                         } else {
                             // Don't touch mailto: links or hrefs which begin with a hash sign
@@ -1083,7 +1089,7 @@ pub fn walk_and_embed_assets(
                     if let Some(frame_attr_src_value) = get_node_attr(node, "src") {
                         if options.no_frames {
                             // Empty the src attribute
-                            set_node_attr(node, "src", Some(str!()));
+                            set_node_attr(node, "src", Some("".to_string()));
                         } else {
                             // Ignore (i)frames with empty source (they cause infinite loops)
                             if !frame_attr_src_value.trim().is_empty() {
@@ -1144,7 +1150,11 @@ pub fn walk_and_embed_assets(
                         // Skip posters with empty source
                         if !video_attr_poster_value.is_empty() {
                             if options.no_images {
-                                set_node_attr(node, "poster", Some(str!(empty_image!())));
+                                set_node_attr(
+                                    node,
+                                    "poster",
+                                    Some(EMPTY_IMAGE_DATA_URL.to_string()),
+                                );
                             } else {
                                 retrieve_and_embed_asset(
                                     cache,
@@ -1167,8 +1177,10 @@ pub fn walk_and_embed_assets(
                                 // Get contents of NOSCRIPT node
                                 let mut noscript_contents = contents.borrow_mut();
                                 // Parse contents of NOSCRIPT node as DOM
-                                let noscript_contents_dom: RcDom =
-                                    html_to_dom(&noscript_contents.as_bytes().to_vec(), str!());
+                                let noscript_contents_dom: RcDom = html_to_dom(
+                                    &noscript_contents.as_bytes().to_vec(),
+                                    "".to_string(),
+                                );
                                 // Embed assets of NOSCRIPT node contents
                                 walk_and_embed_assets(
                                     cache,

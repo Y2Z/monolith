@@ -110,8 +110,8 @@ pub fn is_plaintext_media_type(media_type: &str) -> bool {
 }
 
 pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
-    let mut media_type: String = str!("text/plain");
-    let mut charset: String = str!("US-ASCII");
+    let mut media_type: String = "text/plain".to_string();
+    let mut charset: String = "US-ASCII".to_string();
     let mut is_base64: bool = false;
 
     // Parse meta data
@@ -120,7 +120,7 @@ pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
     for item in &content_type_items {
         if i == 0 {
             if item.trim().len() > 0 {
-                media_type = str!(item.trim());
+                media_type = item.trim().to_string();
             }
         } else {
             if item.trim().eq_ignore_ascii_case("base64") {
@@ -199,7 +199,7 @@ pub fn retrieve_asset(
                     file_blob.clone(),
                     url.clone(),
                     detect_media_type(&file_blob, url),
-                    str!(),
+                    "".to_string(),
                 ))
             }
         } else {
@@ -232,8 +232,8 @@ pub fn retrieve_asset(
             Ok((
                 cache.get(&cache_key).unwrap().to_vec(),
                 url.clone(),
-                str!(),
-                str!(),
+                "".to_string(),
+                "".to_string(),
             ))
         } else {
             // URL not in cache, we retrieve the file
