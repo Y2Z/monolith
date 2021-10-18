@@ -77,8 +77,8 @@ mod passing {
     #[test]
     fn css_import_string() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let path_html: &Path = Path::new("tests/data/css/index.html");
-        let path_css: &Path = Path::new("tests/data/css/style.css");
+        let path_html: &Path = Path::new("tests/_data_/css/index.html");
+        let path_css: &Path = Path::new("tests/_data_/css/style.css");
 
         assert!(path_html.is_file());
         assert!(path_css.is_file());

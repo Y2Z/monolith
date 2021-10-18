@@ -27,7 +27,7 @@ mod passing {
         let out = cmd
             .arg("-M")
             .arg(format!(
-                "tests{s}data{s}basic{s}local-file.html",
+                "tests{s}_data_{s}basic{s}local-file.html",
                 s = MAIN_SEPARATOR
             ))
             .output()
@@ -39,11 +39,11 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file}{cwd}/tests/data/basic/local-file.html\n \
-                {file}{cwd}/tests/data/basic/local-style.css\n \
-                {file}{cwd}/tests/data/basic/local-style-does-not-exist.css (not found)\n \
-                {file}{cwd}/tests/data/basic/monolith.png (not found)\n \
-                {file}{cwd}/tests/data/basic/local-script.js\n\
+                {file}{cwd}/tests/_data_/basic/local-file.html\n \
+                {file}{cwd}/tests/_data_/basic/local-style.css\n \
+                {file}{cwd}/tests/_data_/basic/local-style-does-not-exist.css (not found)\n \
+                {file}{cwd}/tests/_data_/basic/monolith.png (not found)\n \
+                {file}{cwd}/tests/_data_/basic/local-script.js\n\
                 ",
                 file = file_url_protocol,
                 cwd = cwd_normalized
@@ -74,7 +74,7 @@ mod passing {
     #[test]
     fn local_file_target_input_absolute_target_path() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let path_html: &Path = Path::new("tests/data/basic/local-file.html");
+        let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
 
         let out = cmd
             .arg("-M")
@@ -130,7 +130,7 @@ mod passing {
             .arg("-M")
             .arg("-cji")
             .arg(format!(
-                "{file}{cwd}/tests/data/basic/local-file.html",
+                "{file}{cwd}/tests/_data_/basic/local-file.html",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             ))
@@ -141,7 +141,7 @@ mod passing {
         assert_eq!(
             String::from_utf8_lossy(&out.stderr),
             format!(
-                "{file}{cwd}/tests/data/basic/local-file.html\n",
+                "{file}{cwd}/tests/_data_/basic/local-file.html\n",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             )
@@ -175,8 +175,8 @@ mod passing {
     #[test]
     fn embed_file_url_local_asset_within_style_attribute() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let path_html: &Path = Path::new("tests/data/svg/index.html");
-        let path_svg: &Path = Path::new("tests/data/svg/image.svg");
+        let path_html: &Path = Path::new("tests/_data_/svg/index.html");
+        let path_svg: &Path = Path::new("tests/_data_/svg/image.svg");
 
         let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
 
@@ -217,13 +217,13 @@ mod passing {
             .arg("-i")
             .arg(if cfg!(windows) {
                 format!(
-                    "{file}{cwd}/tests/data/integrity/index.html",
+                    "{file}{cwd}/tests/_data_/integrity/index.html",
                     file = file_url_protocol,
                     cwd = cwd_normalized,
                 )
             } else {
                 format!(
-                    "{file}{cwd}/tests/data/integrity/index.html",
+                    "{file}{cwd}/tests/_data_/integrity/index.html",
                     file = file_url_protocol,
                     cwd = cwd_normalized,
                 )
@@ -236,11 +236,11 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file}{cwd}/tests/data/integrity/index.html\n \
-                {file}{cwd}/tests/data/integrity/style.css\n \
-                {file}{cwd}/tests/data/integrity/style.css\n \
-                {file}{cwd}/tests/data/integrity/script.js\n \
-                {file}{cwd}/tests/data/integrity/script.js\n\
+                {file}{cwd}/tests/_data_/integrity/index.html\n \
+                {file}{cwd}/tests/_data_/integrity/style.css\n \
+                {file}{cwd}/tests/_data_/integrity/style.css\n \
+                {file}{cwd}/tests/_data_/integrity/script.js\n \
+                {file}{cwd}/tests/_data_/integrity/script.js\n\
                 ",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
