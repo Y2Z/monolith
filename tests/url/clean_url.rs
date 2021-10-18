@@ -15,8 +15,9 @@ mod passing {
     fn preserve_original() {
         let u: Url = Url::parse("https://somewhere.com/font.eot#iefix").unwrap();
 
-        url::clean_url(u.clone());
+        let clean_u: Url = url::clean_url(u.clone());
 
+        assert_eq!(clean_u.as_str(), "https://somewhere.com/font.eot");
         assert_eq!(u.as_str(), "https://somewhere.com/font.eot#iefix");
     }
 

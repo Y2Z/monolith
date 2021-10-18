@@ -108,8 +108,7 @@ fn main() {
                 }
             }
             Err(_err) => {
-                // Failed to parse given base URL,
-                // perhaps it's a filesystem path?
+                // Failed to parse given base URL (perhaps it's a filesystem path?)
                 let path: &Path = Path::new(&target);
 
                 if path.exists() {

@@ -1,5 +1,6 @@
 use base64;
-use url::{form_urlencoded, Url};
+use percent_encoding::percent_decode_str;
+use url::Url;
 
 use crate::utils::{detect_media_type, parse_content_type};
 
@@ -60,7 +61,7 @@ pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
     let (media_type, charset, is_base64) = parse_content_type(&content_type);
 
     // Parse raw data into vector of bytes
-    let text: String = percent_decode(data);
+    let text: String = percent_decode_str(&data).decode_utf8_lossy().to_string();
     let blob: Vec<u8> = if is_base64 {
         base64::decode(&text).unwrap_or(vec![])
     } else {
@@ -68,29 +69,6 @@ pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
     };
 
     (media_type, charset, blob)
-}
-
-pub fn percent_decode(input: String) -> String {
-    let input: String = input.replace("+", "%2B");
-
-    form_urlencoded::parse(input.as_bytes())
-        .map(|(key, val)| {
-            [
-                key.to_string(),
-                if val.to_string().len() == 0 {
-                    "".to_string()
-                } else {
-                    "=".to_string()
-                },
-                val.to_string(),
-            ]
-            .concat()
-        })
-        .collect()
-}
-
-pub fn percent_encode(input: String) -> String {
-    form_urlencoded::byte_serialize(input.as_bytes()).collect()
 }
 
 pub fn resolve_url(from: &Url, to: &str) -> Url {
