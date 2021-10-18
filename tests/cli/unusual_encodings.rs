@@ -21,7 +21,7 @@ mod passing {
         let out = cmd
             .arg("-M")
             .arg(format!(
-                "tests{s}data{s}unusual_encodings{s}gb2312.html",
+                "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
                 s = MAIN_SEPARATOR
             ))
             .output()
@@ -32,7 +32,7 @@ mod passing {
         assert_eq!(
             String::from_utf8_lossy(&out.stderr),
             format!(
-                "{file}{cwd}/tests/data/unusual_encodings/gb2312.html\n",
+                "{file}{cwd}/tests/_data_/unusual_encodings/gb2312.html\n",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             )
@@ -67,7 +67,7 @@ mod passing {
     fn properly_save_document_with_gb2312_from_stdin() {
         let mut echo = Command::new("cat")
             .arg(format!(
-                "tests{s}data{s}unusual_encodings{s}gb2312.html",
+                "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
                 s = MAIN_SEPARATOR
             ))
             .stdout(Stdio::piped())
@@ -118,7 +118,7 @@ mod passing {
             .arg("-C")
             .arg("utf8")
             .arg(format!(
-                "tests{s}data{s}unusual_encodings{s}gb2312.html",
+                "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
                 s = MAIN_SEPARATOR
             ))
             .output()
@@ -129,7 +129,7 @@ mod passing {
         assert_eq!(
             String::from_utf8_lossy(&out.stderr),
             format!(
-                "{file}{cwd}/tests/data/unusual_encodings/gb2312.html\n",
+                "{file}{cwd}/tests/_data_/unusual_encodings/gb2312.html\n",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             )
@@ -161,7 +161,7 @@ mod passing {
             .arg("-C")
             .arg("utf0")
             .arg(format!(
-                "tests{s}data{s}unusual_encodings{s}gb2312.html",
+                "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
                 s = MAIN_SEPARATOR
             ))
             .output()
@@ -203,7 +203,7 @@ mod failing {
         let out = cmd
             .arg("-M")
             .arg(format!(
-                "tests{s}data{s}unusual_encodings{s}iso-8859-1.html",
+                "tests{s}_data_{s}unusual_encodings{s}iso-8859-1.html",
                 s = MAIN_SEPARATOR
             ))
             .output()
@@ -214,7 +214,7 @@ mod failing {
         assert_eq!(
             String::from_utf8_lossy(&out.stderr),
             format!(
-                "{file}{cwd}/tests/data/unusual_encodings/iso-8859-1.html\n",
+                "{file}{cwd}/tests/_data_/unusual_encodings/iso-8859-1.html\n",
                 file = file_url_protocol,
                 cwd = cwd_normalized,
             )

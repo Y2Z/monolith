@@ -63,13 +63,13 @@ mod passing {
             cache,
             &client,
             &Url::parse(&format!(
-                "{file}{cwd}/tests/data/basic/local-file.html",
+                "{file}{cwd}/tests/_data_/basic/local-file.html",
                 file = file_url_protocol,
                 cwd = cwd.to_str().unwrap()
             ))
             .unwrap(),
             &Url::parse(&format!(
-                "{file}{cwd}/tests/data/basic/local-script.js",
+                "{file}{cwd}/tests/_data_/basic/local-script.js",
                 file = file_url_protocol,
                 cwd = cwd.to_str().unwrap()
             ))
@@ -84,7 +84,7 @@ mod passing {
         assert_eq!(
             final_url,
             Url::parse(&format!(
-                "{file}{cwd}/tests/data/basic/local-script.js",
+                "{file}{cwd}/tests/_data_/basic/local-script.js",
                 file = file_url_protocol,
                 cwd = cwd.to_str().unwrap()
             ))
