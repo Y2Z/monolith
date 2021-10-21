@@ -13,10 +13,13 @@ jobs:
     runs-on: windows-2019
     steps:
     - run: git config --global core.autocrlf false
+
     - name: Checkout the repository
       uses: actions/checkout@v2
+
     - name: Build the executable
       run: cargo build --release
+
     - uses: Shopify/upload-to-release@1.0.0
       with:
         name: monolith.exe
@@ -28,6 +31,7 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
+
     - name: Prepare cross-platform environment
       run: |
         sudo mkdir /cross-build
@@ -44,8 +48,10 @@ jobs:
         echo "OPENSSL_LIB_DIR=/cross-build/usr/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
         echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
         echo "RUSTFLAGS=-C linker=arm-linux-gnueabihf-gcc -L/usr/arm-linux-gnueabihf/lib -L/cross-build/usr/lib/arm-linux-gnueabihf -L/cross-build/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
+
     - name: Build the executable
       run: cargo build --release --target=arm-unknown-linux-gnueabihf
+
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@1.0.0
       with:
@@ -58,6 +64,7 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
+
     - name: Prepare cross-platform environment
       run: |
         sudo mkdir /cross-build
@@ -74,8 +81,10 @@ jobs:
         echo "OPENSSL_LIB_DIR=/cross-build/usr/lib/aarch64-linux-gnu" >> $GITHUB_ENV
         echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
         echo "RUSTFLAGS=-C linker=aarch64-linux-gnu-gcc -L/usr/aarch64-linux-gnu/lib -L/cross-build/usr/lib/aarch64-linux-gnu" >> $GITHUB_ENV
+
     - name: Build the executable
       run: cargo build --release --target=aarch64-unknown-linux-gnu
+
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@1.0.0
       with:
@@ -88,8 +97,10 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
+
     - name: Build the executable
       run: cargo build --release
+
     - uses: Shopify/upload-to-release@1.0.0
       with:
         name: monolith-gnu-linux-x86_64
