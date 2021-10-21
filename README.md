@@ -104,7 +104,7 @@ Every release contains pre-built binaries for Windows, GNU/Linux, as well as pla
 ```console
 monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
 ```
-or
+
 ```console
 cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 ```
