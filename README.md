@@ -25,54 +25,60 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 ## Installation
 
 #### Using [Cargo](https://crates.io/crates/monolith)
+
 ```console
 cargo install monolith
 ```
 
 #### Via [Homebrew](https://formulae.brew.sh/formula/monolith) (macOS and GNU/Linux)
+
 ```console
 brew install monolith
 ```
 
 #### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
+
 ```console
 sudo port install monolith
 ```
 
 #### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
+
 ```console
 sudo port install monolith
 ```
 
 #### Using [Snapcraft](https://snapcraft.io/monolith) (GNU/Linux)
+
 ```console
 snap install monolith
 ```
 
 #### Using [FreeBSD packages](https://svnweb.freebsd.org/ports/head/www/monolith/) (FreeBSD)
+
 ```console
 pkg install monolith
 ```
 
 #### Using [FreeBSD ports](https://www.freshports.org/www/monolith/) (FreeBSD)
+
 ```console
 cd /usr/ports/www/monolith/
 make install clean
 ```
 
 #### Using [pkgsrc](https://pkgsrc.se/www/monolith) (NetBSD, OpenBSD, Haiku, etc)
+
 ```console
 cd /usr/pkgsrc/www/monolith
 make install clean
 ```
 
-#### Using [pre-built binaries](https://github.com/Y2Z/monolith/releases) (Windows, ARM-based devices, etc)
-Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
-
 #### Using [containers](https://www.docker.com/)
+
 ```console
 docker build -t Y2Z/monolith .
-sudo install -b utils/run-in-container.sh /usr/local/bin/monolith
+sudo install -b dist/run-in-container.sh /usr/local/bin/monolith
 ```
 
 #### From source
@@ -85,11 +91,16 @@ cd monolith
 make install
 ```
 
+#### Using [pre-built binaries](https://github.com/Y2Z/monolith/releases) (Windows, ARM-based devices, etc)
+
+Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
+
 
 ---------------------------------------------------
 
 
 ## Usage
+
 ```console
 monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
 ```
@@ -103,6 +114,7 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 
 
 ## Options
+
  - `-a`: Exclude audio sources
  - `-b`: Use custom `base URL`
  - `-c`: Exclude CSS
@@ -127,6 +139,7 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 
 
 ## Proxies
+
 Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
 
 
@@ -134,6 +147,7 @@ Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
 
 
 ## Contributing
+
 Please open an issue if something is wrong, that helps make this project better.
 
 
@@ -141,6 +155,7 @@ Please open an issue if something is wrong, that helps make this project better.
 
 
 ## Related projects
+
  - Monolith Chrome Extension: https://github.com/rhysd/monolith-of-web
  - Pagesaver: https://github.com/distributed-mind/pagesaver
  - Personal WayBack Machine: https://github.com/popey/pwbm

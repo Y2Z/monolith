@@ -3,6 +3,17 @@ name: macOS
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+    - 'assets/'
+    - 'dist/'
+    - 'docs/'
+    - 'snap/'
+    - '.adr-dir'
+    - 'Dockerfile'
+    - 'LICENSE'
+    - 'Makefile'
+    - 'monolith.nuspec'
+    - 'README.md'
 
 jobs:
   build:
@@ -17,6 +28,8 @@ jobs:
 
     steps:
     - run: git config --global core.autocrlf false
+
     - uses: actions/checkout@v2
+
     - name: Build
       run: cargo build --all --locked --verbose
