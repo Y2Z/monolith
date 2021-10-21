@@ -81,9 +81,9 @@ docker build -t Y2Z/monolith .
 sudo install -b dist/run-in-container.sh /usr/local/bin/monolith
 ```
 
-#### From source
+#### From [source](https://github.com/Y2Z/monolith)
 
-Dependency: `libssl-dev`
+Dependency: `libssl`
 
 ```console
 git clone https://github.com/Y2Z/monolith.git
