@@ -42,12 +42,6 @@ brew install monolith
 sudo port install monolith
 ```
 
-#### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
-
-```console
-sudo port install monolith
-```
-
 #### Using [Snapcraft](https://snapcraft.io/monolith) (GNU/Linux)
 
 ```console
