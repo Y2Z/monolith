@@ -40,7 +40,7 @@ mod passing {
             )),
             "<html>\
                 <head>\
-                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:;\"></meta>\
+                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:;\"></meta>\
                     <title>Isolated document</title>\
                     <link rel=\"something\" href=\"some.css\">\
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
@@ -135,7 +135,7 @@ mod passing {
             "<!DOCTYPE html>\
                 <html>\
                     <head>\
-                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;\"></meta>\
+                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;\"></meta>\
                         <title>no-frame no-css no-js no-image isolated document</title>\
                         <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                         <link rel=\"stylesheet\" href=\"some.css\">\

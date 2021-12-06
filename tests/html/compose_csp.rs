@@ -16,7 +16,10 @@ mod passing {
         options.isolate = true;
         let csp_content = html::compose_csp(&options);
 
-        assert_eq!(csp_content, "default-src 'unsafe-inline' data:;");
+        assert_eq!(
+            csp_content,
+            "default-src 'unsafe-eval' 'unsafe-inline' data:;"
+        );
     }
 
     #[test]
@@ -75,6 +78,6 @@ mod passing {
         options.no_images = true;
         let csp_content = html::compose_csp(&options);
 
-        assert_eq!(csp_content, "default-src 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;");
+        assert_eq!(csp_content, "default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;");
     }
 }

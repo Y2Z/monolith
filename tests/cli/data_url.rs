@@ -30,7 +30,7 @@ mod passing {
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
             "<html><head>\
-            <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:;\"></meta>\
+            <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:;\"></meta>\
             </head><body>Hello, World!</body></html>\n"
         );
 
