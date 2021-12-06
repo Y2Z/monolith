@@ -83,7 +83,7 @@ pub fn compose_csp(options: &Options) -> String {
     let mut string_list = vec![];
 
     if options.isolate {
-        string_list.push("default-src 'unsafe-inline' data:;");
+        string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data:;");
     }
 
     if options.no_css {

@@ -98,7 +98,7 @@ mod passing {
             format!(
                 "\
                 <!DOCTYPE html><html lang=\"en\"><head>\
-                <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-inline' data:; style-src 'none'; script-src 'none'; img-src data:;\"></meta>\n  \
+                <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; script-src 'none'; img-src data:;\"></meta>\n  \
                 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  \
                 <title>Local HTML file</title>\n  \
                 <link rel=\"stylesheet\" type=\"text/css\">\n  \
