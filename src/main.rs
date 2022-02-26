@@ -65,10 +65,9 @@ pub fn read_stdin() -> Vec<u8> {
 
 fn main() {
     let options = Options::from_args();
-    let mut target: String = options.target.clone();
 
     // Check if target was provided
-    if target.len() == 0 {
+    if options.target.len() == 0 {
         if !options.silent {
             eprintln!("No target specified");
         }
@@ -83,65 +82,62 @@ fn main() {
         }
     }
 
-    let target_url: Url;
     let mut use_stdin: bool = false;
 
-    // Determine exact target URL
-    if target.clone() == "-" {
-        // Read from pipe (stdin)
-        use_stdin = true;
-        // Set default target URL to an empty data URL; the user can set it via --base-url
-        target_url = Url::parse("data:text/html,").unwrap();
-    } else {
-        match Url::parse(&target.clone()) {
-            Ok(parsed_url) => {
-                if parsed_url.scheme() == "data"
-                    || parsed_url.scheme() == "file"
-                    || (parsed_url.scheme() == "http" || parsed_url.scheme() == "https")
-                {
-                    target_url = parsed_url;
-                } else {
+    let target_url = match options.target.as_str() {
+        "-" => {
+            // Read from pipe (stdin)
+            use_stdin = true;
+            // Set default target URL to an empty data URL; the user can set it via --base-url
+            Url::parse("data:text/html,").unwrap()
+        }
+        target => match Url::parse(&target) {
+            Ok(url) => match url.scheme() {
+                "data" | "file" | "http" | "https" => url,
+                unsupported_scheme => {
                     if !options.silent {
-                        eprintln!("Unsupported target URL type: {}", &parsed_url.scheme());
+                        eprintln!("Unsupported target URL type: {}", unsupported_scheme);
                     }
-                    process::exit(1);
+                    process::exit(1)
                 }
-            }
-            Err(_err) => {
+            },
+            Err(_) => {
                 // Failed to parse given base URL (perhaps it's a filesystem path?)
                 let path: &Path = Path::new(&target);
-
-                if path.exists() {
-                    if path.is_file() {
-                        match Url::from_file_path(fs::canonicalize(&path).unwrap()) {
-                            Ok(file_url) => {
-                                target_url = file_url;
-                            }
-                            Err(_err) => {
-                                if !options.silent {
-                                    eprintln!(
-                                        "Could not generate file URL out of given path: {}",
-                                        "err"
-                                    );
+                match path.exists() {
+                    true => match path.is_file() {
+                        true => {
+                            let canonical_path = fs::canonicalize(&path).unwrap();
+                            match Url::from_file_path(canonical_path) {
+                                Ok(url) => url,
+                                Err(_) => {
+                                    if !options.silent {
+                                        eprintln!(
+                                            "Could not generate file URL out of given path: {}",
+                                            &target
+                                        );
+                                    }
+                                    process::exit(1);
                                 }
-                                process::exit(1);
                             }
                         }
-                    } else {
-                        if !options.silent {
-                            eprintln!("Local target is not a file: {}", &options.target);
+                        false => {
+                            if !options.silent {
+                                eprintln!("Local target is not a file: {}", &target);
+                            }
+                            process::exit(1);
                         }
-                        process::exit(1);
+                    },
+                    false => {
+                        // It is not a FS path, now we do what browsers do:
+                        // prepend "http://" and hope it points to a website
+                        Url::parse(&format!("https://{hopefully_url}", hopefully_url = &target))
+                            .unwrap()
                     }
-                } else {
-                    // Last chance, now we do what browsers do:
-                    // prepend "http://" and hope it points to a website
-                    target.insert_str(0, "http://");
-                    target_url = Url::parse(&target).unwrap();
                 }
             }
-        }
-    }
+        },
+    };
 
     // Initialize client
     let mut cache = HashMap::new();
