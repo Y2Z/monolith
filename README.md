@@ -87,7 +87,7 @@ make install
 
 #### Using [pre-built binaries](https://github.com/Y2Z/monolith/releases) (Windows, ARM-based devices, etc)
 
-Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standart CPU architecture.
+Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standard CPU architecture.
 
 
 ---------------------------------------------------
