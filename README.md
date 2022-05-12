@@ -123,6 +123,7 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
  - `-M`: Don't add timestamp and URL information
  - `-n`: Extract contents of NOSCRIPT elements
  - `-o`: Write output to `file` (use “-” for STDOUT)
+ - `-p`: Preserve remote sources
  - `-s`: Be quiet
  - `-t`: Adjust `network request timeout`
  - `-u`: Provide custom `User-Agent`

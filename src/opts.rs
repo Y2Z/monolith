@@ -16,6 +16,7 @@ pub struct Options {
     pub insecure: bool,
     pub no_metadata: bool,
     pub output: String,
+    pub preserve_remote: bool,
     pub silent: bool,
     pub timeout: u64,
     pub user_agent: Option<String>,
@@ -64,6 +65,7 @@ impl Options {
             .args_from_usage(
                 "-o, --output=[document.html] 'Writes output to <file>, use - for STDOUT'",
             )
+            .args_from_usage("-p, --preserve-remote 'Preserve remote sources'")
             .args_from_usage("-s, --silent 'Suppresses verbosity'")
             .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
             .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
@@ -100,6 +102,7 @@ impl Options {
         options.insecure = app.is_present("insecure");
         options.no_metadata = app.is_present("no-metadata");
         options.output = app.value_of("output").unwrap_or("").to_string();
+        options.preserve_remote = app.is_present("preserve-remote");
         options.silent = app.is_present("silent");
         options.timeout = app
             .value_of("timeout")

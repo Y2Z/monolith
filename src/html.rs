@@ -603,6 +603,12 @@ pub fn retrieve_and_embed_asset(
 ) {
     let resolved_url: Url = resolve_url(document_url, attr_value.clone());
 
+    // Keep remote source references intact if requested
+    if options.preserve_remote && (resolved_url.host_str() != document_url.host_str()) {
+        set_node_attr(node, attr_name, Some(resolved_url.to_string()));
+        return;
+    }
+
     match retrieve_asset(
         cache,
         client,
