@@ -504,8 +504,8 @@ pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>)
                     found_existing_attr = true;
 
                     if let Some(attr_value) = attr_value.clone() {
-                        &attrs_mut[i].value.clear();
-                        &attrs_mut[i].value.push_slice(&attr_value.as_str());
+                        let _ = &attrs_mut[i].value.clear();
+                        let _ = &attrs_mut[i].value.push_slice(&attr_value.as_str());
                     } else {
                         // Remove attr completely if attr_value is not defined
                         attrs_mut.remove(i);
