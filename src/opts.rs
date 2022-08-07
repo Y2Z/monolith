@@ -1,4 +1,4 @@
-use clap::{crate_authors, crate_description, crate_version, App, Arg};
+use clap::{App, Arg};
 use std::env;
 
 #[derive(Default)]
@@ -43,9 +43,9 @@ const ENV_VAR_TERM: &str = "TERM";
 impl Options {
     pub fn from_args() -> Options {
         let app = App::new(env!("CARGO_PKG_NAME"))
-            .version(crate_version!())
-            .author(format!("\n{}", crate_authors!("\n")).as_str())
-            .about(format!("{}\n{}", ASCII, crate_description!()).as_str())
+            .version(env!("CARGO_PKG_VERSION"))
+            .author(format!("\n{}\n\n", env!("CARGO_PKG_AUTHORS").replace(':', "\n")).as_str())
+            .about(format!("{}\n{}", ASCII, env!("CARGO_PKG_DESCRIPTION")).as_str())
             .args_from_usage("-a, --no-audio 'Removes audio sources'")
             .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
