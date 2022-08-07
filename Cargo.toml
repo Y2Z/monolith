@@ -30,7 +30,7 @@ cssparser = "0.28.1"
 encoding_rs = "0.8.29"
 html5ever = "0.24.1"
 percent-encoding = "2.1.0"
-regex = "1.5.4" # Used for parsing srcset and NOSCRIPT
+regex = "1.5.5" # Used for parsing srcset and NOSCRIPT
 sha2 = "0.9.5" # Used for calculating checksums during integrity checks
 url = "2.2.2"
 
