@@ -284,10 +284,11 @@ pub fn retrieve_asset(
                     match response.bytes() {
                         Ok(b) => {
                             data = b.to_vec();
-                        },
+                        }
                         Err(error) => {
                             if !options.silent {
-                                eprintln!("{}{}{}{}",
+                                eprintln!(
+                                    "{}{}{}{}",
                                     indent(depth).as_str(),
                                     if options.no_color { "" } else { ANSI_COLOR_RED },
                                     error,
@@ -298,7 +299,7 @@ pub fn retrieve_asset(
                                     },
                                 );
                             }
-                        },
+                        }
                     }
 
                     // Add retrieved resource to cache
