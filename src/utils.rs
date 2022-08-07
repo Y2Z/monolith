@@ -238,8 +238,8 @@ pub fn retrieve_asset(
         } else {
             // URL not in cache, we retrieve the file
             match client.get(url.as_str()).send() {
-                Ok(mut response) => {
-                    if !options.ignore_errors && response.status() != 200 {
+                Ok(response) => {
+                    if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
                         if !options.silent {
                             eprintln!(
                                 "{}{}{} ({}){}",
@@ -258,19 +258,17 @@ pub fn retrieve_asset(
                         return Err(client.get("").send().unwrap_err());
                     }
 
+                    let response_url: Url = response.url().clone();
+
                     if !options.silent {
-                        if url.as_str() == response.url().as_str() {
+                        if url.as_str() == response_url.as_str() {
                             eprintln!("{}{}", indent(depth).as_str(), &url);
                         } else {
-                            eprintln!("{}{} -> {}", indent(depth).as_str(), &url, &response.url());
+                            eprintln!("{}{} -> {}", indent(depth).as_str(), &url, &response_url);
                         }
                     }
 
-                    let new_cache_key: String = clean_url(response.url().clone()).to_string();
-
-                    // Convert response into a byte array
-                    let mut data: Vec<u8> = vec![];
-                    response.copy_to(&mut data).unwrap();
+                    let new_cache_key: String = clean_url(response_url.clone()).to_string();
 
                     // Attempt to obtain media type and charset by reading Content-Type header
                     let content_type: &str = response
@@ -281,11 +279,34 @@ pub fn retrieve_asset(
 
                     let (media_type, charset, _is_base64) = parse_content_type(&content_type);
 
+                    // Convert response into a byte array
+                    let mut data: Vec<u8> = vec![];
+                    match response.bytes() {
+                        Ok(b) => {
+                            data = b.to_vec();
+                        }
+                        Err(error) => {
+                            if !options.silent {
+                                eprintln!(
+                                    "{}{}{}{}",
+                                    indent(depth).as_str(),
+                                    if options.no_color { "" } else { ANSI_COLOR_RED },
+                                    error,
+                                    if options.no_color {
+                                        ""
+                                    } else {
+                                        ANSI_COLOR_RESET
+                                    },
+                                );
+                            }
+                        }
+                    }
+
                     // Add retrieved resource to cache
                     cache.insert(new_cache_key, data.clone());
 
                     // Return
-                    Ok((data, response.url().clone(), media_type, charset))
+                    Ok((data, response_url, media_type, charset))
                 }
                 Err(error) => {
                     if !options.silent {
