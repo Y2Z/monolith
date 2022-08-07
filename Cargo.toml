@@ -36,7 +36,8 @@ url = "2.2.2"
 
 [dependencies.reqwest]
 version = "0.11.11"
-features = ["blocking"]
+default-features = false
+features = ["default-tls", "blocking", "gzip", "brotli", "deflate"]
 
 [dev-dependencies]
 assert_cmd = "2.0.4"
