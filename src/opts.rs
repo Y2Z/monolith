@@ -52,9 +52,7 @@ impl Options {
             .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
             .args_from_usage("-C, --charset=[UTF-8] 'Enforces custom encoding'")
-            .args_from_usage(
-                "-D, --domains=[bad.org,ads.site,127.0.0.0:8080] 'Whitelist of domains'",
-            )
+            .args_from_usage("-D, --domains=[bad.org,ads.site] 'Whitelist of domains'")
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
             .args_from_usage("-E, --exclude-domains 'Treat list of specified domains as blacklist'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
