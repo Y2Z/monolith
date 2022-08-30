@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{App, Arg, ArgAction};
 use std::env;
 
 #[derive(Default)]
@@ -52,9 +52,17 @@ impl Options {
             .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
             .args_from_usage("-C, --charset=[UTF-8] 'Enforces custom encoding'")
-            .args_from_usage("-D, --domains=[bad.org,ads.site] 'Whitelist of domains'")
+            .arg(
+                Arg::with_name("domains")
+                    .short('d')
+                    .long("domains")
+                    .takes_value(true)
+                    .value_name("DOMAINS")
+                    .action(ArgAction::Append)
+                    .help("Whitelist of domains"),
+            )
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
-            .args_from_usage("-E, --exclude-domains 'Treat list of specified domains as blacklist'")
+            .args_from_usage("-E, --exclude-domains 'Treat specified domains as blacklist'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
             .args_from_usage("-F, --no-fonts 'Removes fonts'")
             .args_from_usage("-i, --no-images 'Removes images'")
@@ -95,8 +103,16 @@ impl Options {
         if let Some(charset) = app.value_of("charset") {
             options.charset = Some(charset.to_string());
         }
-        if let Some(domains) = app.value_of("domains") {
-            options.domains = Some(domains.split(",").map(|s| s.to_string()).collect());
+        if let Some(domains) = app.get_many::<String>("domains") {
+            let mut final_list_of_domains: Vec<String> = Vec::new();
+            let provided_arguments: Vec<&str> = domains.map(|v| v.as_str()).collect::<Vec<_>>();
+            for provided_argument in provided_arguments {
+                let comma_separated_domains: Vec<&str> = provided_argument.split(",").collect();
+                for comma_separated_domain in comma_separated_domains {
+                    final_list_of_domains.push(comma_separated_domain.trim().to_string());
+                }
+            }
+            options.domains = Some(final_list_of_domains);
         }
         options.ignore_errors = app.is_present("ignore-errors");
         options.exclude_domains = app.is_present("exclude-domains");

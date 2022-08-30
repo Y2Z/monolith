@@ -266,23 +266,14 @@ pub fn retrieve_asset(
                 "".to_string(),
             ))
         } else {
-            if options.exclude_domains {
-                if let Some(domains) = &options.domains {
-                    if domains
-                        .iter()
-                        .any(|d| domain_is_within_domain(url.host_str().unwrap(), &d.trim()))
-                    {
-                        return Err(client.get("").send().unwrap_err());
-                    }
-                }
-            } else {
-                if let Some(domains) = &options.domains {
-                    if domains
-                        .iter()
-                        .any(|d| !domain_is_within_domain(url.host_str().unwrap(), &d.trim()))
-                    {
-                        return Err(client.get("").send().unwrap_err());
-                    }
+            if let Some(domains) = &options.domains {
+                let domain_matches = domains
+                    .iter()
+                    .any(|d| domain_is_within_domain(url.host_str().unwrap(), &d.trim()));
+                if (options.exclude_domains && domain_matches)
+                    || (!options.exclude_domains && !domain_matches)
+                {
+                    return Err(client.get("").send().unwrap_err());
                 }
             }
 
