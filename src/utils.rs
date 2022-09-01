@@ -92,6 +92,62 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
     mime.to_string()
 }
 
+pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> bool {
+    if domain_to_match_against.len() == 0 {
+        return false;
+    }
+
+    if domain_to_match_against == "." {
+        return true;
+    }
+
+    let domain_partials: Vec<&str> = domain.trim_end_matches(".").rsplit(".").collect();
+    let domain_to_match_against_partials: Vec<&str> = domain_to_match_against
+        .trim_end_matches(".")
+        .rsplit(".")
+        .collect();
+    let domain_to_match_against_starts_with_a_dot = domain_to_match_against.starts_with(".");
+
+    let mut i: usize = 0;
+    let l: usize = std::cmp::max(
+        domain_partials.len(),
+        domain_to_match_against_partials.len(),
+    );
+    let mut ok: bool = true;
+
+    while i < l {
+        // Exit and return false if went out of bounds of domain to match against, and it didn't start with a dot
+        if !domain_to_match_against_starts_with_a_dot
+            && domain_to_match_against_partials.len() < i + 1
+        {
+            ok = false;
+            break;
+        }
+
+        let domain_partial = if domain_partials.len() < i + 1 {
+            ""
+        } else {
+            domain_partials.get(i).unwrap()
+        };
+        let domain_to_match_against_partial = if domain_to_match_against_partials.len() < i + 1 {
+            ""
+        } else {
+            domain_to_match_against_partials.get(i).unwrap()
+        };
+
+        let parts_match = domain_to_match_against_partial.eq_ignore_ascii_case(domain_partial);
+
+        if !parts_match && domain_to_match_against_partial.len() != 0 {
+            ok = false;
+            break;
+        }
+
+        i += 1;
+    }
+
+    ok
+}
+
 pub fn indent(level: u32) -> String {
     let mut result: String = String::new();
     let mut l: u32 = level;
@@ -148,7 +204,7 @@ pub fn retrieve_asset(
         let (media_type, charset, data) = parse_data_url(url);
         Ok((data, url.clone(), media_type, charset))
     } else if url.scheme() == "file" {
-        // Check if parent_url is also file:/// (if not, then we don't embed the asset)
+        // Check if parent_url is also a file: URL (if not, then we don't embed the asset)
         if parent_url.scheme() != "file" {
             if !options.silent {
                 eprintln!(
@@ -236,6 +292,17 @@ pub fn retrieve_asset(
                 "".to_string(),
             ))
         } else {
+            if let Some(domains) = &options.domains {
+                let domain_matches = domains
+                    .iter()
+                    .any(|d| domain_is_within_domain(url.host_str().unwrap(), &d.trim()));
+                if (options.exclude_domains && domain_matches)
+                    || (!options.exclude_domains && !domain_matches)
+                {
+                    return Err(client.get("").send().unwrap_err());
+                }
+            }
+
             // URL not in cache, we retrieve the file
             match client.get(url.as_str()).send() {
                 Ok(response) => {

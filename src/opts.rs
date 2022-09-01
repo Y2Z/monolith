@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{App, Arg, ArgAction};
 use std::env;
 
 #[derive(Default)]
@@ -7,7 +7,9 @@ pub struct Options {
     pub base_url: Option<String>,
     pub no_css: bool,
     pub charset: Option<String>,
+    pub domains: Option<Vec<String>>,
     pub ignore_errors: bool,
+    pub exclude_domains: bool,
     pub no_frames: bool,
     pub no_fonts: bool,
     pub no_images: bool,
@@ -50,7 +52,17 @@ impl Options {
             .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
             .args_from_usage("-c, --no-css 'Removes CSS'")
             .args_from_usage("-C, --charset=[UTF-8] 'Enforces custom encoding'")
+            .arg(
+                Arg::with_name("domains")
+                    .short('d')
+                    .long("domains")
+                    .takes_value(true)
+                    .value_name("DOMAINS")
+                    .action(ArgAction::Append)
+                    .help("Whitelist of domains"),
+            )
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
+            .args_from_usage("-E, --exclude-domains 'Treat specified domains as blacklist'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
             .args_from_usage("-F, --no-fonts 'Removes fonts'")
             .args_from_usage("-i, --no-images 'Removes images'")
@@ -91,7 +103,12 @@ impl Options {
         if let Some(charset) = app.value_of("charset") {
             options.charset = Some(charset.to_string());
         }
+        if let Some(domains) = app.get_many::<String>("domains") {
+            let list_of_domains: Vec<String> = domains.map(|v| v.clone()).collect::<Vec<_>>();
+            options.domains = Some(list_of_domains);
+        }
         options.ignore_errors = app.is_present("ignore-errors");
+        options.exclude_domains = app.is_present("exclude-domains");
         options.no_frames = app.is_present("no-frames");
         options.no_fonts = app.is_present("no-fonts");
         options.no_images = app.is_present("no-images");
