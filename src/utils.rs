@@ -117,8 +117,8 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
 
     while i < l {
         // Exit and return false if went out of bounds of domain to match against, and it didn't start with a dot
-        if domain_to_match_against_partials.len() < i + 1
-            && !domain_to_match_against_starts_with_a_dot
+        if !domain_to_match_against_starts_with_a_dot
+            && domain_to_match_against_partials.len() < i + 1
         {
             ok = false;
             break;
@@ -135,10 +135,9 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
             domain_to_match_against_partials.get(i).unwrap()
         };
 
-        let parts_match = domain_to_match_against_starts_with_a_dot
-            || domain_to_match_against_partial.eq_ignore_ascii_case(domain_partial);
+        let parts_match = domain_to_match_against_partial.eq_ignore_ascii_case(domain_partial);
 
-        if !parts_match {
+        if !parts_match && domain_to_match_against_partial.len() != 0 {
             ok = false;
             break;
         }

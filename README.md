@@ -115,7 +115,7 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
  - `-C`: Save document using custom `charset`
  - `-d`: Allow retrieving assets only from specified `domain(s)`
  - `-e`: Ignore network errors
- - `-E`: Exclude all assets located within domains specified in whitelist
+ - `-E`: Avoid retrieving assets located within specified domains
  - `-f`: Omit frames
  - `-F`: Exclude web fonts
  - `-i`: Remove images

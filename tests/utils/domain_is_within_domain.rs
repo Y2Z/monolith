@@ -135,6 +135,14 @@ mod failing {
     }
 
     #[test]
+    fn different_domain_is_not_within_dotted_domain() {
+        assert!(!utils::domain_is_within_domain(
+            "www.doodleoptimize.com",
+            ".ycombinator.com"
+        ));
+    }
+
+    #[test]
     fn no_domain_can_be_within_empty_domain() {
         assert!(!utils::domain_is_within_domain("ycombinator.com", ""));
     }
