@@ -104,14 +104,8 @@ impl Options {
             options.charset = Some(charset.to_string());
         }
         if let Some(domains) = app.get_many::<String>("domains") {
-            let mut final_list_of_domains: Vec<String> = Vec::new();
-            let provided_arguments: Vec<&str> = domains.map(|v| v.as_str()).collect::<Vec<_>>();
-            for provided_argument in provided_arguments {
-                let comma_separated_domains: Vec<&str> = provided_argument.split(",").collect();
-                for comma_separated_domain in comma_separated_domains {
-                    final_list_of_domains.push(comma_separated_domain.trim().to_string());
-                }
-            }
+            let final_list_of_domains: Vec<String> = domains.map(|v| v.clone()).collect::<Vec<_>>();
+
             options.domains = Some(final_list_of_domains);
         }
         options.ignore_errors = app.is_present("ignore-errors");
