@@ -104,9 +104,8 @@ impl Options {
             options.charset = Some(charset.to_string());
         }
         if let Some(domains) = app.get_many::<String>("domains") {
-            let final_list_of_domains: Vec<String> = domains.map(|v| v.clone()).collect::<Vec<_>>();
-
-            options.domains = Some(final_list_of_domains);
+            let list_of_domains: Vec<String> = domains.map(|v| v.clone()).collect::<Vec<_>>();
+            options.domains = Some(list_of_domains);
         }
         options.ignore_errors = app.is_present("ignore-errors");
         options.exclude_domains = app.is_present("exclude-domains");
