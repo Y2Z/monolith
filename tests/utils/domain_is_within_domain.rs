@@ -26,14 +26,6 @@ mod passing {
     }
 
     #[test]
-    fn dotted_domain_is_within_domain() {
-        assert!(utils::domain_is_within_domain(
-            ".ycombinator.com",
-            "ycombinator.com"
-        ));
-    }
-
-    #[test]
     fn sub_domain_is_within_dotted_domain() {
         assert!(utils::domain_is_within_domain(
             "news.ycombinator.com",
@@ -67,18 +59,12 @@ mod passing {
 
     #[test]
     fn domain_with_trailing_dot_is_within_single_dot() {
-        assert!(utils::domain_is_within_domain(
-            "ycombinator.com.",
-            "."
-        ));
+        assert!(utils::domain_is_within_domain("ycombinator.com.", "."));
     }
 
     #[test]
     fn domain_matches_single_dot() {
-        assert!(utils::domain_is_within_domain(
-            "ycombinator.com",
-            "."
-        ));
+        assert!(utils::domain_is_within_domain("ycombinator.com", "."));
     }
 
     #[test]
@@ -137,6 +123,14 @@ mod failing {
         assert!(!utils::domain_is_within_domain(
             "news.ycombinator.com",
             "org"
+        ));
+    }
+
+    #[test]
+    fn dotted_domain_is_not_within_domain() {
+        assert!(!utils::domain_is_within_domain(
+            ".ycombinator.com",
+            "ycombinator.com"
         ));
     }
 
