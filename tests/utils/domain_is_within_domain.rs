@@ -10,9 +10,25 @@ mod passing {
     use monolith::utils;
 
     #[test]
-    fn sub_domain_is_within_domain() {
+    fn sub_domain_is_within_dotted_sub_domain() {
         assert!(utils::domain_is_within_domain(
             "news.ycombinator.com",
+            ".news.ycombinator.com"
+        ));
+    }
+
+    #[test]
+    fn domain_is_within_dotted_domain() {
+        assert!(utils::domain_is_within_domain(
+            "ycombinator.com",
+            ".ycombinator.com"
+        ));
+    }
+
+    #[test]
+    fn dotted_domain_is_within_domain() {
+        assert!(utils::domain_is_within_domain(
+            ".ycombinator.com",
             "ycombinator.com"
         ));
     }
@@ -26,8 +42,11 @@ mod passing {
     }
 
     #[test]
-    fn domain_is_within_top_level_domain() {
-        assert!(utils::domain_is_within_domain("ycombinator.com", "com"));
+    fn sub_domain_is_within_dotted_top_level_domain() {
+        assert!(utils::domain_is_within_domain(
+            "news.ycombinator.com",
+            ".com"
+        ));
     }
 
     #[test]
@@ -39,11 +58,45 @@ mod passing {
     }
 
     #[test]
-    fn sub_domain_is_within_dotted_itself() {
+    fn domain_with_trailing_dot_is_within_itself() {
+        assert!(utils::domain_is_within_domain(
+            "ycombinator.com.",
+            "ycombinator.com"
+        ));
+    }
+
+    #[test]
+    fn domain_with_trailing_dot_is_within_single_dot() {
+        assert!(utils::domain_is_within_domain(
+            "ycombinator.com.",
+            "."
+        ));
+    }
+
+    #[test]
+    fn domain_matches_single_dot() {
         assert!(utils::domain_is_within_domain(
             "ycombinator.com",
+            "."
+        ));
+    }
+
+    #[test]
+    fn dotted_domain_must_be_within_dotted_domain() {
+        assert!(utils::domain_is_within_domain(
+            ".ycombinator.com",
             ".ycombinator.com"
         ));
+    }
+
+    #[test]
+    fn empty_is_within_dot() {
+        assert!(utils::domain_is_within_domain("", "."));
+    }
+
+    #[test]
+    fn both_dots() {
+        assert!(utils::domain_is_within_domain(".", "."));
     }
 }
 
@@ -59,7 +112,20 @@ mod failing {
     use monolith::utils;
 
     #[test]
-    fn sub_domain_is_not_within_domain() {
+    fn sub_domain_must_not_be_within_domain() {
+        assert!(!utils::domain_is_within_domain(
+            "news.ycombinator.com",
+            "ycombinator.com"
+        ));
+    }
+
+    #[test]
+    fn domain_must_not_be_within_top_level_domain() {
+        assert!(!utils::domain_is_within_domain("ycombinator.com", "com"));
+    }
+
+    #[test]
+    fn different_domains_must_not_be_within_one_another() {
         assert!(!utils::domain_is_within_domain(
             "news.ycombinator.com",
             "kernel.org"
@@ -67,7 +133,7 @@ mod failing {
     }
 
     #[test]
-    fn sub_domain_is_not_within_top_level_domain() {
+    fn sub_domain_is_not_within_wrong_top_level_domain() {
         assert!(!utils::domain_is_within_domain(
             "news.ycombinator.com",
             "org"
@@ -75,12 +141,12 @@ mod failing {
     }
 
     #[test]
-    fn no_domain_is_not_within_dot() {
-        assert!(!utils::domain_is_within_domain("news.ycombinator.com", "."));
+    fn no_domain_can_be_within_empty_domain() {
+        assert!(!utils::domain_is_within_domain("ycombinator.com", ""));
     }
 
     #[test]
-    fn no_domain_is_within_empty_domain() {
-        assert!(!utils::domain_is_within_domain("news.ycombinator.com", ""));
+    fn both_can_not_be_empty() {
+        assert!(!utils::domain_is_within_domain("", ""));
     }
 }
