@@ -131,7 +131,7 @@ fn main() {
                     false => {
                         // It is not a FS path, now we do what browsers do:
                         // prepend "http://" and hope it points to a website
-                        Url::parse(&format!("https://{hopefully_url}", hopefully_url = &target))
+                        Url::parse(&format!("http://{hopefully_url}", hopefully_url = &target))
                             .unwrap()
                     }
                 }
