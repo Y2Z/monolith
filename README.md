@@ -134,6 +134,20 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 ---------------------------------------------------
 
 
+## Dynamic content
+
+Monolith doesn't feature a JavaScript engine, hence websites that retrieve and display data after initial load may require usage of additional tools.
+
+For example, Chromium (Chrome) can be used to act as a pre-processor for such pages:
+
+```cli
+chromium --headless --incognito --dump-dom https://github.com | monolith - -I -b https://github.com -o github.html
+```
+
+
+---------------------------------------------------
+
+
 ## Proxies
 
 Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
