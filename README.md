@@ -134,13 +134,28 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 ---------------------------------------------------
 
 
+## Whitelisting and blacklisting domains
+
+Options `-d` and `-B` provide control over what domains can be used to retrieve assets from. E.g.:
+
+```console
+monolith -I -d example.com -d www.example.com https://example.com -o example-only.html
+```
+or
+```console
+monolith -I -B -d .googleusercontent.com -d googleanalytics.com -d .google.com https://example.com -o example-no-ads.html
+```
+
+---------------------------------------------------
+
+
 ## Dynamic content
 
 Monolith doesn't feature a JavaScript engine, hence websites that retrieve and display data after initial load may require usage of additional tools.
 
 For example, Chromium (Chrome) can be used to act as a pre-processor for such pages:
 
-```cli
+```console
 chromium --headless --incognito --dump-dom https://github.com | monolith - -I -b https://github.com -o github.html
 ```
 
