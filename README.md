@@ -141,7 +141,7 @@ Options `-d` and `-B` provide control over what domains can be used to retrieve 
 ```console
 monolith -I -d example.com -d www.example.com https://example.com -o example-only.html
 ```
-or
+
 ```console
 monolith -I -B -d .googleusercontent.com -d googleanalytics.com -d .google.com https://example.com -o example-no-ads.html
 ```
