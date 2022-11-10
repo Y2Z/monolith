@@ -196,17 +196,14 @@ mod failing {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd.arg("data:,Hello%2C%20World!").output().unwrap();
 
-        // STDERR should contain error description
-        assert_eq!(
-            String::from_utf8_lossy(&out.stderr),
-            "Unsupported document media type\n"
-        );
+        // STDERR should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stderr), "");
 
-        // STDOUT should contain HTML
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "");
+        // STDOUT should contain text
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "Hello, World!\n");
 
-        // Exit code should be 1
-        out.assert().code(1);
+        // Exit code should be 0
+        out.assert().code(0);
     }
 
     #[test]
@@ -221,7 +218,7 @@ mod failing {
         // STDERR should be empty
         assert_eq!(String::from_utf8_lossy(&out.stderr), "");
 
-        // STDOUT should contain HTML with no JS in it
+        // STDOUT should contain HTML without contents of local JS file
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
             "<html><head><script src=\"data:application/javascript;base64,\"></script></head><body></body></html>\n"
