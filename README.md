@@ -111,11 +111,11 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 
  - `-a`: Exclude audio sources
  - `-b`: Use custom `base URL`
+ - `-B`: Forbid retrieving assets from specified domain(s)
  - `-c`: Exclude CSS
  - `-C`: Save document using custom `charset`
  - `-d`: Allow retrieving assets only from specified `domain(s)`
  - `-e`: Ignore network errors
- - `-E`: Avoid retrieving assets located within specified domains
  - `-f`: Omit frames
  - `-F`: Exclude web fonts
  - `-i`: Remove images
