@@ -175,12 +175,21 @@ fn main() {
     {
         match retrieve_asset(&mut cache, &client, &target_url, &target_url, &options, 0) {
             Ok((retrieved_data, final_url, media_type, charset)) => {
-                // Make sure the media type is text/html
-                if !media_type.eq_ignore_ascii_case("text/html") {
-                    if !options.silent {
-                        eprintln!("Unsupported document media type");
-                    }
-                    process::exit(1);
+                // Provide output as text without processing it, the way browsers do
+                if !media_type.eq_ignore_ascii_case("text/html")
+                    && !media_type.eq_ignore_ascii_case("application/xhtml+xml")
+                {
+                    // Define output
+                    let mut output =
+                        Output::new(&options.output).expect("Could not prepare output");
+
+                    // Write retrieved data into STDOUT or file
+                    output
+                        .write(&retrieved_data)
+                        .expect("Could not write output");
+
+                    // Nothing else to do past this point
+                    process::exit(0);
                 }
 
                 if options
@@ -324,6 +333,6 @@ fn main() {
     // Define output
     let mut output = Output::new(&options.output).expect("Could not prepare output");
 
-    // Write result into stdout or file
-    output.write(&result).expect("Could not write HTML output");
+    // Write result into STDOUT or file
+    output.write(&result).expect("Could not write output");
 }
