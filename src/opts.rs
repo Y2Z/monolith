@@ -5,11 +5,11 @@ use std::env;
 pub struct Options {
     pub no_audio: bool,
     pub base_url: Option<String>,
+    pub blacklist_domains: bool,
     pub no_css: bool,
     pub charset: Option<String>,
     pub domains: Option<Vec<String>>,
     pub ignore_errors: bool,
-    pub exclude_domains: bool,
     pub no_frames: bool,
     pub no_fonts: bool,
     pub no_images: bool,
@@ -50,19 +50,21 @@ impl Options {
             .about(format!("{}\n{}", ASCII, env!("CARGO_PKG_DESCRIPTION")).as_str())
             .args_from_usage("-a, --no-audio 'Removes audio sources'")
             .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
+            .args_from_usage(
+                "-B, --blacklist-domains 'Treat list of specified domains as blacklist'",
+            )
             .args_from_usage("-c, --no-css 'Removes CSS'")
             .args_from_usage("-C, --charset=[UTF-8] 'Enforces custom encoding'")
             .arg(
                 Arg::with_name("domains")
                     .short('d')
-                    .long("domains")
+                    .long("domain")
                     .takes_value(true)
-                    .value_name("DOMAINS")
+                    .value_name("example.com")
                     .action(ArgAction::Append)
-                    .help("Whitelist of domains"),
+                    .help("Specify domains to use for white/black-listing"),
             )
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
-            .args_from_usage("-E, --exclude-domains 'Treat specified domains as blacklist'")
             .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
             .args_from_usage("-F, --no-fonts 'Removes fonts'")
             .args_from_usage("-i, --no-images 'Removes images'")
@@ -99,6 +101,7 @@ impl Options {
         if let Some(base_url) = app.value_of("base-url") {
             options.base_url = Some(base_url.to_string());
         }
+        options.blacklist_domains = app.is_present("blacklist-domains");
         options.no_css = app.is_present("no-css");
         if let Some(charset) = app.value_of("charset") {
             options.charset = Some(charset.to_string());
@@ -108,7 +111,6 @@ impl Options {
             options.domains = Some(list_of_domains);
         }
         options.ignore_errors = app.is_present("ignore-errors");
-        options.exclude_domains = app.is_present("exclude-domains");
         options.no_frames = app.is_present("no-frames");
         options.no_fonts = app.is_present("no-fonts");
         options.no_images = app.is_present("no-images");
