@@ -24,7 +24,7 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 ## Installation
 
-#### Using [Cargo](https://crates.io/crates/monolith)
+#### Using [Cargo](https://crates.io/crates/monolith) (cross-platform)
 
 ```console
 cargo install monolith
