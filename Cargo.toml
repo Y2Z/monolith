@@ -1,6 +1,6 @@
 [package]
 name = "monolith"
-version = "2.6.2"
+version = "2.7.0"
 authors = [
     "Sunshine <sunshine@uberspace.net>",
     "Mahdi Robatipoor <mahdi.robatipoor@gmail.com>",
