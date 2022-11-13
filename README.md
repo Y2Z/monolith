@@ -136,7 +136,7 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
 
 ## Whitelisting and blacklisting domains
 
-Options `-d` and `-B` provide control over what domains can be used to retrieve assets from. E.g.:
+Options `-d` and `-B` provide control over what domains can be used to retrieve assets from, e.g.:
 
 ```console
 monolith -I -d example.com -d www.example.com https://example.com -o example-only.html
