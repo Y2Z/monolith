@@ -48,6 +48,12 @@ sudo port install monolith
 snap install monolith
 ```
 
+#### Using [Guix](https://packages.guix.gnu.org/packages/monolith) (GNU/Linux)
+
+```console
+guix install monolith
+```
+
 #### Using [FreeBSD packages](https://svnweb.freebsd.org/ports/head/www/monolith/) (FreeBSD)
 
 ```console
