@@ -1,5 +1,5 @@
 use reqwest::blocking::Client;
-use reqwest::header::CONTENT_TYPE;
+use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -304,7 +304,17 @@ pub fn retrieve_asset(
             }
 
             // URL not in cache, we retrieve the file
-            match client.get(url.as_str()).send() {
+            let mut headers = HeaderMap::new();
+            if options.cookies.len() > 0 {
+                for cookie in &options.cookies {
+                    if !cookie.is_expired() && cookie.matches_url(url.as_str()) {
+                        let cookie_header_value: String = cookie.name.clone() + "=" + &cookie.value;
+                        headers
+                            .insert(COOKIE, HeaderValue::from_str(&cookie_header_value).unwrap());
+                    }
+                }
+            }
+            match client.get(url.as_str()).headers(headers).send() {
                 Ok(response) => {
                     if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
                         if !options.silent {

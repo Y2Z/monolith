@@ -10,6 +10,7 @@ use std::process;
 use std::time::Duration;
 use url::Url;
 
+use monolith::cookies::parse_cookie_file_contents;
 use monolith::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, has_favicon, html_to_dom,
     serialize_document, set_base_url, set_charset, walk_and_embed_assets,
@@ -64,7 +65,7 @@ pub fn read_stdin() -> Vec<u8> {
 }
 
 fn main() {
-    let options = Options::from_args();
+    let mut options = Options::from_args();
 
     // Check if target was provided
     if options.target.len() == 0 {
@@ -74,10 +75,10 @@ fn main() {
         process::exit(1);
     }
 
-    // Check if custom charset is valid
-    if let Some(custom_charset) = options.charset.clone() {
-        if !Encoding::for_label_no_replacement(custom_charset.as_bytes()).is_some() {
-            eprintln!("Unknown encoding: {}", &custom_charset);
+    // Check if custom encoding is valid
+    if let Some(custom_encoding) = options.encoding.clone() {
+        if !Encoding::for_label_no_replacement(custom_encoding.as_bytes()).is_some() {
+            eprintln!("Unknown encoding: {}", &custom_encoding);
             process::exit(1);
         }
     }
@@ -138,6 +139,30 @@ fn main() {
             }
         },
     };
+
+    // Read and parse cookie file
+    if let Some(opt_cookie_file) = options.cookie_file.clone() {
+        match fs::read_to_string(opt_cookie_file) {
+            Ok(str) => match parse_cookie_file_contents(&str) {
+                Ok(cookies) => {
+                    options.cookies = cookies;
+                    // for c in &cookies {
+                    //     // if !cookie.is_expired() {
+                    //         // options.cookies.append(c);
+                    //     // }
+                    // }
+                }
+                Err(_) => {
+                    eprintln!("Could not parse specified cookie file");
+                    process::exit(1);
+                }
+            },
+            Err(_) => {
+                eprintln!("Could not read specified cookie file");
+                process::exit(1);
+            }
+        }
+    }
 
     // Initialize client
     let mut cache = HashMap::new();
@@ -315,8 +340,8 @@ fn main() {
     }
 
     // Save using specified charset, if given
-    if let Some(custom_charset) = options.charset.clone() {
-        document_encoding = custom_charset;
+    if let Some(custom_encoding) = options.encoding.clone() {
+        document_encoding = custom_encoding;
         dom = set_charset(dom, document_encoding.clone());
     }
 

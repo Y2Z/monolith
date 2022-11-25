@@ -115,7 +115,7 @@ mod passing {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
-            .arg("-C")
+            .arg("-E")
             .arg("utf8")
             .arg(format!(
                 "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
@@ -158,7 +158,7 @@ mod passing {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
-            .arg("-C")
+            .arg("-E")
             .arg("utf0")
             .arg(format!(
                 "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
