@@ -1,15 +1,19 @@
 use clap::{App, Arg, ArgAction};
 use std::env;
 
+use crate::cookies::Cookie;
+
 #[derive(Default)]
 pub struct Options {
     pub no_audio: bool,
     pub base_url: Option<String>,
     pub blacklist_domains: bool,
     pub no_css: bool,
-    pub charset: Option<String>,
+    pub cookie_file: Option<String>,
+    pub cookies: Vec<Cookie>,
     pub domains: Option<Vec<String>>,
     pub ignore_errors: bool,
+    pub encoding: Option<String>,
     pub no_frames: bool,
     pub no_fonts: bool,
     pub no_images: bool,
@@ -48,13 +52,13 @@ impl Options {
             .version(env!("CARGO_PKG_VERSION"))
             .author(format!("\n{}\n\n", env!("CARGO_PKG_AUTHORS").replace(':', "\n")).as_str())
             .about(format!("{}\n{}", ASCII, env!("CARGO_PKG_DESCRIPTION")).as_str())
-            .args_from_usage("-a, --no-audio 'Removes audio sources'")
-            .args_from_usage("-b, --base-url=[http://localhost/] 'Sets custom base URL'")
+            .args_from_usage("-a, --no-audio 'Remove audio sources'")
+            .args_from_usage("-b, --base-url=[http://localhost/] 'Set custom base URL'")
             .args_from_usage(
                 "-B, --blacklist-domains 'Treat list of specified domains as blacklist'",
             )
-            .args_from_usage("-c, --no-css 'Removes CSS'")
-            .args_from_usage("-C, --charset=[UTF-8] 'Enforces custom encoding'")
+            .args_from_usage("-c, --no-css 'Remove CSS'")
+            .args_from_usage("-C, --cookies=[cookies.txt] 'Specify cookie file'")
             .arg(
                 Arg::with_name("domains")
                     .short('d')
@@ -65,23 +69,24 @@ impl Options {
                     .help("Specify domains to use for white/black-listing"),
             )
             .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
-            .args_from_usage("-f, --no-frames 'Removes frames and iframes'")
-            .args_from_usage("-F, --no-fonts 'Removes fonts'")
-            .args_from_usage("-i, --no-images 'Removes images'")
-            .args_from_usage("-I, --isolate 'Cuts off document from the Internet'")
-            .args_from_usage("-j, --no-js 'Removes JavaScript'")
-            .args_from_usage("-k, --insecure 'Allows invalid X.509 (TLS) certificates'")
-            .args_from_usage("-M, --no-metadata 'Excludes timestamp and source information'")
+            .args_from_usage("-E, --encoding=[UTF-8] 'Enforce custom charset'")
+            .args_from_usage("-f, --no-frames 'Remove frames and iframes'")
+            .args_from_usage("-F, --no-fonts 'Remove fonts'")
+            .args_from_usage("-i, --no-images 'Remove images'")
+            .args_from_usage("-I, --isolate 'Cut off document from the Internet'")
+            .args_from_usage("-j, --no-js 'Remove JavaScript'")
+            .args_from_usage("-k, --insecure 'Allow invalid X.509 (TLS) certificates'")
+            .args_from_usage("-M, --no-metadata 'Exclude timestamp and source information'")
             .args_from_usage(
-                "-n, --unwrap-noscript 'Replaces NOSCRIPT elements with their contents'",
+                "-n, --unwrap-noscript 'Replace NOSCRIPT elements with their contents'",
             )
             .args_from_usage(
-                "-o, --output=[document.html] 'Writes output to <file>, use - for STDOUT'",
+                "-o, --output=[document.html] 'Write output to <file>, use - for STDOUT'",
             )
-            .args_from_usage("-s, --silent 'Suppresses verbosity'")
-            .args_from_usage("-t, --timeout=[60] 'Adjusts network request timeout'")
-            .args_from_usage("-u, --user-agent=[Firefox] 'Sets custom User-Agent string'")
-            .args_from_usage("-v, --no-video 'Removes video sources'")
+            .args_from_usage("-s, --silent 'Suppress verbosity'")
+            .args_from_usage("-t, --timeout=[60] 'Adjust network request timeout'")
+            .args_from_usage("-u, --user-agent=[Firefox] 'Set custom User-Agent string'")
+            .args_from_usage("-v, --no-video 'Remove video sources'")
             .arg(
                 Arg::with_name("target")
                     .required(true)
@@ -103,8 +108,11 @@ impl Options {
         }
         options.blacklist_domains = app.is_present("blacklist-domains");
         options.no_css = app.is_present("no-css");
-        if let Some(charset) = app.value_of("charset") {
-            options.charset = Some(charset.to_string());
+        if let Some(cookie_file) = app.value_of("cookies") {
+            options.cookie_file = Some(cookie_file.to_string());
+        }
+        if let Some(encoding) = app.value_of("encoding") {
+            options.encoding = Some(encoding.to_string());
         }
         if let Some(domains) = app.get_many::<String>("domains") {
             let list_of_domains: Vec<String> = domains.map(|v| v.clone()).collect::<Vec<_>>();

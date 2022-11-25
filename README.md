@@ -137,9 +137,10 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
  - `-b`: Use custom `base URL`
  - `-B`: Forbid retrieving assets from specified domain(s)
  - `-c`: Exclude CSS
- - `-C`: Save document using custom `charset`
+ - `-C`: Read cookies from `file`
  - `-d`: Allow retrieving assets only from specified `domain(s)`
  - `-e`: Ignore network errors
+ - `-E`: Save document using custom `encoding`
  - `-f`: Omit frames
  - `-F`: Exclude web fonts
  - `-i`: Remove images
