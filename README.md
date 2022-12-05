@@ -54,6 +54,18 @@ snap install monolith
 guix install monolith
 ```
 
+#### Using [AUR](https://aur.archlinux.org/packages/monolith) (Arch Linux)
+
+```console
+yay monolith
+```
+
+#### Using [aports](https://pkgs.alpinelinux.org/packages?name=monolith) (Alpine Linux)
+
+```console
+apk add monolith
+```
+
 #### Using [FreeBSD packages](https://svnweb.freebsd.org/ports/head/www/monolith/) (FreeBSD)
 
 ```console
