@@ -36,6 +36,12 @@ cargo install monolith
 brew install monolith
 ```
 
+#### Via [Chocolatey](https://community.chocolatey.org/packages/monolith) (Windows)
+
+```console
+choco install monolith
+```
+
 #### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
 
 ```console
