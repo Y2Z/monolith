@@ -1,5 +1,8 @@
 use clap::{App, Arg, ArgAction};
+use once_cell::sync::Lazy;
 use std::env;
+
+pub static OPTIONS: Lazy<Options> = Lazy::new(Options::from_args);
 
 #[derive(Default)]
 pub struct Options {
@@ -27,7 +30,7 @@ pub struct Options {
     pub unwrap_noscript: bool,
 }
 
-const ASCII: &'static str = " \
+const ASCII: &str = " \
  _____     ______________    __________      ___________________    ___
 |     \\   /              \\  |          |    |                   |  |   |
 |      \\_/       __       \\_|    __    |    |    ___     ___    |__|   |
@@ -37,13 +40,13 @@ const ASCII: &'static str = " \
 |___|       |__________|  \\_____________________|   |___|   |___|  |___|
 ";
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
-const DEFAULT_USER_AGENT: &'static str =
+const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
 const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 const ENV_VAR_TERM: &str = "TERM";
 
 impl Options {
-    pub fn from_args() -> Options {
+    fn from_args() -> Options {
         let app = App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
             .author(format!("\n{}\n\n", env!("CARGO_PKG_AUTHORS").replace(':', "\n")).as_str())
@@ -107,7 +110,7 @@ impl Options {
             options.charset = Some(charset.to_string());
         }
         if let Some(domains) = app.get_many::<String>("domains") {
-            let list_of_domains: Vec<String> = domains.map(|v| v.clone()).collect::<Vec<_>>();
+            let list_of_domains: Vec<String> = domains.cloned().collect::<Vec<_>>();
             options.domains = Some(list_of_domains);
         }
         options.ignore_errors = app.is_present("ignore-errors");

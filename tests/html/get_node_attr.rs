@@ -7,14 +7,14 @@
 
 #[cfg(test)]
 mod passing {
-    use html5ever::rcdom::{Handle, NodeData};
+    use markup5ever_rcdom::{Handle, NodeData};
 
     use monolith::html;
 
     #[test]
     fn div_two_style_attributes() {
         let html = "<!doctype html><html><head></head><body><DIV STYLE=\"color: blue;\" style=\"display: none;\"></div></body></html>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(&html.as_bytes(), "".to_string());
         let mut count = 0;
 
         fn test_walk(node: &Handle, i: &mut i8) {

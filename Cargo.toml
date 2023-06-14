@@ -8,7 +8,7 @@ authors = [
     "Emi Simpson <emi@alchemi.dev>",
     "rhysd <lin90162@yahoo.co.jp>",
 ]
-edition = "2018"
+edition = "2021"
 description = "CLI tool for saving web pages as a single HTML file"
 homepage = "https://github.com/Y2Z/monolith"
 repository = "https://github.com/Y2Z/monolith"
@@ -26,16 +26,18 @@ atty = "0.2.14" # Used for highlighting network errors
 base64 = "0.13.0" # Used for integrity attributes
 chrono = "0.4.20" # Used for formatting creation timestamp
 clap = "3.2.16"
-cssparser = "0.29.6"
-encoding_rs = "0.8.31"
-html5ever = "0.24.1"
-percent-encoding = "2.1.0"
-sha2 = "0.10.2" # Used for calculating checksums during integrity checks
-url = "2.2.2"
+cssparser = "0.31.2"
+encoding_rs = "0.8.32"
+html5ever = "0.26.0"
+markup5ever_rcdom = "0.2.0"
+once_cell = "*"
+percent-encoding = "2.3.0"
+sha2 = "0.10.6" # Used for calculating checksums during integrity checks
+url = "2.4.0"
 
 # Used for parsing srcset and NOSCRIPT
 [dependencies.regex]
-version = "1.6.0"
+version = "1.8.4"
 default-features = false
 features = ["std", "perf-dfa", "unicode-perl"]
 

@@ -8,8 +8,7 @@
 #[cfg(test)]
 mod passing {
     use html5ever::serialize::{serialize, SerializeOpts};
-    use reqwest::blocking::Client;
-    use std::collections::HashMap;
+    use markup5ever_rcdom::SerializableHandle;
     use url::Url;
 
     use monolith::html;
@@ -18,8 +17,6 @@ mod passing {
 
     #[test]
     fn basic() {
-        let cache = &mut HashMap::new();
-
         let html: &str = "<div><P></P></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
@@ -27,12 +24,15 @@ mod passing {
         let mut options = Options::default();
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -45,17 +45,19 @@ mod passing {
         let html = "<div><P></P><iframe src=\"\"></iframe></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -68,17 +70,19 @@ mod passing {
         let html = "<frameset><frame src=\"\"></frameset>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -96,18 +100,20 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_css = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -132,18 +138,20 @@ mod passing {
                     <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -169,18 +177,20 @@ mod passing {
             "<body background=\"no/such/image.png\" background=\"no/such/image2.png\"></body>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -193,18 +203,20 @@ mod passing {
         let html = "<frameset><frame src=\"http://trackbook.com\"></frameset>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_frames = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -225,18 +237,20 @@ mod passing {
         let html = "<iframe src=\"http://trackbook.com\"></iframe>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_frames = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -261,18 +275,20 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_js = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -296,17 +312,19 @@ mod passing {
                     <link integrity=\"sha384-12345\" rel=\"something\" href=\"https://some-site.com/some-file.ext\" />";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -331,19 +349,21 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_css = true;
         options.no_js = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -369,19 +389,21 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_css = true;
         options.no_js = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -413,7 +435,6 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_css = true;
@@ -422,12 +443,15 @@ mod passing {
         options.no_images = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -455,18 +479,20 @@ mod passing {
         </html>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
@@ -491,17 +517,19 @@ mod passing {
         let html = "<script id=\"data\" type=\"application/json\">{\"mono\":\"lith\"}</script>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut HashMap::new();
 
         let mut options = Options::default();
         options.silent = true;
 
-        let client = Client::new();
-
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(&url, &dom.document, &options, 0);
 
         let mut buf: Vec<u8> = Vec::new();
-        serialize(&mut buf, &dom.document, SerializeOpts::default()).unwrap();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document),
+            SerializeOpts::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),

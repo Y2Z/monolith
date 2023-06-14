@@ -7,9 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use reqwest::blocking::Client;
     use reqwest::Url;
-    use std::collections::HashMap;
 
     use monolith::html;
     use monolith::opts::Options;
@@ -17,20 +15,12 @@ mod passing {
 
     #[test]
     fn small_medium_large() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
         let srcset_value = "small.png 1x, medium.png 1.5x, large.png 2x";
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(
-            cache,
-            &client,
-            &Url::parse("data:,").unwrap(),
-            &srcset_value,
-            &options,
-            0,
-        );
+        let embedded_css =
+            html::embed_srcset(&Url::parse("data:,").unwrap(), srcset_value, &options, 0);
 
         assert_eq!(
             embedded_css,
@@ -43,20 +33,12 @@ mod passing {
 
     #[test]
     fn small_medium_only_medium_has_scale() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
         let srcset_value = "small.png, medium.png 1.5x";
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(
-            cache,
-            &client,
-            &Url::parse("data:,").unwrap(),
-            &srcset_value,
-            &options,
-            0,
-        );
+        let embedded_css =
+            html::embed_srcset(&Url::parse("data:,").unwrap(), srcset_value, &options, 0);
 
         assert_eq!(
             embedded_css,
@@ -66,20 +48,12 @@ mod passing {
 
     #[test]
     fn commas_within_file_names() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
         let srcset_value = "small,s.png 1x, large,l.png 2x";
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(
-            cache,
-            &client,
-            &Url::parse("data:,").unwrap(),
-            &srcset_value,
-            &options,
-            0,
-        );
+        let embedded_css =
+            html::embed_srcset(&Url::parse("data:,").unwrap(), srcset_value, &options, 0);
 
         assert_eq!(
             embedded_css,
@@ -89,20 +63,12 @@ mod passing {
 
     #[test]
     fn tabs_and_newlines_after_commas() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
         let srcset_value = "small,s.png 1x,\nmedium,m.png 2x,\nlarge,l.png 3x";
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(
-            cache,
-            &client,
-            &Url::parse("data:,").unwrap(),
-            &srcset_value,
-            &options,
-            0,
-        );
+        let embedded_css =
+            html::embed_srcset(&Url::parse("data:,").unwrap(), srcset_value, &options, 0);
 
         assert_eq!(
             embedded_css,
@@ -123,9 +89,7 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use reqwest::blocking::Client;
     use reqwest::Url;
-    use std::collections::HashMap;
 
     use monolith::html;
     use monolith::opts::Options;
@@ -133,20 +97,12 @@ mod failing {
 
     #[test]
     fn trailing_comma() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
         let srcset_value = "small.png 1x, large.png 2x,";
         let mut options = Options::default();
         options.no_images = true;
         options.silent = true;
-        let embedded_css = html::embed_srcset(
-            cache,
-            &client,
-            &Url::parse("data:,").unwrap(),
-            &srcset_value,
-            &options,
-            0,
-        );
+        let embedded_css =
+            html::embed_srcset(&Url::parse("data:,").unwrap(), srcset_value, &options, 0);
 
         assert_eq!(
             embedded_css,

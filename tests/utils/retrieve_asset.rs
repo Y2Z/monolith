@@ -7,9 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use reqwest::blocking::Client;
     use reqwest::Url;
-    use std::collections::HashMap;
     use std::env;
 
     use monolith::opts::Options;
@@ -18,17 +16,12 @@ mod passing {
 
     #[test]
     fn read_data_url() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
-
         let mut options = Options::default();
         options.silent = true;
 
         // If both source and target are data URLs,
         //  ensure the result contains target data URL
         let (data, final_url, media_type, charset) = utils::retrieve_asset(
-            cache,
-            &client,
             &Url::parse("data:text/html;base64,c291cmNl").unwrap(),
             &Url::parse("data:text/html;base64,dGFyZ2V0").unwrap(),
             &options,
@@ -49,9 +42,6 @@ mod passing {
 
     #[test]
     fn read_local_file_with_file_url_parent() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
-
         let mut options = Options::default();
         options.silent = true;
 
@@ -60,8 +50,6 @@ mod passing {
         // Inclusion of local assets from local sources should be allowed
         let cwd = env::current_dir().unwrap();
         let (data, final_url, media_type, charset) = utils::retrieve_asset(
-            cache,
-            &client,
             &Url::parse(&format!(
                 "{file}{cwd}/tests/_data_/basic/local-file.html",
                 file = file_url_protocol,
@@ -102,25 +90,18 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use reqwest::blocking::Client;
     use reqwest::Url;
-    use std::collections::HashMap;
 
     use monolith::opts::Options;
     use monolith::utils;
 
     #[test]
     fn read_local_file_with_data_url_parent() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
-
         let mut options = Options::default();
         options.silent = true;
 
         // Inclusion of local assets from data URL sources should not be allowed
         match utils::retrieve_asset(
-            cache,
-            &client,
             &Url::parse("data:text/html;base64,SoUrCe").unwrap(),
             &Url::parse("file:///etc/passwd").unwrap(),
             &options,
@@ -137,16 +118,11 @@ mod failing {
 
     #[test]
     fn read_local_file_with_https_parent() {
-        let cache = &mut HashMap::new();
-        let client = Client::new();
-
         let mut options = Options::default();
         options.silent = true;
 
         // Inclusion of local assets from remote sources should not be allowed
         match utils::retrieve_asset(
-            cache,
-            &client,
             &Url::parse("https://kernel.org/").unwrap(),
             &Url::parse("file:///etc/passwd").unwrap(),
             &options,

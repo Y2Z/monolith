@@ -1,15 +1,18 @@
+use once_cell::sync::Lazy;
 use reqwest::blocking::Client;
-use reqwest::header::CONTENT_TYPE;
+use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, USER_AGENT};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::Duration;
 use url::Url;
 
-use crate::opts::Options;
+use crate::opts::{Options, OPTIONS};
 use crate::url::{clean_url, parse_data_url};
 
-const ANSI_COLOR_RED: &'static str = "\x1b[31m";
-const ANSI_COLOR_RESET: &'static str = "\x1b[0m";
+const ANSI_COLOR_RED: &str = "\x1b[31m";
+const ANSI_COLOR_RESET: &str = "\x1b[0m";
 const MAGIC: [[&[u8]; 2]; 18] = [
     // Image
     [b"GIF87a", b"image/gif"],
@@ -38,6 +41,31 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "application/json",
     "image/svg+xml",
 ];
+
+static CLIENT: Lazy<Client> = Lazy::new(|| {
+    let mut header_map = HeaderMap::new();
+    if let Some(user_agent) = &OPTIONS.user_agent {
+        header_map.insert(
+            USER_AGENT,
+            HeaderValue::from_str(user_agent).expect("Invalid User-Agent header specified"),
+        );
+    }
+
+    if OPTIONS.timeout > 0 {
+        Client::builder().timeout(Duration::from_secs(OPTIONS.timeout))
+    } else {
+        Client::builder()
+    }
+    .danger_accept_invalid_certs(OPTIONS.insecure)
+    .default_headers(header_map)
+    .build()
+    .expect("Failed to initialize HTTP client")
+});
+
+static CACHE: Lazy<Mutex<HashMap<String, Vec<u8>>>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    Mutex::new(m)
+});
 
 pub fn detect_media_type(data: &[u8], url: &Url) -> String {
     // At first attempt to read file's header
@@ -93,7 +121,7 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
 }
 
 pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> bool {
-    if domain_to_match_against.len() == 0 {
+    if domain_to_match_against.is_empty() {
         return false;
     }
 
@@ -101,12 +129,12 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
         return true;
     }
 
-    let domain_partials: Vec<&str> = domain.trim_end_matches(".").rsplit(".").collect();
+    let domain_partials: Vec<&str> = domain.trim_end_matches('.').rsplit('.').collect();
     let domain_to_match_against_partials: Vec<&str> = domain_to_match_against
-        .trim_end_matches(".")
-        .rsplit(".")
+        .trim_end_matches('.')
+        .rsplit('.')
         .collect();
-    let domain_to_match_against_starts_with_a_dot = domain_to_match_against.starts_with(".");
+    let domain_to_match_against_starts_with_a_dot = domain_to_match_against.starts_with('.');
 
     let mut i: usize = 0;
     let l: usize = std::cmp::max(
@@ -137,7 +165,7 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
 
         let parts_match = domain_to_match_against_partial.eq_ignore_ascii_case(domain_partial);
 
-        if !parts_match && domain_to_match_against_partial.len() != 0 {
+        if !parts_match && !domain_to_match_against_partial.is_empty() {
             ok = false;
             break;
         }
@@ -172,29 +200,22 @@ pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
 
     // Parse meta data
     let content_type_items: Vec<&str> = content_type.split(';').collect();
-    let mut i: i8 = 0;
-    for item in &content_type_items {
+    for (i, item) in (0_i8..).zip(content_type_items.iter()) {
         if i == 0 {
-            if item.trim().len() > 0 {
+            if !item.trim().is_empty() {
                 media_type = item.trim().to_string();
             }
-        } else {
-            if item.trim().eq_ignore_ascii_case("base64") {
-                is_base64 = true;
-            } else if item.trim().starts_with("charset=") {
-                charset = item.trim().chars().skip(8).collect();
-            }
+        } else if item.trim().eq_ignore_ascii_case("base64") {
+            is_base64 = true;
+        } else if item.trim().starts_with("charset=") {
+            charset = item.trim().chars().skip(8).collect();
         }
-
-        i += 1;
     }
 
     (media_type, charset, is_base64)
 }
 
 pub fn retrieve_asset(
-    cache: &mut HashMap<String, Vec<u8>>,
-    client: &Client,
     parent_url: &Url,
     url: &Url,
     options: &Options,
@@ -208,11 +229,10 @@ pub fn retrieve_asset(
         if parent_url.scheme() != "file" {
             if !options.silent {
                 eprintln!(
-                    "{}{}{} ({}){}",
+                    "{}{}{} (Security Error){}",
                     indent(depth).as_str(),
                     if options.no_color { "" } else { ANSI_COLOR_RED },
                     &url,
-                    "Security Error",
                     if options.no_color {
                         ""
                     } else {
@@ -221,10 +241,10 @@ pub fn retrieve_asset(
                 );
             }
             // Provoke error
-            client.get("").send()?;
+            CLIENT.get("").send()?;
         }
 
-        let path_buf: PathBuf = url.to_file_path().unwrap().clone();
+        let path_buf: PathBuf = url.to_file_path().unwrap();
         let path: &Path = path_buf.as_path();
         if path.exists() {
             if path.is_dir() {
@@ -243,20 +263,16 @@ pub fn retrieve_asset(
                 }
 
                 // Provoke error
-                Err(client.get("").send().unwrap_err())
+                Err(CLIENT.get("").send().unwrap_err())
             } else {
                 if !options.silent {
                     eprintln!("{}{}", indent(depth).as_str(), &url);
                 }
 
-                let file_blob: Vec<u8> = fs::read(&path).expect("Unable to read file");
+                let file_blob: Vec<u8> = fs::read(path).expect("Unable to read file");
+                let file_type = detect_media_type(&file_blob, url);
 
-                Ok((
-                    file_blob.clone(),
-                    url.clone(),
-                    detect_media_type(&file_blob, url),
-                    "".to_string(),
-                ))
+                Ok((file_blob, url.clone(), file_type, "".to_string()))
             }
         } else {
             if !options.silent {
@@ -274,19 +290,19 @@ pub fn retrieve_asset(
             }
 
             // Provoke error
-            Err(client.get("").send().unwrap_err())
+            Err(CLIENT.get("").send().unwrap_err())
         }
     } else {
         let cache_key: String = clean_url(url.clone()).as_str().to_string();
 
-        if cache.contains_key(&cache_key) {
+        if CACHE.lock().unwrap().contains_key(&cache_key) {
             // URL is in cache, we get and return it
             if !options.silent {
                 eprintln!("{}{} (from cache)", indent(depth).as_str(), &url);
             }
 
             Ok((
-                cache.get(&cache_key).unwrap().to_vec(),
+                CACHE.lock().unwrap().get(&cache_key).unwrap().to_vec(),
                 url.clone(),
                 "".to_string(),
                 "".to_string(),
@@ -295,16 +311,16 @@ pub fn retrieve_asset(
             if let Some(domains) = &options.domains {
                 let domain_matches = domains
                     .iter()
-                    .any(|d| domain_is_within_domain(url.host_str().unwrap(), &d.trim()));
+                    .any(|d| domain_is_within_domain(url.host_str().unwrap(), d.trim()));
                 if (options.blacklist_domains && domain_matches)
                     || (!options.blacklist_domains && !domain_matches)
                 {
-                    return Err(client.get("").send().unwrap_err());
+                    return Err(CLIENT.get("").send().unwrap_err());
                 }
             }
 
             // URL not in cache, we retrieve the file
-            match client.get(url.as_str()).send() {
+            match CLIENT.get(url.as_str()).send() {
                 Ok(response) => {
                     if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
                         if !options.silent {
@@ -322,7 +338,7 @@ pub fn retrieve_asset(
                             );
                         }
                         // Provoke error
-                        return Err(client.get("").send().unwrap_err());
+                        return Err(CLIENT.get("").send().unwrap_err());
                     }
 
                     let response_url: Url = response.url().clone();
@@ -344,7 +360,7 @@ pub fn retrieve_asset(
                         .and_then(|header| header.to_str().ok())
                         .unwrap_or("");
 
-                    let (media_type, charset, _is_base64) = parse_content_type(&content_type);
+                    let (media_type, charset, _is_base64) = parse_content_type(content_type);
 
                     // Convert response into a byte array
                     let mut data: Vec<u8> = vec![];
@@ -370,7 +386,7 @@ pub fn retrieve_asset(
                     }
 
                     // Add retrieved resource to cache
-                    cache.insert(new_cache_key, data.clone());
+                    CACHE.lock().unwrap().insert(new_cache_key, data.clone());
 
                     // Return
                     Ok((data, response_url, media_type, charset))
@@ -391,7 +407,7 @@ pub fn retrieve_asset(
                         );
                     }
 
-                    Err(client.get("").send().unwrap_err())
+                    Err(CLIENT.get("").send().unwrap_err())
                 }
             }
         }

@@ -4,11 +4,11 @@ use url::Url;
 
 use crate::utils::{detect_media_type, parse_content_type};
 
-pub const EMPTY_IMAGE_DATA_URL: &'static str = "data:image/png;base64,\
+pub const EMPTY_IMAGE_DATA_URL: &str = "data:image/png;base64,\
 iVBORw0KGgoAAAANSUhEUgAAAA0AAAANCAQAAADY4iz3AAAAEUlEQVR42mNkwAkYR6UolgIACvgADsuK6xYAAAAASUVORK5CYII=";
 
 pub fn clean_url(url: Url) -> Url {
-    let mut url = url.clone();
+    let mut url = url;
 
     // Clear fragment (if any)
     url.set_fragment(None);
@@ -19,7 +19,7 @@ pub fn clean_url(url: Url) -> Url {
 pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset_url: &Url) -> Url {
     // TODO: move this block out of this function
     let media_type: String = if media_type.is_empty() {
-        detect_media_type(data, &final_asset_url)
+        detect_media_type(data, final_asset_url)
     } else {
         media_type.to_string()
     };
@@ -39,13 +39,11 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
 }
 
 pub fn is_url_and_has_protocol(input: &str) -> bool {
-    match Url::parse(&input) {
+    match Url::parse(input) {
         Ok(parsed_url) => {
-            return parsed_url.scheme().len() > 0;
+            return !parsed_url.scheme().is_empty();
         }
-        Err(_) => {
-            return false;
-        }
+        Err(_) => false,
     }
 }
 
@@ -72,7 +70,7 @@ pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
 }
 
 pub fn resolve_url(from: &Url, to: &str) -> Url {
-    match Url::parse(&to) {
+    match Url::parse(to) {
         Ok(parsed_url) => parsed_url,
         Err(_) => match from.join(to) {
             Ok(joined) => joined,

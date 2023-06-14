@@ -16,7 +16,7 @@ mod passing {
     #[test]
     fn properly_save_document_with_gb2312() {
         let cwd = env::current_dir().unwrap();
-        let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
+        let cwd_normalized: String = cwd.to_str().unwrap().replace('\\', "/");
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
@@ -111,7 +111,7 @@ mod passing {
     #[test]
     fn properly_save_document_with_gb2312_custom_charset() {
         let cwd = env::current_dir().unwrap();
-        let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
+        let cwd_normalized: String = cwd.to_str().unwrap().replace('\\', "/");
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
@@ -198,7 +198,7 @@ mod failing {
     #[test]
     fn change_iso88591_to_utf8_to_properly_display_html_entities() {
         let cwd = env::current_dir().unwrap();
-        let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
+        let cwd_normalized: String = cwd.to_str().unwrap().replace('\\', "/");
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")

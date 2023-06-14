@@ -23,7 +23,7 @@ mod passing {
             .unwrap()
             .to_str()
             .unwrap()
-            .replace("\\", "/");
+            .replace('\\', "/");
         let out = cmd
             .arg("-M")
             .arg(format!(
@@ -88,7 +88,7 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "{file_url_html}\n",
-                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
+                file_url_html = Url::from_file_path(fs::canonicalize(path_html).unwrap()).unwrap(),
             )
         );
 
@@ -124,7 +124,7 @@ mod passing {
             .unwrap()
             .to_str()
             .unwrap()
-            .replace("\\", "/");
+            .replace('\\', "/");
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
         let out = cmd
             .arg("-M")
@@ -188,8 +188,8 @@ mod passing {
                 {file_url_html}\n \
                 {file_url_svg}\n\
                 ",
-                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
-                file_url_svg = Url::from_file_path(fs::canonicalize(&path_svg).unwrap()).unwrap(),
+                file_url_html = Url::from_file_path(fs::canonicalize(path_html).unwrap()).unwrap(),
+                file_url_svg = Url::from_file_path(fs::canonicalize(path_svg).unwrap()).unwrap(),
             )
         );
 
@@ -210,24 +210,16 @@ mod passing {
             .unwrap()
             .to_str()
             .unwrap()
-            .replace("\\", "/");
+            .replace('\\', "/");
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
         let out = cmd
             .arg("-M")
             .arg("-i")
-            .arg(if cfg!(windows) {
-                format!(
-                    "{file}{cwd}/tests/_data_/integrity/index.html",
-                    file = file_url_protocol,
-                    cwd = cwd_normalized,
-                )
-            } else {
-                format!(
-                    "{file}{cwd}/tests/_data_/integrity/index.html",
-                    file = file_url_protocol,
-                    cwd = cwd_normalized,
-                )
-            })
+            .arg(format!(
+                "{file}{cwd}/tests/_data_/integrity/index.html",
+                file = file_url_protocol,
+                cwd = cwd_normalized,
+            ))
             .output()
             .unwrap();
 

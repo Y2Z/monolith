@@ -1,20 +1,16 @@
 use encoding_rs::Encoding;
-use html5ever::rcdom::RcDom;
-use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
-use std::collections::HashMap;
+use markup5ever_rcdom::RcDom;
 use std::fs;
 use std::io::{self, prelude::*, Error, Write};
 use std::path::Path;
 use std::process;
-use std::time::Duration;
 use url::Url;
 
 use monolith::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, has_favicon, html_to_dom,
     serialize_document, set_base_url, set_charset, walk_and_embed_assets,
 };
-use monolith::opts::Options;
+use monolith::opts::OPTIONS;
 use monolith::url::{create_data_url, resolve_url};
 use monolith::utils::retrieve_asset;
 
@@ -32,13 +28,13 @@ impl Output {
         }
     }
 
-    fn write(&mut self, bytes: &Vec<u8>) -> Result<(), Error> {
+    fn write(&mut self, bytes: &[u8]) -> Result<(), Error> {
         match self {
             Output::Stdout(stdout) => {
                 stdout.write_all(bytes)?;
                 // Ensure newline at end of output
                 if bytes.last() != Some(&b"\n"[0]) {
-                    stdout.write(b"\n")?;
+                    stdout.write_all(b"\n")?;
                 }
                 stdout.flush()
             }
@@ -46,7 +42,7 @@ impl Output {
                 file.write_all(bytes)?;
                 // Ensure newline at end of output
                 if bytes.last() != Some(&b"\n"[0]) {
-                    file.write(b"\n")?;
+                    file.write_all(b"\n")?;
                 }
                 file.flush()
             }
@@ -64,19 +60,17 @@ pub fn read_stdin() -> Vec<u8> {
 }
 
 fn main() {
-    let options = Options::from_args();
-
     // Check if target was provided
-    if options.target.len() == 0 {
-        if !options.silent {
+    if OPTIONS.target.is_empty() {
+        if !OPTIONS.silent {
             eprintln!("No target specified");
         }
         process::exit(1);
     }
 
     // Check if custom charset is valid
-    if let Some(custom_charset) = options.charset.clone() {
-        if !Encoding::for_label_no_replacement(custom_charset.as_bytes()).is_some() {
+    if let Some(custom_charset) = &OPTIONS.charset {
+        if Encoding::for_label_no_replacement(custom_charset.as_bytes()).is_none() {
             eprintln!("Unknown encoding: {}", &custom_charset);
             process::exit(1);
         }
@@ -84,18 +78,18 @@ fn main() {
 
     let mut use_stdin: bool = false;
 
-    let target_url = match options.target.as_str() {
+    let target_url = match OPTIONS.target.as_str() {
         "-" => {
             // Read from pipe (stdin)
             use_stdin = true;
             // Set default target URL to an empty data URL; the user can set it via --base-url
             Url::parse("data:text/html,").unwrap()
         }
-        target => match Url::parse(&target) {
+        target => match Url::parse(target) {
             Ok(url) => match url.scheme() {
                 "data" | "file" | "http" | "https" => url,
                 unsupported_scheme => {
-                    if !options.silent {
+                    if !OPTIONS.silent {
                         eprintln!("Unsupported target URL type: {}", unsupported_scheme);
                     }
                     process::exit(1)
@@ -107,11 +101,11 @@ fn main() {
                 match path.exists() {
                     true => match path.is_file() {
                         true => {
-                            let canonical_path = fs::canonicalize(&path).unwrap();
+                            let canonical_path = fs::canonicalize(path).unwrap();
                             match Url::from_file_path(canonical_path) {
                                 Ok(url) => url,
                                 Err(_) => {
-                                    if !options.silent {
+                                    if !OPTIONS.silent {
                                         eprintln!(
                                             "Could not generate file URL out of given path: {}",
                                             &target
@@ -122,7 +116,7 @@ fn main() {
                             }
                         }
                         false => {
-                            if !options.silent {
+                            if !OPTIONS.silent {
                                 eprintln!("Local target is not a file: {}", &target);
                             }
                             process::exit(1);
@@ -139,26 +133,6 @@ fn main() {
         },
     };
 
-    // Initialize client
-    let mut cache = HashMap::new();
-    let mut header_map = HeaderMap::new();
-    if let Some(user_agent) = &options.user_agent {
-        header_map.insert(
-            USER_AGENT,
-            HeaderValue::from_str(&user_agent).expect("Invalid User-Agent header specified"),
-        );
-    }
-    let client = if options.timeout > 0 {
-        Client::builder().timeout(Duration::from_secs(options.timeout))
-    } else {
-        // No timeout is default
-        Client::builder()
-    }
-    .danger_accept_invalid_certs(options.insecure)
-    .default_headers(header_map)
-    .build()
-    .expect("Failed to initialize HTTP client");
-
     // At first we assume that base URL is the same as target URL
     let mut base_url: Url = target_url.clone();
 
@@ -173,7 +147,7 @@ fn main() {
         || (target_url.scheme() == "http" || target_url.scheme() == "https")
         || target_url.scheme() == "data"
     {
-        match retrieve_asset(&mut cache, &client, &target_url, &target_url, &options, 0) {
+        match retrieve_asset(&target_url, &target_url, &OPTIONS, 0) {
             Ok((retrieved_data, final_url, media_type, charset)) => {
                 // Provide output as text without processing it, the way browsers do
                 if !media_type.eq_ignore_ascii_case("text/html")
@@ -181,7 +155,7 @@ fn main() {
                 {
                     // Define output
                     let mut output =
-                        Output::new(&options.output).expect("Could not prepare output");
+                        Output::new(&OPTIONS.output).expect("Could not prepare output");
 
                     // Write retrieved data into STDOUT or file
                     output
@@ -192,7 +166,7 @@ fn main() {
                     process::exit(0);
                 }
 
-                if options
+                if OPTIONS
                     .base_url
                     .clone()
                     .unwrap_or("".to_string())
@@ -205,7 +179,7 @@ fn main() {
                 document_encoding = charset;
             }
             Err(_) => {
-                if !options.silent {
+                if !OPTIONS.silent {
                     eprintln!("Could not retrieve target document");
                 }
                 process::exit(1);
@@ -233,7 +207,7 @@ fn main() {
     }
 
     // Use custom base URL if specified, read and use what's in the DOM otherwise
-    let custom_base_url: String = options.base_url.clone().unwrap_or("".to_string());
+    let custom_base_url: String = OPTIONS.base_url.clone().unwrap_or("".to_string());
     if custom_base_url.is_empty() {
         // No custom base URL is specified
         // Try to see if document has BASE element
@@ -260,12 +234,12 @@ fn main() {
                     // Relative paths could work for documents saved from filesystem
                     let path: &Path = Path::new(&custom_base_url);
                     if path.exists() {
-                        match Url::from_file_path(fs::canonicalize(&path).unwrap()) {
+                        match Url::from_file_path(fs::canonicalize(path).unwrap()) {
                             Ok(file_url) => {
                                 base_url = file_url;
                             }
                             Err(_) => {
-                                if !options.silent {
+                                if !OPTIONS.silent {
                                     eprintln!(
                                         "Could not map given path to base URL: {}",
                                         custom_base_url
@@ -281,57 +255,50 @@ fn main() {
     }
 
     // Traverse through the document and embed remote assets
-    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options, 0);
+    walk_and_embed_assets(&base_url, &dom.document, &OPTIONS, 0);
 
     // Update or add new BASE element to reroute network requests and hash-links
-    if let Some(new_base_url) = options.base_url.clone() {
+    if let Some(new_base_url) = OPTIONS.base_url.clone() {
         dom = set_base_url(&dom.document, new_base_url);
     }
 
     // Request and embed /favicon.ico (unless it's already linked in the document)
-    if !options.no_images
+    if !OPTIONS.no_images
         && (target_url.scheme() == "http" || target_url.scheme() == "https")
         && !has_favicon(&dom.document)
     {
         let favicon_ico_url: Url = resolve_url(&base_url, "/favicon.ico");
 
-        match retrieve_asset(
-            &mut cache,
-            &client,
-            &target_url,
-            &favicon_ico_url,
-            &options,
-            0,
-        ) {
+        match retrieve_asset(&target_url, &favicon_ico_url, &OPTIONS, 0) {
             Ok((data, final_url, media_type, charset)) => {
                 let favicon_data_url: Url =
                     create_data_url(&media_type, &charset, &data, &final_url);
                 dom = add_favicon(&dom.document, favicon_data_url.to_string());
             }
             Err(_) => {
-                // Failed to retrieve /favicon.ico
+                eprintln!("Failed to retrieve /favicon.ico");
             }
         }
     }
 
     // Save using specified charset, if given
-    if let Some(custom_charset) = options.charset.clone() {
+    if let Some(custom_charset) = OPTIONS.charset.clone() {
         document_encoding = custom_charset;
         dom = set_charset(dom, document_encoding.clone());
     }
 
     // Serialize DOM tree
-    let mut result: Vec<u8> = serialize_document(dom, document_encoding, &options);
+    let mut result: Vec<u8> = serialize_document(dom, document_encoding, &OPTIONS);
 
     // Prepend metadata comment tag
-    if !options.no_metadata {
+    if !OPTIONS.no_metadata {
         let mut metadata_comment: String = create_metadata_tag(&target_url);
         metadata_comment += "\n";
         result.splice(0..0, metadata_comment.as_bytes().to_vec());
     }
 
     // Define output
-    let mut output = Output::new(&options.output).expect("Could not prepare output");
+    let mut output = Output::new(&OPTIONS.output).expect("Could not prepare output");
 
     // Write result into STDOUT or file
     output.write(&result).expect("Could not write output");
