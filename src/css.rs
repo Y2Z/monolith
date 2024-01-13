@@ -88,8 +88,8 @@ pub fn process_css<'a>(
 ) -> Result<String, ParseError<'a, String>> {
     let mut result: String = "".to_string();
 
-    let mut curr_rule: String = rule_name.clone().to_string();
-    let mut curr_prop: String = prop_name.clone().to_string();
+    let mut curr_rule: String = rule_name.to_string();
+    let mut curr_prop: String = prop_name.to_string();
     let mut token: &Token;
     let mut token_offset: SourcePosition;
 
