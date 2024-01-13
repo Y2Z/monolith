@@ -22,27 +22,28 @@ include = [
 license = "CC0-1.0"
 
 [dependencies]
-atty = "0.2.14" # Used for highlighting network errors
-base64 = "0.13.0" # Used for integrity attributes
-chrono = "0.4.20" # Used for formatting creation timestamp
-clap = "3.2.16"
-cssparser = "0.29.6"
-encoding_rs = "0.8.31"
-html5ever = "0.24.1"
-percent-encoding = "2.1.0"
-sha2 = "0.10.2" # Used for calculating checksums during integrity checks
-url = "2.2.2"
+atty = "0.2.14"  # Used for highlighting network errors
+base64 = "0.21.7"  # Used for integrity attributes
+chrono = "0.4.31"  # Used for formatting creation timestamp
+clap = "3.2.25"  # Used for processing CLI arguments
+cssparser = "0.33.0"  # Used for dealing with CSS
+encoding_rs = "0.8.33"  # Used for parsing and converting document charsets
+html5ever = "0.24.1"  # Used for all things DOM
+percent-encoding = "2.3.1"
+sha2 = "0.10.8"  # Used for calculating checksums during integrity checks
+url = "2.5.0"
 
 # Used for parsing srcset and NOSCRIPT
 [dependencies.regex]
-version = "1.6.0"
+version = "1.10.2"
 default-features = false
 features = ["std", "perf-dfa", "unicode-perl"]
 
+# Used for making network requests
 [dependencies.reqwest]
-version = "0.11.11"
+version = "0.11.23"
 default-features = false
 features = ["default-tls", "blocking", "gzip", "brotli", "deflate"]
 
 [dev-dependencies]
-assert_cmd = "2.0.4"
+assert_cmd = "2.0.13"
