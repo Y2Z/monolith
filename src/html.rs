@@ -601,7 +601,7 @@ pub fn retrieve_and_embed_asset(
     options: &Options,
     depth: u32,
 ) {
-    let resolved_url: Url = resolve_url(document_url, attr_value.clone());
+    let resolved_url: Url = resolve_url(document_url, attr_value);
 
     match retrieve_asset(
         cache,
