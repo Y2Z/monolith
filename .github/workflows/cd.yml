@@ -27,7 +27,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
   gnu_linux_armhf:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
@@ -60,7 +60,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
   gnu_linux_aarch64:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
@@ -93,7 +93,7 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
   gnu_linux_x86_64:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v2
