@@ -1,4 +1,4 @@
-use base64;
+use base64::prelude::*;
 use chrono::prelude::*;
 use encoding_rs::Encoding;
 use html5ever::interface::QualName;
@@ -65,15 +65,15 @@ pub fn check_integrity(data: &[u8], integrity: &str) -> bool {
     if integrity.starts_with("sha256-") {
         let mut hasher = Sha256::new();
         hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
+        BASE64_STANDARD.encode(hasher.finalize()) == integrity[7..]
     } else if integrity.starts_with("sha384-") {
         let mut hasher = Sha384::new();
         hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
+        BASE64_STANDARD.encode(hasher.finalize()) == integrity[7..]
     } else if integrity.starts_with("sha512-") {
         let mut hasher = Sha512::new();
         hasher.update(data);
-        base64::encode(hasher.finalize()) == integrity[7..]
+        BASE64_STANDARD.encode(hasher.finalize()) == integrity[7..]
     } else {
         false
     }
