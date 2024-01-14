@@ -143,6 +143,7 @@ cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
  - `-E`: Save document using custom `encoding`
  - `-f`: Omit frames
  - `-F`: Exclude web fonts
+ - `-h`: Print help information
  - `-i`: Remove images
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
