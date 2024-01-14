@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use html5ever::rcdom::{Handle, NodeData};
+    use markup5ever_rcdom::{Handle, NodeData};
 
     use monolith::html;
 

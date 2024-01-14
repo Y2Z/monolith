@@ -1,5 +1,5 @@
 use encoding_rs::Encoding;
-use html5ever::rcdom::RcDom;
+use markup5ever_rcdom::RcDom;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use std::collections::HashMap;

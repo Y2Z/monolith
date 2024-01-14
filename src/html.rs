@@ -3,11 +3,11 @@ use chrono::prelude::*;
 use encoding_rs::Encoding;
 use html5ever::interface::QualName;
 use html5ever::parse_document;
-use html5ever::rcdom::{Handle, NodeData, RcDom};
 use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::{format_tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
 use html5ever::{local_name, namespace_url, ns, LocalName};
+use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
 use regex::Regex;
 use reqwest::blocking::Client;
 use reqwest::Url;
@@ -32,8 +32,12 @@ const ICON_VALUES: &'static [&str] = &["icon", "shortcut icon"];
 
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
-    serialize(&mut buf, document, SerializeOpts::default())
-        .expect("unable to serialize DOM into buffer");
+    serialize(
+        &mut buf,
+        &SerializableHandle::from(document.clone()),
+        SerializeOpts::default(),
+    )
+    .expect("unable to serialize DOM into buffer");
 
     let mut dom = html_to_dom(&buf, "utf-8".to_string());
     let doc = dom.get_document();
@@ -428,8 +432,12 @@ pub fn is_icon(attr_value: &str) -> bool {
 
 pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
-    serialize(&mut buf, document, SerializeOpts::default())
-        .expect("unable to serialize DOM into buffer");
+    serialize(
+        &mut buf,
+        &SerializableHandle::from(document.clone()),
+        SerializeOpts::default(),
+    )
+    .expect("unable to serialize DOM into buffer");
 
     let mut dom = html_to_dom(&buf, "utf-8".to_string());
     let doc = dom.get_document();
@@ -534,7 +542,7 @@ pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>)
 
 pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &Options) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
-    let doc = dom.get_document();
+    let document = dom.get_document();
 
     if options.isolate
         || options.no_css
@@ -544,7 +552,7 @@ pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &O
         || options.no_images
     {
         // Take care of CSP
-        if let Some(html) = get_child_node_by_name(&doc, "html") {
+        if let Some(html) = get_child_node_by_name(&document, "html") {
             if let Some(head) = get_child_node_by_name(&html, "head") {
                 let meta = dom.create_element(
                     QualName::new(None, ns!(), local_name!("meta")),
@@ -570,8 +578,12 @@ pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &O
         }
     }
 
-    serialize(&mut buf, &doc, SerializeOpts::default())
-        .expect("Unable to serialize DOM into buffer");
+    serialize(
+        &mut buf,
+        &SerializableHandle::from(document.clone()),
+        SerializeOpts::default(),
+    )
+    .expect("Unable to serialize DOM into buffer");
 
     // Unwrap NOSCRIPT elements
     if options.unwrap_noscript {
@@ -660,7 +672,7 @@ pub fn retrieve_and_embed_asset(
                     let mut frame_data: Vec<u8> = Vec::new();
                     serialize(
                         &mut frame_data,
-                        &frame_dom.document,
+                        &SerializableHandle::from(frame_dom.document.clone()),
                         SerializeOpts::default(),
                     )
                     .unwrap();
@@ -1198,8 +1210,12 @@ pub fn walk_and_embed_assets(
                                 {
                                     if let Some(body) = get_child_node_by_name(&html, "body") {
                                         let mut buf: Vec<u8> = Vec::new();
-                                        serialize(&mut buf, &body, SerializeOpts::default())
-                                            .expect("Unable to serialize DOM into buffer");
+                                        serialize(
+                                            &mut buf,
+                                            &SerializableHandle::from(body.clone()),
+                                            SerializeOpts::default(),
+                                        )
+                                        .expect("Unable to serialize DOM into buffer");
                                         let result = String::from_utf8_lossy(&buf);
                                         noscript_contents.push_slice(&result);
                                     }
