@@ -20,7 +20,7 @@ jobs:
     - name: Build the executable
       run: cargo build --release
 
-    - uses: Shopify/upload-to-release@1.0.0
+    - uses: Shopify/upload-to-release@2.0.0
       with:
         name: monolith.exe
         path: target\release\monolith.exe
@@ -53,7 +53,7 @@ jobs:
       run: cargo build --release --target=arm-unknown-linux-gnueabihf
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@1.0.0
+      uses: Shopify/upload-to-release@2.0.0
       with:
         name: monolith-gnu-linux-armhf
         path: target/arm-unknown-linux-gnueabihf/release/monolith
@@ -86,7 +86,7 @@ jobs:
       run: cargo build --release --target=aarch64-unknown-linux-gnu
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@1.0.0
+      uses: Shopify/upload-to-release@2.0.0
       with:
         name: monolith-gnu-linux-aarch64
         path: target/aarch64-unknown-linux-gnu/release/monolith
@@ -101,7 +101,7 @@ jobs:
     - name: Build the executable
       run: cargo build --release
 
-    - uses: Shopify/upload-to-release@1.0.0
+    - uses: Shopify/upload-to-release@2.0.0
       with:
         name: monolith-gnu-linux-x86_64
         path: target/release/monolith
