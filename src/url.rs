@@ -1,4 +1,4 @@
-use base64;
+use base64::prelude::*;
 use percent_encoding::percent_decode_str;
 use url::Url;
 
@@ -33,7 +33,15 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
             "".to_string()
         };
 
-    data_url.set_path(format!("{}{};base64,{}", media_type, c, base64::encode(data)).as_str());
+    data_url.set_path(
+        format!(
+            "{}{};base64,{}",
+            media_type,
+            c,
+            BASE64_STANDARD.encode(data)
+        )
+        .as_str(),
+    );
 
     data_url
 }
@@ -63,7 +71,7 @@ pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
     // Parse raw data into vector of bytes
     let text: String = percent_decode_str(&data).decode_utf8_lossy().to_string();
     let blob: Vec<u8> = if is_base64 {
-        base64::decode(&text).unwrap_or(vec![])
+        BASE64_STANDARD.decode(&text).unwrap_or(vec![])
     } else {
         text.as_bytes().to_vec()
     };
