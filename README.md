@@ -42,6 +42,12 @@ brew install monolith
 choco install monolith
 ```
 
+#### Via [Scoop](https://scoop.sh/#/apps?q=monolith) (Windows)
+
+```console
+scoop install main/monolith
+```
+
 #### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
 
 ```console
