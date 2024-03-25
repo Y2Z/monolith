@@ -101,7 +101,25 @@ sudo install -b dist/run-in-container.sh /usr/local/bin/monolith
 
 #### From [source](https://github.com/Y2Z/monolith)
 
-Dependency: `libssl`
+Dependencies: `libssl` `cargo`
+
+<details>
+  <summary>Install cargo (GNU/Linux)</summary>
+ Check if cargo is installed
+ 
+ ```console
+ cargo -v
+ ```
+
+ If cargo is not already installed, install and add it to your existing ```$PATH``` (paraphrasing the [official installation instructions](https://doc.rust-lang.org/cargo/getting-started/installation.html)):
+ 
+ ```console
+ curl https://sh.rustup.rs -sSf | sh
+ . "$HOME/.cargo/env"
+ ```
+
+Proceed with installing from source:
+</details>
 
 ```console
 git clone https://github.com/Y2Z/monolith.git
