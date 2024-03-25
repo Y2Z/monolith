@@ -1,4 +1,4 @@
-FROM ekidd/rust-musl-builder as builder
+FROM clux/muslrust:stable as builder
 
 RUN curl -L -o monolith.tar.gz $(curl -s https://api.github.com/repos/y2z/monolith/releases/latest \
                                  | grep "tarball_url.*\"," \
@@ -17,6 +17,6 @@ RUN apk update && \
   apk add --no-cache openssl && \
   rm -rf "/var/cache/apk/*"
 
-COPY --from=builder /home/rust/.cargo/bin/monolith /usr/bin/monolith
+COPY --from=builder /root/.cargo/bin/monolith /usr/bin/monolith
 WORKDIR /tmp
 ENTRYPOINT ["/usr/bin/monolith"]
