@@ -95,7 +95,7 @@ make install clean
 #### Using [containers](https://www.docker.com/)
 
 ```console
-docker build -t Y2Z/monolith .
+docker build -t y2z/monolith .
 sudo install -b dist/run-in-container.sh /usr/local/bin/monolith
 ```
 
