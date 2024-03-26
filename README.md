@@ -48,7 +48,7 @@ choco install monolith
 scoop install main/monolith
 ```
 
-#### Via [Winget](hhttps://winstall.app/apps/Y2Z.Monolith) (Windows)
+#### Via [Winget](https://winstall.app/apps/Y2Z.Monolith) (Windows)
 
 ```console
 winget install --id=Y2Z.Monolith  -e
