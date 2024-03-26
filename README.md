@@ -48,6 +48,12 @@ choco install monolith
 scoop install main/monolith
 ```
 
+#### Via [Winget](hhttps://winstall.app/apps/Y2Z.Monolith) (Windows)
+
+```console
+winget install --id=Y2Z.Monolith  -e
+```
+
 #### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
 
 ```console
@@ -76,6 +82,12 @@ yay monolith
 
 ```console
 apk add monolith
+```
+
+#### Using [XBPS Package Manager](https://voidlinux.org/packages/?q=monolith) (Void Linux)
+
+```console
+xbps-install -S monolith
 ```
 
 #### Using [FreeBSD packages](https://svnweb.freebsd.org/ports/head/www/monolith/) (FreeBSD)
@@ -107,7 +119,7 @@ sudo install -b dist/run-in-container.sh /usr/local/bin/monolith
 
 #### From [source](https://github.com/Y2Z/monolith)
 
-Dependencies: `libssl` `cargo`
+Dependencies: `libssl`, `cargo`
 
 <details>
   <summary>Install cargo (GNU/Linux)</summary>
@@ -148,7 +160,7 @@ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roa
 ```
 
 ```console
-cat index.html | monolith -aIiFfcMv -b https://original.site/ - > result.html
+cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site-page-with-assets.html
 ```
 
 
