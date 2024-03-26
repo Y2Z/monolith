@@ -72,6 +72,12 @@ snap install monolith
 guix install monolith
 ```
 
+#### Using [NixPkgs](https://search.nixos.org/packages?channel=unstable&show=monolith&query=monolith)
+
+```console
+nix-env -iA nixpkgs.monolith
+```
+
 #### Using [AUR](https://aur.archlinux.org/packages/monolith) (Arch Linux)
 
 ```console
