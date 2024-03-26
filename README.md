@@ -170,13 +170,13 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
 ## Options
 
  - `-a`: Exclude audio sources
- - `-b`: Use custom `base URL`
+ - `-b`: Use `custom base URL`
  - `-B`: Forbid retrieving assets from specified domain(s)
  - `-c`: Exclude CSS
  - `-C`: Read cookies from `file`
  - `-d`: Allow retrieving assets only from specified `domain(s)`
  - `-e`: Ignore network errors
- - `-E`: Save document using custom `encoding`
+ - `-E`: Save document using `custom encoding`
  - `-f`: Omit frames
  - `-F`: Exclude web fonts
  - `-h`: Print help information
@@ -189,7 +189,7 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-s`: Be quiet
  - `-t`: Adjust `network request timeout`
- - `-u`: Provide custom `User-Agent`
+ - `-u`: Provide `custom User-Agent`
  - `-v`: Exclude videos
 
 
