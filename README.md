@@ -229,18 +229,6 @@ Please open an issue if something is wrong, that helps make this project better.
 ---------------------------------------------------
 
 
-## Related projects
-
- - Monolith Chrome Extension: https://github.com/rhysd/monolith-of-web
- - Pagesaver: https://github.com/distributed-mind/pagesaver
- - Personal WayBack Machine: https://github.com/popey/pwbm
- - Hako: https://github.com/dmpop/hako
- - Monk: https://github.com/monk-dev/monk
-
-
----------------------------------------------------
-
-
 ## License
 
 To the extent possible under law, the author(s) have dedicated all copyright related and neighboring rights to this software to the public domain worldwide.
