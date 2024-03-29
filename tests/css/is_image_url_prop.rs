@@ -10,17 +10,17 @@ mod passing {
     use monolith::css;
 
     #[test]
-    fn backrgound() {
+    fn background() {
         assert!(css::is_image_url_prop("background"));
     }
 
     #[test]
-    fn backrgound_image() {
+    fn background_image() {
         assert!(css::is_image_url_prop("background-image"));
     }
 
     #[test]
-    fn backrgound_image_uppercase() {
+    fn background_image_uppercase() {
         assert!(css::is_image_url_prop("BACKGROUND-IMAGE"));
     }
 

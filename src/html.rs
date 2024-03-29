@@ -201,7 +201,7 @@ pub fn embed_srcset(
                         &image_data,
                         &image_final_url,
                     );
-                    // Append retreved asset as a data URL
+                    // Append retrieved asset as a data URL
                     image_data_url.set_fragment(image_full_url.fragment());
                     result.push_str(image_data_url.as_ref());
                 }
