@@ -38,7 +38,7 @@ mod passing {
             )
         );
 
-        // STDOUT should contain original document without any modificatons
+        // STDOUT should contain original document without any modifications
         let s: String;
         if let Some(encoding) = Encoding::for_label(b"gb2312") {
             let (string, _, _) = encoding.decode(&out.stdout);
@@ -135,7 +135,7 @@ mod passing {
             )
         );
 
-        // STDOUT should contain original document without any modificatons
+        // STDOUT should contain original document without any modifications
         assert_eq!(
             String::from_utf8_lossy(&out.stdout).to_string(),
             "<html>\
