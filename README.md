@@ -1,6 +1,10 @@
 [![monolith build status on GNU/Linux](https://github.com/Y2Z/monolith/workflows/GNU%2FLinux/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AGNU%2FLinux)
 [![monolith build status on macOS](https://github.com/Y2Z/monolith/workflows/macOS/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AmacOS)
 [![monolith build status on Windows](https://github.com/Y2Z/monolith/workflows/Windows/badge.svg)](https://github.com/Y2Z/monolith/actions?query=workflow%3AWindows)
+[![Monolith Actor on Apify](https://apify.com/actor-badge?actor=netmilk/monolith)](https://apify.com/netmilk/monolith)
+
+
+
 
 ```
  _____     ______________    __________      ___________________    ___
@@ -242,6 +246,25 @@ chromium --headless --window-size=1920,1080 --run-all-compositor-stages-before-d
 
 Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
 
+
+---------------------------------------------------
+
+### Apify Actor Usage 
+
+<a href="https://apify.com/netmilk/monolith?fpr=monolith"><img src="https://apify.com/ext/run-on-apify.png" alt="Run Monolith Actor on Apify" width="176" height="39" /></a>
+
+You can run Monolith in the cloud without installation using the [Monolith Actor](https://apify.com/netmilk/monolith?fpr=monolith) on [Apify](https://apify.com?fpr=monolith) free of charge.
+
+``` bash
+echo '{"urls": ["https://news.ycombinator.com/"]}' | apify call -so netmilk/monolith
+[{
+  "url": "https://news.ycombinator.com/",
+  "status": "0",
+  "kvsUrl": "https://api.apify.com/v2/key-value-stores/of9xNgvpon4elPLbc/records/https___news.ycombinator.com_"
+}]
+```
+
+Read more about the [Docling Actor](.actor/README.md), including how to use it via the Apify API and CLI.
 
 ---------------------------------------------------
 

@@ -1,0 +1,18 @@
+{
+  "title": "Sherlock actor input",
+  "description": "This is actor input schema",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "urls": {
+      "title": "Urls",
+      "type": "array",
+      "description": "A list of urls of pages to bundle into single HTML document",
+      "editor": "stringList",
+      "prefill": ["http://www.google.com"]
+    }
+  },
+  "required": [
+    "urls"
+  ]
+}
