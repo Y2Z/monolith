@@ -1,35 +1,33 @@
-use clap::{App, Arg, ArgAction};
+use clap::Parser;
 use std::env;
 
-use crate::cookies::Cookie;
-
-#[derive(Default)]
-pub struct Options {
-    pub no_audio: bool,
-    pub base_url: Option<String>,
-    pub blacklist_domains: bool,
-    pub no_css: bool,
-    pub cookie_file: Option<String>,
-    pub cookies: Vec<Cookie>,
-    pub domains: Option<Vec<String>>,
-    pub ignore_errors: bool,
-    pub encoding: Option<String>,
-    pub no_frames: bool,
-    pub no_fonts: bool,
-    pub no_images: bool,
-    pub isolate: bool,
-    pub no_js: bool,
-    pub insecure: bool,
-    pub no_metadata: bool,
-    pub output: String,
-    pub silent: bool,
-    pub timeout: u64,
-    pub user_agent: Option<String>,
-    pub no_video: bool,
-    pub target: String,
-    pub no_color: bool,
-    pub unwrap_noscript: bool,
-}
+// #[derive(Default)]
+// pub struct Options {
+//     pub base_url: Option<String>,
+//     pub blacklist_domains: bool,
+//     pub cookie_file: Option<String>,
+//     pub cookies: Vec<Cookie>,
+//     pub domains: Option<Vec<String>>,
+//     pub encoding: Option<String>,
+//     pub ignore_errors: bool,
+//     pub insecure: bool,
+//     pub isolate: bool,
+//     pub no_audio: bool,
+//     pub no_color: bool,
+//     pub no_css: bool,
+//     pub no_frames: bool,
+//     pub no_fonts: bool,
+//     pub no_images: bool,
+//     pub no_js: bool,
+//     pub no_metadata: bool,
+//     pub no_video: bool,
+//     pub output: String,
+//     pub silent: bool,
+//     pub target: String,
+//     pub timeout: u64,
+//     pub unwrap_noscript: bool,
+//     pub user_agent: Option<String>,
+// }
 
 const ASCII: &'static str = " \
  _____     ______________    __________      ___________________    ___
@@ -43,9 +41,120 @@ const ASCII: &'static str = " \
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &'static str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
-const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
-const ENV_VAR_TERM: &str = "TERM";
 
+#[derive(Parser, Debug)]
+#[command(
+    version,
+    // author = format!("\n{}\n\n", env!("CARGO_PKG_AUTHORS").replace(':', "\n")).as_str(),
+    // about = format!("{}\n{}", ASCII, env!("CARGO_PKG_DESCRIPTION")).as_str()
+)]
+pub struct Options {
+    /// Remove audio sources
+    #[arg(short = 'a', long = "no-audio")]
+    pub no_audio: bool,
+
+    /// Set custom base URL
+    #[arg(short = 'b', long = "base-url")]
+    pub base_url: Option<String>,
+
+    /// Treat list of specified domains as blacklist
+    #[arg(short = 'B', long = "blacklist-domains")]
+    pub blacklist_domains: bool,
+
+    /// Remove CSS
+    #[arg(short = 'c', long = "no-css")]
+    pub no_css: bool,
+
+    /// Specify cookie file
+    #[arg(short = 'C', long = "cookies")]
+    pub cookie_file: Option<String>,
+
+    /// Specify domains to use for white/black-listing
+    #[arg(short = 'd', long = "domains")]
+    pub domains: Option<Vec<String>>,
+
+    /// Ignore network errors
+    #[arg(short = 'e', long = "ignore-errors")]
+    pub ignore_errors: bool,
+
+    /// Enforce custom charset
+    #[arg(short = 'E', long = "encoding")]
+    pub encoding: Option<String>,
+
+    /// Remove frames and iframes
+    #[arg(short = 'f', long = "no-frames")]
+    pub no_frames: bool,
+
+    /// Remove fonts
+    #[arg(short = 'F', long = "no-fonts")]
+    pub no_fonts: bool,
+
+    /// Remove images
+    #[arg(short = 'i', long = "no-images")]
+    pub no_images: bool,
+
+    /// Cut off document from the Internet
+    #[arg(short = 'I', long = "isolate")]
+    pub isolate: bool,
+
+    /// Remove JavaScript
+    #[arg(short = 'j', long = "no-js")]
+    pub no_js: bool,
+
+    /// Allow invalid X.509 (TLS) certificates
+    #[arg(short = 'k', long = "insecure")]
+    pub insecure: bool,
+
+    /// Exclude timestamp and source information
+    #[arg(short = 'M', long = "no-metadata")]
+    pub no_metadata: bool,
+
+    /// Replace NOSCRIPT elements with their contents
+    #[arg(short = 'n', long = "unwrap-noscript")]
+    pub unwrap_noscript: bool,
+
+    /// Write output to <file>, use - for STDOUT
+    #[arg(short = 'o', long = "output")]
+    pub output: String,
+
+    /// Suppress verbosity
+    #[arg(short = 's', long = "silent")]
+    pub silent: bool,
+
+    /// Adjust network request timeout
+    // #[arg(short = 't', long = "timeout", default_value = format!("{}", DEFAULT_NETWORK_TIMEOUT).as_str())]
+    #[arg(short = 't', long = "timeout", default_value = "60")]
+    pub timeout: u64,
+
+    /// Set custom User-Agent string
+    #[arg(short = 'u', long = "user-agent")]
+    pub user_agent: Option<String>,
+
+    /// Remove video sources
+    #[arg(short = 'v', long = "no-video")]
+    pub no_video: bool,
+
+    /// URL or file path, use - for STDIN
+    #[arg(name = "target", default_value = "-")]
+    pub target: String,
+
+/*
+    /// Files to cat
+    #[arg(name = "FILES", default_value = "-")]
+    files: Vec<String>,
+    /// Print line numbers
+    #[arg(short, long = "number")]
+    number_lines: bool,
+    /// Print line numbers for nonblank lines
+    #[arg(short = 'b', long = "number-nonblank", conflicts_with = "number_lines")]
+    number_nonblank_lines: bool,
+    /// Show $ at the end of each line
+    #[arg(short = 'E', long = "show-ends")]
+    show_ends: bool,
+*/
+}
+
+/*
 impl Options {
     pub fn from_args() -> Options {
         let app = App::new(env!("CARGO_PKG_NAME"))
@@ -141,14 +250,7 @@ impl Options {
         options.unwrap_noscript = app.is_present("unwrap-noscript");
         options.no_video = app.is_present("no-video");
 
-        options.no_color =
-            env::var_os(ENV_VAR_NO_COLOR).is_some() || atty::isnt(atty::Stream::Stderr);
-        if let Some(term) = env::var_os(ENV_VAR_TERM) {
-            if term == "dumb" {
-                options.no_color = true;
-            }
-        }
-
         options
     }
 }
+*/
