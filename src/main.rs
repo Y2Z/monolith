@@ -198,7 +198,7 @@ fn main() {
         || (target_url.scheme() == "http" || target_url.scheme() == "https")
         || target_url.scheme() == "data"
     {
-        match retrieve_asset(&mut cache, &client, &target_url, &target_url, &options, 0) {
+        match retrieve_asset(&mut cache, &client, &target_url, &target_url, &options) {
             Ok((retrieved_data, final_url, media_type, charset)) => {
                 // Provide output as text without processing it, the way browsers do
                 if !media_type.eq_ignore_ascii_case("text/html")
@@ -306,7 +306,7 @@ fn main() {
     }
 
     // Traverse through the document and embed remote assets
-    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options, 0);
+    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options);
 
     // Update or add new BASE element to reroute network requests and hash-links
     if let Some(new_base_url) = options.base_url.clone() {
@@ -320,14 +320,7 @@ fn main() {
     {
         let favicon_ico_url: Url = resolve_url(&base_url, "/favicon.ico");
 
-        match retrieve_asset(
-            &mut cache,
-            &client,
-            &target_url,
-            &favicon_ico_url,
-            &options,
-            0,
-        ) {
+        match retrieve_asset(&mut cache, &client, &target_url, &favicon_ico_url, &options) {
             Ok((data, final_url, media_type, charset)) => {
                 let favicon_data_url: Url =
                     create_data_url(&media_type, &charset, &data, &final_url);

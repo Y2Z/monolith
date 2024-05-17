@@ -29,7 +29,6 @@ mod passing {
             &Url::parse("data:,").unwrap(),
             &srcset_value,
             &options,
-            0,
         );
 
         assert_eq!(
@@ -55,7 +54,6 @@ mod passing {
             &Url::parse("data:,").unwrap(),
             &srcset_value,
             &options,
-            0,
         );
 
         assert_eq!(
@@ -78,7 +76,6 @@ mod passing {
             &Url::parse("data:,").unwrap(),
             &srcset_value,
             &options,
-            0,
         );
 
         assert_eq!(
@@ -101,7 +98,6 @@ mod passing {
             &Url::parse("data:,").unwrap(),
             &srcset_value,
             &options,
-            0,
         );
 
         assert_eq!(
@@ -145,7 +141,6 @@ mod failing {
             &Url::parse("data:,").unwrap(),
             &srcset_value,
             &options,
-            0,
         );
 
         assert_eq!(

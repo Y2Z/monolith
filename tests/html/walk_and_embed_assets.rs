@@ -30,7 +30,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -58,7 +58,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -86,7 +86,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -120,7 +120,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -161,7 +161,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -203,7 +203,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -232,7 +232,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -269,7 +269,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -310,7 +310,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -349,7 +349,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -391,7 +391,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -434,7 +434,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -485,7 +485,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -529,7 +529,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -569,7 +569,7 @@ mod passing {
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, 0);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(

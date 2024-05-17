@@ -32,7 +32,6 @@ mod passing {
             &Url::parse("data:text/html;base64,c291cmNl").unwrap(),
             &Url::parse("data:text/html;base64,dGFyZ2V0").unwrap(),
             &options,
-            0,
         )
         .unwrap();
         assert_eq!(&media_type, "text/html");
@@ -75,7 +74,6 @@ mod passing {
             ))
             .unwrap(),
             &options,
-            0,
         )
         .unwrap();
         assert_eq!(&media_type, "application/javascript");
@@ -124,7 +122,6 @@ mod failing {
             &Url::parse("data:text/html;base64,SoUrCe").unwrap(),
             &Url::parse("file:///etc/passwd").unwrap(),
             &options,
-            0,
         ) {
             Ok((..)) => {
                 assert!(false);
@@ -150,7 +147,6 @@ mod failing {
             &Url::parse("https://kernel.org/").unwrap(),
             &Url::parse("file:///etc/passwd").unwrap(),
             &options,
-            0,
         ) {
             Ok((..)) => {
                 assert!(false);
