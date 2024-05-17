@@ -23,16 +23,16 @@ license = "CC0-1.0"
 
 [dependencies]
 atty = "0.2.14"  # Used for highlighting network errors
-base64 = "0.21.7"  # Used for integrity attributes
-chrono = "0.4.31"  # Used for formatting creation timestamp
+base64 = "0.22.1"  # Used for integrity attributes
+chrono = "0.4.38"  # Used for formatting output timestamp
 clap = "3.2.25"  # Used for processing CLI arguments
-cssparser = "0.33.0"  # Used for dealing with CSS
-encoding_rs = "0.8.33"  # Used for parsing and converting document charsets
-html5ever = "0.26.0"  # Used for all things DOM
-markup5ever_rcdom = "0.2.0"
-percent-encoding = "2.3.1"
+cssparser = "0.34.0"  # Used for dealing with CSS
+encoding_rs = "0.8.34"  # Used for parsing and converting document charsets
+html5ever = "0.27.0"  # Used for all things DOM
+markup5ever_rcdom = "0.3.0"  # Used for manipulating DOM
+percent-encoding = "2.3.1"  # Used for encoding URLs
 sha2 = "0.10.8"  # Used for calculating checksums during integrity checks
-url = "2.5.0"
+url = "2.5.0"  # Used for parsing URLs
 
 # Used for parsing srcset and NOSCRIPT
 [dependencies.regex]
