@@ -39,10 +39,10 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file}{cwd}/tests/_data_/basic/local-file.html\n \
-                {file}{cwd}/tests/_data_/basic/local-style.css\n \
-                {file}{cwd}/tests/_data_/basic/local-style-does-not-exist.css (not found)\n \
-                {file}{cwd}/tests/_data_/basic/monolith.png (not found)\n \
+                {file}{cwd}/tests/_data_/basic/local-file.html\n\
+                {file}{cwd}/tests/_data_/basic/local-style.css\n\
+                {file}{cwd}/tests/_data_/basic/local-style-does-not-exist.css (not found)\n\
+                {file}{cwd}/tests/_data_/basic/monolith.png (not found)\n\
                 {file}{cwd}/tests/_data_/basic/local-script.js\n\
                 ",
                 file = file_url_protocol,
@@ -185,7 +185,7 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file_url_html}\n \
+                {file_url_html}\n\
                 {file_url_svg}\n\
                 ",
                 file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
@@ -236,10 +236,10 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file}{cwd}/tests/_data_/integrity/index.html\n \
-                {file}{cwd}/tests/_data_/integrity/style.css\n \
-                {file}{cwd}/tests/_data_/integrity/style.css\n \
-                {file}{cwd}/tests/_data_/integrity/script.js\n \
+                {file}{cwd}/tests/_data_/integrity/index.html\n\
+                {file}{cwd}/tests/_data_/integrity/style.css\n\
+                {file}{cwd}/tests/_data_/integrity/style.css\n\
+                {file}{cwd}/tests/_data_/integrity/script.js\n\
                 {file}{cwd}/tests/_data_/integrity/script.js\n\
                 ",
                 file = file_url_protocol,

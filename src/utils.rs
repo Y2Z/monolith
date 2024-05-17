@@ -148,18 +148,6 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
     ok
 }
 
-pub fn indent(level: u32) -> String {
-    let mut result: String = String::new();
-    let mut l: u32 = level;
-
-    while l > 0 {
-        result += " ";
-        l -= 1;
-    }
-
-    result
-}
-
 pub fn is_plaintext_media_type(media_type: &str) -> bool {
     media_type.to_lowercase().as_str().starts_with("text/")
         || PLAINTEXT_MEDIA_TYPES.contains(&media_type.to_lowercase().as_str())
@@ -198,7 +186,6 @@ pub fn retrieve_asset(
     parent_url: &Url,
     url: &Url,
     options: &Options,
-    depth: u32,
 ) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
     if url.scheme() == "data" {
         let (media_type, charset, data) = parse_data_url(url);
@@ -208,8 +195,7 @@ pub fn retrieve_asset(
         if parent_url.scheme() != "file" {
             if !options.silent {
                 eprintln!(
-                    "{}{}{} ({}){}",
-                    indent(depth).as_str(),
+                    "{}{} ({}){}",
                     if options.no_color { "" } else { ANSI_COLOR_RED },
                     &url,
                     "Security Error",
@@ -230,8 +216,7 @@ pub fn retrieve_asset(
             if path.is_dir() {
                 if !options.silent {
                     eprintln!(
-                        "{}{}{} (is a directory){}",
-                        indent(depth).as_str(),
+                        "{}{} (is a directory){}",
                         if options.no_color { "" } else { ANSI_COLOR_RED },
                         &url,
                         if options.no_color {
@@ -246,7 +231,7 @@ pub fn retrieve_asset(
                 Err(client.get("").send().unwrap_err())
             } else {
                 if !options.silent {
-                    eprintln!("{}{}", indent(depth).as_str(), &url);
+                    eprintln!("{}", &url);
                 }
 
                 let file_blob: Vec<u8> = fs::read(&path).expect("Unable to read file");
@@ -261,8 +246,7 @@ pub fn retrieve_asset(
         } else {
             if !options.silent {
                 eprintln!(
-                    "{}{}{} (not found){}",
-                    indent(depth).as_str(),
+                    "{}{} (not found){}",
                     if options.no_color { "" } else { ANSI_COLOR_RED },
                     &url,
                     if options.no_color {
@@ -282,7 +266,7 @@ pub fn retrieve_asset(
         if cache.contains_key(&cache_key) {
             // URL is in cache, we get and return it
             if !options.silent {
-                eprintln!("{}{} (from cache)", indent(depth).as_str(), &url);
+                eprintln!("{} (from cache)", &url);
             }
 
             Ok((
@@ -319,8 +303,7 @@ pub fn retrieve_asset(
                     if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
                         if !options.silent {
                             eprintln!(
-                                "{}{}{} ({}){}",
-                                indent(depth).as_str(),
+                                "{}{} ({}){}",
                                 if options.no_color { "" } else { ANSI_COLOR_RED },
                                 &url,
                                 response.status(),
@@ -339,9 +322,9 @@ pub fn retrieve_asset(
 
                     if !options.silent {
                         if url.as_str() == response_url.as_str() {
-                            eprintln!("{}{}", indent(depth).as_str(), &url);
+                            eprintln!("{}", &url);
                         } else {
-                            eprintln!("{}{} -> {}", indent(depth).as_str(), &url, &response_url);
+                            eprintln!("{} -> {}", &url, &response_url);
                         }
                     }
 
@@ -365,8 +348,7 @@ pub fn retrieve_asset(
                         Err(error) => {
                             if !options.silent {
                                 eprintln!(
-                                    "{}{}{}{}",
-                                    indent(depth).as_str(),
+                                    "{}{}{}",
                                     if options.no_color { "" } else { ANSI_COLOR_RED },
                                     error,
                                     if options.no_color {
@@ -388,8 +370,7 @@ pub fn retrieve_asset(
                 Err(error) => {
                     if !options.silent {
                         eprintln!(
-                            "{}{}{} ({}){}",
-                            indent(depth).as_str(),
+                            "{}{} ({}){}",
                             if options.no_color { "" } else { ANSI_COLOR_RED },
                             &url,
                             error,

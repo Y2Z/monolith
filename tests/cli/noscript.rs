@@ -27,7 +27,7 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file_url_html}\n \
+                {file_url_html}\n\
                 {file_url_svg}\n\
                 ",
                 file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
@@ -58,7 +58,7 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file_url_html}\n \
+                {file_url_html}\n\
                 {file_url_svg}\n\
                 ",
                 file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
@@ -89,7 +89,7 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file_url_html}\n \
+                {file_url_html}\n\
                 {file_url_svg}\n\
                 ",
                 file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
@@ -120,7 +120,7 @@ mod passing {
             String::from_utf8_lossy(&out.stderr),
             format!(
                 "\
-                {file_url_html}\n \
+                {file_url_html}\n\
                 {file_url_svg}\n\
                 ",
                 file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
