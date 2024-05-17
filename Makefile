@@ -7,23 +7,30 @@ build:
 	@cargo build --locked
 .PHONY: build
 
-test: build
-	@cargo test --locked
-	@cargo fmt --all -- --check
-.PHONY: test
-
-lint:
-	@cargo fmt --all --
-.PHONY: lint
+clean:
+	@cargo clean
+.PHONY: clean
 
 install:
 	@cargo install --force --locked --path .
 .PHONY: install
 
+lint:
+	@cargo fmt --all --
+.PHONY: lint
+
+lint_check:
+	@cargo fmt --all -- --check
+.PHONY: lint_check
+
+test: build
+	@cargo test --locked
+.PHONY: test
+
 uninstall:
 	@cargo uninstall
 .PHONY: uninstall
 
-clean:
-	@cargo clean
+update-lock-file:
+	@cargo update
 .PHONY: clean
