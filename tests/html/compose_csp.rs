@@ -7,12 +7,14 @@
 
 #[cfg(test)]
 mod passing {
+    use clap::Parser;
+
     use monolith::html;
     use monolith::opts::Options;
 
     #[test]
     fn isolated() {
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.isolate = true;
         let csp_content = html::compose_csp(&options);
 
@@ -24,7 +26,7 @@ mod passing {
 
     #[test]
     fn no_css() {
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_css = true;
         let csp_content = html::compose_csp(&options);
 
@@ -33,7 +35,7 @@ mod passing {
 
     #[test]
     fn no_fonts() {
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_fonts = true;
         let csp_content = html::compose_csp(&options);
 
@@ -42,7 +44,7 @@ mod passing {
 
     #[test]
     fn no_frames() {
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_frames = true;
         let csp_content = html::compose_csp(&options);
 
@@ -51,7 +53,7 @@ mod passing {
 
     #[test]
     fn no_js() {
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_js = true;
         let csp_content = html::compose_csp(&options);
 
@@ -60,7 +62,7 @@ mod passing {
 
     #[test]
     fn no_images() {
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_images = true;
         let csp_content = html::compose_csp(&options);
 
@@ -69,7 +71,7 @@ mod passing {
 
     #[test]
     fn all() {
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.isolate = true;
         options.no_css = true;
         options.no_fonts = true;

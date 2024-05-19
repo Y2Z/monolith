@@ -169,12 +169,10 @@ fn main() {
     // Initialize client
     let mut cache = HashMap::new();
     let mut header_map = HeaderMap::new();
-    if let Some(user_agent) = &options.user_agent {
-        header_map.insert(
-            USER_AGENT,
-            HeaderValue::from_str(&user_agent).expect("Invalid User-Agent header specified"),
-        );
-    }
+    header_map.insert(
+        USER_AGENT,
+        HeaderValue::from_str(&options.user_agent).expect("Invalid User-Agent header specified"),
+    );
     let client = if options.timeout > 0 {
         Client::builder().timeout(Duration::from_secs(options.timeout))
     } else {

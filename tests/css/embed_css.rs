@@ -7,10 +7,12 @@
 
 #[cfg(test)]
 mod passing {
+    use clap::Parser;
     use reqwest::blocking::Client;
     use reqwest::Url;
     use std::collections::HashMap;
 
+    use monolith::cookies::Cookie;
     use monolith::css;
     use monolith::opts::Options;
     use monolith::url::EMPTY_IMAGE_DATA_URL;
@@ -19,11 +21,12 @@ mod passing {
     fn empty_input() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("data:,").unwrap();
-        let options = Options::default();
+        let options = Options::parse();
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, "", &options),
+            css::embed_css(cache, &client, &document_url, "", &options, &cookies),
             ""
         );
     }
@@ -32,11 +35,12 @@ mod passing {
     fn trim_if_empty() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let options = Options::default();
+        let options = Options::parse();
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, "\t     \t   ", &options),
+            css::embed_css(cache, &client, &document_url, "\t     \t   ", &options, &cookies),
             ""
         );
     }
@@ -45,8 +49,9 @@ mod passing {
     fn style_exclude_unquoted_images() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_images = true;
         options.silent = true;
 
@@ -59,7 +64,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &STYLE, &options),
+            css::embed_css(cache, &client, &document_url, &STYLE, &options, &cookies),
             format!(
                 "/* border: none;*/\
                 background-image: url(\"{empty_image}\"); \
@@ -77,8 +82,9 @@ mod passing {
     fn style_exclude_single_quoted_images() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("data:,").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_images = true;
         options.silent = true;
 
@@ -91,7 +97,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &STYLE, &options),
+            css::embed_css(cache, &client, &document_url, &STYLE, &options, &cookies),
             format!(
                 "/* border: none;*/\
                 background-image: url(\"{empty_image}\"); \
@@ -109,8 +115,9 @@ mod passing {
     fn style_block() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("file:///").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         const CSS: &str = "\
@@ -122,7 +129,7 @@ mod passing {
             html > body {}";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             CSS
         );
     }
@@ -131,8 +138,9 @@ mod passing {
     fn attribute_selectors() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         const CSS: &str = "\
@@ -166,7 +174,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             CSS
         );
     }
@@ -175,8 +183,9 @@ mod passing {
     fn import_string() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         const CSS: &str = "\
@@ -188,7 +197,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             "\
             @charset \"UTF-8\";\n\
             \n\
@@ -203,8 +212,9 @@ mod passing {
     fn hash_urls() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         const CSS: &str = "\
@@ -218,7 +228,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             CSS
         );
     }
@@ -227,8 +237,9 @@ mod passing {
     fn transform_percentages_and_degrees() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         const CSS: &str = "\
@@ -240,7 +251,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             CSS
         );
     }
@@ -249,8 +260,9 @@ mod passing {
     fn unusual_indents() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         const CSS: &str = "\
@@ -264,7 +276,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             CSS
         );
     }
@@ -273,8 +285,9 @@ mod passing {
     fn exclude_fonts() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_fonts = true;
         options.silent = true;
 
@@ -312,7 +325,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             CSS_OUT
         );
     }
@@ -321,8 +334,9 @@ mod passing {
     fn content() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("data:,").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         const CSS: &str = "\
@@ -337,7 +351,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             CSS_OUT
         );
     }
@@ -346,8 +360,9 @@ mod passing {
     fn ie_css_hack() {
         let cache = &mut HashMap::new();
         let client = Client::new();
+        let cookies: Vec<Cookie> = vec![];
         let document_url: Url = Url::parse("data:,").unwrap();
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         const CSS: &str = "\
@@ -364,7 +379,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, &CSS, &options, &cookies),
             CSS_OUT
         );
     }

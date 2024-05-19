@@ -7,12 +7,14 @@
 
 #[cfg(test)]
 mod passing {
+    use clap::Parser;
     use html5ever::serialize::{serialize, SerializeOpts};
     use markup5ever_rcdom::SerializableHandle;
     use reqwest::blocking::Client;
     use std::collections::HashMap;
     use url::Url;
 
+    use monolith::cookies::Cookie;
     use monolith::html;
     use monolith::opts::Options;
     use monolith::url::EMPTY_IMAGE_DATA_URL;
@@ -20,17 +22,16 @@ mod passing {
     #[test]
     fn basic() {
         let cache = &mut HashMap::new();
-
+        let cookies: Vec<Cookie> = vec![];
         let html: &str = "<div><P></P></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
 
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -48,17 +49,16 @@ mod passing {
 
     #[test]
     fn ensure_no_recursive_iframe() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "<div><P></P><iframe src=\"\"></iframe></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -76,17 +76,16 @@ mod passing {
 
     #[test]
     fn ensure_no_recursive_frame() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "<frameset><frame src=\"\"></frameset>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -104,6 +103,7 @@ mod passing {
 
     #[test]
     fn no_css() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "\
             <link rel=\"stylesheet\" href=\"main.css\">\
             <link rel=\"alternate stylesheet\" href=\"main.css\">\
@@ -113,14 +113,12 @@ mod passing {
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_css = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -149,19 +147,18 @@ mod passing {
 
     #[test]
     fn no_images() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "<link rel=\"icon\" href=\"favicon.ico\">\
                     <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_images = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -191,19 +188,18 @@ mod passing {
 
     #[test]
     fn no_body_background_images() {
+        let cookies: Vec<Cookie> = vec![];
         let html =
             "<body background=\"no/such/image.png\" background=\"no/such/image2.png\"></body>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_images = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -221,18 +217,17 @@ mod passing {
 
     #[test]
     fn no_frames() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "<frameset><frame src=\"http://trackbook.com\"></frameset>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_frames = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -258,18 +253,17 @@ mod passing {
 
     #[test]
     fn no_iframes() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "<iframe src=\"http://trackbook.com\"></iframe>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_frames = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -294,6 +288,7 @@ mod passing {
 
     #[test]
     fn no_js() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "\
             <div onClick=\"void(0)\">\
                 <script src=\"http://localhost/assets/some.js\"></script>\
@@ -303,14 +298,12 @@ mod passing {
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_js = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -338,18 +331,17 @@ mod passing {
 
     #[test]
     fn keeps_integrity_for_unfamiliar_links() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "<title>Has integrity</title>\
                     <link integrity=\"sha384-12345\" rel=\"something\" href=\"https://some-site.com/some-file.ext\" />";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -375,6 +367,7 @@ mod passing {
 
     #[test]
     fn discards_integrity_for_known_links_nojs_nocss() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "\
             <title>No integrity</title>\
             <link integrity=\"\" rel=\"stylesheet\" href=\"data:;\"/>\
@@ -383,15 +376,13 @@ mod passing {
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_css = true;
         options.no_js = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -418,6 +409,7 @@ mod passing {
 
     #[test]
     fn discards_integrity_for_embedded_assets() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "\
             <title>No integrity</title>\
             <link integrity=\"sha384-123\" rel=\"something\" href=\"data:;\"/>\
@@ -426,15 +418,13 @@ mod passing {
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_css = true;
         options.no_js = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -462,6 +452,7 @@ mod passing {
 
     #[test]
     fn removes_unwanted_meta_tags() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "\
             <html>\
                 <head>\
@@ -475,17 +466,15 @@ mod passing {
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_css = true;
         options.no_frames = true;
         options.no_js = true;
         options.no_images = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -511,6 +500,7 @@ mod passing {
 
     #[test]
     fn processes_noscript_tags() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "\
         <html>\
             <body>\
@@ -522,14 +512,12 @@ mod passing {
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_images = true;
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -559,17 +547,16 @@ mod passing {
 
     #[test]
     fn preserves_script_type_json() {
+        let cookies: Vec<Cookie> = vec![];
         let html = "<script id=\"data\" type=\"application/json\">{\"mono\":\"lith\"}</script>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
         let cache = &mut HashMap::new();
-
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.silent = true;
-
         let client = Client::new();
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options, &cookies);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(

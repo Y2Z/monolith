@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::env;
 
 // #[derive(Default)]
@@ -38,9 +38,9 @@ const ASCII: &'static str = " \
 |   | \\___/ |          | \\                      |   |   |   |   |  |   |
 |___|       |__________|  \\_____________________|   |___|   |___|  |___|
 ";
-const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
-const DEFAULT_USER_AGENT: &'static str =
-    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
+// const DEFAULT_NETWORK_TIMEOUT: u64 = 60;
+// const DEFAULT_USER_AGENT: &'static str =
+//     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
 
 #[derive(Parser, Debug)]
 #[command(
@@ -114,7 +114,7 @@ pub struct Options {
     pub unwrap_noscript: bool,
 
     /// Write output to <file>, use - for STDOUT
-    #[arg(short = 'o', long = "output")]
+    #[arg(short = 'o', long = "output", default_value = "-")]
     pub output: String,
 
     /// Suppress verbosity
@@ -127,8 +127,8 @@ pub struct Options {
     pub timeout: u64,
 
     /// Set custom User-Agent string
-    #[arg(short = 'u', long = "user-agent")]
-    pub user_agent: Option<String>,
+    #[arg(short = 'u', long = "user-agent", default_value = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0")]
+    pub user_agent: String,
 
     /// Remove video sources
     #[arg(short = 'v', long = "no-video")]
