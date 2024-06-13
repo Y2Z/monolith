@@ -78,10 +78,10 @@ guix install monolith
 nix-env -iA nixpkgs.monolith
 ```
 
-#### Using [AUR](https://aur.archlinux.org/packages/monolith) (Arch Linux)
+#### Using [Pacman](https://archlinux.org/packages/extra/x86_64/monolith) (Arch Linux)
 
 ```console
-yay monolith
+pacman -S monolith
 ```
 
 #### Using [aports](https://pkgs.alpinelinux.org/packages?name=monolith) (Alpine Linux)
