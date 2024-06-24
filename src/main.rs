@@ -11,6 +11,7 @@ use std::process;
 use std::time::Duration;
 use url::Url;
 
+use monolith::args;
 use monolith::cookies::{parse_cookie_file_contents, Cookie};
 use monolith::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, has_favicon, html_to_dom,
