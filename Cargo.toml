@@ -44,7 +44,7 @@ features = ["std", "perf-dfa", "unicode-perl"]
 [dependencies.reqwest]
 version = "0.11.23"
 default-features = false
-features = ["default-tls", "blocking", "gzip", "brotli", "deflate"]
+features = ["native-tls", "blocking", "gzip", "brotli", "deflate"]
 
 [dev-dependencies]
 assert_cmd = "2.0.13"
