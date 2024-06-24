@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>monolith</id>
-    <version>2.4.0</version>
+    <version>2.8.1</version>
     <title>Monolith</title>
     <authors>Sunshine, Mahdi Robatipoor, Emmanuel Delaborde, Emi Simpson, rhysd</authors>
     <projectUrl>https://github.com/Y2Z/monolith</projectUrl>
