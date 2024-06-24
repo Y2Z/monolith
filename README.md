@@ -125,7 +125,7 @@ sudo install -b dist/run-in-container.sh /usr/local/bin/monolith
 
 #### From [source](https://github.com/Y2Z/monolith)
 
-Dependencies: `libssl`, `cargo`
+Dependencies: `cargo`
 
 <details>
   <summary>Install cargo (GNU/Linux)</summary>
