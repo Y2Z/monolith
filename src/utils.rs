@@ -1,3 +1,4 @@
+use std::env;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE};
 use std::collections::HashMap;
@@ -5,11 +6,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use url::Url;
 
+use crate::cookies::Cookie;
 use crate::opts::Options;
 use crate::url::{clean_url, parse_data_url};
 
 const ANSI_COLOR_RED: &'static str = "\x1b[31m";
 const ANSI_COLOR_RESET: &'static str = "\x1b[0m";
+const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
+const ENV_VAR_TERM: &str = "TERM";
 const MAGIC: [[&[u8]; 2]; 18] = [
     // Image
     [b"GIF87a", b"image/gif"],
@@ -186,7 +190,16 @@ pub fn retrieve_asset(
     parent_url: &Url,
     url: &Url,
     options: &Options,
+    cookies: &Vec<Cookie>
 ) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
+    let mut no_color: bool =
+            env::var_os(ENV_VAR_NO_COLOR).is_some() || atty::isnt(atty::Stream::Stderr);
+        if let Some(term) = env::var_os(ENV_VAR_TERM) {
+            if term == "dumb" {
+                no_color = true;
+            }
+        }
+
     if url.scheme() == "data" {
         let (media_type, charset, data) = parse_data_url(url);
         Ok((data, url.clone(), media_type, charset))
@@ -196,10 +209,10 @@ pub fn retrieve_asset(
             if !options.silent {
                 eprintln!(
                     "{}{} ({}){}",
-                    if options.no_color { "" } else { ANSI_COLOR_RED },
+                    if no_color { "" } else { ANSI_COLOR_RED },
                     &url,
                     "Security Error",
-                    if options.no_color {
+                    if no_color {
                         ""
                     } else {
                         ANSI_COLOR_RESET
@@ -217,9 +230,9 @@ pub fn retrieve_asset(
                 if !options.silent {
                     eprintln!(
                         "{}{} (is a directory){}",
-                        if options.no_color { "" } else { ANSI_COLOR_RED },
+                        if no_color { "" } else { ANSI_COLOR_RED },
                         &url,
-                        if options.no_color {
+                        if no_color {
                             ""
                         } else {
                             ANSI_COLOR_RESET
@@ -247,9 +260,9 @@ pub fn retrieve_asset(
             if !options.silent {
                 eprintln!(
                     "{}{} (not found){}",
-                    if options.no_color { "" } else { ANSI_COLOR_RED },
+                    if no_color { "" } else { ANSI_COLOR_RED },
                     &url,
-                    if options.no_color {
+                    if no_color {
                         ""
                     } else {
                         ANSI_COLOR_RESET
@@ -289,8 +302,8 @@ pub fn retrieve_asset(
 
             // URL not in cache, we retrieve the file
             let mut headers = HeaderMap::new();
-            if options.cookies.len() > 0 {
-                for cookie in &options.cookies {
+            if cookies.len() > 0 {
+                for cookie in cookies {
                     if !cookie.is_expired() && cookie.matches_url(url.as_str()) {
                         let cookie_header_value: String = cookie.name.clone() + "=" + &cookie.value;
                         headers
@@ -304,10 +317,10 @@ pub fn retrieve_asset(
                         if !options.silent {
                             eprintln!(
                                 "{}{} ({}){}",
-                                if options.no_color { "" } else { ANSI_COLOR_RED },
+                                if no_color { "" } else { ANSI_COLOR_RED },
                                 &url,
                                 response.status(),
-                                if options.no_color {
+                                if no_color {
                                     ""
                                 } else {
                                     ANSI_COLOR_RESET
@@ -349,9 +362,9 @@ pub fn retrieve_asset(
                             if !options.silent {
                                 eprintln!(
                                     "{}{}{}",
-                                    if options.no_color { "" } else { ANSI_COLOR_RED },
+                                    if no_color { "" } else { ANSI_COLOR_RED },
                                     error,
-                                    if options.no_color {
+                                    if no_color {
                                         ""
                                     } else {
                                         ANSI_COLOR_RESET
@@ -371,10 +384,10 @@ pub fn retrieve_asset(
                     if !options.silent {
                         eprintln!(
                             "{}{} ({}){}",
-                            if options.no_color { "" } else { ANSI_COLOR_RED },
+                            if no_color { "" } else { ANSI_COLOR_RED },
                             &url,
                             error,
-                            if options.no_color {
+                            if no_color {
                                 ""
                             } else {
                                 ANSI_COLOR_RESET

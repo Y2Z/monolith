@@ -15,6 +15,7 @@ use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::collections::HashMap;
 use std::default::Default;
 
+use crate::cookies::Cookie;
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::opts::Options;
@@ -165,6 +166,7 @@ pub fn embed_srcset(
     document_url: &Url,
     srcset: &str,
     options: &Options,
+    cookies: &Vec<Cookie>,
 ) -> String {
     let mut array: Vec<SrcSetItem> = vec![];
     let re = Regex::new(r",\s+").unwrap();
@@ -185,7 +187,7 @@ pub fn embed_srcset(
             result.push_str(EMPTY_IMAGE_DATA_URL);
         } else {
             let image_full_url: Url = resolve_url(&document_url, part.path);
-            match retrieve_asset(cache, client, &document_url, &image_full_url, options) {
+            match retrieve_asset(cache, client, &document_url, &image_full_url, options, cookies) {
                 Ok((image_data, image_final_url, image_media_type, image_charset)) => {
                     let mut image_data_url = create_data_url(
                         &image_media_type,
@@ -603,10 +605,11 @@ pub fn retrieve_and_embed_asset(
     attr_name: &str,
     attr_value: &str,
     options: &Options,
+    cookies: &Vec<Cookie>
 ) {
     let resolved_url: Url = resolve_url(document_url, attr_value);
 
-    match retrieve_asset(cache, client, &document_url.clone(), &resolved_url, options) {
+    match retrieve_asset(cache, client, &document_url.clone(), &resolved_url, options, cookies) {
         Ok((data, final_url, mut media_type, charset)) => {
             let node_name: &str = get_node_name(&node).unwrap();
 
@@ -635,7 +638,7 @@ pub fn retrieve_and_embed_asset(
 
                 if node_name == "link" && determine_link_node_type(node) == "stylesheet" {
                     // Stylesheet LINK elements require special treatment
-                    let css: String = embed_css(cache, client, &final_url, &s, options);
+                    let css: String = embed_css(cache, client, &final_url, &s, options, cookies);
 
                     // Create and embed data URL
                     let css_data_url =
@@ -644,7 +647,7 @@ pub fn retrieve_and_embed_asset(
                 } else if node_name == "frame" || node_name == "iframe" {
                     // (I)FRAMEs are also quite different from conventional resources
                     let frame_dom = html_to_dom(&data, charset.clone());
-                    walk_and_embed_assets(cache, client, &final_url, &frame_dom.document, &options);
+                    walk_and_embed_assets(cache, client, &final_url, &frame_dom.document, &options, &cookies);
 
                     let mut frame_data: Vec<u8> = Vec::new();
                     serialize(
@@ -699,12 +702,13 @@ pub fn walk_and_embed_assets(
     document_url: &Url,
     node: &Handle,
     options: &Options,
+    cookies: &Vec<Cookie>,
 ) {
     match node.data {
         NodeData::Document => {
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(cache, client, &document_url, child, options);
+                walk_and_embed_assets(cache, client, &document_url, child, options, cookies);
             }
         }
         NodeData::Element {
@@ -739,6 +743,7 @@ pub fn walk_and_embed_assets(
                                     "href",
                                     &link_attr_href_value,
                                     options,
+                                    cookies,
                                 );
                             } else {
                                 set_node_attr(node, "href", None);
@@ -761,6 +766,7 @@ pub fn walk_and_embed_assets(
                                         "href",
                                         &link_attr_href_value,
                                         options,
+                                        cookies,
                                     );
                                 }
                             }
@@ -802,6 +808,7 @@ pub fn walk_and_embed_assets(
                                 "background",
                                 &body_attr_background_value,
                                 options,
+                                cookies,
                             );
                         }
                     }
@@ -847,6 +854,7 @@ pub fn walk_and_embed_assets(
                                 "src",
                                 &img_full_url,
                                 options,
+                                cookies,
                             );
                         }
                     }
@@ -855,7 +863,7 @@ pub fn walk_and_embed_assets(
                     if let Some(img_srcset) = get_node_attr(node, "srcset") {
                         if !img_srcset.is_empty() {
                             let resolved_srcset: String =
-                                embed_srcset(cache, client, &document_url, &img_srcset, options);
+                                embed_srcset(cache, client, &document_url, &img_srcset, options, cookies);
                             set_node_attr(node, "srcset", Some(resolved_srcset));
                         }
                     }
@@ -885,6 +893,7 @@ pub fn walk_and_embed_assets(
                                         "src",
                                         &input_attr_src_value,
                                         options,
+                                        cookies,
                                     );
                                 }
                             }
@@ -917,6 +926,7 @@ pub fn walk_and_embed_assets(
                             "href",
                             &image_href,
                             options,
+                            cookies,
                         );
                     }
                 }
@@ -937,6 +947,7 @@ pub fn walk_and_embed_assets(
                                     "src",
                                     &source_attr_src_value,
                                     options,
+                                    cookies,
                                 );
                             }
                         } else if parent_node_name == "video" {
@@ -951,6 +962,7 @@ pub fn walk_and_embed_assets(
                                     "src",
                                     &source_attr_src_value,
                                     options,
+                                    cookies,
                                 );
                             }
                         }
@@ -972,6 +984,7 @@ pub fn walk_and_embed_assets(
                                         &document_url,
                                         &source_attr_srcset_value,
                                         options,
+                                        cookies,
                                     );
                                     set_node_attr(node, "srcset", Some(resolved_srcset));
                                 }
@@ -1024,6 +1037,7 @@ pub fn walk_and_embed_assets(
                             "src",
                             &script_attr_src.unwrap_or_default(),
                             options,
+                            cookies,
                         );
                     }
                 }
@@ -1041,6 +1055,7 @@ pub fn walk_and_embed_assets(
                                     &document_url,
                                     tendril.as_ref(),
                                     options,
+                                    cookies,
                                 );
                                 tendril.clear();
                                 tendril.push_slice(&replacement);
@@ -1072,6 +1087,7 @@ pub fn walk_and_embed_assets(
                                     "src",
                                     &frame_attr_src_value,
                                     options,
+                                    cookies,
                                 );
                             }
                         }
@@ -1091,6 +1107,7 @@ pub fn walk_and_embed_assets(
                                 "src",
                                 &audio_attr_src_value,
                                 options,
+                                cookies,
                             );
                         }
                     }
@@ -1109,6 +1126,7 @@ pub fn walk_and_embed_assets(
                                 "src",
                                 &video_attr_src_value,
                                 options,
+                                cookies,
                             );
                         }
                     }
@@ -1132,6 +1150,7 @@ pub fn walk_and_embed_assets(
                                     "poster",
                                     &video_attr_poster_value,
                                     options,
+                                    cookies,
                                 );
                             }
                         }
@@ -1155,6 +1174,7 @@ pub fn walk_and_embed_assets(
                                     &document_url,
                                     &noscript_contents_dom.document,
                                     &options,
+                                    cookies,
                                 );
                                 // Get rid of original contents
                                 noscript_contents.clear();
@@ -1195,6 +1215,7 @@ pub fn walk_and_embed_assets(
                         &document_url,
                         &node_attr_style_value,
                         options,
+                        cookies,
                     );
                     set_node_attr(node, "style", Some(embedded_style));
                 }
@@ -1218,7 +1239,7 @@ pub fn walk_and_embed_assets(
 
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(cache, client, &document_url, child, options);
+                walk_and_embed_assets(cache, client, &document_url, child, options, cookies);
             }
         }
         _ => {

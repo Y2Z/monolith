@@ -1,3 +1,4 @@
+use clap::Parser;
 use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
 use reqwest::blocking::Client;
@@ -10,7 +11,8 @@ use std::process;
 use std::time::Duration;
 use url::Url;
 
-use monolith::cookies::parse_cookie_file_contents;
+use monolith::args;
+use monolith::cookies::{parse_cookie_file_contents, Cookie};
 use monolith::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, has_favicon, html_to_dom,
     serialize_document, set_base_url, set_charset, walk_and_embed_assets,
@@ -65,7 +67,8 @@ pub fn read_stdin() -> Vec<u8> {
 }
 
 fn main() {
-    let mut options = Options::from_args();
+    let options = Options::parse();
+    let mut cookies: Vec<Cookie> = vec![];
 
     // Check if target was provided
     if options.target.len() == 0 {
@@ -144,8 +147,8 @@ fn main() {
     if let Some(opt_cookie_file) = options.cookie_file.clone() {
         match fs::read_to_string(opt_cookie_file) {
             Ok(str) => match parse_cookie_file_contents(&str) {
-                Ok(cookies) => {
-                    options.cookies = cookies;
+                Ok(parsed_cookies) => {
+                    cookies = parsed_cookies;
                     // for c in &cookies {
                     //     // if !cookie.is_expired() {
                     //         // options.cookies.append(c);
@@ -167,12 +170,10 @@ fn main() {
     // Initialize client
     let mut cache = HashMap::new();
     let mut header_map = HeaderMap::new();
-    if let Some(user_agent) = &options.user_agent {
-        header_map.insert(
-            USER_AGENT,
-            HeaderValue::from_str(&user_agent).expect("Invalid User-Agent header specified"),
-        );
-    }
+    header_map.insert(
+        USER_AGENT,
+        HeaderValue::from_str(&options.user_agent).expect("Invalid User-Agent header specified"),
+    );
     let client = if options.timeout > 0 {
         Client::builder().timeout(Duration::from_secs(options.timeout))
     } else {
@@ -198,7 +199,7 @@ fn main() {
         || (target_url.scheme() == "http" || target_url.scheme() == "https")
         || target_url.scheme() == "data"
     {
-        match retrieve_asset(&mut cache, &client, &target_url, &target_url, &options) {
+        match retrieve_asset(&mut cache, &client, &target_url, &target_url, &options, &cookies) {
             Ok((retrieved_data, final_url, media_type, charset)) => {
                 // Provide output as text without processing it, the way browsers do
                 if !media_type.eq_ignore_ascii_case("text/html")
@@ -306,7 +307,7 @@ fn main() {
     }
 
     // Traverse through the document and embed remote assets
-    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options);
+    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options, &cookies);
 
     // Update or add new BASE element to reroute network requests and hash-links
     if let Some(new_base_url) = options.base_url.clone() {
@@ -320,7 +321,7 @@ fn main() {
     {
         let favicon_ico_url: Url = resolve_url(&base_url, "/favicon.ico");
 
-        match retrieve_asset(&mut cache, &client, &target_url, &favicon_ico_url, &options) {
+        match retrieve_asset(&mut cache, &client, &target_url, &favicon_ico_url, &options, &cookies) {
             Ok((data, final_url, media_type, charset)) => {
                 let favicon_data_url: Url =
                     create_data_url(&media_type, &charset, &data, &final_url);

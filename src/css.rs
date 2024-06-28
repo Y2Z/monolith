@@ -5,6 +5,7 @@ use reqwest::blocking::Client;
 use std::collections::HashMap;
 use url::Url;
 
+use crate::cookies::Cookie;
 use crate::opts::Options;
 use crate::url::{create_data_url, resolve_url, EMPTY_IMAGE_DATA_URL};
 use crate::utils::retrieve_asset;
@@ -36,6 +37,7 @@ pub fn embed_css(
     document_url: &Url,
     css: &str,
     options: &Options,
+    cookies: &Vec<Cookie>
 ) -> String {
     let mut input = ParserInput::new(&css);
     let mut parser = Parser::new(&mut input);
@@ -46,6 +48,7 @@ pub fn embed_css(
         document_url,
         &mut parser,
         options,
+        cookies,
         "",
         "",
         "",
@@ -79,6 +82,7 @@ pub fn process_css<'a>(
     document_url: &Url,
     parser: &mut Parser,
     options: &Options,
+    cookies: &Vec<Cookie>,
     rule_name: &str,
     prop_name: &str,
     func_name: &str,
@@ -132,6 +136,7 @@ pub fn process_css<'a>(
                             document_url,
                             parser,
                             options,
+                            cookies,
                             rule_name,
                             curr_prop.as_str(),
                             func_name,
@@ -186,7 +191,7 @@ pub fn process_css<'a>(
                     }
 
                     let import_full_url: Url = resolve_url(&document_url, value);
-                    match retrieve_asset(cache, client, &document_url, &import_full_url, options) {
+                    match retrieve_asset(cache, client, &document_url, &import_full_url, options, cookies) {
                         Ok((
                             import_contents,
                             import_final_url,
@@ -202,6 +207,7 @@ pub fn process_css<'a>(
                                     &import_final_url,
                                     &String::from_utf8_lossy(&import_contents),
                                     options,
+                                    cookies,
                                 )
                                 .as_bytes(),
                                 &import_final_url,
@@ -239,6 +245,7 @@ pub fn process_css<'a>(
                                 &document_url,
                                 &resolved_url,
                                 options,
+                                cookies,
                             ) {
                                 Ok((data, final_url, media_type, charset)) => {
                                     let mut data_url =
@@ -328,7 +335,7 @@ pub fn process_css<'a>(
                 result.push_str("url(");
                 if is_import {
                     let full_url: Url = resolve_url(&document_url, value);
-                    match retrieve_asset(cache, client, &document_url, &full_url, options) {
+                    match retrieve_asset(cache, client, &document_url, &full_url, options, cookies) {
                         Ok((css, final_url, media_type, charset)) => {
                             let mut data_url = create_data_url(
                                 &media_type,
@@ -339,6 +346,7 @@ pub fn process_css<'a>(
                                     &final_url,
                                     &String::from_utf8_lossy(&css),
                                     options,
+                                    cookies,
                                 )
                                 .as_bytes(),
                                 &final_url,
@@ -359,7 +367,7 @@ pub fn process_css<'a>(
                         result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                     } else {
                         let full_url: Url = resolve_url(&document_url, value);
-                        match retrieve_asset(cache, client, &document_url, &full_url, options) {
+                        match retrieve_asset(cache, client, &document_url, &full_url, options, cookies) {
                             Ok((data, final_url, media_type, charset)) => {
                                 let mut data_url =
                                     create_data_url(&media_type, &charset, &data, &final_url);
@@ -395,6 +403,7 @@ pub fn process_css<'a>(
                             document_url,
                             parser,
                             options,
+                            cookies,
                             curr_rule.as_str(),
                             curr_prop.as_str(),
                             function_name,
