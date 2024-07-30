@@ -78,6 +78,12 @@ guix install monolith
 nix-env -iA nixpkgs.monolith
 ```
 
+#### Using [Flox](https://flox.dev)
+
+```flox
+flox install monolith
+```
+
 #### Using [Pacman](https://archlinux.org/packages/extra/x86_64/monolith) (Arch Linux)
 
 ```console
