@@ -80,7 +80,7 @@ nix-env -iA nixpkgs.monolith
 
 #### Using [Flox](https://flox.dev)
 
-```flox
+```console
 flox install monolith
 ```
 
