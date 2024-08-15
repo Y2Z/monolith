@@ -135,7 +135,7 @@ mod passing {
     }
 
     #[test]
-    fn the_latest_without_descriptor() {
+    fn last_without_descriptor() {
         let cache = &mut HashMap::new();
         let client = Client::new();
         let srcset_value = "small,s.png 1x, medium,m.png 2x, large,l.png";
