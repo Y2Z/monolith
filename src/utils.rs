@@ -1,12 +1,12 @@
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE};
+use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE, REFERER};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use url::Url;
 
 use crate::opts::Options;
-use crate::url::{clean_url, parse_data_url};
+use crate::url::{clean_url, parse_data_url, referer_url};
 
 const ANSI_COLOR_RED: &'static str = "\x1b[31m";
 const ANSI_COLOR_RESET: &'static str = "\x1b[0m";
@@ -297,6 +297,13 @@ pub fn retrieve_asset(
                             .insert(COOKIE, HeaderValue::from_str(&cookie_header_value).unwrap());
                     }
                 }
+            }
+            // Add referer header for page resource requests
+            if parent_url != url {
+                headers.insert(
+                    REFERER,
+                    HeaderValue::from_str(referer_url(parent_url.clone()).as_str()).unwrap(),
+                );
             }
             match client.get(url.as_str()).headers(headers).send() {
                 Ok(response) => {

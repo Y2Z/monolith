@@ -79,6 +79,17 @@ pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
     (media_type, charset, blob)
 }
 
+pub fn referer_url(url: Url) -> Url {
+    let mut url = url.clone();
+    // https://httpwg.org/specs/rfc9110.html#field.referer
+    // MUST NOT include the fragment and userinfo components of the URI
+    url.set_fragment(None);
+    url.set_username(&"").unwrap();
+    url.set_password(None).unwrap();
+
+    url
+}
+
 pub fn resolve_url(from: &Url, to: &str) -> Url {
     match Url::parse(&to) {
         Ok(parsed_url) => parsed_url,
