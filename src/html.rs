@@ -28,9 +28,9 @@ struct SrcSetItem<'a> {
     descriptor: &'a str,
 }
 
-const WHITESPACES: &'static [char] = &['\t', '\n', '\x0c', '\r', ' '];
-
 const ICON_VALUES: &'static [&str] = &["icon", "shortcut icon"];
+
+const WHITESPACES: &'static [char] = &['\t', '\n', '\x0c', '\r', ' '];
 
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
@@ -177,7 +177,7 @@ pub fn embed_srcset(
 
     while offset < size {
         let mut has_descriptor = true;
-        // Zero or more ASCII whitespace + skip leading U+002C COMMA character (,)
+        // Zero or more whitespaces + skip leading comma
         let url_start = offset
             + srcset[offset..]
                 .chars()
@@ -186,7 +186,7 @@ pub fn embed_srcset(
         if url_start >= size {
             break;
         }
-        // A valid non-empty URL that does not start or end with a U+002C COMMA character (,)
+        // A valid non-empty URL that does not start or end with comma
         let mut url_end = url_start
             + srcset[url_start..]
                 .chars()
@@ -197,7 +197,7 @@ pub fn embed_srcset(
             url_end -= 1;
         }
         offset = url_end;
-        // If the URL wasn't terminated by a U+002C COMMA character (,) there may also be a descriptor.
+        // If the URL wasn't terminated by comma there may also be a descriptor
         if has_descriptor {
             offset += srcset[url_end..].chars().take_while(|&c| c != ',').count();
         }
