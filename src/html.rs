@@ -28,6 +28,8 @@ struct SrcSetItem<'a> {
     descriptor: &'a str,
 }
 
+const WHITESPACES: &'static [char] = &['\t', '\n', '\x0c', '\r', ' '];
+
 const ICON_VALUES: &'static [&str] = &["icon", "shortcut icon"];
 
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
@@ -167,12 +169,42 @@ pub fn embed_srcset(
     options: &Options,
 ) -> String {
     let mut array: Vec<SrcSetItem> = vec![];
-    let re = Regex::new(r",\s+").unwrap();
-    for srcset_item in re.split(srcset) {
-        let parts: Vec<&str> = srcset_item.trim().split_whitespace().collect();
-        if parts.len() > 0 {
-            let path = parts[0].trim();
-            let descriptor = if parts.len() > 1 { parts[1].trim() } else { "" };
+
+    // Parse srcset attribute according to the specs
+    // https://html.spec.whatwg.org/multipage/images.html#srcset-attribute
+    let mut offset = 0;
+    let size = srcset.chars().count();
+
+    while offset < size {
+        let mut has_descriptor = true;
+        // Zero or more ASCII whitespace + skip leading U+002C COMMA character (,)
+        let url_start = offset
+            + srcset[offset..]
+                .chars()
+                .take_while(|&c| WHITESPACES.contains(&c) || c == ',')
+                .count();
+        if url_start >= size {
+            break;
+        }
+        // A valid non-empty URL that does not start or end with a U+002C COMMA character (,)
+        let mut url_end = url_start
+            + srcset[url_start..]
+                .chars()
+                .take_while(|&c| !WHITESPACES.contains(&c))
+                .count();
+        while (url_end - 1) > url_start && srcset.chars().nth(url_end - 1).unwrap() == ',' {
+            has_descriptor = false;
+            url_end -= 1;
+        }
+        offset = url_end;
+        // If the URL wasn't terminated by a U+002C COMMA character (,) there may also be a descriptor.
+        if has_descriptor {
+            offset += srcset[url_end..].chars().take_while(|&c| c != ',').count();
+        }
+        // Collect SrcSetItem
+        if url_end > url_start {
+            let path = &srcset[url_start..url_end];
+            let descriptor = &srcset[url_end..offset].trim();
             let srcset_real_item = SrcSetItem { path, descriptor };
             array.push(srcset_real_item);
         }

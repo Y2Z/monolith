@@ -108,6 +108,56 @@ mod passing {
             ),
         );
     }
+
+    #[test]
+    fn no_whitespace_after_commas() {
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+        let srcset_value = "small,s.png 1x,medium,m.png 2x,large,l.png 3x";
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
+        let embedded_css = html::embed_srcset(
+            cache,
+            &client,
+            &Url::parse("data:,").unwrap(),
+            &srcset_value,
+            &options,
+        );
+
+        assert_eq!(
+            embedded_css,
+            format!(
+                "{} 1x, {} 2x, {} 3x",
+                EMPTY_IMAGE_DATA_URL, EMPTY_IMAGE_DATA_URL, EMPTY_IMAGE_DATA_URL
+            ),
+        );
+    }
+
+    #[test]
+    fn the_latest_without_descriptor() {
+        let cache = &mut HashMap::new();
+        let client = Client::new();
+        let srcset_value = "small,s.png 1x, medium,m.png 2x, large,l.png";
+        let mut options = Options::default();
+        options.no_images = true;
+        options.silent = true;
+        let embedded_css = html::embed_srcset(
+            cache,
+            &client,
+            &Url::parse("data:,").unwrap(),
+            &srcset_value,
+            &options,
+        );
+
+        assert_eq!(
+            embedded_css,
+            format!(
+                "{} 1x, {} 2x, {}",
+                EMPTY_IMAGE_DATA_URL, EMPTY_IMAGE_DATA_URL, EMPTY_IMAGE_DATA_URL
+            ),
+        );
+    }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
@@ -145,7 +195,7 @@ mod failing {
 
         assert_eq!(
             embedded_css,
-            format!("{} 1x, {} 2x,", EMPTY_IMAGE_DATA_URL, EMPTY_IMAGE_DATA_URL),
+            format!("{} 1x, {} 2x", EMPTY_IMAGE_DATA_URL, EMPTY_IMAGE_DATA_URL),
         );
     }
 }
