@@ -79,10 +79,10 @@ pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
     (media_type, charset, blob)
 }
 
-pub fn referer_url(url: Url) -> Url {
+pub fn get_referer_url(url: Url) -> Url {
     let mut url = url.clone();
-    // https://httpwg.org/specs/rfc9110.html#field.referer
-    // MUST NOT include the fragment and userinfo components of the URI
+    // Spec: https://httpwg.org/specs/rfc9110.html#field.referer
+    // Must not include the fragment and userinfo components of the URI
     url.set_fragment(None);
     url.set_username(&"").unwrap();
     url.set_password(None).unwrap();
