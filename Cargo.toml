@@ -7,6 +7,7 @@ authors = [
     "Emmanuel Delaborde <th3rac25@gmail.com>",
     "Emi Simpson <emi@alchemi.dev>",
     "rhysd <lin90162@yahoo.co.jp>",
+    "Andriy Rakhnin <a@rakhnin.com>",
 ]
 edition = "2021"
 description = "CLI tool for saving web pages as a single HTML file"
