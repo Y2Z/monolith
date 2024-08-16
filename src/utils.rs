@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use url::Url;
 
 use crate::opts::Options;
-use crate::url::{clean_url, parse_data_url, referer_url};
+use crate::url::{clean_url, get_referer_url, parse_data_url};
 
 const ANSI_COLOR_RED: &'static str = "\x1b[31m";
 const ANSI_COLOR_RESET: &'static str = "\x1b[0m";
@@ -302,7 +302,7 @@ pub fn retrieve_asset(
             if parent_url != url {
                 headers.insert(
                     REFERER,
-                    HeaderValue::from_str(referer_url(parent_url.clone()).as_str()).unwrap(),
+                    HeaderValue::from_str(get_referer_url(parent_url.clone()).as_str()).unwrap(),
                 );
             }
             match client.get(url.as_str()).headers(headers).send() {
