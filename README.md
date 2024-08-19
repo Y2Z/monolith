@@ -230,7 +230,7 @@ Monolith doesn't feature a JavaScript engine, hence websites that retrieve and d
 For example, Chromium (Chrome) can be used to act as a pre-processor for such pages:
 
 ```console
-chromium --headless --incognito --dump-dom https://github.com | monolith - -I -b https://github.com -o github.html
+chromium --headless --window-size=1920,1080 --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --incognito --dump-dom https://github.com | monolith - -I -b https://github.com -o github.html
 ```
 
 
@@ -257,10 +257,3 @@ Please open an issue if something is wrong, that helps make this project better.
 
 To the extent possible under law, the author(s) have dedicated all copyright related and neighboring rights to this software to the public domain worldwide.
 This software is distributed without any warranty.
-
-
----------------------------------------------------
-
-
-<!-- Microtext -->
-<sub>Keep in mind that `monolith` is not aware of your browser’s session</sub>
