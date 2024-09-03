@@ -7,6 +7,8 @@
 
 #[cfg(test)]
 mod passing {
+    use clap::Parser;
+
     use monolith::html;
     use monolith::opts::Options;
 
@@ -14,7 +16,7 @@ mod passing {
     fn div_as_root_element() {
         let html = "<div><script src=\"some.js\"></script></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let options = Options::default();
+        let options = Options::parse();
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
@@ -29,7 +31,7 @@ mod passing {
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                     <div><script src=\"some.js\"></script></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.isolate = true;
 
         assert_eq!(
@@ -61,7 +63,7 @@ mod passing {
                     <link rel=\"stylesheet\" href=\"main.css\"/>\
                     <div style=\"display: none;\"></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_css = true;
 
         assert_eq!(
@@ -85,7 +87,7 @@ mod passing {
                     <link rel=\"something\"/>\
                     <div><script src=\"some.js\"></script></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.no_frames = true;
 
         assert_eq!(
@@ -118,7 +120,7 @@ mod passing {
                         <iframe src=\"some.html\"></iframe>\
                     </div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let mut options = Options::default();
+        let mut options = Options::parse();
         options.isolate = true;
         options.no_css = true;
         options.no_fonts = true;

@@ -7,11 +7,13 @@
 
 #[cfg(test)]
 mod passing {
+    use clap::Parser;
     use reqwest::blocking::Client;
     use reqwest::Url;
     use std::collections::HashMap;
     use std::env;
 
+    use monolith::cookies::Cookie;
     use monolith::opts::Options;
     use monolith::url;
     use monolith::utils;
@@ -20,8 +22,8 @@ mod passing {
     fn read_data_url() {
         let cache = &mut HashMap::new();
         let client = Client::new();
-
-        let mut options = Options::default();
+        let cookies: Vec<Cookie> = vec![];
+        let mut options = Options::parse();
         options.silent = true;
 
         // If both source and target are data URLs,
@@ -32,6 +34,7 @@ mod passing {
             &Url::parse("data:text/html;base64,c291cmNl").unwrap(),
             &Url::parse("data:text/html;base64,dGFyZ2V0").unwrap(),
             &options,
+            &cookies,
         )
         .unwrap();
         assert_eq!(&media_type, "text/html");
@@ -50,8 +53,8 @@ mod passing {
     fn read_local_file_with_file_url_parent() {
         let cache = &mut HashMap::new();
         let client = Client::new();
-
-        let mut options = Options::default();
+        let cookies: Vec<Cookie> = vec![];
+        let mut options = Options::parse();
         options.silent = true;
 
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
@@ -74,6 +77,7 @@ mod passing {
             ))
             .unwrap(),
             &options,
+            &cookies,
         )
         .unwrap();
         assert_eq!(&media_type, "application/javascript");
@@ -100,10 +104,12 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
+    use clap::Parser;
     use reqwest::blocking::Client;
     use reqwest::Url;
     use std::collections::HashMap;
 
+    use monolith::cookies::Cookie;
     use monolith::opts::Options;
     use monolith::utils;
 
@@ -111,8 +117,8 @@ mod failing {
     fn read_local_file_with_data_url_parent() {
         let cache = &mut HashMap::new();
         let client = Client::new();
-
-        let mut options = Options::default();
+        let cookies: Vec<Cookie> = vec![];
+        let mut options = Options::parse();
         options.silent = true;
 
         // Inclusion of local assets from data URL sources should not be allowed
@@ -122,6 +128,7 @@ mod failing {
             &Url::parse("data:text/html;base64,SoUrCe").unwrap(),
             &Url::parse("file:///etc/passwd").unwrap(),
             &options,
+            &cookies,
         ) {
             Ok((..)) => {
                 assert!(false);
@@ -136,8 +143,8 @@ mod failing {
     fn read_local_file_with_https_parent() {
         let cache = &mut HashMap::new();
         let client = Client::new();
-
-        let mut options = Options::default();
+        let cookies: Vec<Cookie> = vec![];
+        let mut options = Options::parse();
         options.silent = true;
 
         // Inclusion of local assets from remote sources should not be allowed
@@ -147,6 +154,7 @@ mod failing {
             &Url::parse("https://kernel.org/").unwrap(),
             &Url::parse("file:///etc/passwd").unwrap(),
             &options,
+            &cookies,
         ) {
             Ok((..)) => {
                 assert!(false);
