@@ -22,6 +22,11 @@ include = [
 ]
 license = "CC0-1.0"
 
+[features]
+default = ["vendored-openssl"]
+# Compile and statically link a copy of OpenSSL.
+vendored-openssl = ["openssl/vendored"]
+
 [dependencies]
 atty = "0.2.14"  # Used for highlighting network errors
 base64 = "0.22.1"  # Used for integrity attributes
@@ -34,7 +39,7 @@ markup5ever_rcdom = "0.3.0"  # Used for manipulating DOM
 percent-encoding = "2.3.1"  # Used for encoding URLs
 sha2 = "0.10.8"  # Used for calculating checksums during integrity checks
 url = "2.5.0"  # Used for parsing URLs
-openssl = { version = "0.10.64", features = ["vendored"] }  # Used for making network requests
+openssl = "0.10.64" # Used for making network requests
 
 # Used for parsing srcset and NOSCRIPT
 [dependencies.regex]
