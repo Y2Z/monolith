@@ -36,7 +36,7 @@ jobs:
       run: |
         sudo mkdir /cross-build
         sudo touch /etc/apt/sources.list.d/armhf.list
-        echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic main" | sudo tee -a /etc/apt/sources.list.d/armhf.list
+        echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ focal main" | sudo tee -a /etc/apt/sources.list.d/armhf.list
         sudo apt-get update
         sudo apt-get install -y gcc-arm-linux-gnueabihf libc6-armhf-cross libc6-dev-armhf-cross
         sudo apt-get download libssl1.1:armhf libssl-dev:armhf
@@ -69,7 +69,7 @@ jobs:
       run: |
         sudo mkdir /cross-build
         sudo touch /etc/apt/sources.list.d/arm64.list
-        echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ bionic main" | sudo tee -a /etc/apt/sources.list.d/arm64.list
+        echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ focal main" | sudo tee -a /etc/apt/sources.list.d/arm64.list
         sudo apt-get update
         sudo apt-get install -y gcc-aarch64-linux-gnu libc6-arm64-cross libc6-dev-arm64-cross
         sudo apt-get download libssl1.1:arm64 libssl-dev:arm64
