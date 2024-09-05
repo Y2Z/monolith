@@ -38,20 +38,20 @@ html5ever = "0.27.0"  # Used for all things DOM
 markup5ever_rcdom = "0.3.0"  # Used for manipulating DOM
 percent-encoding = "2.3.1"  # Used for encoding URLs
 sha2 = "0.10.8"  # Used for calculating checksums during integrity checks
-url = "2.5.0"  # Used for parsing URLs
-openssl = "0.10.64" # Used for making network requests
+url = "2.5.2"  # Used for parsing URLs
+openssl = "0.10.64" # Used for static linking of the OpenSSL library
 
 # Used for parsing srcset and NOSCRIPT
 [dependencies.regex]
-version = "1.10.2"
+version = "1.10.6"
 default-features = false
 features = ["std", "perf-dfa", "unicode-perl"]
 
 # Used for making network requests
 [dependencies.reqwest]
-version = "0.11.23"
+version = "0.12.7"
 default-features = false
 features = ["default-tls", "blocking", "gzip", "brotli", "deflate"]
 
 [dev-dependencies]
-assert_cmd = "2.0.13"
+assert_cmd = "2.0.16"
