@@ -299,7 +299,7 @@ pub fn retrieve_asset(
                 }
             }
             // Add referer header for page resource requests
-            if parent_url != url {
+            if ["https", "http"].contains(&parent_url.scheme()) && parent_url != url {
                 headers.insert(
                     REFERER,
                     HeaderValue::from_str(get_referer_url(parent_url.clone()).as_str()).unwrap(),
