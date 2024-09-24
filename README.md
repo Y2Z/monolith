@@ -51,7 +51,7 @@ scoop install main/monolith
 #### Via [Winget](https://winstall.app/apps/Y2Z.Monolith) (Windows)
 
 ```console
-winget install --id=Y2Z.Monolith  -e
+winget install --id=Y2Z.Monolith -e
 ```
 
 #### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)

@@ -6,9 +6,7 @@ on:
     paths-ignore:
     - 'assets/'
     - 'dist/'
-    - 'docs/'
     - 'snap/'
-    - '.adr-dir'
     - 'Dockerfile'
     - 'LICENSE'
     - 'Makefile'
