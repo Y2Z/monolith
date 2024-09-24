@@ -1,10 +1,10 @@
 #!/bin/sh
 
 DOCKER=docker
-PROG_NAME=monolith
-
 if which podman 2>&1 > /dev/null; then
     DOCKER=podman
 fi
+ORG_NAME=y2z
+PROG_NAME=monolith
 
-$DOCKER run --rm y2z/$PROG_NAME "$@"
+$DOCKER run --rm $ORG_NAME/$PROG_NAME "$@"

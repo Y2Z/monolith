@@ -8,9 +8,7 @@ on:
     paths-ignore:
     - 'assets/'
     - 'dist/'
-    - 'docs/'
     - 'snap/'
-    - '.adr-dir'
     - 'Dockerfile'
     - 'LICENSE'
     - 'Makefile'
@@ -19,7 +17,6 @@ on:
 
 jobs:
   build_and_test:
-
     strategy:
       matrix:
         os:
@@ -31,7 +28,6 @@ jobs:
           - beta
           - nightly
     runs-on: ${{ matrix.os }}
-
     steps:
     - run: git config --global core.autocrlf false
 
