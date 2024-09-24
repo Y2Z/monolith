@@ -1,0 +1,34 @@
+# CI NetBSD GitHub Actions workflow for monolith
+
+name: CI
+
+on:
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+    - 'assets/'
+    - 'dist/'
+    - 'snap/'
+    - 'Dockerfile'
+    - 'LICENSE'
+    - 'Makefile'
+    - 'monolith.nuspec'
+    - 'README.md'
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    name: Build and test (netbsd)
+    steps:
+    - name: "Checkout repository"
+      uses: actions/checkout@v4
+
+    - name: Test in NetBSD
+      uses: vmactions/netbsd-vm@v1
+      with:
+        usesh: true
+        prepare: |
+          /usr/sbin/pkg_add rust mktools gmake pkgconf cwrappers
+        run: |
+          cargo build --all --locked --verbose --no-default-features
+          cargo test --all --locked --verbose --no-default-features
