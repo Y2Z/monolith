@@ -21,6 +21,7 @@ lint:
 
 lint_check:
 	@cargo fmt --all -- --check
+	@cargo clippy --
 .PHONY: lint_check
 
 test: build
