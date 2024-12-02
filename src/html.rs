@@ -23,6 +23,15 @@ use crate::url::{
 };
 use crate::utils::{parse_content_type, retrieve_asset};
 
+#[derive(PartialEq, Eq)]
+pub enum LinkType {
+    Alternate,
+    DnsPrefetch,
+    Icon,
+    Preload,
+    Stylesheet,
+}
+
 struct SrcSetItem<'a> {
     path: &'a str,
     descriptor: &'a str,
@@ -139,26 +148,6 @@ pub fn create_metadata_tag(url: &Url) -> String {
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION"),
     )
-}
-
-pub fn determine_link_node_type(node: &Handle) -> &str {
-    let mut link_type: &str = "unknown";
-
-    if let Some(link_attr_rel_value) = get_node_attr(node, "rel") {
-        if is_icon(&link_attr_rel_value) {
-            link_type = "icon";
-        } else if link_attr_rel_value.eq_ignore_ascii_case("stylesheet")
-            || link_attr_rel_value.eq_ignore_ascii_case("alternate stylesheet")
-        {
-            link_type = "stylesheet";
-        } else if link_attr_rel_value.eq_ignore_ascii_case("preload") {
-            link_type = "preload";
-        } else if link_attr_rel_value.eq_ignore_ascii_case("dns-prefetch") {
-            link_type = "dns-prefetch";
-        }
-    }
-
-    link_type
 }
 
 pub fn embed_srcset(
@@ -454,6 +443,26 @@ pub fn is_icon(attr_value: &str) -> bool {
     ICON_VALUES.contains(&attr_value.to_lowercase().as_str())
 }
 
+pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
+    let mut types: Vec<LinkType> = vec![];
+
+    for link_attr_rel_type in link_attr_rel_value.split_whitespace() {
+        if link_attr_rel_type.eq_ignore_ascii_case("alternate") {
+            types.push(LinkType::Alternate);
+        } else if link_attr_rel_type.eq_ignore_ascii_case("dns-prefetch") {
+            types.push(LinkType::DnsPrefetch);
+        } else if link_attr_rel_type.eq_ignore_ascii_case("preload") {
+            types.push(LinkType::Preload);
+        } else if link_attr_rel_type.eq_ignore_ascii_case("stylesheet") {
+            types.push(LinkType::Stylesheet);
+        } else if is_icon(&link_attr_rel_type) {
+            types.push(LinkType::Icon);
+        }
+    }
+
+    types
+}
+
 pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
     serialize(
@@ -665,7 +674,10 @@ pub fn retrieve_and_embed_asset(
                     s = String::from_utf8_lossy(&data).to_string();
                 }
 
-                if node_name == "link" && determine_link_node_type(node) == "stylesheet" {
+                if node_name == "link"
+                    && parse_link_type(&get_node_attr(node, "rel").unwrap_or(String::from("")))
+                        .contains(&LinkType::Stylesheet)
+                {
                     // Stylesheet LINK elements require special treatment
                     let css: String = embed_css(cache, client, &final_url, &s, options);
 
@@ -757,9 +769,10 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "link" => {
-                    let link_type: &str = determine_link_node_type(node);
+                    let link_node_types: Vec<LinkType> =
+                        parse_link_type(&get_node_attr(node, "rel").unwrap_or(String::from("")));
 
-                    if link_type == "icon" {
+                    if link_node_types.contains(&LinkType::Icon) {
                         // Find and resolve LINK's href attribute
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
                             if !options.no_images && !link_attr_href_value.is_empty() {
@@ -776,7 +789,7 @@ pub fn walk_and_embed_assets(
                                 set_node_attr(node, "href", None);
                             }
                         }
-                    } else if link_type == "stylesheet" {
+                    } else if link_node_types.contains(&LinkType::Stylesheet) {
                         // Resolve LINK's href attribute
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
                             if options.no_css {
@@ -797,7 +810,9 @@ pub fn walk_and_embed_assets(
                                 }
                             }
                         }
-                    } else if link_type == "preload" || link_type == "dns-prefetch" {
+                    } else if link_node_types.contains(&LinkType::Preload)
+                        || link_node_types.contains(&LinkType::DnsPrefetch)
+                    {
                         // Since all resources are embedded as data URLs, preloading and prefetching are not necessary
                         set_node_attr(node, "rel", None);
                     } else {
