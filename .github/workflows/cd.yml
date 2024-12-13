@@ -44,6 +44,7 @@ jobs:
         sudo dpkg -x libssl-dev*.deb /cross-build
         rustup target add arm-unknown-linux-gnueabihf
         echo "C_INCLUDE_PATH=/cross-build/usr/include" >> $GITHUB_ENV
+        echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
         echo "OPENSSL_INCLUDE_DIR=/cross-build/usr/include/arm-linux-gnueabihf" >> $GITHUB_ENV
         echo "OPENSSL_LIB_DIR=/cross-build/usr/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
         echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
@@ -77,6 +78,7 @@ jobs:
         sudo dpkg -x libssl-dev*.deb /cross-build
         rustup target add aarch64-unknown-linux-gnu
         echo "C_INCLUDE_PATH=/cross-build/usr/include" >> $GITHUB_ENV
+        echo "OPENSSL_STATIC=yes" >> $GITHUB_ENV
         echo "OPENSSL_INCLUDE_DIR=/cross-build/usr/include/aarch64-linux-gnu" >> $GITHUB_ENV
         echo "OPENSSL_LIB_DIR=/cross-build/usr/lib/aarch64-linux-gnu" >> $GITHUB_ENV
         echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
@@ -98,11 +100,15 @@ jobs:
     - name: Checkout the repository
       uses: actions/checkout@v2
 
+    - name: Prepare cross-platform environment
+      run: |
+        rustup target add x86_64-unknown-linux-musl
+
     - name: Build the executable
-      run: cargo build --release
+      run: cargo build --release --target=x86_64-unknown-linux-musl
 
     - uses: Shopify/upload-to-release@v2.0.0
       with:
         name: monolith-gnu-linux-x86_64
-        path: target/release/monolith
+        path: target/x86_64-unknown-linux-musl/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
