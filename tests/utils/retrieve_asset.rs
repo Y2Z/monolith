@@ -9,16 +9,16 @@
 mod passing {
     use reqwest::blocking::Client;
     use reqwest::Url;
-    use std::collections::HashMap;
     use std::env;
 
+    use monolith::cache::Cache;
     use monolith::opts::Options;
     use monolith::url;
     use monolith::utils;
 
     #[test]
     fn read_data_url() {
-        let cache = &mut HashMap::new();
+        let cache = &mut Cache::new(0, None);
         let client = Client::new();
 
         let mut options = Options::default();
@@ -48,7 +48,7 @@ mod passing {
 
     #[test]
     fn read_local_file_with_file_url_parent() {
-        let cache = &mut HashMap::new();
+        let cache = &mut Cache::new(0, None);
         let client = Client::new();
 
         let mut options = Options::default();
@@ -102,14 +102,14 @@ mod passing {
 mod failing {
     use reqwest::blocking::Client;
     use reqwest::Url;
-    use std::collections::HashMap;
 
+    use monolith::cache::Cache;
     use monolith::opts::Options;
     use monolith::utils;
 
     #[test]
     fn read_local_file_with_data_url_parent() {
-        let cache = &mut HashMap::new();
+        let cache = &mut Cache::new(0, None);
         let client = Client::new();
 
         let mut options = Options::default();
@@ -134,7 +134,7 @@ mod failing {
 
     #[test]
     fn read_local_file_with_https_parent() {
-        let cache = &mut HashMap::new();
+        let cache = &mut Cache::new(0, None);
         let client = Client::new();
 
         let mut options = Options::default();

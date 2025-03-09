@@ -1,10 +1,10 @@
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE, REFERER};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use url::Url;
 
+use crate::cache::Cache;
 use crate::opts::Options;
 use crate::url::{clean_url, get_referer_url, parse_data_url};
 
@@ -181,7 +181,7 @@ pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
 }
 
 pub fn retrieve_asset(
-    cache: &mut HashMap<String, Vec<u8>>,
+    cache: &mut Cache,
     client: &Client,
     parent_url: &Url,
     url: &Url,
@@ -270,10 +270,10 @@ pub fn retrieve_asset(
             }
 
             Ok((
-                cache.get(&cache_key).unwrap().to_vec(),
+                cache.get(&cache_key).unwrap().0.to_vec(),
                 url.clone(),
-                "".to_string(),
-                "".to_string(),
+                cache.get(&cache_key).unwrap().1,
+                cache.get(&cache_key).unwrap().2,
             ))
         } else {
             if let Some(domains) = &options.domains {
@@ -369,7 +369,7 @@ pub fn retrieve_asset(
                     }
 
                     // Add retrieved resource to cache
-                    cache.insert(new_cache_key, data.clone());
+                    cache.set(&new_cache_key, &data, media_type.clone(), charset.clone());
 
                     // Return
                     Ok((data, response_url, media_type, charset))

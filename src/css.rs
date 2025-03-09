@@ -2,9 +2,9 @@ use cssparser::{
     serialize_identifier, serialize_string, ParseError, Parser, ParserInput, SourcePosition, Token,
 };
 use reqwest::blocking::Client;
-use std::collections::HashMap;
 use url::Url;
 
+use crate::cache::Cache;
 use crate::opts::Options;
 use crate::url::{create_data_url, resolve_url, EMPTY_IMAGE_DATA_URL};
 use crate::utils::retrieve_asset;
@@ -31,7 +31,7 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
 ];
 
 pub fn embed_css(
-    cache: &mut HashMap<String, Vec<u8>>,
+    cache: &mut Cache,
     client: &Client,
     document_url: &Url,
     css: &str,
@@ -74,7 +74,7 @@ pub fn is_image_url_prop(prop_name: &str) -> bool {
 }
 
 pub fn process_css<'a>(
-    cache: &mut HashMap<String, Vec<u8>>,
+    cache: &mut Cache,
     client: &Client,
     document_url: &Url,
     parser: &mut Parser,

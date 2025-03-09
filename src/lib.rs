@@ -1,3 +1,4 @@
+pub mod cache;
 pub mod cookies;
 pub mod css;
 pub mod html;

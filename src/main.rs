@@ -1,15 +1,17 @@
-use encoding_rs::Encoding;
-use markup5ever_rcdom::RcDom;
-use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
-use std::collections::HashMap;
 use std::fs;
 use std::io::{self, prelude::*, Error, Write};
 use std::path::Path;
 use std::process;
 use std::time::Duration;
+
+use encoding_rs::Encoding;
+use markup5ever_rcdom::RcDom;
+use reqwest::blocking::Client;
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use tempfile::Builder;
 use url::Url;
 
+use monolith::cache::Cache;
 use monolith::cookies::parse_cookie_file_contents;
 use monolith::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, has_favicon, html_to_dom,
@@ -63,6 +65,8 @@ pub fn read_stdin() -> Vec<u8> {
         Err(_) => buffer,
     }
 }
+
+const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 50; // Minimum asset file size (in bytes)
 
 fn main() {
     let mut options = Options::from_args();
@@ -146,11 +150,6 @@ fn main() {
             Ok(str) => match parse_cookie_file_contents(&str) {
                 Ok(cookies) => {
                     options.cookies = cookies;
-                    // for c in &cookies {
-                    //     // if !cookie.is_expired() {
-                    //         // options.cookies.append(c);
-                    //     // }
-                    // }
                 }
                 Err(_) => {
                     eprintln!("Could not parse specified cookie file");
@@ -165,7 +164,15 @@ fn main() {
     }
 
     // Initialize client
-    let mut cache = HashMap::new();
+    let temp_file = Builder::new()
+        .prefix(".monolith-")
+        .keep(!true)
+        .tempfile()
+        .unwrap();
+    let mut cache = Cache::new(
+        CACHE_ASSET_FILE_SIZE_THRESHOLD,
+        Some(temp_file.path().display().to_string()),
+    );
     let mut header_map = HeaderMap::new();
     if let Some(user_agent) = &options.user_agent {
         header_map.insert(
@@ -353,4 +360,7 @@ fn main() {
 
     // Write result into STDOUT or file
     output.write(&result).expect("Could not write output");
+
+    // Remove temporary file used for storing cache's database
+    // drop(temp_file);
 }

@@ -12,9 +12,9 @@ use regex::Regex;
 use reqwest::blocking::Client;
 use reqwest::Url;
 use sha2::{Digest, Sha256, Sha384, Sha512};
-use std::collections::HashMap;
 use std::default::Default;
 
+use crate::cache::Cache;
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::opts::Options;
@@ -151,7 +151,7 @@ pub fn create_metadata_tag(url: &Url) -> String {
 }
 
 pub fn embed_srcset(
-    cache: &mut HashMap<String, Vec<u8>>,
+    cache: &mut Cache,
     client: &Client,
     document_url: &Url,
     srcset: &str,
@@ -637,7 +637,7 @@ pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &O
 }
 
 pub fn retrieve_and_embed_asset(
-    cache: &mut HashMap<String, Vec<u8>>,
+    cache: &mut Cache,
     client: &Client,
     document_url: &Url,
     node: &Handle,
@@ -738,7 +738,7 @@ pub fn retrieve_and_embed_asset(
 }
 
 pub fn walk_and_embed_assets(
-    cache: &mut HashMap<String, Vec<u8>>,
+    cache: &mut Cache,
     client: &Client,
     document_url: &Url,
     node: &Handle,
