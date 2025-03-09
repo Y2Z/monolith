@@ -25,8 +25,9 @@ use crate::url::{
 #[derive(PartialEq, Eq)]
 pub enum LinkType {
     Alternate,
+    AppleTouchIcon,
     DnsPrefetch,
-    Icon,
+    Favicon,
     Preload,
     Stylesheet,
 }
@@ -36,7 +37,7 @@ struct SrcSetItem<'a> {
     descriptor: &'a str,
 }
 
-const ICON_VALUES: &'static [&str] = &["icon", "shortcut icon"];
+const FAVICON_VALUES: &'static [&str] = &["icon", "shortcut icon"];
 
 const WHITESPACES: &'static [char] = &['\t', '\n', '\x0c', '\r', ' '];
 
@@ -398,7 +399,7 @@ pub fn has_favicon(handle: &Handle) -> bool {
             match name.local.as_ref() {
                 "link" => {
                     if let Some(attr_value) = get_node_attr(handle, "rel") {
-                        if is_icon(attr_value.trim()) {
+                        if is_favicon(attr_value.trim()) {
                             found_favicon = true;
                         }
                     }
@@ -438,8 +439,8 @@ pub fn html_to_dom(data: &Vec<u8>, document_encoding: String) -> RcDom {
         .unwrap()
 }
 
-pub fn is_icon(attr_value: &str) -> bool {
-    ICON_VALUES.contains(&attr_value.to_lowercase().as_str())
+pub fn is_favicon(attr_value: &str) -> bool {
+    FAVICON_VALUES.contains(&attr_value.to_lowercase().as_str())
 }
 
 pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
@@ -454,8 +455,10 @@ pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
             types.push(LinkType::Preload);
         } else if link_attr_rel_type.eq_ignore_ascii_case("stylesheet") {
             types.push(LinkType::Stylesheet);
-        } else if is_icon(&link_attr_rel_type) {
-            types.push(LinkType::Icon);
+        } else if is_favicon(&link_attr_rel_type) {
+            types.push(LinkType::Favicon);
+        } else if link_attr_rel_type.eq_ignore_ascii_case("apple-touch-icon") {
+            types.push(LinkType::AppleTouchIcon);
         }
     }
 
@@ -771,7 +774,9 @@ pub fn walk_and_embed_assets(
                     let link_node_types: Vec<LinkType> =
                         parse_link_type(&get_node_attr(node, "rel").unwrap_or(String::from("")));
 
-                    if link_node_types.contains(&LinkType::Icon) {
+                    if link_node_types.contains(&LinkType::Favicon)
+                        || link_node_types.contains(&LinkType::AppleTouchIcon)
+                    {
                         // Find and resolve LINK's href attribute
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
                             if !options.no_images && !link_attr_href_value.is_empty() {

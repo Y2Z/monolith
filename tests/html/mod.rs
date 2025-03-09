@@ -8,7 +8,7 @@ mod get_charset;
 mod get_node_attr;
 mod get_node_name;
 mod has_favicon;
-mod is_icon;
+mod is_favicon;
 mod parse_link_type;
 mod serialize_document;
 mod set_node_attr;
