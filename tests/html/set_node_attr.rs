@@ -27,7 +27,7 @@ mod passing {
                         test_walk(child, &mut *i);
                     }
                 }
-                NodeData::Element { ref name, .. } => {
+                NodeData::Element { name, .. } => {
                     let node_name = name.local.as_ref().to_string();
 
                     if node_name == "html" {
@@ -80,7 +80,7 @@ mod passing {
                         test_walk(child, &mut *i);
                     }
                 }
-                NodeData::Element { ref name, .. } => {
+                NodeData::Element { name, .. } => {
                     let node_name = name.local.as_ref().to_string();
 
                     if node_name == "body" {

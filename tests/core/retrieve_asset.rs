@@ -7,12 +7,12 @@
 
 #[cfg(test)]
 mod passing {
-    use reqwest::blocking::Client;
     use reqwest::Url;
+    use reqwest::blocking::Client;
     use std::env;
 
     use monolith::cache::Cache;
-    use monolith::core::{retrieve_asset, Options};
+    use monolith::core::{Options, retrieve_asset};
     use monolith::url;
 
     #[test]
@@ -99,11 +99,11 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use reqwest::blocking::Client;
     use reqwest::Url;
+    use reqwest::blocking::Client;
 
     use monolith::cache::Cache;
-    use monolith::core::{retrieve_asset, Options};
+    use monolith::core::{Options, retrieve_asset};
 
     #[test]
     fn read_local_file_with_data_url_parent() {

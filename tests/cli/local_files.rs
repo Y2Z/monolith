@@ -10,7 +10,7 @@ mod passing {
     use assert_cmd::prelude::*;
     use std::env;
     use std::fs;
-    use std::path::{Path, MAIN_SEPARATOR};
+    use std::path::{MAIN_SEPARATOR, Path};
     use std::process::Command;
     use url::Url;
 

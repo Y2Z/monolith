@@ -8,7 +8,7 @@ use std::time::Duration;
 use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE, REFERER, USER_AGENT};
+use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, REFERER, USER_AGENT};
 use url::Url;
 
 use crate::cache::Cache;
