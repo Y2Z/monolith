@@ -132,7 +132,25 @@ mod failing {
         // STDERR should contain error description
         assert_eq!(
             String::from_utf8_lossy(&out.stderr),
-            "No target specified\n"
+            "Error: no target specified\n"
+        );
+
+        // STDOUT should be empty
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "");
+
+        // Exit code should be 1
+        out.assert().code(1);
+    }
+
+    #[test]
+    fn unsupported_scheme() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let out = cmd.arg("mailto:snshn@tutanota.com").output().unwrap();
+
+        // STDERR should contain error description
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            "Error: unsupported target URL scheme \"mailto\"\n"
         );
 
         // STDOUT should be empty

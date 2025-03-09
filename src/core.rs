@@ -48,8 +48,7 @@ impl Error for MonolithError {
 pub struct Options {
     pub base_url: Option<String>,
     pub blacklist_domains: bool,
-    // pub cache: Option<Cache>,
-    pub cookies: Vec<Cookie>,
+    pub cookies: Vec<Cookie>, // TODO: move out of this struct
     pub domains: Option<Vec<String>>,
     pub encoding: Option<String>,
     pub ignore_errors: bool,
@@ -66,7 +65,6 @@ pub struct Options {
     pub no_video: bool,
     pub output: String,
     pub silent: bool,
-    pub target: String,
     pub timeout: u64,
     pub unwrap_noscript: bool,
     pub user_agent: Option<String>,
@@ -104,30 +102,28 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
 ];
 
 pub fn create_monolithic_document(
+    target: String,
     options: &Options,
-    mut cache: &mut Cache,
+    mut cache: &mut Cache, // TODO: make it Option-al
 ) -> Result<Vec<u8>, MonolithError> {
     // Check if target was provided
-    if options.target.len() == 0 {
-        if !options.silent {
-            eprintln!("No target specified");
-        }
-
+    if target.len() == 0 {
         return Err(MonolithError::new("no target specified"));
     }
 
     // Check if custom encoding value is acceptable
     if let Some(custom_encoding) = options.encoding.clone() {
         if !Encoding::for_label_no_replacement(custom_encoding.as_bytes()).is_some() {
-            eprintln!("Unknown encoding: {}", &custom_encoding);
-
-            return Err(MonolithError::new("unknown encoding specified"));
+            return Err(MonolithError::new(&format!(
+                "unknown encoding \"{}\"",
+                &custom_encoding
+            )));
         }
     }
 
     let mut use_stdin: bool = false;
 
-    let target_url = match options.target.as_str() {
+    let target_url = match target.as_str() {
         "-" => {
             // Read from pipe (stdin)
             use_stdin = true;
@@ -138,11 +134,10 @@ pub fn create_monolithic_document(
             Ok(url) => match url.scheme() {
                 "data" | "file" | "http" | "https" => url,
                 unsupported_scheme => {
-                    if !options.silent {
-                        eprintln!("Unsupported target URL type: {}", unsupported_scheme);
-                    }
-
-                    return Err(MonolithError::new("unsupported target URL type"));
+                    return Err(MonolithError::new(&format!(
+                        "unsupported target URL scheme \"{}\"",
+                        unsupported_scheme
+                    )));
                 }
             },
             Err(_) => {
@@ -155,13 +150,10 @@ pub fn create_monolithic_document(
                             match Url::from_file_path(canonical_path) {
                                 Ok(url) => url,
                                 Err(_) => {
-                                    if !options.silent {
-                                        eprintln!(
-                                            "Could not generate file URL out of given path: {}",
-                                            &target
-                                        );
-                                    }
-
+                                    // eprintln!(
+                                    //     "Could not generate file URL out of given path: {}",
+                                    //     &target
+                                    // );
                                     return Err(MonolithError::new(
                                         "could not generate file URL out of given path",
                                     ));
@@ -169,10 +161,7 @@ pub fn create_monolithic_document(
                             }
                         }
                         false => {
-                            if !options.silent {
-                                eprintln!("Local target is not a file: {}", &target);
-                            }
-
+                            // eprintln!("Local target is not a file: {}", &target);
                             return Err(MonolithError::new("local target is not a file"));
                         }
                     },
@@ -245,10 +234,6 @@ pub fn create_monolithic_document(
                 document_encoding = charset;
             }
             Err(_) => {
-                if !options.silent {
-                    eprintln!("Could not retrieve target document");
-                }
-
                 return Err(MonolithError::new("could not retrieve target document"));
             }
         }
@@ -306,15 +291,10 @@ pub fn create_monolithic_document(
                                 base_url = file_url;
                             }
                             Err(_) => {
-                                if !options.silent {
-                                    eprintln!(
-                                        "Could not map given path to base URL: {}",
-                                        custom_base_url
-                                    );
-                                }
-                                return Err(MonolithError::new(
-                                    "could not map given path to base URL",
-                                ));
+                                return Err(MonolithError::new(&format!(
+                                    "could not map given path to base URL \"{}\"",
+                                    custom_base_url
+                                )));
                             }
                         }
                     }

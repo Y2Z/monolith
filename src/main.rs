@@ -66,6 +66,7 @@ fn main() {
     // Process CLI flags and options
     let mut cookie_file_path: Option<String> = None;
     let mut options: Options = Options::default();
+    let target;
     {
         let app = App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
@@ -116,7 +117,7 @@ fn main() {
             .get_matches();
 
         // Process the command
-        options.target = app
+        target = app
             .value_of("target")
             .expect("please set target")
             .to_string();
@@ -208,7 +209,7 @@ fn main() {
         }
     }
 
-    match create_monolithic_document(&options, &mut cache) {
+    match create_monolithic_document(target, &options, &mut cache) {
         Ok(result) => {
             // Define output
             let mut output = Output::new(&options.output).expect("Could not prepare output");
@@ -216,7 +217,11 @@ fn main() {
             // Write result into STDOUT or file
             output.write(&result).expect("Could not write output");
         }
-        Err(_) => {
+        Err(error) => {
+            if !options.silent {
+                eprintln!("Error: {}", error);
+            }
+
             process::exit(1);
         }
     }

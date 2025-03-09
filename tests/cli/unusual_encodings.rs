@@ -170,7 +170,7 @@ mod passing {
         // STDERR should contain error message
         assert_eq!(
             String::from_utf8_lossy(&out.stderr),
-            "Unknown encoding: utf0\n"
+            "Error: unknown encoding \"utf0\"\n"
         );
 
         // STDOUT should be empty
