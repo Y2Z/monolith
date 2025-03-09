@@ -203,6 +203,7 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-t`: Adjust `network request timeout`
  - `-u`: Provide `custom User-Agent`
  - `-v`: Exclude videos
+ - `-V`: Print version number
 
 
 ---------------------------------------------------
