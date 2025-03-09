@@ -17,7 +17,7 @@ pub struct Cache {
     db_ok: Option<bool>, // None by default, Some(true) if was able to initialize database, Some (false) if an error occured
 }
 
-const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("_"); // The one and only table used for caching assets
+const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("_");
 
 impl Cache {
     pub fn new(min_file_size: usize, db_file_path: Option<String>) -> Cache {
@@ -28,8 +28,8 @@ impl Cache {
             db_ok: None,
         };
 
-        // Initialize database
         if db_file_path.is_some() {
+            // Attempt to initialize on-disk database
             match Database::create(Path::new(&db_file_path.unwrap())) {
                 Ok(db) => {
                     cache.db = Some(db);
@@ -37,7 +37,6 @@ impl Cache {
                     cache
                 }
                 Err(..) => {
-                    // eprintln!("Error: unable to initialize cache database in {}", &temp_file.path().display());
                     cache.db_ok = Some(false);
                     cache
                 }
@@ -49,7 +48,6 @@ impl Cache {
     }
 
     pub fn set(&mut self, key: &str, data: &Vec<u8>, media_type: String, charset: String) {
-        // Store metadata information outside of database (data, media type, charset)
         let mut cache_metadata_item: CacheMetadataItem = CacheMetadataItem {
             data: if self.db_ok.is_some() && self.db_ok.unwrap() {
                 None
@@ -59,10 +57,6 @@ impl Cache {
             media_type: Some(media_type.to_owned()),
             charset: Some(charset),
         };
-
-        // TODO: If it's already there, but the updated value exceeds min_file_size, delete metadata[].data and store it in database
-
-        // TODO: If database is not there, attempt to initialize it
 
         if (self.db_ok.is_none() || !self.db_ok.unwrap()) || data.len() <= self.min_file_size {
             cache_metadata_item.data = Some((&*data.to_owned()).to_vec());
@@ -76,7 +70,7 @@ impl Cache {
                     write_txn.commit().unwrap();
                 }
                 Err(..) => {
-                    // Fallback to caching in RAM
+                    // Fall back to caching everything in memory
                     cache_metadata_item.data = Some((&*data.to_owned()).to_vec());
                 }
             }
@@ -100,8 +94,9 @@ impl Cache {
                 if self.db_ok.is_some() && self.db_ok.unwrap() {
                     let read_txn = self.db.as_ref().unwrap().begin_read()?;
                     let table = read_txn.open_table(TABLE)?;
-                    let key = table.get(key)?; //.ok_or(Self::GetError::NotFound)?;
-                    let bytes = key.unwrap();
+                    let data = table.get(key)?;
+                    let bytes = data.unwrap();
+
                     return Ok((
                         bytes.value().to_vec(),
                         metadata_item.media_type.as_ref().expect("").to_string(),
