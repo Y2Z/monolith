@@ -14,14 +14,21 @@ fn main() {
     let mut options = Options::from_args();
 
     // Set up cache (attempt to create temporary file)
-    let temp_cache_file = match Builder::new().prefix(".monolith-").keep(false).tempfile() {
+    let temp_cache_file = match Builder::new().prefix("monolith-").tempfile() {
         Ok(tempfile) => Some(tempfile),
         Err(_) => None,
     };
     let mut cache = Cache::new(
         CACHE_ASSET_FILE_SIZE_THRESHOLD,
         if temp_cache_file.is_some() {
-            Some(temp_cache_file.unwrap().path().display().to_string())
+            Some(
+                temp_cache_file
+                    .as_ref()
+                    .unwrap()
+                    .path()
+                    .display()
+                    .to_string(),
+            )
         } else {
             None
         },
@@ -47,7 +54,4 @@ fn main() {
     }
 
     create_monolithic_file(&mut cache, &options);
-
-    // Remove temporary file used for storing cache's database
-    // drop(temp_file);
 }
