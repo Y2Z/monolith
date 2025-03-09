@@ -3,23 +3,23 @@ use chrono::prelude::*;
 use encoding_rs::Encoding;
 use html5ever::interface::QualName;
 use html5ever::parse_document;
-use html5ever::serialize::{serialize, SerializeOpts};
-use html5ever::tendril::{format_tendril, TendrilSink};
+use html5ever::serialize::{SerializeOpts, serialize};
+use html5ever::tendril::{TendrilSink, format_tendril};
 use html5ever::tree_builder::{Attribute, TreeSink};
-use html5ever::{local_name, namespace_url, ns, LocalName};
+use html5ever::{LocalName, local_name, namespace_url, ns};
 use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
 use regex::Regex;
-use reqwest::blocking::Client;
 use reqwest::Url;
+use reqwest::blocking::Client;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
 
 use crate::cache::Cache;
-use crate::core::{parse_content_type, retrieve_asset, Options};
+use crate::core::{Options, parse_content_type, retrieve_asset};
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::url::{
-    clean_url, create_data_url, is_url_and_has_protocol, resolve_url, EMPTY_IMAGE_DATA_URL,
+    EMPTY_IMAGE_DATA_URL, clean_url, create_data_url, is_url_and_has_protocol, resolve_url,
 };
 
 #[derive(PartialEq, Eq)]
@@ -139,7 +139,7 @@ pub fn create_metadata_tag(url: &Url) -> String {
     format!(
         "<!-- Saved from {} at {} using {} v{} -->",
         if clean_url.scheme() == "http" || clean_url.scheme() == "https" {
-            &clean_url.as_str()
+            clean_url.as_str()
         } else {
             "local source"
         },
@@ -357,7 +357,7 @@ pub fn get_child_node_by_name(parent: &Handle, node_name: &str) -> Option<Handle
 
 pub fn get_node_attr(node: &Handle, attr_name: &str) -> Option<String> {
     match &node.data {
-        NodeData::Element { ref attrs, .. } => {
+        NodeData::Element { attrs, .. } => {
             for attr in attrs.borrow().iter() {
                 if &*attr.name.local == attr_name {
                     return Some(attr.value.to_string());
@@ -371,7 +371,7 @@ pub fn get_node_attr(node: &Handle, attr_name: &str) -> Option<String> {
 
 pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
     match &node.data {
-        NodeData::Element { ref name, .. } => Some(name.local.as_ref()),
+        NodeData::Element { name, .. } => Some(name.local.as_ref()),
         _ => None,
     }
 }
@@ -534,7 +534,7 @@ pub fn set_charset(mut dom: RcDom, desired_charset: String) -> RcDom {
 
 pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>) {
     match &node.data {
-        NodeData::Element { ref attrs, .. } => {
+        NodeData::Element { attrs, .. } => {
             let attrs_mut = &mut attrs.borrow_mut();
             let mut i = 0;
             let mut found_existing_attr: bool = false;

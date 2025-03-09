@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use html5ever::serialize::{serialize, SerializeOpts};
+    use html5ever::serialize::{SerializeOpts, serialize};
     use markup5ever_rcdom::SerializableHandle;
 
     use monolith::html;

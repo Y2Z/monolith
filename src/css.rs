@@ -1,12 +1,12 @@
 use cssparser::{
-    serialize_identifier, serialize_string, ParseError, Parser, ParserInput, SourcePosition, Token,
+    ParseError, Parser, ParserInput, SourcePosition, Token, serialize_identifier, serialize_string,
 };
 use reqwest::blocking::Client;
 use url::Url;
 
 use crate::cache::Cache;
-use crate::core::{retrieve_asset, Options};
-use crate::url::{create_data_url, resolve_url, EMPTY_IMAGE_DATA_URL};
+use crate::core::{Options, retrieve_asset};
+use crate::url::{EMPTY_IMAGE_DATA_URL, create_data_url, resolve_url};
 
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     // Universal

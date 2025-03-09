@@ -7,8 +7,8 @@
 
 #[cfg(test)]
 mod passing {
-    use reqwest::blocking::Client;
     use reqwest::Url;
+    use reqwest::blocking::Client;
 
     use monolith::cache::Cache;
     use monolith::core::Options;

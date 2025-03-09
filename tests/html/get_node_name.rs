@@ -26,7 +26,7 @@ mod passing {
                         test_walk(child, &mut *i);
                     }
                 }
-                NodeData::Element { ref name, .. } => {
+                NodeData::Element { name, .. } => {
                     let node_name = name.local.as_ref().to_string();
                     let parent = html::get_parent_node(node);
                     let parent_node_name = html::get_node_name(&parent);
