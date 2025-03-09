@@ -22,24 +22,21 @@ include = [
 ]
 license = "CC0-1.0"
 
-[features]
-default = ["vendored-openssl"]
-# Compile and statically link a copy of OpenSSL.
-vendored-openssl = ["openssl/vendored"]
-
 [dependencies]
 atty = "0.2.14"  # Used for highlighting network errors
 base64 = "0.22.1"  # Used for integrity attributes
 chrono = "0.4.38"  # Used for formatting output timestamp
-clap = "3.2.25"  # Used for processing CLI arguments
+clap = { version = "3.2.25", optional = true }  # Used for processing CLI arguments
 cssparser = "0.34.0"  # Used for dealing with CSS
 encoding_rs = "0.8.34"  # Used for parsing and converting document charsets
 html5ever = "0.27.0"  # Used for all things DOM
 markup5ever_rcdom = "0.3.0"  # Used for manipulating DOM
 percent-encoding = "2.3.1"  # Used for encoding URLs
 sha2 = "0.10.8"  # Used for calculating checksums during integrity checks
+redb = "2.4.0"  # Used for on-disk caching of downloaded assets
+tempfile = { version = "3.14.0", optional = true }  # Used for on-disk caching of downloaded assets
 url = "2.5.2"  # Used for parsing URLs
-openssl = "0.10.64" # Used for static linking of the OpenSSL library
+openssl = "0.10.64"  # Used for static linking of the OpenSSL library
 
 # Used for parsing srcset and NOSCRIPT
 [dependencies.regex]
@@ -55,3 +52,8 @@ features = ["default-tls", "blocking", "gzip", "brotli", "deflate"]
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
+
+[features]
+default = ["cli", "vendored-openssl"]
+cli = ["clap", "tempfile"]  # Build a CLI tool that includes main() function
+vendored-openssl = ["openssl/vendored"]  # Compile and statically link a copy of OpenSSL
