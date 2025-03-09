@@ -9,7 +9,7 @@ authors = [
     "rhysd <lin90162@yahoo.co.jp>",
     "Andriy Rakhnin <a@rakhnin.com>",
 ]
-edition = "2024"
+edition = "2021"
 description = "CLI tool for saving web pages as a single HTML file"
 homepage = "https://github.com/Y2Z/monolith"
 repository = "https://github.com/Y2Z/monolith"
