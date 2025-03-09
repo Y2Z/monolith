@@ -24,7 +24,7 @@ pub struct Options {
     pub base_url: Option<String>,
     pub blacklist_domains: bool,
     pub no_css: bool,
-    pub cookie_file: Option<String>,
+    // pub cache: Option<Cache>,
     pub cookies: Vec<Cookie>,
     pub domains: Option<Vec<String>>,
     pub ignore_errors: bool,
@@ -113,7 +113,7 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "image/svg+xml",
 ];
 
-pub fn create_monolithic_file(mut cache: &mut Cache, options: &Options) {
+pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
     // Check if target was provided
     if options.target.len() == 0 {
         if !options.silent {
