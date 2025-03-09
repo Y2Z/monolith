@@ -20,30 +20,30 @@ use crate::url::{clean_url, create_data_url, get_referer_url, parse_data_url, re
 
 #[derive(Default)]
 pub struct Options {
-    pub no_audio: bool,
     pub base_url: Option<String>,
     pub blacklist_domains: bool,
-    pub no_css: bool,
     // pub cache: Option<Cache>,
     pub cookies: Vec<Cookie>,
     pub domains: Option<Vec<String>>,
-    pub ignore_errors: bool,
     pub encoding: Option<String>,
-    pub no_frames: bool,
-    pub no_fonts: bool,
-    pub no_images: bool,
-    pub isolate: bool,
-    pub no_js: bool,
+    pub ignore_errors: bool,
     pub insecure: bool,
+    pub isolate: bool,
+    pub no_audio: bool,
+    pub no_color: bool,
+    pub no_css: bool,
+    pub no_fonts: bool,
+    pub no_frames: bool,
+    pub no_images: bool,
+    pub no_js: bool,
     pub no_metadata: bool,
+    pub no_video: bool,
     pub output: String,
     pub silent: bool,
-    pub timeout: u64,
-    pub user_agent: Option<String>,
-    pub no_video: bool,
     pub target: String,
-    pub no_color: bool,
+    pub timeout: u64,
     pub unwrap_noscript: bool,
+    pub user_agent: Option<String>,
 }
 
 enum Output {
@@ -84,7 +84,7 @@ impl Output {
 
 const ANSI_COLOR_RED: &'static str = "\x1b[31m";
 const ANSI_COLOR_RESET: &'static str = "\x1b[0m";
-const MAGIC: [[&[u8]; 2]; 18] = [
+const FILE_SIGNATURES: [[&[u8]; 2]; 18] = [
     // Image
     [b"GIF87a", b"image/gif"],
     [b"GIF89a", b"image/gif"],
@@ -382,9 +382,9 @@ pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
 
 pub fn detect_media_type(data: &[u8], url: &Url) -> String {
     // At first attempt to read file's header
-    for magic_item in MAGIC.iter() {
-        if data.starts_with(magic_item[0]) {
-            return String::from_utf8(magic_item[1].to_vec()).unwrap();
+    for file_signature in FILE_SIGNATURES.iter() {
+        if data.starts_with(file_signature[0]) {
+            return String::from_utf8(file_signature[1].to_vec()).unwrap();
         }
     }
 
