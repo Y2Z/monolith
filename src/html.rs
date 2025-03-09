@@ -3,23 +3,23 @@ use chrono::prelude::*;
 use encoding_rs::Encoding;
 use html5ever::interface::QualName;
 use html5ever::parse_document;
-use html5ever::serialize::{SerializeOpts, serialize};
-use html5ever::tendril::{TendrilSink, format_tendril};
+use html5ever::serialize::{serialize, SerializeOpts};
+use html5ever::tendril::{format_tendril, TendrilSink};
 use html5ever::tree_builder::{Attribute, TreeSink};
-use html5ever::{LocalName, local_name, namespace_url, ns};
+use html5ever::{local_name, namespace_url, ns, LocalName};
 use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
 use regex::Regex;
-use reqwest::Url;
 use reqwest::blocking::Client;
+use reqwest::Url;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
 
 use crate::cache::Cache;
-use crate::core::{Options, parse_content_type, retrieve_asset};
+use crate::core::{parse_content_type, retrieve_asset, Options};
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::url::{
-    EMPTY_IMAGE_DATA_URL, clean_url, create_data_url, is_url_and_has_protocol, resolve_url,
+    clean_url, create_data_url, is_url_and_has_protocol, resolve_url, EMPTY_IMAGE_DATA_URL,
 };
 
 #[derive(PartialEq, Eq)]
