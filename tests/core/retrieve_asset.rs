@@ -12,8 +12,7 @@ mod passing {
     use std::env;
 
     use monolith::cache::Cache;
-    use monolith::core::retrieve_asset;
-    use monolith::opts::Options;
+    use monolith::core::{retrieve_asset, Options};
     use monolith::url;
 
     #[test]
@@ -104,8 +103,7 @@ mod failing {
     use reqwest::Url;
 
     use monolith::cache::Cache;
-    use monolith::core::retrieve_asset;
-    use monolith::opts::Options;
+    use monolith::core::{retrieve_asset, Options};
 
     #[test]
     fn read_local_file_with_data_url_parent() {

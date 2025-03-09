@@ -7,8 +7,8 @@
 
 #[cfg(test)]
 mod passing {
+    use monolith::core::Options;
     use monolith::html;
-    use monolith::opts::Options;
 
     #[test]
     fn div_as_root_element() {

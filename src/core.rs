@@ -11,12 +11,40 @@ use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE, REFERER, USE
 use url::Url;
 
 use crate::cache::Cache;
+use crate::cookies::Cookie;
 use crate::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, has_favicon, html_to_dom,
     serialize_document, set_base_url, set_charset, walk_and_embed_assets,
 };
-use crate::opts::Options;
 use crate::url::{clean_url, create_data_url, get_referer_url, parse_data_url, resolve_url};
+
+#[derive(Default)]
+pub struct Options {
+    pub no_audio: bool,
+    pub base_url: Option<String>,
+    pub blacklist_domains: bool,
+    pub no_css: bool,
+    pub cookie_file: Option<String>,
+    pub cookies: Vec<Cookie>,
+    pub domains: Option<Vec<String>>,
+    pub ignore_errors: bool,
+    pub encoding: Option<String>,
+    pub no_frames: bool,
+    pub no_fonts: bool,
+    pub no_images: bool,
+    pub isolate: bool,
+    pub no_js: bool,
+    pub insecure: bool,
+    pub no_metadata: bool,
+    pub output: String,
+    pub silent: bool,
+    pub timeout: u64,
+    pub user_agent: Option<String>,
+    pub no_video: bool,
+    pub target: String,
+    pub no_color: bool,
+    pub unwrap_noscript: bool,
+}
 
 enum Output {
     Stdout(io::Stdout),

@@ -11,8 +11,8 @@ mod passing {
     use reqwest::Url;
 
     use monolith::cache::Cache;
+    use monolith::core::Options;
     use monolith::css;
-    use monolith::opts::Options;
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
     #[test]
