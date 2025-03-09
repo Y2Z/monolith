@@ -5,9 +5,9 @@ use reqwest::blocking::Client;
 use url::Url;
 
 use crate::cache::Cache;
+use crate::core::retrieve_asset;
 use crate::opts::Options;
 use crate::url::{create_data_url, resolve_url, EMPTY_IMAGE_DATA_URL};
-use crate::utils::retrieve_asset;
 
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     // Universal
