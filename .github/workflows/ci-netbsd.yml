@@ -28,7 +28,9 @@ jobs:
       with:
         usesh: true
         prepare: |
-          /usr/sbin/pkg_add rust mktools gmake pkgconf cwrappers
+          /usr/sbin/pkg_add curl cwrappers gmake mktools pkgconf
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         run: |
+          export PATH="/root/.cargo/bin:$PATH"
           cargo build --all --locked --verbose --no-default-features --features cli
           cargo test --all --locked --verbose --no-default-features --features cli
