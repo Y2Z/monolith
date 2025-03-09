@@ -63,7 +63,6 @@ pub struct Options {
     pub no_js: bool,
     pub no_metadata: bool,
     pub no_video: bool,
-    pub output: String,
     pub silent: bool,
     pub timeout: u64,
     pub unwrap_noscript: bool,
@@ -102,12 +101,12 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
 ];
 
 pub fn create_monolithic_document(
-    target: String,
+    source: String,
     options: &Options,
     mut cache: &mut Cache, // TODO: make it Option-al
 ) -> Result<Vec<u8>, MonolithError> {
-    // Check if target was provided
-    if target.len() == 0 {
+    // Check if source was provided
+    if source.len() == 0 {
         return Err(MonolithError::new("no target specified"));
     }
 
@@ -123,7 +122,7 @@ pub fn create_monolithic_document(
 
     let mut use_stdin: bool = false;
 
-    let target_url = match target.as_str() {
+    let target_url = match source.as_str() {
         "-" => {
             // Read from pipe (stdin)
             use_stdin = true;
@@ -150,26 +149,24 @@ pub fn create_monolithic_document(
                             match Url::from_file_path(canonical_path) {
                                 Ok(url) => url,
                                 Err(_) => {
-                                    // eprintln!(
-                                    //     "Could not generate file URL out of given path: {}",
-                                    //     &target
-                                    // );
-                                    return Err(MonolithError::new(
-                                        "could not generate file URL out of given path",
-                                    ));
+                                    return Err(MonolithError::new(&format!(
+                                        "could not generate file URL out of given path \"{}\"",
+                                        &target
+                                    )));
                                 }
                             }
                         }
                         false => {
-                            // eprintln!("Local target is not a file: {}", &target);
-                            return Err(MonolithError::new("local target is not a file"));
+                            return Err(MonolithError::new(&format!(
+                                "local target \"{}\" is not a file",
+                                &target
+                            )));
                         }
                     },
                     false => {
                         // It is not a FS path, now we do what browsers do:
                         // prepend "http://" and hope it points to a website
-                        Url::parse(&format!("http://{hopefully_url}", hopefully_url = &target))
-                            .unwrap()
+                        Url::parse(&format!("http://{}", &target)).unwrap()
                     }
                 }
             }

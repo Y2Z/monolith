@@ -16,11 +16,11 @@ enum Output {
 }
 
 impl Output {
-    fn new(file_path: &str) -> Result<Output, IoError> {
-        if file_path.is_empty() || file_path.eq("-") {
+    fn new(destination: &str) -> Result<Output, IoError> {
+        if destination.is_empty() || destination.eq("-") {
             Ok(Output::Stdout(io::stdout()))
         } else {
-            Ok(Output::File(fs::File::create(file_path)?))
+            Ok(Output::File(fs::File::create(destination)?))
         }
     }
 
@@ -66,7 +66,8 @@ fn main() {
     // Process CLI flags and options
     let mut cookie_file_path: Option<String> = None;
     let mut options: Options = Options::default();
-    let target;
+    let source;
+    let destination;
     {
         let app = App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
@@ -117,7 +118,7 @@ fn main() {
             .get_matches();
 
         // Process the command
-        target = app
+        source = app
             .value_of("target")
             .expect("please set target")
             .to_string();
@@ -145,7 +146,7 @@ fn main() {
         options.no_js = app.is_present("no-js");
         options.insecure = app.is_present("insecure");
         options.no_metadata = app.is_present("no-metadata");
-        options.output = app.value_of("output").unwrap_or("").to_string();
+        destination = app.value_of("output").unwrap_or("").to_string();
         options.silent = app.is_present("silent");
         options.timeout = app
             .value_of("timeout")
@@ -209,10 +210,10 @@ fn main() {
         }
     }
 
-    match create_monolithic_document(target, &options, &mut cache) {
+    match create_monolithic_document(source, &options, &mut cache) {
         Ok(result) => {
             // Define output
-            let mut output = Output::new(&options.output).expect("Could not prepare output");
+            let mut output = Output::new(&destination).expect("Could not prepare output");
 
             // Write result into STDOUT or file
             output.write(&result).expect("Could not write output");
