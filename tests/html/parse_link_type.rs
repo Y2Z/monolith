@@ -11,12 +11,12 @@ mod passing {
 
     #[test]
     fn icon() {
-        assert!(html::parse_link_type("icon").contains(&html::LinkType::Icon));
+        assert!(html::parse_link_type("icon").contains(&html::LinkType::Favicon));
     }
 
     #[test]
     fn shortcut_icon_capitalized() {
-        assert!(html::parse_link_type("Shortcut Icon").contains(&html::LinkType::Icon));
+        assert!(html::parse_link_type("Shortcut Icon").contains(&html::LinkType::Favicon));
     }
 
     #[test]
@@ -27,6 +27,11 @@ mod passing {
     #[test]
     fn preload_stylesheet() {
         assert!(html::parse_link_type("preload stylesheet").contains(&html::LinkType::Stylesheet));
+    }
+
+    #[test]
+    fn apple_touch_icon() {
+        assert!(html::parse_link_type("apple-touch-icon").contains(&html::LinkType::AppleTouchIcon));
     }
 }
 
