@@ -1,7 +1,8 @@
+use std::error::Error;
+use std::fmt;
 use std::fs;
-use std::io::{self, prelude::*, Error, Write};
+use std::io::{self, prelude::*};
 use std::path::{Path, PathBuf};
-use std::process;
 use std::time::Duration;
 
 use encoding_rs::Encoding;
@@ -17,6 +18,31 @@ use crate::html::{
     serialize_document, set_base_url, set_charset, walk_and_embed_assets,
 };
 use crate::url::{clean_url, create_data_url, get_referer_url, parse_data_url, resolve_url};
+
+#[derive(Debug)]
+pub struct MonolithError {
+    details: String,
+}
+
+impl MonolithError {
+    fn new(msg: &str) -> MonolithError {
+        MonolithError {
+            details: msg.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for MonolithError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl Error for MonolithError {
+    fn description(&self) -> &str {
+        &self.details
+    }
+}
 
 #[derive(Default)]
 pub struct Options {
@@ -44,42 +70,6 @@ pub struct Options {
     pub timeout: u64,
     pub unwrap_noscript: bool,
     pub user_agent: Option<String>,
-}
-
-enum Output {
-    Stdout(io::Stdout),
-    File(fs::File),
-}
-
-impl Output {
-    fn new(file_path: &str) -> Result<Output, Error> {
-        if file_path.is_empty() || file_path.eq("-") {
-            Ok(Output::Stdout(io::stdout()))
-        } else {
-            Ok(Output::File(fs::File::create(file_path)?))
-        }
-    }
-
-    fn write(&mut self, bytes: &Vec<u8>) -> Result<(), Error> {
-        match self {
-            Output::Stdout(stdout) => {
-                stdout.write_all(bytes)?;
-                // Ensure newline at end of output
-                if bytes.last() != Some(&b"\n"[0]) {
-                    stdout.write(b"\n")?;
-                }
-                stdout.flush()
-            }
-            Output::File(file) => {
-                file.write_all(bytes)?;
-                // Ensure newline at end of output
-                if bytes.last() != Some(&b"\n"[0]) {
-                    file.write(b"\n")?;
-                }
-                file.flush()
-            }
-        }
-    }
 }
 
 const ANSI_COLOR_RED: &'static str = "\x1b[31m";
@@ -113,20 +103,25 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "image/svg+xml",
 ];
 
-pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
+pub fn create_monolithic_document(
+    options: &Options,
+    mut cache: &mut Cache,
+) -> Result<Vec<u8>, MonolithError> {
     // Check if target was provided
     if options.target.len() == 0 {
         if !options.silent {
             eprintln!("No target specified");
         }
-        process::exit(1);
+
+        return Err(MonolithError::new("no target specified"));
     }
 
     // Check if custom encoding value is acceptable
     if let Some(custom_encoding) = options.encoding.clone() {
         if !Encoding::for_label_no_replacement(custom_encoding.as_bytes()).is_some() {
             eprintln!("Unknown encoding: {}", &custom_encoding);
-            process::exit(1);
+
+            return Err(MonolithError::new("unknown encoding specified"));
         }
     }
 
@@ -146,7 +141,8 @@ pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
                     if !options.silent {
                         eprintln!("Unsupported target URL type: {}", unsupported_scheme);
                     }
-                    process::exit(1)
+
+                    return Err(MonolithError::new("unsupported target URL type"));
                 }
             },
             Err(_) => {
@@ -165,7 +161,10 @@ pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
                                             &target
                                         );
                                     }
-                                    process::exit(1);
+
+                                    return Err(MonolithError::new(
+                                        "could not generate file URL out of given path",
+                                    ));
                                 }
                             }
                         }
@@ -173,7 +172,8 @@ pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
                             if !options.silent {
                                 eprintln!("Local target is not a file: {}", &target);
                             }
-                            process::exit(1);
+
+                            return Err(MonolithError::new("local target is not a file"));
                         }
                     },
                     false => {
@@ -225,21 +225,11 @@ pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
     {
         match retrieve_asset(&mut cache, &client, &target_url, &target_url, &options) {
             Ok((retrieved_data, final_url, media_type, charset)) => {
-                // Provide output as text without processing it, the way browsers do
+                // Provide output as text (without processing it, the way browsers do)
                 if !media_type.eq_ignore_ascii_case("text/html")
                     && !media_type.eq_ignore_ascii_case("application/xhtml+xml")
                 {
-                    // Define output
-                    let mut output =
-                        Output::new(&options.output).expect("Could not prepare output");
-
-                    // Write retrieved data into STDOUT or file
-                    output
-                        .write(&retrieved_data)
-                        .expect("Could not write output");
-
-                    // Nothing else to do past this point
-                    process::exit(0);
+                    return Ok(retrieved_data);
                 }
 
                 if options
@@ -258,11 +248,12 @@ pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
                 if !options.silent {
                     eprintln!("Could not retrieve target document");
                 }
-                process::exit(1);
+
+                return Err(MonolithError::new("could not retrieve target document"));
             }
         }
     } else {
-        process::exit(1);
+        return Err(MonolithError::new("unsupported target"));
     }
 
     // Initial parse
@@ -321,7 +312,9 @@ pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
                                         custom_base_url
                                     );
                                 }
-                                process::exit(1);
+                                return Err(MonolithError::new(
+                                    "could not map given path to base URL",
+                                ));
                             }
                         }
                     }
@@ -373,11 +366,7 @@ pub fn create_monolithic_file(options: &Options, mut cache: &mut Cache) {
         result.splice(0..0, metadata_comment.as_bytes().to_vec());
     }
 
-    // Define output
-    let mut output = Output::new(&options.output).expect("Could not prepare output");
-
-    // Write result into STDOUT or file
-    output.write(&result).expect("Could not write output");
+    Ok(result)
 }
 
 pub fn detect_media_type(data: &[u8], url: &Url) -> String {

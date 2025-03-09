@@ -1,5 +1,6 @@
 use std::env;
-use std::fs::read_to_string;
+use std::fs;
+use std::io::{self, Error as IoError, Write};
 use std::process;
 
 use clap::{App, Arg, ArgAction};
@@ -7,7 +8,43 @@ use tempfile::Builder;
 
 use monolith::cache::Cache;
 use monolith::cookies::parse_cookie_file_contents;
-use monolith::core::{create_monolithic_file, Options};
+use monolith::core::{create_monolithic_document, Options};
+
+enum Output {
+    Stdout(io::Stdout),
+    File(fs::File),
+}
+
+impl Output {
+    fn new(file_path: &str) -> Result<Output, IoError> {
+        if file_path.is_empty() || file_path.eq("-") {
+            Ok(Output::Stdout(io::stdout()))
+        } else {
+            Ok(Output::File(fs::File::create(file_path)?))
+        }
+    }
+
+    fn write(&mut self, bytes: &Vec<u8>) -> Result<(), IoError> {
+        match self {
+            Output::Stdout(stdout) => {
+                stdout.write_all(bytes)?;
+                // Ensure newline at end of output
+                if bytes.last() != Some(&b"\n"[0]) {
+                    stdout.write(b"\n")?;
+                }
+                stdout.flush()
+            }
+            Output::File(file) => {
+                file.write_all(bytes)?;
+                // Ensure newline at end of output
+                if bytes.last() != Some(&b"\n"[0]) {
+                    file.write(b"\n")?;
+                }
+                file.flush()
+            }
+        }
+    }
+}
 
 const ASCII: &'static str = " \
  _____     ______________    __________      ___________________    ___
@@ -154,7 +191,7 @@ fn main() {
 
     // Read and parse cookie file
     if let Some(opt_cookie_file) = cookie_file_path.clone() {
-        match read_to_string(opt_cookie_file) {
+        match fs::read_to_string(opt_cookie_file) {
             Ok(str) => match parse_cookie_file_contents(&str) {
                 Ok(parsed_cookies_from_file) => {
                     options.cookies = parsed_cookies_from_file;
@@ -171,5 +208,16 @@ fn main() {
         }
     }
 
-    create_monolithic_file(&options, &mut cache);
+    match create_monolithic_document(&options, &mut cache) {
+        Ok(result) => {
+            // Define output
+            let mut output = Output::new(&options.output).expect("Could not prepare output");
+
+            // Write result into STDOUT or file
+            output.write(&result).expect("Could not write output");
+        }
+        Err(_) => {
+            process::exit(1);
+        }
+    }
 }
