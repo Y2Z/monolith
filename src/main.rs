@@ -8,7 +8,7 @@ use tempfile::Builder;
 
 use monolith::cache::Cache;
 use monolith::cookies::parse_cookie_file_contents;
-use monolith::core::{Options, create_monolithic_document};
+use monolith::core::{create_monolithic_document, Options};
 
 enum Output {
     Stdout(io::Stdout),
