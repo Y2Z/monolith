@@ -58,7 +58,7 @@ const ASCII: &'static str = " \
 const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 50; // Minimum file size for on-disk caching (in bytes)
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &'static str =
-    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:73.0) Gecko/20100101 Firefox/73.0";
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
 const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 const ENV_VAR_TERM: &str = "TERM";
 
