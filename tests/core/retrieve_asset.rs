@@ -12,9 +12,9 @@ mod passing {
     use std::env;
 
     use monolith::cache::Cache;
+    use monolith::core::retrieve_asset;
     use monolith::opts::Options;
     use monolith::url;
-    use monolith::utils;
 
     #[test]
     fn read_data_url() {
@@ -26,7 +26,7 @@ mod passing {
 
         // If both source and target are data URLs,
         //  ensure the result contains target data URL
-        let (data, final_url, media_type, charset) = utils::retrieve_asset(
+        let (data, final_url, media_type, charset) = retrieve_asset(
             cache,
             &client,
             &Url::parse("data:text/html;base64,c291cmNl").unwrap(),
@@ -58,7 +58,7 @@ mod passing {
 
         // Inclusion of local assets from local sources should be allowed
         let cwd = env::current_dir().unwrap();
-        let (data, final_url, media_type, charset) = utils::retrieve_asset(
+        let (data, final_url, media_type, charset) = retrieve_asset(
             cache,
             &client,
             &Url::parse(&format!(
@@ -104,8 +104,8 @@ mod failing {
     use reqwest::Url;
 
     use monolith::cache::Cache;
+    use monolith::core::retrieve_asset;
     use monolith::opts::Options;
-    use monolith::utils;
 
     #[test]
     fn read_local_file_with_data_url_parent() {
@@ -116,7 +116,7 @@ mod failing {
         options.silent = true;
 
         // Inclusion of local assets from data URL sources should not be allowed
-        match utils::retrieve_asset(
+        match retrieve_asset(
             cache,
             &client,
             &Url::parse("data:text/html;base64,SoUrCe").unwrap(),
@@ -141,7 +141,7 @@ mod failing {
         options.silent = true;
 
         // Inclusion of local assets from remote sources should not be allowed
-        match utils::retrieve_asset(
+        match retrieve_asset(
             cache,
             &client,
             &Url::parse("https://kernel.org/").unwrap(),

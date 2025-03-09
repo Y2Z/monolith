@@ -2,7 +2,7 @@ use base64::prelude::*;
 use percent_encoding::percent_decode_str;
 use url::Url;
 
-use crate::utils::{detect_media_type, parse_content_type};
+use crate::core::{detect_media_type, parse_content_type};
 
 pub const EMPTY_IMAGE_DATA_URL: &'static str = "data:image/png,\
 %89PNG%0D%0A%1A%0A%00%00%00%0DIHDR%00%00%00%0D%00%00%00%0D%08%04%00%00%00%D8%E2%2C%F7%00%00%00%11IDATx%DAcd%C0%09%18G%A5%28%96%02%00%0A%F8%00%0E%CB%8A%EB%16%00%00%00%00IEND%AEB%60%82";
