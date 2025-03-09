@@ -13,8 +13,8 @@ mod passing {
     use url::Url;
 
     use monolith::cache::Cache;
+    use monolith::core::Options;
     use monolith::html;
-    use monolith::opts::Options;
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
     #[test]

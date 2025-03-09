@@ -15,10 +15,9 @@ use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
 
 use crate::cache::Cache;
-use crate::core::{parse_content_type, retrieve_asset};
+use crate::core::{parse_content_type, retrieve_asset, Options};
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
-use crate::opts::Options;
 use crate::url::{
     clean_url, create_data_url, is_url_and_has_protocol, resolve_url, EMPTY_IMAGE_DATA_URL,
 };

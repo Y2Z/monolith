@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use monolith::opts::Options;
+    use monolith::core::Options;
 
     #[test]
     fn defaults() {
