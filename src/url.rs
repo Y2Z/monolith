@@ -48,12 +48,8 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
 
 pub fn is_url_and_has_protocol(input: &str) -> bool {
     match Url::parse(&input) {
-        Ok(parsed_url) => {
-            return parsed_url.scheme().len() > 0;
-        }
-        Err(_) => {
-            return false;
-        }
+        Ok(parsed_url) => parsed_url.scheme().len() > 0,
+        Err(_) => false,
     }
 }
 

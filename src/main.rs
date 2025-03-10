@@ -30,7 +30,7 @@ impl Output {
                 stdout.write_all(bytes)?;
                 // Ensure newline at end of output
                 if bytes.last() != Some(&b"\n"[0]) {
-                    stdout.write(b"\n")?;
+                    stdout.write_all(b"\n")?;
                 }
                 stdout.flush()
             }
@@ -38,7 +38,7 @@ impl Output {
                 file.write_all(bytes)?;
                 // Ensure newline at end of output
                 if bytes.last() != Some(&b"\n"[0]) {
-                    file.write(b"\n")?;
+                    file.write_all(b"\n")?;
                 }
                 file.flush()
             }
