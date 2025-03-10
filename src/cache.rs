@@ -52,14 +52,14 @@ impl Cache {
             data: if self.db_ok.is_some() && self.db_ok.unwrap() {
                 None
             } else {
-                Some((&*data.to_owned()).to_vec())
+                Some((data.to_owned()).to_vec())
             },
             media_type: Some(media_type.to_owned()),
             charset: Some(charset),
         };
 
         if (self.db_ok.is_none() || !self.db_ok.unwrap()) || data.len() <= self.min_file_size {
-            cache_metadata_item.data = Some((&*data.to_owned()).to_vec());
+            cache_metadata_item.data = Some((data.to_owned()).to_vec());
         } else {
             match self.db.as_ref().unwrap().begin_write() {
                 Ok(write_txn) => {
@@ -71,7 +71,7 @@ impl Cache {
                 }
                 Err(..) => {
                     // Fall back to caching everything in memory
-                    cache_metadata_item.data = Some((&*data.to_owned()).to_vec());
+                    cache_metadata_item.data = Some((data.to_owned()).to_vec());
                 }
             }
         }

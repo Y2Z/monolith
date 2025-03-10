@@ -341,7 +341,7 @@ pub fn get_charset(node: &Handle) -> Option<String> {
         }
     }
 
-    return None;
+    None
 }
 
 pub fn get_child_node_by_name(parent: &Handle, node_name: &str) -> Option<Handle> {
