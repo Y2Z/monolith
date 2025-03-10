@@ -54,7 +54,7 @@ const ASCII: &str = " \
 |   | \\___/ |          | \\                      |   |   |   |   |  |   |
 |___|       |__________|  \\_____________________|   |___|   |___|  |___|
 ";
-const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 50; // Minimum file size for on-disk caching (in bytes)
+const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 10; // Minimum file size for on-disk caching (in bytes)
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
@@ -62,6 +62,7 @@ const DEFAULT_USER_AGENT: &str =
 fn main() {
     // Process CLI flags and options
     let mut cookie_file_path: Option<String> = None;
+    let mut exit_code = 0;
     let mut options: Options = Options::default();
     let source;
     let destination;
@@ -164,7 +165,7 @@ fn main() {
         Ok(tempfile) => Some(tempfile),
         Err(_) => None,
     };
-    let cache = Cache::new(
+    let mut cache = Some(Cache::new(
         CACHE_ASSET_FILE_SIZE_THRESHOLD,
         if temp_cache_file.is_some() {
             Some(
@@ -178,7 +179,7 @@ fn main() {
         } else {
             None
         },
-    );
+    ));
 
     // Read and parse cookie file
     if let Some(opt_cookie_file) = cookie_file_path.clone() {
@@ -211,7 +212,7 @@ fn main() {
         }
     }
 
-    match create_monolithic_document(source, &options, &mut Some(cache)) {
+    match create_monolithic_document(source, &options, &mut cache) {
         Ok(result) => {
             // Define output
             let mut output = Output::new(&destination).expect("could not prepare output");
@@ -222,7 +223,14 @@ fn main() {
         Err(error) => {
             print_error_message(&format!("Error: {}", error), &options);
 
-            process::exit(1);
+            exit_code = 1;
         }
+    }
+
+    // Clean up (shred database file)
+    cache.unwrap().destroy_database_file();
+
+    if exit_code > 0 {
+        process::exit(exit_code);
     }
 }
