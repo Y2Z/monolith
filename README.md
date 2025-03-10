@@ -199,7 +199,7 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-M`: Don't add timestamp and URL information
  - `-n`: Extract contents of NOSCRIPT elements
  - `-o`: Write output to `file` (use “-” for STDOUT)
- - `-s`: Be quiet
+ - `-q`: Be quiet
  - `-t`: Adjust `network request timeout`
  - `-u`: Provide `custom User-Agent`
  - `-v`: Exclude videos

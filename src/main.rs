@@ -1,4 +1,3 @@
-use std::env;
 use std::fs;
 use std::io::{self, Error as IoError, Write};
 use std::process;
@@ -59,8 +58,6 @@ const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 50; // Minimum file size f
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
-const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
-const ENV_VAR_TERM: &str = "TERM";
 
 fn main() {
     // Process CLI flags and options
@@ -79,7 +76,7 @@ fn main() {
                 "-B, --blacklist-domains 'Treat list of specified domains as blacklist'",
             )
             .args_from_usage("-c, --no-css 'Remove CSS'")
-            .args_from_usage("-C, --cookies=[cookies.txt] 'Specify cookie file'")
+            .args_from_usage("-C, --cookie-file=[cookies.txt] 'Specify cookie file'")
             .arg(
                 Arg::with_name("domains")
                     .short('d')
@@ -104,7 +101,7 @@ fn main() {
             .args_from_usage(
                 "-o, --output=[document.html] 'Write output to <file>, use - for STDOUT'",
             )
-            .args_from_usage("-s, --silent 'Suppress verbosity'")
+            .args_from_usage("-q, --quiet 'Suppress verbosity'")
             .args_from_usage("-t, --timeout=[60] 'Adjust network request timeout'")
             .args_from_usage("-u, --user-agent=[Firefox] 'Set custom User-Agent string'")
             .args_from_usage("-v, --no-video 'Remove video sources'")
@@ -128,7 +125,7 @@ fn main() {
         }
         options.blacklist_domains = app.is_present("blacklist-domains");
         options.no_css = app.is_present("no-css");
-        if let Some(cookie_file) = app.value_of("cookies") {
+        if let Some(cookie_file) = app.value_of("cookie-file") {
             cookie_file_path = Some(cookie_file.to_string());
         }
         if let Some(encoding) = app.value_of("encoding") {
@@ -147,7 +144,7 @@ fn main() {
         options.insecure = app.is_present("insecure");
         options.no_metadata = app.is_present("no-metadata");
         destination = app.value_of("output").unwrap_or("").to_string();
-        options.silent = app.is_present("silent");
+        options.silent = app.is_present("quiet");
         options.timeout = app
             .value_of("timeout")
             .unwrap_or(&DEFAULT_NETWORK_TIMEOUT.to_string())
@@ -160,14 +157,6 @@ fn main() {
         }
         options.unwrap_noscript = app.is_present("unwrap-noscript");
         options.no_video = app.is_present("no-video");
-
-        options.no_color =
-            env::var_os(ENV_VAR_NO_COLOR).is_some() || atty::isnt(atty::Stream::Stderr);
-        if let Some(term) = env::var_os(ENV_VAR_TERM) {
-            if term == "dumb" {
-                options.no_color = true;
-            }
-        }
     }
 
     // Set up cache (attempt to create temporary file)
