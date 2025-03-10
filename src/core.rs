@@ -1,7 +1,8 @@
+use std::env;
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::io::{self, prelude::*};
+use std::io::{self, prelude::*, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -65,7 +66,6 @@ pub struct Options {
     pub insecure: bool,
     pub isolate: bool,
     pub no_audio: bool,
-    pub no_color: bool,
     pub no_css: bool,
     pub no_fonts: bool,
     pub no_frames: bool,
@@ -659,24 +659,29 @@ pub fn read_stdin() -> Vec<u8> {
     }
 }
 
-use std::io::Write;
-
 pub fn print_error_message(text: &str, options: &Options) {
     if !options.silent {
         let stderr = io::stderr();
         let mut handle = stderr.lock();
 
+        const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
+        const ENV_VAR_TERM: &str = "TERM";
+
+        let mut no_color =
+            env::var_os(ENV_VAR_NO_COLOR).is_some() || atty::isnt(atty::Stream::Stderr);
+        if let Some(term) = env::var_os(ENV_VAR_TERM) {
+            if term == "dumb" {
+                no_color = true;
+            }
+        }
+
         if handle
             .write_all(
                 format!(
                     "{}{}{}\n",
-                    if options.no_color { "" } else { ANSI_COLOR_RED },
+                    if no_color { "" } else { ANSI_COLOR_RED },
                     &text,
-                    if options.no_color {
-                        ""
-                    } else {
-                        ANSI_COLOR_RESET
-                    },
+                    if no_color { "" } else { ANSI_COLOR_RESET },
                 )
                 .as_bytes(),
             )
