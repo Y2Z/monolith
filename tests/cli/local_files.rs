@@ -41,8 +41,8 @@ mod passing {
                 "\
                 {file}{cwd}/tests/_data_/basic/local-file.html\n\
                 {file}{cwd}/tests/_data_/basic/local-style.css\n\
-                {file}{cwd}/tests/_data_/basic/local-style-does-not-exist.css (not found)\n\
-                {file}{cwd}/tests/_data_/basic/monolith.png (not found)\n\
+                {file}{cwd}/tests/_data_/basic/local-style-does-not-exist.css (file not found)\n\
+                {file}{cwd}/tests/_data_/basic/monolith.png (file not found)\n\
                 {file}{cwd}/tests/_data_/basic/local-script.js\n\
                 ",
                 file = file_url_protocol,
