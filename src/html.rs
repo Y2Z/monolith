@@ -920,33 +920,37 @@ pub fn walk_and_embed_assets(
                         }
                     }
                 }
-                "image" => {
-                    let mut image_href: String = "".to_string();
-
+                "image" | "use" => {
                     if let Some(image_attr_href_value) = get_node_attr(node, "href") {
-                        image_href = image_attr_href_value;
                         if options.no_images {
                             set_node_attr(node, "href", None);
+                        } else {
+                            retrieve_and_embed_asset(
+                                cache,
+                                client,
+                                document_url,
+                                node,
+                                "href",
+                                &image_attr_href_value,
+                                options,
+                            );
                         }
                     }
 
                     if let Some(image_attr_xlink_href_value) = get_node_attr(node, "xlink:href") {
-                        image_href = image_attr_xlink_href_value;
                         if options.no_images {
                             set_node_attr(node, "xlink:href", None);
+                        } else {
+                            retrieve_and_embed_asset(
+                                cache,
+                                client,
+                                document_url,
+                                node,
+                                "xlink:href",
+                                &image_attr_xlink_href_value,
+                                options,
+                            );
                         }
-                    }
-
-                    if !options.no_images && !image_href.is_empty() {
-                        retrieve_and_embed_asset(
-                            cache,
-                            client,
-                            document_url,
-                            node,
-                            "href",
-                            &image_href,
-                            options,
-                        );
                     }
                 }
                 "source" => {
