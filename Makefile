@@ -11,16 +11,23 @@ clean:
 	@cargo clean
 .PHONY: clean
 
+format:
+	@cargo fmt --all --
+.PHONY: format
+
+format_check:
+	@cargo fmt --all -- --check
+.PHONY: format
+
 install:
 	@cargo install --force --locked --path .
 .PHONY: install
 
 lint:
-	@cargo fmt --all --
+	@cargo clippy --fix --allow-dirty
 .PHONY: lint
 
 lint_check:
-	@cargo fmt --all -- --check
 	@cargo clippy --
 .PHONY: lint_check
 
