@@ -513,18 +513,8 @@ pub fn retrieve_asset(
     } else if url.scheme() == "file" {
         // Check if parent_url is also a file: URL (if not, then we don't embed the asset)
         if parent_url.scheme() != "file" {
-            if !options.silent {
-                eprintln!(
-                    "{}{} (Security Error){}",
-                    if options.no_color { "" } else { ANSI_COLOR_RED },
-                    &url,
-                    if options.no_color {
-                        ""
-                    } else {
-                        ANSI_COLOR_RESET
-                    },
-                );
-            }
+            print_error_message(&format!("{} (security error)", &url), options);
+
             // Provoke error
             client.get("").send()?;
         }
@@ -533,27 +523,14 @@ pub fn retrieve_asset(
         let path: &Path = path_buf.as_path();
         if path.exists() {
             if path.is_dir() {
-                if !options.silent {
-                    eprintln!(
-                        "{}{} (is a directory){}",
-                        if options.no_color { "" } else { ANSI_COLOR_RED },
-                        &url,
-                        if options.no_color {
-                            ""
-                        } else {
-                            ANSI_COLOR_RESET
-                        },
-                    );
-                }
+                print_error_message(&format!("{} (is a directory)", &url), options);
 
                 // Provoke error
                 Err(client.get("").send().unwrap_err())
             } else {
-                if !options.silent {
-                    eprintln!("{}", &url);
-                }
+                print_info_message(&format!("{}", &url), options);
 
-                let file_blob: Vec<u8> = fs::read(path).expect("Unable to read file");
+                let file_blob: Vec<u8> = fs::read(path).expect("unable to read file");
 
                 Ok((
                     file_blob.clone(),
@@ -563,18 +540,7 @@ pub fn retrieve_asset(
                 ))
             }
         } else {
-            if !options.silent {
-                eprintln!(
-                    "{}{} (not found){}",
-                    if options.no_color { "" } else { ANSI_COLOR_RED },
-                    &url,
-                    if options.no_color {
-                        ""
-                    } else {
-                        ANSI_COLOR_RESET
-                    },
-                );
-            }
+            print_error_message(&format!("{} (not found)", &url), options);
 
             // Provoke error
             Err(client.get("").send().unwrap_err())
@@ -584,9 +550,7 @@ pub fn retrieve_asset(
 
         if cache.is_some() && cache.as_ref().unwrap().contains_key(&cache_key) {
             // URL is in cache, we get and return it
-            if !options.silent {
-                eprintln!("{} (from cache)", &url);
-            }
+            print_info_message(&format!("{} (from cache)", &url), options);
 
             Ok((
                 cache.as_ref().unwrap().get(&cache_key).unwrap().0.to_vec(),
@@ -627,31 +591,18 @@ pub fn retrieve_asset(
             match client.get(url.as_str()).headers(headers).send() {
                 Ok(response) => {
                     if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
-                        if !options.silent {
-                            eprintln!(
-                                "{}{} ({}){}",
-                                if options.no_color { "" } else { ANSI_COLOR_RED },
-                                &url,
-                                response.status(),
-                                if options.no_color {
-                                    ""
-                                } else {
-                                    ANSI_COLOR_RESET
-                                },
-                            );
-                        }
+                        print_error_message(&format!("{} ({})", &url, response.status()), options);
+
                         // Provoke error
                         return Err(client.get("").send().unwrap_err());
                     }
 
                     let response_url: Url = response.url().clone();
 
-                    if !options.silent {
-                        if url.as_str() == response_url.as_str() {
-                            eprintln!("{}", &url);
-                        } else {
-                            eprintln!("{} -> {}", &url, &response_url);
-                        }
+                    if url.as_str() == response_url.as_str() {
+                        print_info_message(&format!("{}", &url), options);
+                    } else {
+                        print_info_message(&format!("{} -> {}", &url, &response_url), options);
                     }
 
                     let new_cache_key: String = clean_url(response_url.clone()).to_string();
@@ -672,18 +623,7 @@ pub fn retrieve_asset(
                             data = b.to_vec();
                         }
                         Err(error) => {
-                            if !options.silent {
-                                eprintln!(
-                                    "{}{}{}",
-                                    if options.no_color { "" } else { ANSI_COLOR_RED },
-                                    error,
-                                    if options.no_color {
-                                        ""
-                                    } else {
-                                        ANSI_COLOR_RESET
-                                    },
-                                );
-                            }
+                            print_error_message(&format!("{}", error), options);
                         }
                     }
 
@@ -701,19 +641,7 @@ pub fn retrieve_asset(
                     Ok((data, response_url, media_type, charset))
                 }
                 Err(error) => {
-                    if !options.silent {
-                        eprintln!(
-                            "{}{} ({}){}",
-                            if options.no_color { "" } else { ANSI_COLOR_RED },
-                            &url,
-                            error,
-                            if options.no_color {
-                                ""
-                            } else {
-                                ANSI_COLOR_RESET
-                            },
-                        );
-                    }
+                    print_error_message(&format!("{} ({})", &url, error), options);
 
                     Err(client.get("").send().unwrap_err())
                 }
@@ -728,5 +656,40 @@ pub fn read_stdin() -> Vec<u8> {
     match io::stdin().lock().read_to_end(&mut buffer) {
         Ok(_) => buffer,
         Err(_) => buffer,
+    }
+}
+
+use std::io::Write;
+
+pub fn print_error_message(text: &str, options: &Options) {
+    if !options.silent {
+        let stderr = io::stderr();
+        let mut handle = stderr.lock();
+
+        if handle
+            .write_all(
+                format!(
+                    "{}{}{}\n",
+                    if options.no_color { "" } else { ANSI_COLOR_RED },
+                    &text,
+                    if options.no_color {
+                        ""
+                    } else {
+                        ANSI_COLOR_RESET
+                    },
+                )
+                .as_bytes(),
+            )
+            .is_ok()
+        {}
+    }
+}
+
+pub fn print_info_message(text: &str, options: &Options) {
+    if !options.silent {
+        let stderr = io::stderr();
+        let mut handle = stderr.lock();
+
+        if handle.write_all(format!("{}\n", &text).as_bytes()).is_ok() {}
     }
 }

@@ -8,7 +8,7 @@ use tempfile::Builder;
 
 use monolith::cache::Cache;
 use monolith::cookies::parse_cookie_file_contents;
-use monolith::core::{create_monolithic_document, Options};
+use monolith::core::{create_monolithic_document, print_error_message, Options};
 
 enum Output {
     Stdout(io::Stdout),
@@ -193,18 +193,30 @@ fn main() {
 
     // Read and parse cookie file
     if let Some(opt_cookie_file) = cookie_file_path.clone() {
-        match fs::read_to_string(opt_cookie_file) {
+        match fs::read_to_string(&opt_cookie_file) {
             Ok(str) => match parse_cookie_file_contents(&str) {
                 Ok(parsed_cookies_from_file) => {
                     options.cookies = parsed_cookies_from_file;
                 }
                 Err(_) => {
-                    eprintln!("Could not parse specified cookie file");
+                    print_error_message(
+                        &format!(
+                            "could not parse specified cookie file \"{}\"",
+                            opt_cookie_file
+                        ),
+                        &options,
+                    );
                     process::exit(1);
                 }
             },
             Err(_) => {
-                eprintln!("Could not read specified cookie file");
+                print_error_message(
+                    &format!(
+                        "could not read specified cookie file \"{}\"",
+                        opt_cookie_file
+                    ),
+                    &options,
+                );
                 process::exit(1);
             }
         }
@@ -213,15 +225,13 @@ fn main() {
     match create_monolithic_document(source, &options, &mut Some(cache)) {
         Ok(result) => {
             // Define output
-            let mut output = Output::new(&destination).expect("Could not prepare output");
+            let mut output = Output::new(&destination).expect("could not prepare output");
 
             // Write result into STDOUT or file
-            output.write(&result).expect("Could not write output");
+            output.write(&result).expect("could not write output");
         }
         Err(error) => {
-            if !options.silent {
-                eprintln!("Error: {}", error);
-            }
+            print_error_message(&format!("Error: {}", error), &options);
 
             process::exit(1);
         }
