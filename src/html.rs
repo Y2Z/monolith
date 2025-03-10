@@ -151,7 +151,7 @@ pub fn create_metadata_tag(url: &Url) -> String {
 }
 
 pub fn embed_srcset(
-    cache: &mut Cache,
+    cache: &mut Option<Cache>,
     client: &Client,
     document_url: &Url,
     srcset: &str,
@@ -639,7 +639,7 @@ pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &O
 }
 
 pub fn retrieve_and_embed_asset(
-    cache: &mut Cache,
+    cache: &mut Option<Cache>,
     client: &Client,
     document_url: &Url,
     node: &Handle,
@@ -740,7 +740,7 @@ pub fn retrieve_and_embed_asset(
 }
 
 pub fn walk_and_embed_assets(
-    cache: &mut Cache,
+    cache: &mut Option<Cache>,
     client: &Client,
     document_url: &Url,
     node: &Handle,

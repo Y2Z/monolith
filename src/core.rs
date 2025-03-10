@@ -103,7 +103,7 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
 pub fn create_monolithic_document(
     source: String,
     options: &Options,
-    mut cache: &mut Cache, // TODO: make it Option-al
+    mut cache: &mut Option<Cache>,
 ) -> Result<Vec<u8>, MonolithError> {
     // Check if source was provided
     if source.len() == 0 {
@@ -488,7 +488,7 @@ pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
 }
 
 pub fn retrieve_asset(
-    cache: &mut Cache,
+    cache: &mut Option<Cache>,
     client: &Client,
     parent_url: &Url,
     url: &Url,
@@ -570,17 +570,17 @@ pub fn retrieve_asset(
     } else {
         let cache_key: String = clean_url(url.clone()).as_str().to_string();
 
-        if cache.contains_key(&cache_key) {
+        if cache.is_some() && cache.as_ref().unwrap().contains_key(&cache_key) {
             // URL is in cache, we get and return it
             if !options.silent {
                 eprintln!("{} (from cache)", &url);
             }
 
             Ok((
-                cache.get(&cache_key).unwrap().0.to_vec(),
+                cache.as_ref().unwrap().get(&cache_key).unwrap().0.to_vec(),
                 url.clone(),
-                cache.get(&cache_key).unwrap().1,
-                cache.get(&cache_key).unwrap().2,
+                cache.as_ref().unwrap().get(&cache_key).unwrap().1,
+                cache.as_ref().unwrap().get(&cache_key).unwrap().2,
             ))
         } else {
             if let Some(domains) = &options.domains {
@@ -676,7 +676,14 @@ pub fn retrieve_asset(
                     }
 
                     // Add retrieved resource to cache
-                    cache.set(&new_cache_key, &data, media_type.clone(), charset.clone());
+                    if cache.is_some() {
+                        cache.as_mut().unwrap().set(
+                            &new_cache_key,
+                            &data,
+                            media_type.clone(),
+                            charset.clone(),
+                        );
+                    }
 
                     // Return
                     Ok((data, response_url, media_type, charset))

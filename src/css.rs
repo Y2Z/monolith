@@ -30,7 +30,7 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
 ];
 
 pub fn embed_css(
-    cache: &mut Cache,
+    cache: &mut Option<Cache>,
     client: &Client,
     document_url: &Url,
     css: &str,
@@ -73,7 +73,7 @@ pub fn is_image_url_prop(prop_name: &str) -> bool {
 }
 
 pub fn process_css<'a>(
-    cache: &mut Cache,
+    cache: &mut Option<Cache>,
     client: &Client,
     document_url: &Url,
     parser: &mut Parser,

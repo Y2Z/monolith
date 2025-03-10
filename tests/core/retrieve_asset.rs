@@ -17,7 +17,7 @@ mod passing {
 
     #[test]
     fn read_data_url() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
 
         let mut options = Options::default();
@@ -47,7 +47,7 @@ mod passing {
 
     #[test]
     fn read_local_file_with_file_url_parent() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
 
         let mut options = Options::default();
@@ -107,7 +107,7 @@ mod failing {
 
     #[test]
     fn read_local_file_with_data_url_parent() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
 
         let mut options = Options::default();
@@ -132,7 +132,7 @@ mod failing {
 
     #[test]
     fn read_local_file_with_https_parent() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
 
         let mut options = Options::default();
