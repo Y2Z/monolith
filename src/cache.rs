@@ -22,7 +22,7 @@ const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("_");
 impl Cache {
     pub fn new(min_file_size: usize, db_file_path: Option<String>) -> Cache {
         let mut cache = Cache {
-            min_file_size: min_file_size,
+            min_file_size,
             metadata: HashMap::new(),
             db: None,
             db_ok: None,
@@ -90,19 +90,17 @@ impl Cache {
                     metadata_item.media_type.as_ref().expect("").to_string(),
                     metadata_item.charset.as_ref().expect("").to_string(),
                 ));
-            } else {
-                if self.db_ok.is_some() && self.db_ok.unwrap() {
-                    let read_txn = self.db.as_ref().unwrap().begin_read()?;
-                    let table = read_txn.open_table(TABLE)?;
-                    let data = table.get(key)?;
-                    let bytes = data.unwrap();
+            } else if self.db_ok.is_some() && self.db_ok.unwrap() {
+                let read_txn = self.db.as_ref().unwrap().begin_read()?;
+                let table = read_txn.open_table(TABLE)?;
+                let data = table.get(key)?;
+                let bytes = data.unwrap();
 
-                    return Ok((
-                        bytes.value().to_vec(),
-                        metadata_item.media_type.as_ref().expect("").to_string(),
-                        metadata_item.charset.as_ref().expect("").to_string(),
-                    ));
-                }
+                return Ok((
+                    bytes.value().to_vec(),
+                    metadata_item.media_type.as_ref().expect("").to_string(),
+                    metadata_item.charset.as_ref().expect("").to_string(),
+                ));
             }
         }
 
