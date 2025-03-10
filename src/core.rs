@@ -540,7 +540,7 @@ pub fn retrieve_asset(
                 ))
             }
         } else {
-            print_error_message(&format!("{} (not found)", &url), options);
+            print_error_message(&format!("{} (file not found)", &url), options);
 
             // Provoke error
             Err(client.get("").send().unwrap_err())
@@ -550,7 +550,7 @@ pub fn retrieve_asset(
 
         if cache.is_some() && cache.as_ref().unwrap().contains_key(&cache_key) {
             // URL is in cache, we get and return it
-            print_info_message(&format!("{} (from cache)", &url), options);
+            print_info_message(&format!("{} (from cache)", &cache_key), options);
 
             Ok((
                 cache.as_ref().unwrap().get(&cache_key).unwrap().0.to_vec(),
@@ -591,7 +591,10 @@ pub fn retrieve_asset(
             match client.get(url.as_str()).headers(headers).send() {
                 Ok(response) => {
                     if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
-                        print_error_message(&format!("{} ({})", &url, response.status()), options);
+                        print_error_message(
+                            &format!("{} ({})", &cache_key, response.status()),
+                            options,
+                        );
 
                         // Provoke error
                         return Err(client.get("").send().unwrap_err());
@@ -600,9 +603,12 @@ pub fn retrieve_asset(
                     let response_url: Url = response.url().clone();
 
                     if url.as_str() == response_url.as_str() {
-                        print_info_message(&format!("{}", &url), options);
+                        print_info_message(&cache_key.to_string(), options);
                     } else {
-                        print_info_message(&format!("{} -> {}", &url, &response_url), options);
+                        print_info_message(
+                            &format!("{} -> {}", &cache_key, &response_url),
+                            options,
+                        );
                     }
 
                     let new_cache_key: String = clean_url(response_url.clone()).to_string();
@@ -641,7 +647,7 @@ pub fn retrieve_asset(
                     Ok((data, response_url, media_type, charset))
                 }
                 Err(error) => {
-                    print_error_message(&format!("{} ({})", &url, error), options);
+                    print_error_message(&format!("{} ({})", &cache_key, error), options);
 
                     Err(client.get("").send().unwrap_err())
                 }
