@@ -84,27 +84,25 @@ mod failing {
 
     #[test]
     fn url_with_no_protocol() {
-        assert_eq!(
-            url::is_url_and_has_protocol("//some-hostname.com/some-file.html"),
-            false
-        );
+        assert!(!url::is_url_and_has_protocol(
+            "//some-hostname.com/some-file.html"
+        ));
     }
 
     #[test]
     fn relative_path() {
-        assert_eq!(
-            url::is_url_and_has_protocol("some-hostname.com/some-file.html"),
-            false
-        );
+        assert!(!url::is_url_and_has_protocol(
+            "some-hostname.com/some-file.html"
+        ));
     }
 
     #[test]
     fn relative_to_root_path() {
-        assert_eq!(url::is_url_and_has_protocol("/some-file.html"), false);
+        assert!(!url::is_url_and_has_protocol("/some-file.html"));
     }
 
     #[test]
     fn empty_string() {
-        assert_eq!(url::is_url_and_has_protocol(""), false);
+        assert!(!url::is_url_and_has_protocol(""));
     }
 }

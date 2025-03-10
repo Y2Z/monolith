@@ -46,7 +46,7 @@ impl Output {
     }
 }
 
-const ASCII: &'static str = " \
+const ASCII: &str = " \
  _____     ______________    __________      ___________________    ___
 |     \\   /              \\  |          |    |                   |  |   |
 |      \\_/       __       \\_|    __    |    |    ___     ___    |__|   |
@@ -57,7 +57,7 @@ const ASCII: &'static str = " \
 ";
 const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 50; // Minimum file size for on-disk caching (in bytes)
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
-const DEFAULT_USER_AGENT: &'static str =
+const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
 const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
 const ENV_VAR_TERM: &str = "TERM";
@@ -135,7 +135,7 @@ fn main() {
             options.encoding = Some(encoding.to_string());
         }
         if let Some(domains) = app.get_many::<String>("domains") {
-            let list_of_domains: Vec<String> = domains.map(|v| v.clone()).collect::<Vec<_>>();
+            let list_of_domains: Vec<String> = domains.cloned().collect::<Vec<_>>();
             options.domains = Some(list_of_domains);
         }
         options.ignore_errors = app.is_present("ignore-errors");
