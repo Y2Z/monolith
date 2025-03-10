@@ -17,7 +17,7 @@ mod passing {
 
     #[test]
     fn empty_input() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("data:,").unwrap();
         let options = Options::default();
@@ -30,7 +30,7 @@ mod passing {
 
     #[test]
     fn trim_if_empty() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let options = Options::default();
@@ -43,7 +43,7 @@ mod passing {
 
     #[test]
     fn style_exclude_unquoted_images() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
@@ -75,7 +75,7 @@ mod passing {
 
     #[test]
     fn style_exclude_single_quoted_images() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("data:,").unwrap();
         let mut options = Options::default();
@@ -107,7 +107,7 @@ mod passing {
 
     #[test]
     fn style_block() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("file:///").unwrap();
         let mut options = Options::default();
@@ -129,7 +129,7 @@ mod passing {
 
     #[test]
     fn attribute_selectors() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
@@ -173,7 +173,7 @@ mod passing {
 
     #[test]
     fn import_string() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
@@ -201,7 +201,7 @@ mod passing {
 
     #[test]
     fn hash_urls() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
@@ -225,7 +225,7 @@ mod passing {
 
     #[test]
     fn transform_percentages_and_degrees() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
@@ -247,7 +247,7 @@ mod passing {
 
     #[test]
     fn unusual_indents() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
@@ -271,7 +271,7 @@ mod passing {
 
     #[test]
     fn exclude_fonts() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let mut options = Options::default();
@@ -319,7 +319,7 @@ mod passing {
 
     #[test]
     fn content() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("data:,").unwrap();
         let mut options = Options::default();
@@ -344,7 +344,7 @@ mod passing {
 
     #[test]
     fn ie_css_hack() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let document_url: Url = Url::parse("data:,").unwrap();
         let mut options = Options::default();

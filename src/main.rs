@@ -175,7 +175,7 @@ fn main() {
         Ok(tempfile) => Some(tempfile),
         Err(_) => None,
     };
-    let mut cache = Cache::new(
+    let cache = Cache::new(
         CACHE_ASSET_FILE_SIZE_THRESHOLD,
         if temp_cache_file.is_some() {
             Some(
@@ -210,7 +210,7 @@ fn main() {
         }
     }
 
-    match create_monolithic_document(source, &options, &mut cache) {
+    match create_monolithic_document(source, &options, &mut Some(cache)) {
         Ok(result) => {
             // Define output
             let mut output = Output::new(&destination).expect("Could not prepare output");

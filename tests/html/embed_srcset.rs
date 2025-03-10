@@ -17,7 +17,7 @@ mod passing {
 
     #[test]
     fn small_medium_large() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let srcset_value = "small.png 1x, medium.png 1.5x, large.png 2x";
         let mut options = Options::default();
@@ -42,7 +42,7 @@ mod passing {
 
     #[test]
     fn small_medium_only_medium_has_scale() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let srcset_value = "small.png, medium.png 1.5x";
         let mut options = Options::default();
@@ -64,7 +64,7 @@ mod passing {
 
     #[test]
     fn commas_within_file_names() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let srcset_value = "small,s.png 1x, large,l.png 2x";
         let mut options = Options::default();
@@ -86,7 +86,7 @@ mod passing {
 
     #[test]
     fn tabs_and_newlines_after_commas() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let srcset_value = "small,s.png 1x,\nmedium,m.png 2x,\nlarge,l.png 3x";
         let mut options = Options::default();
@@ -111,7 +111,7 @@ mod passing {
 
     #[test]
     fn no_whitespace_after_commas() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let srcset_value = "small,s.png 1x,medium,m.png 2x,large,l.png 3x";
         let mut options = Options::default();
@@ -136,7 +136,7 @@ mod passing {
 
     #[test]
     fn last_without_descriptor() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let srcset_value = "small,s.png 1x, medium,m.png 2x, large,l.png";
         let mut options = Options::default();
@@ -179,7 +179,7 @@ mod failing {
 
     #[test]
     fn trailing_comma() {
-        let cache = &mut Cache::new(0, None);
+        let cache = &mut Some(Cache::new(0, None));
         let client = Client::new();
         let srcset_value = "small.png 1x, large.png 2x,";
         let mut options = Options::default();
