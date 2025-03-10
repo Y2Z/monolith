@@ -59,7 +59,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &STYLE, &options),
+            css::embed_css(cache, &client, &document_url, STYLE, &options),
             format!(
                 "/* border: none;*/\
                 background-image: url(\"{empty_image}\"); \
@@ -91,7 +91,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &STYLE, &options),
+            css::embed_css(cache, &client, &document_url, STYLE, &options),
             format!(
                 "/* border: none;*/\
                 background-image: url(\"{empty_image}\"); \
@@ -122,7 +122,7 @@ mod passing {
             html > body {}";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             CSS
         );
     }
@@ -166,7 +166,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             CSS
         );
     }
@@ -188,7 +188,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             "\
             @charset \"UTF-8\";\n\
             \n\
@@ -218,7 +218,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             CSS
         );
     }
@@ -240,7 +240,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             CSS
         );
     }
@@ -264,7 +264,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             CSS
         );
     }
@@ -312,7 +312,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             CSS_OUT
         );
     }
@@ -337,7 +337,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             CSS_OUT
         );
     }
@@ -364,7 +364,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(cache, &client, &document_url, &CSS, &options),
+            css::embed_css(cache, &client, &document_url, CSS, &options),
             CSS_OUT
         );
     }

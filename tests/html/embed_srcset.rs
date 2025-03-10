@@ -27,7 +27,7 @@ mod passing {
             cache,
             &client,
             &Url::parse("data:,").unwrap(),
-            &srcset_value,
+            srcset_value,
             &options,
         );
 
@@ -52,7 +52,7 @@ mod passing {
             cache,
             &client,
             &Url::parse("data:,").unwrap(),
-            &srcset_value,
+            srcset_value,
             &options,
         );
 
@@ -74,7 +74,7 @@ mod passing {
             cache,
             &client,
             &Url::parse("data:,").unwrap(),
-            &srcset_value,
+            srcset_value,
             &options,
         );
 
@@ -96,7 +96,7 @@ mod passing {
             cache,
             &client,
             &Url::parse("data:,").unwrap(),
-            &srcset_value,
+            srcset_value,
             &options,
         );
 
@@ -121,7 +121,7 @@ mod passing {
             cache,
             &client,
             &Url::parse("data:,").unwrap(),
-            &srcset_value,
+            srcset_value,
             &options,
         );
 
@@ -146,7 +146,7 @@ mod passing {
             cache,
             &client,
             &Url::parse("data:,").unwrap(),
-            &srcset_value,
+            srcset_value,
             &options,
         );
 
@@ -189,7 +189,7 @@ mod failing {
             cache,
             &client,
             &Url::parse("data:,").unwrap(),
-            &srcset_value,
+            srcset_value,
             &options,
         );
 
