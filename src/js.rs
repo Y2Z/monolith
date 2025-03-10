@@ -1,4 +1,4 @@
-const JS_DOM_EVENT_ATTRS: &'static [&str] = &[
+const JS_DOM_EVENT_ATTRS: &[&str] = &[
     // From WHATWG HTML spec 8.1.5.2 "Event handlers on elements, Document objects, and Window objects":
     //   https://html.spec.whatwg.org/#event-handlers-on-elements,-document-objects,-and-window-objects
     //   https://html.spec.whatwg.org/#attributes-3 (table "List of event handler content attributes")
@@ -98,6 +98,5 @@ const JS_DOM_EVENT_ATTRS: &'static [&str] = &[
 pub fn attr_is_event_handler(attr_name: &str) -> bool {
     JS_DOM_EVENT_ATTRS
         .iter()
-        .find(|a| attr_name.eq_ignore_ascii_case(a))
-        .is_some()
+        .any(|a| attr_name.eq_ignore_ascii_case(a))
 }

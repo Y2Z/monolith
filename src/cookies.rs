@@ -31,7 +31,7 @@ impl Cookie {
     }
 
     pub fn matches_url(&self, url: &str) -> bool {
-        match Url::parse(&url) {
+        match Url::parse(url) {
             Ok(url) => {
                 // Check protocol scheme
                 match url.scheme() {
@@ -56,10 +56,8 @@ impl Cookie {
                         {
                             return false;
                         }
-                    } else {
-                        if !url_host.eq_ignore_ascii_case(&self.domain) {
-                            return false;
-                        }
+                    } else if !url_host.eq_ignore_ascii_case(&self.domain) {
+                        return false;
                     }
                 } else {
                     return false;
@@ -105,9 +103,9 @@ pub fn parse_cookie_file_contents(
             }
             cookies.push(Cookie {
                 domain: fields.next().unwrap().to_string().to_lowercase(),
-                include_subdomains: fields.next().unwrap().to_string() == "TRUE",
+                include_subdomains: fields.next().unwrap() == "TRUE",
                 path: fields.next().unwrap().to_string(),
-                https_only: fields.next().unwrap().to_string() == "TRUE",
+                https_only: fields.next().unwrap() == "TRUE",
                 expires: fields.next().unwrap().parse::<u64>().unwrap(),
                 name: fields.next().unwrap().to_string(),
                 value: fields.next().unwrap().to_string(),

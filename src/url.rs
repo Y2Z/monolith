@@ -4,7 +4,7 @@ use url::Url;
 
 use crate::core::{detect_media_type, parse_content_type};
 
-pub const EMPTY_IMAGE_DATA_URL: &'static str = "data:image/png,\
+pub const EMPTY_IMAGE_DATA_URL: &str = "data:image/png,\
 %89PNG%0D%0A%1A%0A%00%00%00%0DIHDR%00%00%00%0D%00%00%00%0D%08%04%00%00%00%D8%E2%2C%F7%00%00%00%11IDATx%DAcd%C0%09%18G%A5%28%96%02%00%0A%F8%00%0E%CB%8A%EB%16%00%00%00%00IEND%AEB%60%82";
 
 pub fn clean_url(url: Url) -> Url {
@@ -19,7 +19,7 @@ pub fn clean_url(url: Url) -> Url {
 pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset_url: &Url) -> Url {
     // TODO: move this block out of this function
     let media_type: String = if media_type.is_empty() {
-        detect_media_type(data, &final_asset_url)
+        detect_media_type(data, final_asset_url)
     } else {
         media_type.to_string()
     };
@@ -47,8 +47,8 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
 }
 
 pub fn is_url_and_has_protocol(input: &str) -> bool {
-    match Url::parse(&input) {
-        Ok(parsed_url) => parsed_url.scheme().len() > 0,
+    match Url::parse(input) {
+        Ok(parsed_url) => !parsed_url.scheme().is_empty(),
         Err(_) => false,
     }
 }
@@ -67,7 +67,7 @@ pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
     // Parse raw data into vector of bytes
     let text: String = percent_decode_str(&data).decode_utf8_lossy().to_string();
     let blob: Vec<u8> = if is_base64 {
-        BASE64_STANDARD.decode(&text).unwrap_or(vec![])
+        BASE64_STANDARD.decode(&text).unwrap_or_default()
     } else {
         text.as_bytes().to_vec()
     };
@@ -80,14 +80,14 @@ pub fn get_referer_url(url: Url) -> Url {
     // Spec: https://httpwg.org/specs/rfc9110.html#field.referer
     // Must not include the fragment and userinfo components of the URI
     url.set_fragment(None);
-    url.set_username(&"").unwrap();
+    url.set_username("").unwrap();
     url.set_password(None).unwrap();
 
     url
 }
 
 pub fn resolve_url(from: &Url, to: &str) -> Url {
-    match Url::parse(&to) {
+    match Url::parse(to) {
         Ok(parsed_url) => parsed_url,
         Err(_) => match from.join(to) {
             Ok(joined) => joined,

@@ -69,8 +69,8 @@ pub struct Options {
     pub user_agent: Option<String>,
 }
 
-const ANSI_COLOR_RED: &'static str = "\x1b[31m";
-const ANSI_COLOR_RESET: &'static str = "\x1b[0m";
+const ANSI_COLOR_RED: &str = "\x1b[31m";
+const ANSI_COLOR_RESET: &str = "\x1b[0m";
 const FILE_SIGNATURES: [[&[u8]; 2]; 18] = [
     // Image
     [b"GIF87a", b"image/gif"],
@@ -103,16 +103,16 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
 pub fn create_monolithic_document(
     source: String,
     options: &Options,
-    mut cache: &mut Option<Cache>,
+    cache: &mut Option<Cache>,
 ) -> Result<Vec<u8>, MonolithError> {
     // Check if source was provided
-    if source.len() == 0 {
+    if source.is_empty() {
         return Err(MonolithError::new("no target specified"));
     }
 
     // Check if custom encoding value is acceptable
     if let Some(custom_encoding) = options.encoding.clone() {
-        if !Encoding::for_label_no_replacement(custom_encoding.as_bytes()).is_some() {
+        if Encoding::for_label_no_replacement(custom_encoding.as_bytes()).is_none() {
             return Err(MonolithError::new(&format!(
                 "unknown encoding \"{}\"",
                 &custom_encoding
@@ -129,7 +129,7 @@ pub fn create_monolithic_document(
             // Set default target URL to an empty data URL; the user can set it via --base-url
             Url::parse("data:text/html,").unwrap()
         }
-        target => match Url::parse(&target) {
+        target => match Url::parse(target) {
             Ok(url) => match url.scheme() {
                 "data" | "file" | "http" | "https" => url,
                 unsupported_scheme => {
@@ -145,7 +145,7 @@ pub fn create_monolithic_document(
                 match path.exists() {
                     true => match path.is_file() {
                         true => {
-                            let canonical_path = fs::canonicalize(&path).unwrap();
+                            let canonical_path = fs::canonicalize(path).unwrap();
                             match Url::from_file_path(canonical_path) {
                                 Ok(url) => url,
                                 Err(_) => {
@@ -178,7 +178,7 @@ pub fn create_monolithic_document(
     if let Some(user_agent) = &options.user_agent {
         header_map.insert(
             USER_AGENT,
-            HeaderValue::from_str(&user_agent).expect("Invalid User-Agent header specified"),
+            HeaderValue::from_str(user_agent).expect("Invalid User-Agent header specified"),
         );
     }
     let client = Client::builder()
@@ -209,7 +209,7 @@ pub fn create_monolithic_document(
         || target_url.scheme() == "https"
         || target_url.scheme() == "data"
     {
-        match retrieve_asset(&mut cache, &client, &target_url, &target_url, &options) {
+        match retrieve_asset(cache, &client, &target_url, &target_url, options) {
             Ok((retrieved_data, final_url, media_type, charset)) => {
                 // Provide output as text (without processing it, the way browsers do)
                 if !media_type.eq_ignore_ascii_case("text/html")
@@ -283,7 +283,7 @@ pub fn create_monolithic_document(
                     // Relative paths could work for documents saved from filesystem
                     let path: &Path = Path::new(&custom_base_url);
                     if path.exists() {
-                        match Url::from_file_path(fs::canonicalize(&path).unwrap()) {
+                        match Url::from_file_path(fs::canonicalize(path).unwrap()) {
                             Ok(file_url) => {
                                 base_url = file_url;
                             }
@@ -301,7 +301,7 @@ pub fn create_monolithic_document(
     }
 
     // Traverse through the document and embed remote assets
-    walk_and_embed_assets(&mut cache, &client, &base_url, &dom.document, &options);
+    walk_and_embed_assets(cache, &client, &base_url, &dom.document, options);
 
     // Update or add new BASE element to reroute network requests and hash-links
     if let Some(new_base_url) = options.base_url.clone() {
@@ -315,7 +315,7 @@ pub fn create_monolithic_document(
     {
         let favicon_ico_url: Url = resolve_url(&base_url, "/favicon.ico");
 
-        match retrieve_asset(&mut cache, &client, &target_url, &favicon_ico_url, &options) {
+        match retrieve_asset(cache, &client, &target_url, &favicon_ico_url, options) {
             Ok((data, final_url, media_type, charset)) => {
                 let favicon_data_url: Url =
                     create_data_url(&media_type, &charset, &data, &final_url);
@@ -334,7 +334,7 @@ pub fn create_monolithic_document(
     }
 
     // Serialize DOM tree
-    let mut result: Vec<u8> = serialize_document(dom, document_encoding, &options);
+    let mut result: Vec<u8> = serialize_document(dom, document_encoding, options);
 
     // Prepend metadata comment tag
     if !options.no_metadata {
@@ -400,7 +400,7 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
 }
 
 pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> bool {
-    if domain_to_match_against.len() == 0 {
+    if domain_to_match_against.is_empty() {
         return false;
     }
 
@@ -444,7 +444,7 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
 
         let parts_match = domain_to_match_against_partial.eq_ignore_ascii_case(domain_partial);
 
-        if !parts_match && domain_to_match_against_partial.len() != 0 {
+        if !parts_match && !domain_to_match_against_partial.is_empty() {
             ok = false;
             break;
         }
@@ -470,15 +470,13 @@ pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
     let mut i: i8 = 0;
     for item in &content_type_items {
         if i == 0 {
-            if item.trim().len() > 0 {
+            if !item.trim().is_empty() {
                 media_type = item.trim().to_string();
             }
-        } else {
-            if item.trim().eq_ignore_ascii_case("base64") {
-                is_base64 = true;
-            } else if item.trim().starts_with("charset=") {
-                charset = item.trim().chars().skip(8).collect();
-            }
+        } else if item.trim().eq_ignore_ascii_case("base64") {
+            is_base64 = true;
+        } else if item.trim().starts_with("charset=") {
+            charset = item.trim().chars().skip(8).collect();
         }
 
         i += 1;
@@ -502,10 +500,9 @@ pub fn retrieve_asset(
         if parent_url.scheme() != "file" {
             if !options.silent {
                 eprintln!(
-                    "{}{} ({}){}",
+                    "{}{} (Security Error){}",
                     if options.no_color { "" } else { ANSI_COLOR_RED },
                     &url,
-                    "Security Error",
                     if options.no_color {
                         ""
                     } else {
@@ -541,7 +538,7 @@ pub fn retrieve_asset(
                     eprintln!("{}", &url);
                 }
 
-                let file_blob: Vec<u8> = fs::read(&path).expect("Unable to read file");
+                let file_blob: Vec<u8> = fs::read(path).expect("Unable to read file");
 
                 Ok((
                     file_blob.clone(),
@@ -586,7 +583,7 @@ pub fn retrieve_asset(
             if let Some(domains) = &options.domains {
                 let domain_matches = domains
                     .iter()
-                    .any(|d| domain_is_within_domain(url.host_str().unwrap(), &d.trim()));
+                    .any(|d| domain_is_within_domain(url.host_str().unwrap(), d.trim()));
                 if (options.blacklist_domains && domain_matches)
                     || (!options.blacklist_domains && !domain_matches)
                 {
@@ -596,7 +593,7 @@ pub fn retrieve_asset(
 
             // URL not in cache, we retrieve the file
             let mut headers = HeaderMap::new();
-            if options.cookies.len() > 0 {
+            if !options.cookies.is_empty() {
                 for cookie in &options.cookies {
                     if !cookie.is_expired() && cookie.matches_url(url.as_str()) {
                         let cookie_header_value: String = cookie.name.clone() + "=" + &cookie.value;
@@ -651,7 +648,7 @@ pub fn retrieve_asset(
                         .and_then(|header| header.to_str().ok())
                         .unwrap_or("");
 
-                    let (media_type, charset, _is_base64) = parse_content_type(&content_type);
+                    let (media_type, charset, _is_base64) = parse_content_type(content_type);
 
                     // Convert response into a byte array
                     let mut data: Vec<u8> = vec![];

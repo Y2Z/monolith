@@ -37,9 +37,9 @@ struct SrcSetItem<'a> {
     descriptor: &'a str,
 }
 
-const FAVICON_VALUES: &'static [&str] = &["icon", "shortcut icon"];
+const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
 
-const WHITESPACES: &'static [char] = &['\t', '\n', '\x0c', '\r', ' '];
+const WHITESPACES: &[char] = &['\t', '\n', '\x0c', '\r', ' '];
 
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
@@ -205,8 +205,8 @@ pub fn embed_srcset(
         if options.no_images {
             result.push_str(EMPTY_IMAGE_DATA_URL);
         } else {
-            let image_full_url: Url = resolve_url(&document_url, part.path);
-            match retrieve_asset(cache, client, &document_url, &image_full_url, options) {
+            let image_full_url: Url = resolve_url(document_url, part.path);
+            match retrieve_asset(cache, client, document_url, &image_full_url, options) {
                 Ok((image_data, image_final_url, image_media_type, image_charset)) => {
                     let mut image_data_url = create_data_url(
                         &image_media_type,
@@ -231,7 +231,7 @@ pub fn embed_srcset(
         }
 
         if !part.descriptor.is_empty() {
-            result.push_str(" ");
+            result.push(' ');
             result.push_str(part.descriptor);
         }
 
@@ -256,11 +256,8 @@ pub fn find_base_node(node: &Handle) -> Option<Handle> {
             }
         }
         NodeData::Element { ref name, .. } => {
-            match name.local.as_ref() {
-                "head" => {
-                    return get_child_node_by_name(node, "base");
-                }
-                _ => {}
+            if name.local.as_ref() == "head" {
+                return get_child_node_by_name(node, "base");
             }
 
             // Dig deeper
@@ -287,22 +284,18 @@ pub fn find_meta_charset_or_content_type_node(node: &Handle) -> Option<Handle> {
             }
         }
         NodeData::Element { ref name, .. } => {
-            match name.local.as_ref() {
-                "head" => {
-                    if let Some(meta_node) = get_child_node_by_name(node, "meta") {
-                        if let Some(_) = get_node_attr(&meta_node, "charset") {
+            if name.local.as_ref() == "head" {
+                if let Some(meta_node) = get_child_node_by_name(node, "meta") {
+                    if get_node_attr(&meta_node, "charset").is_some() {
+                        return Some(meta_node);
+                    } else if let Some(meta_node_http_equiv_attr_value) =
+                        get_node_attr(&meta_node, "http-equiv")
+                    {
+                        if meta_node_http_equiv_attr_value.eq_ignore_ascii_case("content-type") {
                             return Some(meta_node);
-                        } else if let Some(meta_node_http_equiv_attr_value) =
-                            get_node_attr(&meta_node, "http-equiv")
-                        {
-                            if meta_node_http_equiv_attr_value.eq_ignore_ascii_case("content-type")
-                            {
-                                return Some(meta_node);
-                            }
                         }
                     }
                 }
-                _ => {}
             }
 
             // Dig deeper
@@ -350,10 +343,7 @@ pub fn get_child_node_by_name(parent: &Handle, node_name: &str) -> Option<Handle
         NodeData::Element { ref name, .. } => &*name.local == node_name,
         _ => false,
     });
-    match matching_children {
-        Some(node) => Some(node.clone()),
-        _ => None,
-    }
+    matching_children.cloned()
 }
 
 pub fn get_node_attr(node: &Handle, attr_name: &str) -> Option<String> {
@@ -396,15 +386,12 @@ pub fn has_favicon(handle: &Handle) -> bool {
             }
         }
         NodeData::Element { ref name, .. } => {
-            match name.local.as_ref() {
-                "link" => {
-                    if let Some(attr_value) = get_node_attr(handle, "rel") {
-                        if is_favicon(attr_value.trim()) {
-                            found_favicon = true;
-                        }
+            if name.local.as_ref() == "link" {
+                if let Some(attr_value) = get_node_attr(handle, "rel") {
+                    if is_favicon(attr_value.trim()) {
+                        found_favicon = true;
                     }
                 }
-                _ => {}
             }
 
             if !found_favicon {
@@ -427,10 +414,10 @@ pub fn html_to_dom(data: &Vec<u8>, document_encoding: String) -> RcDom {
     let s: String;
 
     if let Some(encoding) = Encoding::for_label(document_encoding.as_bytes()) {
-        let (string, _, _) = encoding.decode(&data);
+        let (string, _, _) = encoding.decode(data);
         s = string.to_string();
     } else {
-        s = String::from_utf8_lossy(&data).to_string();
+        s = String::from_utf8_lossy(data).to_string();
     }
 
     parse_document(RcDom::default(), Default::default())
@@ -455,7 +442,7 @@ pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
             types.push(LinkType::Preload);
         } else if link_attr_rel_type.eq_ignore_ascii_case("stylesheet") {
             types.push(LinkType::Stylesheet);
-        } else if is_favicon(&link_attr_rel_type) {
+        } else if is_favicon(link_attr_rel_type) {
             types.push(LinkType::Favicon);
         } else if link_attr_rel_type.eq_ignore_ascii_case("apple-touch-icon") {
             types.push(LinkType::AppleTouchIcon);
@@ -502,9 +489,9 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
 
 pub fn set_charset(mut dom: RcDom, desired_charset: String) -> RcDom {
     if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(&dom.document) {
-        if let Some(_) = get_node_attr(&meta_charset_node, "charset") {
+        if get_node_attr(&meta_charset_node, "charset").is_some() {
             set_node_attr(&meta_charset_node, "charset", Some(desired_charset));
-        } else if let Some(_) = get_node_attr(&meta_charset_node, "content") {
+        } else if get_node_attr(&meta_charset_node, "content").is_some() {
             set_node_attr(
                 &meta_charset_node,
                 "content",
@@ -536,42 +523,39 @@ pub fn set_charset(mut dom: RcDom, desired_charset: String) -> RcDom {
 }
 
 pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>) {
-    match &node.data {
-        NodeData::Element { attrs, .. } => {
-            let attrs_mut = &mut attrs.borrow_mut();
-            let mut i = 0;
-            let mut found_existing_attr: bool = false;
+    if let NodeData::Element { attrs, .. } = &node.data {
+        let attrs_mut = &mut attrs.borrow_mut();
+        let mut i = 0;
+        let mut found_existing_attr: bool = false;
 
-            while i < attrs_mut.len() {
-                if &attrs_mut[i].name.local == attr_name {
-                    found_existing_attr = true;
+        while i < attrs_mut.len() {
+            if &attrs_mut[i].name.local == attr_name {
+                found_existing_attr = true;
 
-                    if let Some(attr_value) = attr_value.clone() {
-                        let _ = &attrs_mut[i].value.clear();
-                        let _ = &attrs_mut[i].value.push_slice(&attr_value.as_str());
-                    } else {
-                        // Remove attr completely if attr_value is not defined
-                        attrs_mut.remove(i);
-                        continue;
-                    }
+                if let Some(attr_value) = attr_value.clone() {
+                    let _ = &attrs_mut[i].value.clear();
+                    let _ = &attrs_mut[i].value.push_slice(attr_value.as_str());
+                } else {
+                    // Remove attr completely if attr_value is not defined
+                    attrs_mut.remove(i);
+                    continue;
                 }
-
-                i += 1;
             }
 
-            if !found_existing_attr {
-                // Add new attribute (since originally the target node didn't have it)
-                if let Some(attr_value) = attr_value.clone() {
-                    let name = LocalName::from(attr_name);
+            i += 1;
+        }
 
-                    attrs_mut.push(Attribute {
-                        name: QualName::new(None, ns!(), name),
-                        value: format_tendril!("{}", attr_value),
-                    });
-                }
+        if !found_existing_attr {
+            // Add new attribute (since originally the target node didn't have it)
+            if let Some(attr_value) = attr_value.clone() {
+                let name = LocalName::from(attr_name);
+
+                attrs_mut.push(Attribute {
+                    name: QualName::new(None, ns!(), name),
+                    value: format_tendril!("{}", attr_value),
+                });
             }
         }
-        _ => {}
     };
 }
 
@@ -624,7 +608,7 @@ pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &O
     if options.unwrap_noscript {
         let s: &str = &String::from_utf8_lossy(&buf);
         let noscript_re = Regex::new(r"<(?P<c>/?noscript[^>]*)>").unwrap();
-        buf = noscript_re.replace_all(&s, "<!--$c-->").as_bytes().to_vec();
+        buf = noscript_re.replace_all(s, "<!--$c-->").as_bytes().to_vec();
     }
 
     if !document_encoding.is_empty() {
@@ -651,7 +635,7 @@ pub fn retrieve_and_embed_asset(
 
     match retrieve_asset(cache, client, &document_url.clone(), &resolved_url, options) {
         Ok((data, final_url, mut media_type, charset)) => {
-            let node_name: &str = get_node_name(&node).unwrap();
+            let node_name: &str = get_node_name(node).unwrap();
 
             // Check integrity if it's a LINK or SCRIPT element
             let mut ok_to_include: bool = true;
@@ -686,11 +670,11 @@ pub fn retrieve_and_embed_asset(
                     // Create and embed data URL
                     let css_data_url =
                         create_data_url(&media_type, &charset, css.as_bytes(), &final_url);
-                    set_node_attr(&node, attr_name, Some(css_data_url.to_string()));
+                    set_node_attr(node, attr_name, Some(css_data_url.to_string()));
                 } else if node_name == "frame" || node_name == "iframe" {
                     // (I)FRAMEs are also quite different from conventional resources
                     let frame_dom = html_to_dom(&data, charset.clone());
-                    walk_and_embed_assets(cache, client, &final_url, &frame_dom.document, &options);
+                    walk_and_embed_assets(cache, client, &final_url, &frame_dom.document, options);
 
                     let mut frame_data: Vec<u8> = Vec::new();
                     serialize(
@@ -709,14 +693,12 @@ pub fn retrieve_and_embed_asset(
                     // Every other type of element gets processed here
 
                     // Parse media type for SCRIPT elements
-                    if node_name == "script" {
-                        if let Some(_) = get_node_attr(node, "src") {
-                            if let Some(script_node_type_attr_value) = get_node_attr(node, "type") {
-                                media_type = script_node_type_attr_value.to_string();
-                            } else {
-                                // Fallback to default one if it's not specified
-                                media_type = "application/javascript".to_string();
-                            }
+                    if node_name == "script" && get_node_attr(node, "src").is_some() {
+                        if let Some(script_node_type_attr_value) = get_node_attr(node, "type") {
+                            media_type = script_node_type_attr_value.to_string();
+                        } else {
+                            // Fallback to default one if it's not specified
+                            media_type = "application/javascript".to_string();
                         }
                     }
 
@@ -750,7 +732,7 @@ pub fn walk_and_embed_assets(
         NodeData::Document => {
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(cache, client, &document_url, child, options);
+                walk_and_embed_assets(cache, client, document_url, child, options);
             }
         }
         NodeData::Element {
@@ -766,7 +748,7 @@ pub fn walk_and_embed_assets(
                             || meta_attr_http_equiv_value.eq_ignore_ascii_case("location")
                         {
                             // Remove http-equiv attributes from META nodes if they're able to control the page
-                            set_node_attr(&node, "http-equiv", None);
+                            set_node_attr(node, "http-equiv", None);
                         }
                     }
                 }
@@ -783,7 +765,7 @@ pub fn walk_and_embed_assets(
                                 retrieve_and_embed_asset(
                                     cache,
                                     client,
-                                    &document_url,
+                                    document_url,
                                     node,
                                     "href",
                                     &link_attr_href_value,
@@ -800,18 +782,16 @@ pub fn walk_and_embed_assets(
                                 set_node_attr(node, "href", None);
                                 // Wipe integrity attribute
                                 set_node_attr(node, "integrity", None);
-                            } else {
-                                if !link_attr_href_value.is_empty() {
-                                    retrieve_and_embed_asset(
-                                        cache,
-                                        client,
-                                        &document_url,
-                                        node,
-                                        "href",
-                                        &link_attr_href_value,
-                                        options,
-                                    );
-                                }
+                            } else if !link_attr_href_value.is_empty() {
+                                retrieve_and_embed_asset(
+                                    cache,
+                                    client,
+                                    document_url,
+                                    node,
+                                    "href",
+                                    &link_attr_href_value,
+                                    options,
+                                );
                             }
                         }
                     } else if link_node_types.contains(&LinkType::Preload)
@@ -823,7 +803,7 @@ pub fn walk_and_embed_assets(
                         // Make sure that all other LINKs' href attributes are full URLs
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
                             let href_full_url: Url =
-                                resolve_url(&document_url, &link_attr_href_value);
+                                resolve_url(document_url, &link_attr_href_value);
                             set_node_attr(node, "href", Some(href_full_url.to_string()));
                         }
                     }
@@ -864,49 +844,47 @@ pub fn walk_and_embed_assets(
 
                     if options.no_images {
                         // Put empty images into src and data-src attributes
-                        if img_attr_src_value != None {
+                        if img_attr_src_value.is_some() {
                             set_node_attr(node, "src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
-                        if img_attr_data_src_value != None {
+                        if img_attr_data_src_value.is_some() {
                             set_node_attr(node, "data-src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
+                    } else if img_attr_src_value.clone().unwrap_or_default().is_empty()
+                        && img_attr_data_src_value
+                            .clone()
+                            .unwrap_or_default()
+                            .is_empty()
+                    {
+                        // Add empty src attribute
+                        set_node_attr(node, "src", Some("".to_string()));
                     } else {
-                        if img_attr_src_value.clone().unwrap_or_default().is_empty()
-                            && img_attr_data_src_value
-                                .clone()
-                                .unwrap_or_default()
-                                .is_empty()
+                        // Add data URL src attribute
+                        let img_full_url: String = if !img_attr_data_src_value
+                            .clone()
+                            .unwrap_or_default()
+                            .is_empty()
                         {
-                            // Add empty src attribute
-                            set_node_attr(node, "src", Some("".to_string()));
+                            img_attr_data_src_value.unwrap_or_default()
                         } else {
-                            // Add data URL src attribute
-                            let img_full_url: String = if !img_attr_data_src_value
-                                .clone()
-                                .unwrap_or_default()
-                                .is_empty()
-                            {
-                                img_attr_data_src_value.unwrap_or_default()
-                            } else {
-                                img_attr_src_value.unwrap_or_default()
-                            };
-                            retrieve_and_embed_asset(
-                                cache,
-                                client,
-                                document_url,
-                                node,
-                                "src",
-                                &img_full_url,
-                                options,
-                            );
-                        }
+                            img_attr_src_value.unwrap_or_default()
+                        };
+                        retrieve_and_embed_asset(
+                            cache,
+                            client,
+                            document_url,
+                            node,
+                            "src",
+                            &img_full_url,
+                            options,
+                        );
                     }
 
                     // Resolve srcset attribute
                     if let Some(img_srcset) = get_node_attr(node, "srcset") {
                         if !img_srcset.is_empty() {
                             let resolved_srcset: String =
-                                embed_srcset(cache, client, &document_url, &img_srcset, options);
+                                embed_srcset(cache, client, document_url, &img_srcset, options);
                             set_node_attr(node, "srcset", Some(resolved_srcset));
                         }
                     }
@@ -1008,24 +986,22 @@ pub fn walk_and_embed_assets(
                     }
 
                     if let Some(source_attr_srcset_value) = get_node_attr(node, "srcset") {
-                        if parent_node_name == "picture" {
-                            if !source_attr_srcset_value.is_empty() {
-                                if options.no_images {
-                                    set_node_attr(
-                                        node,
-                                        "srcset",
-                                        Some(EMPTY_IMAGE_DATA_URL.to_string()),
-                                    );
-                                } else {
-                                    let resolved_srcset: String = embed_srcset(
-                                        cache,
-                                        client,
-                                        &document_url,
-                                        &source_attr_srcset_value,
-                                        options,
-                                    );
-                                    set_node_attr(node, "srcset", Some(resolved_srcset));
-                                }
+                        if parent_node_name == "picture" && !source_attr_srcset_value.is_empty() {
+                            if options.no_images {
+                                set_node_attr(
+                                    node,
+                                    "srcset",
+                                    Some(EMPTY_IMAGE_DATA_URL.to_string()),
+                                );
+                            } else {
+                                let resolved_srcset: String = embed_srcset(
+                                    cache,
+                                    client,
+                                    document_url,
+                                    &source_attr_srcset_value,
+                                    options,
+                                );
+                                set_node_attr(node, "srcset", Some(resolved_srcset));
                             }
                         }
                     }
@@ -1061,7 +1037,7 @@ pub fn walk_and_embed_assets(
                         // Empty inner content
                         node.children.borrow_mut().clear();
                         // Remove src attribute
-                        if script_attr_src != None {
+                        if script_attr_src.is_some() {
                             set_node_attr(node, "src", None);
                             // Wipe integrity attribute
                             set_node_attr(node, "integrity", None);
@@ -1089,7 +1065,7 @@ pub fn walk_and_embed_assets(
                                 let replacement = embed_css(
                                     cache,
                                     client,
-                                    &document_url,
+                                    document_url,
                                     tendril.as_ref(),
                                     options,
                                 );
@@ -1118,7 +1094,7 @@ pub fn walk_and_embed_assets(
                                 retrieve_and_embed_asset(
                                     cache,
                                     client,
-                                    &document_url,
+                                    document_url,
                                     node,
                                     "src",
                                     &frame_attr_src_value,
@@ -1190,43 +1166,38 @@ pub fn walk_and_embed_assets(
                 }
                 "noscript" => {
                     for child_node in node.children.borrow_mut().iter_mut() {
-                        match child_node.data {
-                            NodeData::Text { ref contents } => {
-                                // Get contents of NOSCRIPT node
-                                let mut noscript_contents = contents.borrow_mut();
-                                // Parse contents of NOSCRIPT node as DOM
-                                let noscript_contents_dom: RcDom = html_to_dom(
-                                    &noscript_contents.as_bytes().to_vec(),
-                                    "".to_string(),
-                                );
-                                // Embed assets of NOSCRIPT node contents
-                                walk_and_embed_assets(
-                                    cache,
-                                    client,
-                                    &document_url,
-                                    &noscript_contents_dom.document,
-                                    &options,
-                                );
-                                // Get rid of original contents
-                                noscript_contents.clear();
-                                // Insert HTML containing embedded assets into NOSCRIPT node
-                                if let Some(html) =
-                                    get_child_node_by_name(&noscript_contents_dom.document, "html")
-                                {
-                                    if let Some(body) = get_child_node_by_name(&html, "body") {
-                                        let mut buf: Vec<u8> = Vec::new();
-                                        serialize(
-                                            &mut buf,
-                                            &SerializableHandle::from(body.clone()),
-                                            SerializeOpts::default(),
-                                        )
-                                        .expect("Unable to serialize DOM into buffer");
-                                        let result = String::from_utf8_lossy(&buf);
-                                        noscript_contents.push_slice(&result);
-                                    }
+                        if let NodeData::Text { ref contents } = child_node.data {
+                            // Get contents of NOSCRIPT node
+                            let mut noscript_contents = contents.borrow_mut();
+                            // Parse contents of NOSCRIPT node as DOM
+                            let noscript_contents_dom: RcDom =
+                                html_to_dom(&noscript_contents.as_bytes().to_vec(), "".to_string());
+                            // Embed assets of NOSCRIPT node contents
+                            walk_and_embed_assets(
+                                cache,
+                                client,
+                                document_url,
+                                &noscript_contents_dom.document,
+                                options,
+                            );
+                            // Get rid of original contents
+                            noscript_contents.clear();
+                            // Insert HTML containing embedded assets into NOSCRIPT node
+                            if let Some(html) =
+                                get_child_node_by_name(&noscript_contents_dom.document, "html")
+                            {
+                                if let Some(body) = get_child_node_by_name(&html, "body") {
+                                    let mut buf: Vec<u8> = Vec::new();
+                                    serialize(
+                                        &mut buf,
+                                        &SerializableHandle::from(body.clone()),
+                                        SerializeOpts::default(),
+                                    )
+                                    .expect("Unable to serialize DOM into buffer");
+                                    let result = String::from_utf8_lossy(&buf);
+                                    noscript_contents.push_slice(&result);
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -1240,13 +1211,8 @@ pub fn walk_and_embed_assets(
             } else {
                 // Embed URLs found within the style attribute of this node
                 if let Some(node_attr_style_value) = get_node_attr(node, "style") {
-                    let embedded_style = embed_css(
-                        cache,
-                        client,
-                        &document_url,
-                        &node_attr_style_value,
-                        options,
-                    );
+                    let embedded_style =
+                        embed_css(cache, client, document_url, &node_attr_style_value, options);
                     set_node_attr(node, "style", Some(embedded_style));
                 }
             }
@@ -1269,7 +1235,7 @@ pub fn walk_and_embed_assets(
 
             // Dig deeper
             for child in node.children.borrow().iter() {
-                walk_and_embed_assets(cache, client, &document_url, child, options);
+                walk_and_embed_assets(cache, client, document_url, child, options);
             }
         }
         _ => {
