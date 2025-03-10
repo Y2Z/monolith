@@ -44,6 +44,16 @@ impl Error for MonolithError {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Default)]
+pub enum MonolithOutputFormat {
+    #[default]
+    HTML,
+    // MHT,
+    // WARC,
+    // ZIM,
+    // HAR,
+}
+
 #[derive(Default)]
 pub struct Options {
     pub base_url: Option<String>,
@@ -63,6 +73,7 @@ pub struct Options {
     pub no_js: bool,
     pub no_metadata: bool,
     pub no_video: bool,
+    pub output_format: MonolithOutputFormat,
     pub silent: bool,
     pub timeout: u64,
     pub unwrap_noscript: bool,
@@ -333,17 +344,21 @@ pub fn create_monolithic_document(
         dom = set_charset(dom, document_encoding.clone());
     }
 
-    // Serialize DOM tree
-    let mut result: Vec<u8> = serialize_document(dom, document_encoding, options);
+    if options.output_format == MonolithOutputFormat::HTML {
+        // Serialize DOM tree
+        let mut result: Vec<u8> = serialize_document(dom, document_encoding, options);
 
-    // Prepend metadata comment tag
-    if !options.no_metadata {
-        let mut metadata_comment: String = create_metadata_tag(&target_url);
-        metadata_comment += "\n";
-        result.splice(0..0, metadata_comment.as_bytes().to_vec());
+        // Prepend metadata comment tag
+        if !options.no_metadata {
+            let mut metadata_comment: String = create_metadata_tag(&target_url);
+            metadata_comment += "\n";
+            result.splice(0..0, metadata_comment.as_bytes().to_vec());
+        }
+
+        Ok(result)
+    } else {
+        Ok(vec![])
     }
-
-    Ok(result)
 }
 
 pub fn detect_media_type(data: &[u8], url: &Url) -> String {
