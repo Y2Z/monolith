@@ -9,61 +9,11 @@ on:
 
 jobs:
 
-  windows:
-    runs-on: windows-2019
-    steps:
-    - run: git config --global core.autocrlf false
-
-    - name: Checkout the repository
-      uses: actions/checkout@v2
-
-    - name: Build the executable
-      run: cargo build --release
-
-    - uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: monolith.exe
-        path: target\release\monolith.exe
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-  gnu_linux_armhf:
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v2
-
-    - name: Prepare cross-platform environment
-      run: |
-        sudo mkdir /cross-build
-        sudo touch /etc/apt/sources.list.d/armhf.list
-        echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ focal main" | sudo tee -a /etc/apt/sources.list.d/armhf.list
-        sudo apt-get update
-        sudo apt-get install -y gcc-arm-linux-gnueabihf libc6-armhf-cross libc6-dev-armhf-cross
-        sudo apt-get download libssl1.1:armhf libssl-dev:armhf
-        sudo dpkg -x libssl1.1*.deb /cross-build
-        sudo dpkg -x libssl-dev*.deb /cross-build
-        rustup target add arm-unknown-linux-gnueabihf
-        echo "C_INCLUDE_PATH=/cross-build/usr/include" >> $GITHUB_ENV
-        echo "OPENSSL_INCLUDE_DIR=/cross-build/usr/include/arm-linux-gnueabihf" >> $GITHUB_ENV
-        echo "OPENSSL_LIB_DIR=/cross-build/usr/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
-        echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
-        echo "RUSTFLAGS=-C linker=arm-linux-gnueabihf-gcc -L/usr/arm-linux-gnueabihf/lib -L/cross-build/usr/lib/arm-linux-gnueabihf -L/cross-build/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
-
-    - name: Build the executable
-      run: cargo build --release --target=arm-unknown-linux-gnueabihf
-
-    - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: monolith-gnu-linux-armhf
-        path: target/arm-unknown-linux-gnueabihf/release/monolith
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-
   gnu_linux_aarch64:
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout the repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Prepare cross-platform environment
       run: |
@@ -83,7 +33,7 @@ jobs:
         echo "RUSTFLAGS=-C linker=aarch64-linux-gnu-gcc -L/usr/aarch64-linux-gnu/lib -L/cross-build/usr/lib/aarch64-linux-gnu" >> $GITHUB_ENV
 
     - name: Build the executable
-      run: cargo build --release --target=aarch64-unknown-linux-gnu
+      run: cargo build --release --target=aarch64-unknown-linux-gnu --no-default-features --features cli
 
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@v2.0.0
@@ -92,11 +42,44 @@ jobs:
         path: target/aarch64-unknown-linux-gnu/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+  gnu_linux_armhf:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Prepare cross-platform environment
+      run: |
+        sudo mkdir /cross-build
+        sudo touch /etc/apt/sources.list.d/armhf.list
+        echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ focal main" | sudo tee -a /etc/apt/sources.list.d/armhf.list
+        sudo apt-get update
+        sudo apt-get install -y gcc-arm-linux-gnueabihf libc6-armhf-cross libc6-dev-armhf-cross
+        sudo apt-get download libssl1.1:armhf libssl-dev:armhf
+        sudo dpkg -x libssl1.1*.deb /cross-build
+        sudo dpkg -x libssl-dev*.deb /cross-build
+        rustup target add arm-unknown-linux-gnueabihf
+        echo "C_INCLUDE_PATH=/cross-build/usr/include" >> $GITHUB_ENV
+        echo "OPENSSL_INCLUDE_DIR=/cross-build/usr/include/arm-linux-gnueabihf" >> $GITHUB_ENV
+        echo "OPENSSL_LIB_DIR=/cross-build/usr/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
+        echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+        echo "RUSTFLAGS=-C linker=arm-linux-gnueabihf-gcc -L/usr/arm-linux-gnueabihf/lib -L/cross-build/usr/lib/arm-linux-gnueabihf -L/cross-build/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
+
+    - name: Build the executable
+      run: cargo build --release --target=arm-unknown-linux-gnueabihf --no-default-features --features cli
+
+    - name: Attach artifact to the release
+      uses: Shopify/upload-to-release@v2.0.0
+      with:
+        name: monolith-gnu-linux-armhf
+        path: target/arm-unknown-linux-gnueabihf/release/monolith
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
   gnu_linux_x86_64:
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout the repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Build the executable
       run: cargo build --release
@@ -105,4 +88,21 @@ jobs:
       with:
         name: monolith-gnu-linux-x86_64
         path: target/release/monolith
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    runs-on: windows-2019
+    steps:
+    - run: git config --global core.autocrlf false
+
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Build the executable
+      run: cargo build --release
+
+    - uses: Shopify/upload-to-release@v2.0.0
+      with:
+        name: monolith.exe
+        path: target\release\monolith.exe
         repo-token: ${{ secrets.GITHUB_TOKEN }}
