@@ -26,7 +26,7 @@ license = "CC0-1.0"
 atty = "0.2.14"  # Used for highlighting network errors
 base64 = "0.22.1"  # Used for integrity attributes
 chrono = "0.4.40"  # Used for formatting output timestamp
-clap = { version = "3.2.25", optional = true }  # Used for processing CLI arguments
+clap = { version = "4.5.32", features = ["derive"], optional = true }  # Used for processing CLI arguments
 cssparser = "0.34.0"  # Used for dealing with CSS
 encoding_rs = "0.8.35"  # Used for parsing and converting document charsets
 html5ever = "0.27.0"  # Used for all things DOM

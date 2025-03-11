@@ -2,12 +2,115 @@ use std::fs;
 use std::io::{self, Error as IoError, Write};
 use std::process;
 
-use clap::{App, Arg, ArgAction};
+use clap::Parser;
 use tempfile::Builder;
 
 use monolith::cache::Cache;
 use monolith::cookies::parse_cookie_file_contents;
 use monolith::core::{create_monolithic_document, print_error_message, Options};
+
+const ASCII: &str = " \
+ _____     ______________    __________      ___________________    ___
+|     \\   /              \\  |          |    |                   |  |   |
+|      \\_/       __       \\_|    __    |    |    ___     ___    |__|   |
+|               |  |            |  |   |    |   |   |   |   |          |
+|   |\\     /|   |__|    _       |__|   |____|   |   |   |   |    __    |
+|   | \\___/ |          | \\                      |   |   |   |   |  |   |
+|___|       |__________|  \\_____________________|   |___|   |___|  |___|
+";
+
+#[derive(Parser)]
+#[command(name = env!("CARGO_PKG_NAME"))]
+#[command(version)] // Read version from Cargo.toml
+#[command(about = ASCII.to_owned() + "\n" + env!("CARGO_PKG_NAME") + " " + env!("CARGO_PKG_VERSION") + "\n\n" + env!("CARGO_PKG_DESCRIPTION"), long_about = None)]
+struct Cli {
+    /// Remove audio sources
+    #[arg(short = 'a', long)]
+    no_audio: bool,
+
+    /// Set custom base URL
+    #[arg(short, long, value_name = "http://localhost/")]
+    base_url: Option<String>,
+
+    /// Treat specified domains as blacklist
+    #[arg(short = 'B', long)]
+    blacklist_domains: bool,
+
+    /// Remove CSS
+    #[arg(short = 'c', long)]
+    no_css: bool,
+
+    /// Specify cookie file
+    #[arg(short = 'C', long, value_name = "cookies.txt")]
+    cookie_file: Option<String>,
+
+    /// Specify domains to use for white/black-listing
+    #[arg(short = 'd', long = "domain", value_name = "example.com")]
+    domains: Vec<String>,
+
+    /// Ignore network errors
+    #[arg(short = 'e', long)]
+    ignore_errors: bool,
+
+    /// Enforce custom charset
+    #[arg(short = 'E', long, value_name = "UTF-8")]
+    encoding: Option<String>,
+
+    /// Remove frames and iframes
+    #[arg(short = 'f', long)]
+    no_frames: bool,
+
+    /// Remove fonts
+    #[arg(short = 'F', long)]
+    no_fonts: bool,
+
+    /// Remove images
+    #[arg(short = 'i', long)]
+    no_images: bool,
+
+    /// Cut off document from the Internet
+    #[arg(short = 'I', long)]
+    isolate: bool,
+
+    /// Remove JavaScript
+    #[arg(short = 'j', long)]
+    no_js: bool,
+
+    /// Allow invalid X.509 (TLS) certificates
+    #[arg(short = 'k', long)]
+    insecure: bool,
+
+    /// Exclude timestamp and source information
+    #[arg(short = 'M', long)]
+    no_metadata: bool,
+
+    /// Replace NOSCRIPT elements with their contents
+    #[arg(short = 'n', long)]
+    unwrap_noscript: bool,
+
+    /// File to write to, use - for STDOUT
+    #[arg(short, long, value_name = "result.html")]
+    output: Option<String>,
+
+    /// Suppress verbosity
+    #[arg(short, long)]
+    quiet: bool,
+
+    /// Adjust network request timeout
+    #[arg(short, long, value_name = "60")]
+    timeout: Option<u64>,
+
+    /// Set custom User-Agent string
+    #[arg(short, long, value_name = "Firefox")]
+    user_agent: Option<String>,
+
+    /// Remove video sources
+    #[arg(short = 'v', long)]
+    no_video: bool,
+
+    /// URL or file path, use - for STDIN
+    target: String,
+}
 
 enum Output {
     Stdout(io::Stdout),
@@ -45,119 +148,48 @@ impl Output {
     }
 }
 
-const ASCII: &str = " \
- _____     ______________    __________      ___________________    ___
-|     \\   /              \\  |          |    |                   |  |   |
-|      \\_/       __       \\_|    __    |    |    ___     ___    |__|   |
-|               |  |            |  |   |    |   |   |   |   |          |
-|   |\\     /|   |__|    _       |__|   |____|   |   |   |   |    __    |
-|   | \\___/ |          | \\                      |   |   |   |   |  |   |
-|___|       |__________|  \\_____________________|   |___|   |___|  |___|
-";
 const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 10; // Minimum file size for on-disk caching (in bytes)
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
 
 fn main() {
-    // Process CLI flags and options
-    let mut cookie_file_path: Option<String> = None;
+    let cli = Cli::parse();
+    let cookie_file_path;
     let mut exit_code = 0;
     let mut options: Options = Options::default();
-    let source;
     let destination;
-    {
-        let app = App::new(env!("CARGO_PKG_NAME"))
-            .version(env!("CARGO_PKG_VERSION"))
-            .author(format!("\n{}\n\n", env!("CARGO_PKG_AUTHORS").replace(':', "\n")).as_str())
-            .about(format!("{}\n{}", ASCII, env!("CARGO_PKG_DESCRIPTION")).as_str())
-            .args_from_usage("-a, --no-audio 'Remove audio sources'")
-            .args_from_usage("-b, --base-url=[http://localhost/] 'Set custom base URL'")
-            .args_from_usage(
-                "-B, --blacklist-domains 'Treat list of specified domains as blacklist'",
-            )
-            .args_from_usage("-c, --no-css 'Remove CSS'")
-            .args_from_usage("-C, --cookie-file=[cookies.txt] 'Specify cookie file'")
-            .arg(
-                Arg::with_name("domains")
-                    .short('d')
-                    .long("domain")
-                    .takes_value(true)
-                    .value_name("example.com")
-                    .action(ArgAction::Append)
-                    .help("Specify domains to use for white/black-listing"),
-            )
-            .args_from_usage("-e, --ignore-errors 'Ignore network errors'")
-            .args_from_usage("-E, --encoding=[UTF-8] 'Enforce custom charset'")
-            .args_from_usage("-f, --no-frames 'Remove frames and iframes'")
-            .args_from_usage("-F, --no-fonts 'Remove fonts'")
-            .args_from_usage("-i, --no-images 'Remove images'")
-            .args_from_usage("-I, --isolate 'Cut off document from the Internet'")
-            .args_from_usage("-j, --no-js 'Remove JavaScript'")
-            .args_from_usage("-k, --insecure 'Allow invalid X.509 (TLS) certificates'")
-            .args_from_usage("-M, --no-metadata 'Exclude timestamp and source information'")
-            .args_from_usage(
-                "-n, --unwrap-noscript 'Replace NOSCRIPT elements with their contents'",
-            )
-            .args_from_usage(
-                "-o, --output=[document.html] 'Write output to <file>, use - for STDOUT'",
-            )
-            .args_from_usage("-q, --quiet 'Suppress verbosity'")
-            .args_from_usage("-t, --timeout=[60] 'Adjust network request timeout'")
-            .args_from_usage("-u, --user-agent=[Firefox] 'Set custom User-Agent string'")
-            .args_from_usage("-v, --no-video 'Remove video sources'")
-            .arg(
-                Arg::with_name("target")
-                    .required(true)
-                    .takes_value(true)
-                    .index(1)
-                    .help("URL or file path, use - for STDIN"),
-            )
-            .get_matches();
 
-        // Process the command
-        source = app
-            .value_of("target")
-            .expect("please set target")
-            .to_string();
-        options.no_audio = app.is_present("no-audio");
-        if let Some(base_url) = app.value_of("base-url") {
-            options.base_url = Some(base_url.to_string());
+    // Process the command
+    {
+        options.base_url = cli.base_url;
+        options.blacklist_domains = cli.blacklist_domains;
+        options.encoding = cli.encoding;
+        if !cli.domains.is_empty() {
+            options.domains = Some(cli.domains);
         }
-        options.blacklist_domains = app.is_present("blacklist-domains");
-        options.no_css = app.is_present("no-css");
-        if let Some(cookie_file) = app.value_of("cookie-file") {
-            cookie_file_path = Some(cookie_file.to_string());
-        }
-        if let Some(encoding) = app.value_of("encoding") {
-            options.encoding = Some(encoding.to_string());
-        }
-        if let Some(domains) = app.get_many::<String>("domains") {
-            let list_of_domains: Vec<String> = domains.cloned().collect::<Vec<_>>();
-            options.domains = Some(list_of_domains);
-        }
-        options.ignore_errors = app.is_present("ignore-errors");
-        options.no_frames = app.is_present("no-frames");
-        options.no_fonts = app.is_present("no-fonts");
-        options.no_images = app.is_present("no-images");
-        options.isolate = app.is_present("isolate");
-        options.no_js = app.is_present("no-js");
-        options.insecure = app.is_present("insecure");
-        options.no_metadata = app.is_present("no-metadata");
-        destination = app.value_of("output").unwrap_or("").to_string();
-        options.silent = app.is_present("quiet");
-        options.timeout = app
-            .value_of("timeout")
-            .unwrap_or(&DEFAULT_NETWORK_TIMEOUT.to_string())
-            .parse::<u64>()
-            .unwrap();
-        if let Some(user_agent) = app.value_of("user-agent") {
-            options.user_agent = Some(user_agent.to_string());
-        } else {
+        options.ignore_errors = cli.ignore_errors;
+        options.insecure = cli.insecure;
+        options.isolate = cli.isolate;
+        options.no_audio = cli.no_audio;
+        options.no_css = cli.no_css;
+        options.no_fonts = cli.no_fonts;
+        options.no_frames = cli.no_frames;
+        options.no_images = cli.no_images;
+        options.no_js = cli.no_js;
+        options.no_metadata = cli.no_metadata;
+        options.no_video = cli.no_video;
+        options.silent = cli.quiet;
+        options.timeout = cli.timeout.unwrap_or(DEFAULT_NETWORK_TIMEOUT);
+        options.unwrap_noscript = cli.unwrap_noscript;
+        if cli.user_agent.is_none() {
             options.user_agent = Some(DEFAULT_USER_AGENT.to_string());
+        } else {
+            options.user_agent = cli.user_agent;
         }
-        options.unwrap_noscript = app.is_present("unwrap-noscript");
-        options.no_video = app.is_present("no-video");
+
+        cookie_file_path = cli.cookie_file;
+        destination = cli.output.clone();
     }
 
     // Set up cache (attempt to create temporary file)
@@ -212,10 +244,12 @@ fn main() {
         }
     }
 
-    match create_monolithic_document(source, &options, &mut cache) {
+    // Retrieve target from source and output result
+    match create_monolithic_document(cli.target, &options, &mut cache) {
         Ok(result) => {
             // Define output
-            let mut output = Output::new(&destination).expect("could not prepare output");
+            let mut output = Output::new(&destination.unwrap_or(String::new()))
+                .expect("could not prepare output");
 
             // Write result into STDOUT or file
             output.write(&result).expect("could not write output");
