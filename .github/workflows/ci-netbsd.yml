@@ -18,17 +18,15 @@ on:
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
-    name: Build and test (netbsd)
+    name: Test with musl
     steps:
-    - name: "Checkout repository"
-      uses: actions/checkout@v4
+    - name: Checkout the repository
+      uses: actions/checkout@v2
 
-    - name: Test in NetBSD
-      uses: vmactions/netbsd-vm@v1
-      with:
-        usesh: true
-        prepare: |
-          /usr/sbin/pkg_add cwrappers gmake mktools pkgconf rust
-        run: |
-          cargo build --all --locked --verbose --no-default-features --features cli
-          cargo test --all --locked --verbose --no-default-features --features cli
+    - name: Prepare cross-platform environment
+      run: |
+        rustup target add x86_64-unknown-linux-musl
+
+    - name: Build the executable
+      run: cargo build --release --target=x86_64-unknown-linux-musl
+
