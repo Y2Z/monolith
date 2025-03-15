@@ -1,12 +1,12 @@
 use base64::prelude::*;
 use chrono::prelude::*;
 use encoding_rs::Encoding;
-use html5ever::interface::QualName;
+use html5ever::interface::{Attribute, QualName};
 use html5ever::parse_document;
 use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::{format_tendril, TendrilSink};
-use html5ever::tree_builder::{Attribute, TreeSink};
-use html5ever::{local_name, namespace_url, ns, LocalName};
+use html5ever::tree_builder::create_element;
+use html5ever::{namespace_url, ns, LocalName};
 use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
 use regex::Regex;
 use reqwest::blocking::Client;
@@ -50,23 +50,22 @@ pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     )
     .expect("unable to serialize DOM into buffer");
 
-    let mut dom = html_to_dom(&buf, "utf-8".to_string());
-    let doc = dom.get_document();
-    if let Some(html) = get_child_node_by_name(&doc, "html") {
+    let dom = html_to_dom(&buf, "utf-8".to_string());
+    if let Some(html) = get_child_node_by_name(&dom.document, "html") {
         if let Some(head) = get_child_node_by_name(&html, "head") {
-            let favicon_node = dom.create_element(
-                QualName::new(None, ns!(), local_name!("link")),
+            let favicon_node = create_element(
+                &dom,
+                QualName::new(None, ns!(), LocalName::from("link")),
                 vec![
                     Attribute {
-                        name: QualName::new(None, ns!(), local_name!("rel")),
+                        name: QualName::new(None, ns!(), LocalName::from("rel")),
                         value: format_tendril!("icon"),
                     },
                     Attribute {
-                        name: QualName::new(None, ns!(), local_name!("href")),
+                        name: QualName::new(None, ns!(), LocalName::from("href")),
                         value: format_tendril!("{}", favicon_data_url),
                     },
                 ],
-                Default::default(),
             );
             // Insert favicon LINK tag into HEAD
             head.children.borrow_mut().push(favicon_node.clone());
@@ -461,21 +460,20 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
     )
     .expect("unable to serialize DOM into buffer");
 
-    let mut dom = html_to_dom(&buf, "utf-8".to_string());
-    let doc = dom.get_document();
-    if let Some(html_node) = get_child_node_by_name(&doc, "html") {
+    let dom = html_to_dom(&buf, "utf-8".to_string());
+    if let Some(html_node) = get_child_node_by_name(&dom.document, "html") {
         if let Some(head_node) = get_child_node_by_name(&html_node, "head") {
             // Check if BASE node already exists in the DOM tree
             if let Some(base_node) = get_child_node_by_name(&head_node, "base") {
                 set_node_attr(&base_node, "href", Some(desired_base_href));
             } else {
-                let base_node = dom.create_element(
-                    QualName::new(None, ns!(), local_name!("base")),
+                let base_node = create_element(
+                    &dom,
+                    QualName::new(None, ns!(), LocalName::from("base")),
                     vec![Attribute {
-                        name: QualName::new(None, ns!(), local_name!("href")),
+                        name: QualName::new(None, ns!(), LocalName::from("href")),
                         value: format_tendril!("{}", desired_base_href),
                     }],
-                    Default::default(),
                 );
 
                 // Insert newly created BASE node into HEAD
@@ -487,7 +485,7 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
     dom
 }
 
-pub fn set_charset(mut dom: RcDom, desired_charset: String) -> RcDom {
+pub fn set_charset(dom: RcDom, desired_charset: String) -> RcDom {
     if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(&dom.document) {
         if get_node_attr(&meta_charset_node, "charset").is_some() {
             set_node_attr(&meta_charset_node, "charset", Some(desired_charset));
@@ -499,13 +497,13 @@ pub fn set_charset(mut dom: RcDom, desired_charset: String) -> RcDom {
             );
         }
     } else {
-        let meta_charset_node = dom.create_element(
-            QualName::new(None, ns!(), local_name!("meta")),
+        let meta_charset_node: Handle = create_element(
+            &dom,
+            QualName::new(None, ns!(), LocalName::from("meta")),
             vec![Attribute {
-                name: QualName::new(None, ns!(), local_name!("charset")),
+                name: QualName::new(None, ns!(), LocalName::from("charset")),
                 value: format_tendril!("{}", desired_charset),
             }],
-            Default::default(),
         );
 
         // Insert newly created META charset node into HEAD
@@ -559,9 +557,8 @@ pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>)
     };
 }
 
-pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &Options) -> Vec<u8> {
+pub fn serialize_document(dom: RcDom, document_encoding: String, options: &Options) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
-    let document = dom.get_document();
 
     if options.isolate
         || options.no_css
@@ -571,21 +568,21 @@ pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &O
         || options.no_images
     {
         // Take care of CSP
-        if let Some(html) = get_child_node_by_name(&document, "html") {
+        if let Some(html) = get_child_node_by_name(&dom.document, "html") {
             if let Some(head) = get_child_node_by_name(&html, "head") {
-                let meta = dom.create_element(
-                    QualName::new(None, ns!(), local_name!("meta")),
+                let meta = create_element(
+                    &dom,
+                    QualName::new(None, ns!(), LocalName::from("meta")),
                     vec![
                         Attribute {
-                            name: QualName::new(None, ns!(), local_name!("http-equiv")),
+                            name: QualName::new(None, ns!(), LocalName::from("http-equiv")),
                             value: format_tendril!("Content-Security-Policy"),
                         },
                         Attribute {
-                            name: QualName::new(None, ns!(), local_name!("content")),
+                            name: QualName::new(None, ns!(), LocalName::from("content")),
                             value: format_tendril!("{}", compose_csp(options)),
                         },
                     ],
-                    Default::default(),
                 );
                 // The CSP meta-tag has to be prepended, never appended,
                 //  since there already may be one defined in the original document,
@@ -597,12 +594,9 @@ pub fn serialize_document(mut dom: RcDom, document_encoding: String, options: &O
         }
     }
 
-    serialize(
-        &mut buf,
-        &SerializableHandle::from(document.clone()),
-        SerializeOpts::default(),
-    )
-    .expect("Unable to serialize DOM into buffer");
+    let serializable: SerializableHandle = dom.document.into();
+    serialize(&mut buf, &serializable, SerializeOpts::default())
+        .expect("Unable to serialize DOM into buffer");
 
     // Unwrap NOSCRIPT elements
     if options.unwrap_noscript {
@@ -634,7 +628,7 @@ pub fn retrieve_and_embed_asset(
     let resolved_url: Url = resolve_url(document_url, attr_value);
 
     match retrieve_asset(cache, client, &document_url.clone(), &resolved_url, options) {
-        Ok((data, final_url, mut media_type, charset)) => {
+        Ok((data, final_url, media_type, charset)) => {
             let node_name: &str = get_node_name(node).unwrap();
 
             // Check integrity if it's a LINK or SCRIPT element
@@ -677,12 +671,8 @@ pub fn retrieve_and_embed_asset(
                     walk_and_embed_assets(cache, client, &final_url, &frame_dom.document, options);
 
                     let mut frame_data: Vec<u8> = Vec::new();
-                    serialize(
-                        &mut frame_data,
-                        &SerializableHandle::from(frame_dom.document.clone()),
-                        SerializeOpts::default(),
-                    )
-                    .unwrap();
+                    let serializable: SerializableHandle = frame_dom.document.into();
+                    serialize(&mut frame_data, &serializable, SerializeOpts::default()).unwrap();
 
                     // Create and embed data URL
                     let mut frame_data_url =
@@ -694,18 +684,31 @@ pub fn retrieve_and_embed_asset(
 
                     // Parse media type for SCRIPT elements
                     if node_name == "script" && get_node_attr(node, "src").is_some() {
-                        if let Some(script_node_type_attr_value) = get_node_attr(node, "type") {
-                            media_type = script_node_type_attr_value.to_string();
-                        } else {
-                            // Fallback to default one if it's not specified
-                            media_type = "application/javascript".to_string();
-                        }
-                    }
+                        let script_media_type =
+                            get_node_attr(node, "type").unwrap_or(String::from("text/javascript"));
 
-                    // Create and embed data URL
-                    let mut data_url = create_data_url(&media_type, &charset, &data, &final_url);
-                    data_url.set_fragment(resolved_url.fragment());
-                    set_node_attr(node, attr_name, Some(data_url.to_string()));
+                        if script_media_type == "text/javascript" {
+                            // TODO: embed content here instead of using data URLs
+
+                            // Create and embed data URL
+                            let mut data_url =
+                                create_data_url(&script_media_type, &charset, &data, &final_url);
+                            data_url.set_fragment(resolved_url.fragment());
+                            set_node_attr(node, attr_name, Some(data_url.to_string()));
+                        } else {
+                            // Create and embed data URL
+                            let mut data_url =
+                                create_data_url(&script_media_type, &charset, &data, &final_url);
+                            data_url.set_fragment(resolved_url.fragment());
+                            set_node_attr(node, attr_name, Some(data_url.to_string()));
+                        }
+                    } else {
+                        // Create and embed data URL
+                        let mut data_url =
+                            create_data_url(&media_type, &charset, &data, &final_url);
+                        data_url.set_fragment(resolved_url.fragment());
+                        set_node_attr(node, attr_name, Some(data_url.to_string()));
+                    }
                 }
             }
         }
@@ -1035,25 +1038,25 @@ pub fn walk_and_embed_assets(
                 }
                 "script" => {
                     // Read values of integrity and src attributes
-                    let script_attr_src: Option<String> = get_node_attr(node, "src");
+                    let script_attr_src: &str = &get_node_attr(node, "src").unwrap_or_default();
 
                     if options.no_js {
                         // Empty inner content
                         node.children.borrow_mut().clear();
                         // Remove src attribute
-                        if script_attr_src.is_some() {
+                        if !script_attr_src.is_empty() {
                             set_node_attr(node, "src", None);
                             // Wipe integrity attribute
                             set_node_attr(node, "integrity", None);
                         }
-                    } else if !script_attr_src.clone().unwrap_or_default().is_empty() {
+                    } else if !script_attr_src.is_empty() {
                         retrieve_and_embed_asset(
                             cache,
                             client,
                             document_url,
                             node,
                             "src",
-                            &script_attr_src.unwrap_or_default(),
+                            script_attr_src,
                             options,
                         );
                     }
@@ -1192,12 +1195,9 @@ pub fn walk_and_embed_assets(
                             {
                                 if let Some(body) = get_child_node_by_name(&html, "body") {
                                     let mut buf: Vec<u8> = Vec::new();
-                                    serialize(
-                                        &mut buf,
-                                        &SerializableHandle::from(body.clone()),
-                                        SerializeOpts::default(),
-                                    )
-                                    .expect("Unable to serialize DOM into buffer");
+                                    let serializable: SerializableHandle = body.into();
+                                    serialize(&mut buf, &serializable, SerializeOpts::default())
+                                        .expect("Unable to serialize DOM into buffer");
                                     let result = String::from_utf8_lossy(&buf);
                                     noscript_contents.push_slice(&result);
                                 }

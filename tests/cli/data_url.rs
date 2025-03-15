@@ -221,7 +221,7 @@ mod failing {
         // STDOUT should contain HTML without contents of local JS file
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head><script src=\"data:application/javascript;base64,\"></script></head><body></body></html>\n"
+            "<html><head><script src=\"data:text/javascript;base64,\"></script></head><body></body></html>\n"
         );
 
         // Exit code should be 0
