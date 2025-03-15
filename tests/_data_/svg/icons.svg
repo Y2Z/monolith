@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <symbol id="icon-1" viewBox="0 0 24 24">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M10 20h4V10h3l-5-6.5L7 10h3v10Z" />
+    </symbol>
+    <symbol id="icon-2" viewBox="0 0 24 24">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M10 20h4V10h3l-5-6.5L7 10h3v10Z" />
+    </symbol>
+  </defs>
+</svg>

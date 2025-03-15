@@ -204,6 +204,37 @@ mod passing {
     }
 
     #[test]
+    fn embed_svg_local_asset_via_use() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let path_html: &Path = Path::new("tests/_data_/svg/svg.html");
+        let path_svg: &Path = Path::new("tests/_data_/svg/icons.svg");
+
+        let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
+
+        // STDERR should list files that got retrieved
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                "\
+                {file_url_html}\n\
+                {file_url_svg}\n\
+                ",
+                file_url_html = Url::from_file_path(fs::canonicalize(path_html).unwrap()).unwrap(),
+                file_url_svg = Url::from_file_path(fs::canonicalize(path_svg).unwrap()).unwrap(),
+            )
+        );
+
+        // STDOUT should contain HTML with date URL for background-image in it
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "<html><head></head><body>\n<button class=\"tm-votes-lever__button\" data-test-id=\"votes-lever-upvote-button\" title=\"Like\" type=\"button\">\n  <svg class=\"tm-svg-img tm-votes-lever__icon\" height=\"24\" width=\"24\">\n    <title>Like</title>\n    <use xlink:href=\"#icon-1\"><symbol id=\"icon-1\">\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M10 20h4V10h3l-5-6.5L7 10h3v10Z\"></path>\n    </symbol></use>\n  </svg>\n</button>\n\n\n</body></html>\n"
+        );
+
+        // Exit code should be 0
+        out.assert().code(0);
+    }
+
+    #[test]
     fn discard_integrity_for_local_files() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let cwd_normalized: String = env::current_dir()

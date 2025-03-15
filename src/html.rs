@@ -5,7 +5,7 @@ use html5ever::interface::{Attribute, QualName};
 use html5ever::parse_document;
 use html5ever::serialize::{serialize, SerializeOpts};
 use html5ever::tendril::{format_tendril, TendrilSink};
-use html5ever::tree_builder::create_element;
+use html5ever::tree_builder::{create_element, TreeSink};
 use html5ever::{namespace_url, ns, LocalName};
 use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
 use regex::Regex;
@@ -38,7 +38,6 @@ struct SrcSetItem<'a> {
 }
 
 const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
-
 const WHITESPACES: &[char] = &['\t', '\n', '\x0c', '\r', ' '];
 
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
@@ -51,25 +50,24 @@ pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     .expect("unable to serialize DOM into buffer");
 
     let dom = html_to_dom(&buf, "utf-8".to_string());
-    if let Some(html) = get_child_node_by_name(&dom.document, "html") {
-        if let Some(head) = get_child_node_by_name(&html, "head") {
-            let favicon_node = create_element(
-                &dom,
-                QualName::new(None, ns!(), LocalName::from("link")),
-                vec![
-                    Attribute {
-                        name: QualName::new(None, ns!(), LocalName::from("rel")),
-                        value: format_tendril!("icon"),
-                    },
-                    Attribute {
-                        name: QualName::new(None, ns!(), LocalName::from("href")),
-                        value: format_tendril!("{}", favicon_data_url),
-                    },
-                ],
-            );
-            // Insert favicon LINK tag into HEAD
-            head.children.borrow_mut().push(favicon_node.clone());
-        }
+    for head in find_nodes(&dom.document, vec!["html", "head"]).iter() {
+        let favicon_node = create_element(
+            &dom,
+            QualName::new(None, ns!(), LocalName::from("link")),
+            vec![
+                Attribute {
+                    name: QualName::new(None, ns!(), LocalName::from("rel")),
+                    value: format_tendril!("icon"),
+                },
+                Attribute {
+                    name: QualName::new(None, ns!(), LocalName::from("href")),
+                    value: format_tendril!("{}", favicon_data_url),
+                },
+            ],
+        );
+
+        // Insert favicon LINK tag into HEAD
+        head.children.borrow_mut().push(favicon_node.clone());
     }
 
     dom
@@ -244,98 +242,68 @@ pub fn embed_srcset(
     result
 }
 
-pub fn find_base_node(node: &Handle) -> Option<Handle> {
-    match node.data {
-        NodeData::Document => {
-            // Dig deeper
-            for child in node.children.borrow().iter() {
-                if let Some(base_node) = find_base_node(child) {
-                    return Some(base_node);
-                }
-            }
-        }
-        NodeData::Element { ref name, .. } => {
-            if name.local.as_ref() == "head" {
-                return get_child_node_by_name(node, "base");
-            }
+pub fn find_nodes(node: &Handle, mut path: Vec<&str>) -> Vec<Handle> {
+    let mut result = vec![];
 
-            // Dig deeper
-            for child in node.children.borrow().iter() {
-                if let Some(base_node) = find_base_node(child) {
-                    return Some(base_node);
-                }
-            }
-        }
-        _ => {}
-    }
-
-    None
-}
-
-pub fn find_meta_charset_or_content_type_node(node: &Handle) -> Option<Handle> {
-    match node.data {
-        NodeData::Document => {
-            // Dig deeper
-            for child in node.children.borrow().iter() {
-                if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(child) {
-                    return Some(meta_charset_node);
-                }
-            }
-        }
-        NodeData::Element { ref name, .. } => {
-            if name.local.as_ref() == "head" {
-                if let Some(meta_node) = get_child_node_by_name(node, "meta") {
-                    if get_node_attr(&meta_node, "charset").is_some() {
-                        return Some(meta_node);
-                    } else if let Some(meta_node_http_equiv_attr_value) =
-                        get_node_attr(&meta_node, "http-equiv")
+    while !path.is_empty() {
+        match node.data {
+            NodeData::Document | NodeData::Element { .. } => {
+                // Dig deeper
+                for child in node.children.borrow().iter() {
+                    if get_node_name(child)
+                        .unwrap_or_default()
+                        .eq_ignore_ascii_case(path[0])
                     {
-                        if meta_node_http_equiv_attr_value.eq_ignore_ascii_case("content-type") {
-                            return Some(meta_node);
+                        if path.len() == 1 {
+                            result.push(child.clone());
+                        } else {
+                            result.append(&mut find_nodes(child, path[1..].to_vec()));
                         }
                     }
                 }
             }
-
-            // Dig deeper
-            for child in node.children.borrow().iter() {
-                if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(child) {
-                    return Some(meta_charset_node);
-                }
-            }
+            _ => {}
         }
-        _ => {}
+
+        path.remove(0);
     }
 
-    None
+    result
 }
 
 pub fn get_base_url(handle: &Handle) -> Option<String> {
-    if let Some(base_node) = find_base_node(handle) {
-        get_node_attr(&base_node, "href")
-    } else {
-        None
+    for base_node in find_nodes(handle, vec!["html", "head", "base"]).iter() {
+        // Only the first base tag matters (we ignore the rest, if there's any)
+        return get_node_attr(base_node, "href");
     }
+
+    None
 }
 
 pub fn get_charset(node: &Handle) -> Option<String> {
-    if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(node) {
-        if let Some(meta_charset_node_attr_value) = get_node_attr(&meta_charset_node, "charset") {
+    for meta_node in find_nodes(node, vec!["html", "head", "meta"]).iter() {
+        if let Some(meta_charset_node_attr_value) = get_node_attr(meta_node, "charset") {
             // Processing <meta charset="..." />
             return Some(meta_charset_node_attr_value);
-        } else if let Some(meta_content_type_node_attr_value) =
-            get_node_attr(&meta_charset_node, "content")
+        }
+
+        if get_node_attr(meta_node, "http-equiv")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("content-type")
         {
-            // Processing <meta http-equiv="content-type" content="text/html; charset=..." />
-            let (_media_type, charset, _is_base64) =
-                parse_content_type(&meta_content_type_node_attr_value);
-            return Some(charset);
+            if let Some(meta_content_type_node_attr_value) = get_node_attr(meta_node, "content") {
+                // Processing <meta http-equiv="content-type" content="text/html; charset=..." />
+                let (_media_type, charset, _is_base64) =
+                    parse_content_type(&meta_content_type_node_attr_value);
+                return Some(charset);
+            }
         }
     }
 
     None
 }
 
+// TODO: get rid of this function (replace with find_nodes)
 pub fn get_child_node_by_name(parent: &Handle, node_name: &str) -> Option<Handle> {
     let children = parent.children.borrow();
     let matching_children = children.iter().find(|child| match child.data {
@@ -374,36 +342,13 @@ pub fn get_parent_node(child: &Handle) -> Handle {
 pub fn has_favicon(handle: &Handle) -> bool {
     let mut found_favicon: bool = false;
 
-    match handle.data {
-        NodeData::Document => {
-            // Dig deeper
-            for child in handle.children.borrow().iter() {
-                if has_favicon(child) {
-                    found_favicon = true;
-                    break;
-                }
+    for link_node in find_nodes(handle, vec!["html", "head", "link"]).iter() {
+        if let Some(attr_value) = get_node_attr(link_node, "rel") {
+            if is_favicon(attr_value.trim()) {
+                found_favicon = true;
+                break;
             }
         }
-        NodeData::Element { ref name, .. } => {
-            if name.local.as_ref() == "link" {
-                if let Some(attr_value) = get_node_attr(handle, "rel") {
-                    if is_favicon(attr_value.trim()) {
-                        found_favicon = true;
-                    }
-                }
-            }
-
-            if !found_favicon {
-                // Dig deeper
-                for child in handle.children.borrow().iter() {
-                    if has_favicon(child) {
-                        found_favicon = true;
-                        break;
-                    }
-                }
-            }
-        }
-        _ => {}
     }
 
     found_favicon
@@ -459,8 +404,8 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
         SerializeOpts::default(),
     )
     .expect("unable to serialize DOM into buffer");
-
     let dom = html_to_dom(&buf, "utf-8".to_string());
+
     if let Some(html_node) = get_child_node_by_name(&dom.document, "html") {
         if let Some(head_node) = get_child_node_by_name(&html_node, "head") {
             // Check if BASE node already exists in the DOM tree
@@ -486,17 +431,28 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
 }
 
 pub fn set_charset(dom: RcDom, desired_charset: String) -> RcDom {
-    if let Some(meta_charset_node) = find_meta_charset_or_content_type_node(&dom.document) {
-        if get_node_attr(&meta_charset_node, "charset").is_some() {
-            set_node_attr(&meta_charset_node, "charset", Some(desired_charset));
-        } else if get_node_attr(&meta_charset_node, "content").is_some() {
+    for meta_node in find_nodes(&dom.document, vec!["html", "head", "meta"]).iter() {
+        if get_node_attr(meta_node, "charset").is_some() {
+            set_node_attr(meta_node, "charset", Some(desired_charset));
+            return dom;
+        }
+
+        if get_node_attr(meta_node, "http-equiv")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("content-type")
+            && get_node_attr(meta_node, "content").is_some()
+        {
             set_node_attr(
-                &meta_charset_node,
+                meta_node,
                 "content",
                 Some(format!("text/html;charset={}", desired_charset)),
             );
+            return dom;
         }
-    } else {
+    }
+
+    // Manually append charset META node to HEAD
+    {
         let meta_charset_node: Handle = create_element(
             &dom,
             QualName::new(None, ns!(), LocalName::from("meta")),
@@ -507,13 +463,11 @@ pub fn set_charset(dom: RcDom, desired_charset: String) -> RcDom {
         );
 
         // Insert newly created META charset node into HEAD
-        if let Some(html_node) = get_child_node_by_name(&dom.document, "html") {
-            if let Some(head_node) = get_child_node_by_name(&html_node, "head") {
-                head_node
-                    .children
-                    .borrow_mut()
-                    .push(meta_charset_node.clone());
-            }
+        for head_node in find_nodes(&dom.document, vec!["html", "head"]).iter() {
+            head_node
+                .children
+                .borrow_mut()
+                .push(meta_charset_node.clone());
         }
     }
 
@@ -894,6 +848,7 @@ pub fn walk_and_embed_assets(
                 }
                 "svg" => {
                     if options.no_images {
+                        // Remove all children
                         node.children.borrow_mut().clear();
                     }
                 }
@@ -924,35 +879,123 @@ pub fn walk_and_embed_assets(
                     }
                 }
                 "image" | "use" => {
-                    if let Some(image_attr_href_value) = get_node_attr(node, "href") {
-                        if options.no_images {
-                            set_node_attr(node, "href", None);
-                        } else {
-                            retrieve_and_embed_asset(
-                                cache,
-                                client,
-                                document_url,
-                                node,
-                                "href",
-                                &image_attr_href_value,
-                                options,
-                            );
-                        }
-                    }
+                    let attr_names: [&str; 2] = ["href", "xlink:href"];
 
-                    if let Some(image_attr_xlink_href_value) = get_node_attr(node, "xlink:href") {
-                        if options.no_images {
-                            set_node_attr(node, "xlink:href", None);
-                        } else {
-                            retrieve_and_embed_asset(
-                                cache,
-                                client,
-                                document_url,
-                                node,
-                                "xlink:href",
-                                &image_attr_xlink_href_value,
-                                options,
-                            );
+                    for attr_name in attr_names.into_iter() {
+                        if let Some(image_attr_href_value) = get_node_attr(node, attr_name) {
+                            if options.no_images {
+                                set_node_attr(node, attr_name, None);
+                            } else {
+                                let image_asset_url: Url =
+                                    resolve_url(document_url, &image_attr_href_value);
+
+                                match retrieve_asset(
+                                    cache,
+                                    client,
+                                    document_url,
+                                    &image_asset_url,
+                                    options,
+                                ) {
+                                    Ok((data, final_url, media_type, charset)) => {
+                                        if media_type == "image/svg+xml" {
+                                            // Parse SVG
+                                            let svg_dom: RcDom = parse_document(
+                                                RcDom::default(),
+                                                Default::default(),
+                                            )
+                                            .from_utf8()
+                                            .read_from(&mut data.as_slice())
+                                            .unwrap();
+
+                                            if image_asset_url.fragment().is_some() {
+                                                // Take only that one #fragment symbol from SVG and replace this image|use with that node
+                                                let single_symbol_node = create_element(
+                                                    &svg_dom,
+                                                    QualName::new(
+                                                        None,
+                                                        ns!(),
+                                                        LocalName::from("symbol"),
+                                                    ),
+                                                    vec![],
+                                                );
+                                                for symbol_node in find_nodes(
+                                                    &svg_dom.document,
+                                                    vec!["html", "body", "svg", "defs", "symbol"],
+                                                )
+                                                .iter()
+                                                {
+                                                    if get_node_attr(symbol_node, "id")
+                                                        .unwrap_or_default()
+                                                        == image_asset_url.fragment().unwrap()
+                                                    {
+                                                        svg_dom.reparent_children(
+                                                            symbol_node,
+                                                            &single_symbol_node,
+                                                        );
+                                                        set_node_attr(
+                                                            &single_symbol_node,
+                                                            "id",
+                                                            Some(
+                                                                image_asset_url
+                                                                    .fragment()
+                                                                    .unwrap()
+                                                                    .to_string(),
+                                                            ),
+                                                        );
+
+                                                        set_node_attr(
+                                                            node,
+                                                            attr_name,
+                                                            Some(format!(
+                                                                "#{}",
+                                                                image_asset_url.fragment().unwrap()
+                                                            )),
+                                                        );
+
+                                                        break;
+                                                    }
+                                                }
+
+                                                node.children
+                                                    .borrow_mut()
+                                                    .push(single_symbol_node.clone());
+                                            } else {
+                                                // Replace this image|use with whole DOM of that SVG file
+                                                for svg_node in find_nodes(
+                                                    &svg_dom.document,
+                                                    vec!["html", "body", "svg"],
+                                                )
+                                                .iter()
+                                                {
+                                                    svg_dom.reparent_children(svg_node, node);
+                                                    break;
+                                                }
+                                                // TODO: decide if we resort to using data URL here or stick with embedding the DOM
+                                            }
+                                        } else {
+                                            // It's likely a raster image; embed it as data URL
+                                            let image_asset_data: Url = create_data_url(
+                                                &media_type,
+                                                &charset,
+                                                &data,
+                                                &final_url,
+                                            );
+                                            set_node_attr(
+                                                node,
+                                                attr_name,
+                                                Some(image_asset_data.to_string()),
+                                            );
+                                        }
+                                    }
+                                    Err(_) => {
+                                        set_node_attr(
+                                            node,
+                                            attr_name,
+                                            Some(image_asset_url.to_string()),
+                                        );
+                                    }
+                                }
+                            }
                         }
                     }
                 }
