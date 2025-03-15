@@ -105,12 +105,18 @@ const FILE_SIGNATURES: [[&[u8]; 2]; 18] = [
     [b"....moov", b"video/quicktime"],
     [b"\x1A\x45\xDF\xA3", b"video/webm"],
 ];
+// All known non-"text/..." plaintext media types
 const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
-    "application/javascript",
-    "application/json",
-    "image/svg+xml",
+    "application/json",                // .json
+    "application/ld+json",             // .jsonld
+    "application/x-sh",                // .sh
+    "application/xhtml+xml",           // .xhtml
+    "application/xml",                 // .xml
+    "application/vnd.mozilla.xul+xml", // .xul
+    "image/svg+xml",                   // .svg
 ];
 
+// TODO: split it into three separate functions [create_from_data(), create_from_url(), create() -- create is likely not public]
 pub fn create_monolithic_document(
     source: String,
     options: &Options,
@@ -137,7 +143,9 @@ pub fn create_monolithic_document(
         "-" => {
             // Read from pipe (stdin)
             use_stdin = true;
-            // Set default target URL to an empty data URL; the user can set it via --base-url
+
+            // Set default target URL to an empty data URL
+            // (the user can change it by using the custom base URL option)
             Url::parse("data:text/html,").unwrap()
         }
         target => match Url::parse(target) {
@@ -266,7 +274,7 @@ pub fn create_monolithic_document(
         }
     }
 
-    // Use custom base URL if specified, read and use what's in the DOM otherwise
+    // Use custom base URL if specified; read and use what's in the DOM otherwise
     let custom_base_url: String = options.base_url.clone().unwrap_or("".to_string());
     if custom_base_url.is_empty() {
         // No custom base URL is specified
@@ -389,8 +397,9 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
             "htm" | "html" => "text/html",
             "ico" => "image/x-icon",
             "jpeg" | "jpg" => "image/jpeg",
-            "js" => "application/javascript",
+            "js" => "text/javascript",
             "json" => "application/json",
+            "jsonld" => "application/ld+json",
             "mp3" => "audio/mpeg",
             "mp4" | "m4v" => "video/mp4",
             "ogg" => "audio/ogg",
@@ -405,12 +414,12 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
             "webp" => "image/webp",
             "woff" => "font/woff",
             "woff2" => "font/woff2",
+            "xhtml" => "application/xhtml+xml",
             "xml" => "text/xml",
             &_ => "",
         },
         None => "",
     };
-
     mime.to_string()
 }
 
@@ -511,9 +520,11 @@ pub fn retrieve_asset(
         let (media_type, charset, data) = parse_data_url(url);
         Ok((data, url.clone(), media_type, charset))
     } else if url.scheme() == "file" {
+        let cache_key: String = clean_url(url.clone()).as_str().to_string();
+
         // Check if parent_url is also a file: URL (if not, then we don't embed the asset)
         if parent_url.scheme() != "file" {
-            print_error_message(&format!("{} (security error)", &url), options);
+            print_error_message(&format!("{} (security error)", &cache_key), options);
 
             // Provoke error
             client.get("").send()?;
@@ -523,12 +534,12 @@ pub fn retrieve_asset(
         let path: &Path = path_buf.as_path();
         if path.exists() {
             if path.is_dir() {
-                print_error_message(&format!("{} (is a directory)", &url), options);
+                print_error_message(&format!("{} (is a directory)", &cache_key), options);
 
                 // Provoke error
                 Err(client.get("").send().unwrap_err())
             } else {
-                print_info_message(&format!("{}", &url), options);
+                print_info_message(&cache_key.to_string(), options);
 
                 let file_blob: Vec<u8> = fs::read(path).expect("unable to read file");
 

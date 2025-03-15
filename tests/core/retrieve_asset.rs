@@ -75,9 +75,9 @@ mod passing {
             &options,
         )
         .unwrap();
-        assert_eq!(&media_type, "application/javascript");
+        assert_eq!(&media_type, "text/javascript");
         assert_eq!(&charset, "");
-        assert_eq!(url::create_data_url(&media_type, &charset, &data, &final_url), Url::parse("data:application/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==").unwrap());
+        assert_eq!(url::create_data_url(&media_type, &charset, &data, &final_url), Url::parse("data:text/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==").unwrap());
         assert_eq!(
             final_url,
             Url::parse(&format!(
