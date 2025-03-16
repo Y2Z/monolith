@@ -224,10 +224,41 @@ mod passing {
             )
         );
 
-        // STDOUT should contain HTML with date URL for background-image in it
+        // STDOUT should contain HTML with one symbol extracted from SVG file
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
             "<html><head></head><body>\n<button class=\"tm-votes-lever__button\" data-test-id=\"votes-lever-upvote-button\" title=\"Like\" type=\"button\">\n  <svg class=\"tm-svg-img tm-votes-lever__icon\" height=\"24\" width=\"24\">\n    <title>Like</title>\n    <use xlink:href=\"#icon-1\"><symbol id=\"icon-1\">\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M10 20h4V10h3l-5-6.5L7 10h3v10Z\"></path>\n    </symbol></use>\n  </svg>\n</button>\n\n\n</body></html>\n"
+        );
+
+        // Exit code should be 0
+        out.assert().code(0);
+    }
+
+    #[test]
+    fn embed_svg_local_asset_via_image() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let path_html: &Path = Path::new("tests/_data_/svg/image.html");
+        let path_svg: &Path = Path::new("tests/_data_/svg/image.svg");
+
+        let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
+
+        // STDERR should list files that got retrieved
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                "\
+                {file_url_html}\n\
+                {file_url_svg}\n\
+                ",
+                file_url_html = Url::from_file_path(fs::canonicalize(path_html).unwrap()).unwrap(),
+                file_url_svg = Url::from_file_path(fs::canonicalize(path_svg).unwrap()).unwrap(),
+            )
+        );
+
+        // STDOUT should contain HTML with data URL of SVG file
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "<html><head></head><body>\n        <svg height=\"24\" width=\"24\">\n            <image href=\"data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=\" width=\"24\" height=\"24\">\n        </image></svg>\n    \n\n</body></html>\n"
         );
 
         // Exit code should be 0
