@@ -860,12 +860,6 @@ pub fn walk_and_embed_assets(
                         }
                     }
                 }
-                "svg" => {
-                    if options.no_images {
-                        // Remove all children
-                        node.children.borrow_mut().clear();
-                    }
-                }
                 "input" => {
                     if let Some(input_attr_type_value) = get_node_attr(node, "type") {
                         if input_attr_type_value.eq_ignore_ascii_case("image") {
@@ -892,7 +886,13 @@ pub fn walk_and_embed_assets(
                         }
                     }
                 }
-                "image" | "use" => {
+                "svg" => {
+                    if options.no_images {
+                        // Remove all children
+                        node.children.borrow_mut().clear();
+                    }
+                }
+                "image" => {
                     let attr_names: [&str; 2] = ["href", "xlink:href"];
 
                     for attr_name in attr_names.into_iter() {
@@ -900,8 +900,29 @@ pub fn walk_and_embed_assets(
                             if options.no_images {
                                 set_node_attr(node, attr_name, None);
                             } else {
+                                retrieve_and_embed_asset(
+                                    cache,
+                                    client,
+                                    document_url,
+                                    node,
+                                    attr_name,
+                                    &image_attr_href_value,
+                                    options,
+                                );
+                            }
+                        }
+                    }
+                }
+                "use" => {
+                    let attr_names: [&str; 2] = ["href", "xlink:href"];
+
+                    for attr_name in attr_names.into_iter() {
+                        if let Some(use_attr_href_value) = get_node_attr(node, attr_name) {
+                            if options.no_images {
+                                set_node_attr(node, attr_name, None);
+                            } else {
                                 let image_asset_url: Url =
-                                    resolve_url(document_url, &image_attr_href_value);
+                                    resolve_url(document_url, &use_attr_href_value);
 
                                 match retrieve_asset(
                                     cache,
