@@ -124,7 +124,7 @@ pub fn compose_csp(options: &Options) -> String {
 }
 
 pub fn create_metadata_tag(url: &Url) -> String {
-    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    let datetime: &str = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     let mut clean_url: Url = clean_url(url.clone());
 
     // Prevent credentials from getting into metadata
@@ -141,7 +141,7 @@ pub fn create_metadata_tag(url: &Url) -> String {
         } else {
             "local source"
         },
-        timestamp,
+        datetime,
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION"),
     )
@@ -337,6 +337,18 @@ pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
 pub fn get_parent_node(child: &Handle) -> Handle {
     let parent = child.parent.take().clone();
     parent.and_then(|node| node.upgrade()).unwrap()
+}
+
+pub fn get_title(node: &Handle) -> Option<String> {
+    for title_node in find_nodes(node, vec!["html", "head", "title"]).iter() {
+        for child_node in title_node.children.borrow().iter() {
+            if let NodeData::Text { ref contents } = child_node.data {
+                return Some(contents.borrow().to_string());
+            }
+        }
+    }
+
+    None
 }
 
 pub fn has_favicon(handle: &Handle) -> bool {

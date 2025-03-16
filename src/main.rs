@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{self, Error as IoError, Write};
 use std::process;
 
+use chrono::prelude::*;
 use clap::Parser;
 use tempfile::Builder;
 
@@ -118,11 +119,28 @@ enum Output {
 }
 
 impl Output {
-    fn new(destination: &str) -> Result<Output, IoError> {
+    fn new(destination: &str, document_title: &str) -> Result<Output, IoError> {
         if destination.is_empty() || destination.eq("-") {
             Ok(Output::Stdout(io::stdout()))
         } else {
-            Ok(Output::File(fs::File::create(destination)?))
+            let datetime: &str = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+            let final_destination = &destination
+                .replace("%timestamp%", &datetime.replace(':', "_"))
+                .replace(
+                    "%title%",
+                    document_title
+                        .to_string()
+                        .replace('/', "∕")
+                        .replace('\\', "⧵")
+                        .replace('<', "[")
+                        .replace('>', "]")
+                        .replace(':', "_")
+                        .replace('\"', "''")
+                        .replace('|', "_")
+                        .replace('?', "")
+                        .trim_start_matches('.'),
+                );
+            Ok(Output::File(fs::File::create(final_destination)?))
         }
     }
 
@@ -246,10 +264,13 @@ fn main() {
 
     // Retrieve target from source and output result
     match create_monolithic_document(cli.target, &options, &mut cache) {
-        Ok(result) => {
+        Ok((result, title)) => {
             // Define output
-            let mut output = Output::new(&destination.unwrap_or(String::new()))
-                .expect("could not prepare output");
+            let mut output = Output::new(
+                &destination.unwrap_or(String::new()),
+                &title.unwrap_or_default(),
+            )
+            .expect("could not prepare output");
 
             // Write result into STDOUT or file
             output.write(&result).expect("could not write output");
