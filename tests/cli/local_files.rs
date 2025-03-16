@@ -62,7 +62,7 @@ mod passing {
             <img alt=\"\">\n  \
             <a href=\"file://local-file.html/\">Tricky href</a>\n  \
             <a href=\"https://github.com/Y2Z/monolith\">Remote URL</a>\n  \
-            <script src=\"data:text/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==\"></script>\n\n\n\n\
+            <script>document.body.style.backgroundColor = \"green\";\ndocument.body.style.color = \"red\";\n</script>\n\n\n\n\
             </body></html>\n\
             "
         );
@@ -289,7 +289,7 @@ mod passing {
                 <link href=\"data:text/css;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNGRkY7Cn0K\" rel=\"stylesheet\" type=\"text/css\" crossorigin=\"anonymous\">\n  \
                 <link href=\"style.css\" rel=\"stylesheet\" type=\"text/css\" crossorigin=\"anonymous\">\n</head>\n\n<body>\n  \
                 <p>This page should have black background and white foreground, but only when served via http: (not via file:)</p>\n  \
-                <script src=\"data:text/javascript;base64,ZnVuY3Rpb24gbm9vcCgpIHsKICAgIGNvbnNvbGUubG9nKCJtb25vbGl0aCIpOwp9Cg==\"></script>\n  \
+                <script>function noop() {{\n    console.log(\"monolith\");\n}}\n</script>\n  \
                 <script src=\"script.js\"></script>\n\n\n\n\
                 </body></html>\n\
                 "

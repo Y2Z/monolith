@@ -637,18 +637,32 @@ pub fn retrieve_and_embed_asset(
                     // Every other type of element gets processed here
 
                     // Parse media type for SCRIPT elements
-                    if node_name == "script" && get_node_attr(node, "src").is_some() {
+                    if node_name == "script" {
                         let script_media_type =
                             get_node_attr(node, "type").unwrap_or(String::from("text/javascript"));
 
-                        if script_media_type == "text/javascript" {
-                            // TODO: embed content here instead of using data URLs
+                        if script_media_type == "text/javascript"
+                            || script_media_type == "application/javascript"
+                        {
+                            // Embed javascript code instead of using data URLs
+                            let script_dom: RcDom =
+                                parse_document(RcDom::default(), Default::default())
+                                    .one("<script>;</script>");
+                            for script_node in
+                                find_nodes(&script_dom.document, vec!["html", "head", "script"])
+                                    .iter()
+                            {
+                                let text_node = &script_node.children.borrow()[0];
 
-                            // Create and embed data URL
-                            let mut data_url =
-                                create_data_url(&script_media_type, &charset, &data, &final_url);
-                            data_url.set_fragment(resolved_url.fragment());
-                            set_node_attr(node, attr_name, Some(data_url.to_string()));
+                                if let NodeData::Text { ref contents } = text_node.data {
+                                    let mut tendril = contents.borrow_mut();
+                                    tendril.clear();
+                                    tendril.push_slice(&String::from_utf8_lossy(&data));
+                                }
+
+                                node.children.borrow_mut().push(text_node.clone());
+                                set_node_attr(node, attr_name, None);
+                            }
                         } else {
                             // Create and embed data URL
                             let mut data_url =

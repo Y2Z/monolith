@@ -107,6 +107,7 @@ const FILE_SIGNATURES: [[&[u8]; 2]; 18] = [
 ];
 // All known non-"text/..." plaintext media types
 const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
+    "application/javascript",          // .js
     "application/json",                // .json
     "application/ld+json",             // .jsonld
     "application/x-sh",                // .sh
