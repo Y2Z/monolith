@@ -15,8 +15,8 @@ use url::Url;
 use crate::cache::Cache;
 use crate::cookies::Cookie;
 use crate::html::{
-    add_favicon, create_metadata_tag, get_base_url, get_charset, has_favicon, html_to_dom,
-    serialize_document, set_base_url, set_charset, walk_and_embed_assets,
+    add_favicon, create_metadata_tag, get_base_url, get_charset, get_title, has_favicon,
+    html_to_dom, serialize_document, set_base_url, set_charset, walk_and_embed_assets,
 };
 use crate::url::{clean_url, create_data_url, get_referer_url, parse_data_url, resolve_url};
 
@@ -122,7 +122,7 @@ pub fn create_monolithic_document(
     source: String,
     options: &Options,
     cache: &mut Option<Cache>,
-) -> Result<Vec<u8>, MonolithError> {
+) -> Result<(Vec<u8>, Option<String>), MonolithError> {
     // Check if source was provided
     if source.is_empty() {
         return Err(MonolithError::new("no target specified"));
@@ -235,7 +235,7 @@ pub fn create_monolithic_document(
                 if !media_type.eq_ignore_ascii_case("text/html")
                     && !media_type.eq_ignore_ascii_case("application/xhtml+xml")
                 {
-                    return Ok(retrieved_data);
+                    return Ok((retrieved_data, None));
                 }
 
                 if options
@@ -353,6 +353,8 @@ pub fn create_monolithic_document(
         dom = set_charset(dom, document_encoding.clone());
     }
 
+    let document_title: Option<String> = get_title(&dom.document);
+
     if options.output_format == MonolithOutputFormat::HTML {
         // Serialize DOM tree
         let mut result: Vec<u8> = serialize_document(dom, document_encoding, options);
@@ -364,9 +366,9 @@ pub fn create_monolithic_document(
             result.splice(0..0, metadata_comment.as_bytes().to_vec());
         }
 
-        Ok(result)
+        Ok((result, document_title))
     } else {
-        Ok(vec![])
+        Ok((vec![], document_title))
     }
 }
 
