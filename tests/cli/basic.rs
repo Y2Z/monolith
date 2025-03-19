@@ -67,7 +67,9 @@ mod passing {
         // STDOUT should contain HTML created out of STDIN
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head></head><body>Hello from STDIN\n</body></html>\n"
+            r#"<html><head></head><body>Hello from STDIN
+</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -103,7 +105,19 @@ mod passing {
         // STDOUT should contain embedded CSS url()'s
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head><style>\n\n    @charset \"UTF-8\";\n\n    @import \"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\";\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n    @import url(\"data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K\");\n\n</style>\n</head><body></body></html>\n"
+            r##"<html><head><style>
+
+    @charset "UTF-8";
+
+    @import "data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K";
+
+    @import url("data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K");
+
+    @import url("data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K");
+
+</style>
+</head><body></body></html>
+"##
         );
 
         // Exit code should be 0
