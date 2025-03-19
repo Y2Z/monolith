@@ -57,3 +57,12 @@ assert_cmd = "2.0.16"
 default = ["cli", "vendored-openssl"]
 cli = ["clap", "tempfile"]  # Build a CLI tool that includes main() function
 vendored-openssl = ["openssl/vendored"]  # Compile and statically link a copy of OpenSSL
+
+[lib]
+name = "monolith"
+path = "src/lib.rs"
+
+[[bin]]
+name = "monolith"
+path = "src/main.rs"
+required-features = ["cli"]
