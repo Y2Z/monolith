@@ -28,9 +28,8 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head>\
-            <base href=\"http://localhost:8000/\"></base>\
-            </head><body>Hello, World!</body></html>\n"
+            r#"<html><head><base href="http://localhost:8000/"></base></head><body>Hello, World!</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -42,7 +41,7 @@ mod passing {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
-            .arg("data:text/html,<base href=\"http://localhost:8000/\" />Hello%2C%20World!")
+            .arg(r#"data:text/html,<base href="http://localhost:8000/" />Hello%2C%20World!"#)
             .output()
             .unwrap();
 
@@ -52,9 +51,8 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head>\
-            <base href=\"http://localhost:8000/\">\
-            </head><body>Hello, World!</body></html>\n"
+            r#"<html><head><base href="http://localhost:8000/"></head><body>Hello, World!</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -68,7 +66,7 @@ mod passing {
             .arg("-M")
             .arg("-b")
             .arg("http://localhost/")
-            .arg("data:text/html,<base href=\"http://localhost:8000/\" />Hello%2C%20World!")
+            .arg(r#"data:text/html,<base href="http://localhost:8000/" />Hello%2C%20World!"#)
             .output()
             .unwrap();
 
@@ -78,9 +76,8 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head>\
-            <base href=\"http://localhost/\">\
-            </head><body>Hello, World!</body></html>\n"
+            r#"<html><head><base href="http://localhost/"></head><body>Hello, World!</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -94,7 +91,7 @@ mod passing {
             .arg("-M")
             .arg("-b")
             .arg("")
-            .arg("data:text/html,<base href=\"http://localhost:8000/\" />Hello%2C%20World!")
+            .arg(r#"data:text/html,<base href="http://localhost:8000/" />Hello%2C%20World!"#)
             .output()
             .unwrap();
 
@@ -104,9 +101,8 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head>\
-            <base href=\"\">\
-            </head><body>Hello, World!</body></html>\n"
+            r#"<html><head><base href=""></head><body>Hello, World!</body></html>
+"#
         );
 
         // Exit code should be 0

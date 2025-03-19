@@ -11,7 +11,7 @@ mod passing {
 
     #[test]
     fn icon() {
-        let html = "<link rel=\"icon\" href=\"\" /><div>text</div>";
+        let html = r#"<link rel="icon" href="" /><div>text</div>"#;
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let res: bool = html::has_favicon(&dom.document);
 
@@ -20,7 +20,7 @@ mod passing {
 
     #[test]
     fn shortcut_icon() {
-        let html = "<link rel=\"shortcut icon\" href=\"\" /><div>text</div>";
+        let html = r#"<link rel="shortcut icon" href="" /><div>text</div>"#;
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let res: bool = html::has_favicon(&dom.document);
 

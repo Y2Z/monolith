@@ -29,9 +29,8 @@ mod passing {
         // STDOUT should contain isolated HTML
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head>\
-            <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:;\"></meta>\
-            </head><body>Hello, World!</body></html>\n"
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-eval' 'unsafe-inline' data:;"></meta></head><body>Hello, World!</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -54,10 +53,8 @@ mod passing {
         // STDOUT should contain HTML with no CSS
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head>\
-            <meta http-equiv=\"Content-Security-Policy\" content=\"style-src 'none';\"></meta>\
-            <style></style>\
-            </head><body>Hello</body></html>\n"
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="style-src 'none';"></meta><style></style></head><body>Hello</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -80,10 +77,8 @@ mod passing {
         // STDOUT should contain HTML with no web fonts
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head>\
-            <meta http-equiv=\"Content-Security-Policy\" content=\"font-src 'none';\"></meta>\
-            <style></style>\
-            </head><body>Hi</body></html>\n"
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="font-src 'none';"></meta><style></style></head><body>Hi</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -96,7 +91,7 @@ mod passing {
         let out = cmd
             .arg("-M")
             .arg("-f")
-            .arg("data:text/html,<iframe src=\"https://duckduckgo.com\"></iframe>Hi")
+            .arg(r#"data:text/html,<iframe src="https://duckduckgo.com"></iframe>Hi"#)
             .output()
             .unwrap();
 
@@ -106,9 +101,8 @@ mod passing {
         // STDOUT should contain HTML with no iframes
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head>\
-            <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none'; child-src 'none';\"></meta>\
-            </head><body><iframe src=\"\"></iframe>Hi</body></html>\n"
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none';"></meta></head><body><iframe src=""></iframe>Hi</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -132,15 +126,8 @@ mod passing {
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
             format!(
-                "<html>\
-                <head>\
-                <meta http-equiv=\"Content-Security-Policy\" content=\"img-src data:;\"></meta>\
-                </head>\
-                <body>\
-                <img src=\"{empty_image}\">\
-                Hi\
-                </body>\
-                </html>\n",
+                r#"<html><head><meta http-equiv="Content-Security-Policy" content="img-src data:;"></meta></head><body><img src="{empty_image}">Hi</body></html>
+"#,
                 empty_image = EMPTY_IMAGE_DATA_URL,
             )
         );
@@ -165,12 +152,8 @@ mod passing {
         // STDOUT should contain HTML with no JS
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html>\
-            <head>\
-            <meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'none';\"></meta>\
-            <script></script></head>\
-            <body>Hi</body>\
-            </html>\n"
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none';"></meta><script></script></head><body>Hi</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -211,7 +194,7 @@ mod failing {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let out = cmd
             .arg("-M")
-            .arg("data:text/html,%3Cscript%20src=\"src/tests/data/basic/local-script.js\"%3E%3C/script%3E")
+            .arg(r#"data:text/html,%3Cscript%20src="src/tests/data/basic/local-script.js"%3E%3C/script%3E"#)
             .output()
             .unwrap();
 
