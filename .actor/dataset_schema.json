@@ -1,0 +1,56 @@
+{
+    "actorSpecification": 1,
+    "fields":{
+      "title": "Sherlock actor input",
+      "description": "This is actor input schema",
+      "type": "object",
+      "schemaVersion": 1,
+      "properties": {
+        "kvsUrl": {
+          "title": "Object URL",
+          "type": "string",
+          "description": "A link to the Apify key-value store object where the monolithic html is available"
+        },
+        "status": {
+          "title": "Exist status",
+          "type": "string",
+          "description": "Exit status of the monolith process"
+        },
+        "url": {
+          "title": "URL",
+          "type": "string",
+          "description": "The original start URL for the monolith process "
+        }
+        
+      },
+      "required": [
+        "kvsUrl", 
+        "status",
+        "url"
+      ]
+    },
+    "views": {
+        "overview": {
+            "title": "Overview",
+            "transformation": {
+              "fields": [
+                "url",
+                "kvsUrl",
+                "status"
+              ],
+            },
+            "display": {
+               "component": "table",
+               "url": {
+                 "label": "Page URL"
+               },
+               "kvsUrl": {
+                 "label": "KVS URL" 
+               },
+               "status": {
+                 "label": "Status"
+               }
+           }
+        }
+    }
+}
