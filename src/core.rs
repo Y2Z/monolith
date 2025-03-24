@@ -313,7 +313,7 @@ pub fn create_monolithic_document(
         }
     }
 
-    let target_url = match target.as_str() {
+    let mut target_url = match target.as_str() {
         target_str => match Url::parse(target_str) {
             Ok(target_url) => match target_url.scheme() {
                 "data" | "file" | "http" | "https" => target_url,
@@ -362,7 +362,6 @@ pub fn create_monolithic_document(
 
     let client: Client = init_client(options);
     let data: Vec<u8>;
-    let mut base_url: Url = target_url.clone();
     let document_encoding: Option<String>;
 
     // Retrieve target document
@@ -380,8 +379,9 @@ pub fn create_monolithic_document(
                     return Ok((retrieved_data, None));
                 }
 
-                if options.base_url.clone().unwrap_or_default().is_empty() {
-                    base_url = final_url;
+                // If got redirected, set target_url to that
+                if final_url != target_url {
+                    target_url = final_url.clone();
                 }
 
                 data = retrieved_data;
