@@ -1,4 +1,4 @@
-use base64::prelude::*;
+use base64::{prelude::BASE64_STANDARD, Engine};
 use percent_encoding::percent_decode_str;
 use url::Url;
 
