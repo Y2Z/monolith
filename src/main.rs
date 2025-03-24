@@ -1,23 +1,25 @@
 use std::fs;
-use std::io::{self, Error as IoError, Write};
+use std::io::{self, Error as IoError, Read, Write};
 use std::process;
 
-use chrono::prelude::*;
+use chrono::{SecondsFormat, Utc};
 use clap::Parser;
 use tempfile::Builder;
 
 use monolith::cache::Cache;
 use monolith::cookies::parse_cookie_file_contents;
-use monolith::core::{create_monolithic_document, print_error_message, Options};
+use monolith::core::{
+    create_monolithic_document, create_monolithic_document_from_data, print_error_message, Options,
+};
 
 const ASCII: &str = " \
- _____     ______________    __________      ___________________    ___
-|     \\   /              \\  |          |    |                   |  |   |
-|      \\_/       __       \\_|    __    |    |    ___     ___    |__|   |
-|               |  |            |  |   |    |   |   |   |   |          |
-|   |\\     /|   |__|    _       |__|   |____|   |   |   |   |    __    |
-|   | \\___/ |          | \\                      |   |   |   |   |  |   |
-|___|       |__________|  \\_____________________|   |___|   |___|  |___|
+ _____    _____________   __________     ___________________    ___
+|     \\  /             \\ |          |   |                   |  |   |
+|      \\/       __      \\|    __    |   |    ___     ___    |__|   |
+|              |  |          |  |   |   |   |   |   |   |          |
+|   |\\    /|   |__|          |__|   |___|   |   |   |   |    __    |
+|   | \\__/ |          |\\                    |   |   |   |   |  |   |
+|___|      |__________| \\___________________|   |___|   |___|  |___|
 ";
 
 #[derive(Parser)]
@@ -167,9 +169,18 @@ impl Output {
 }
 
 const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 10; // Minimum file size for on-disk caching (in bytes)
-const DEFAULT_NETWORK_TIMEOUT: u64 = 120;
+const DEFAULT_NETWORK_TIMEOUT: u64 = 120; // Maximum time to retrieve each remote asset (in seconds)
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
+
+pub fn read_stdin() -> Vec<u8> {
+    let mut buffer: Vec<u8> = vec![];
+
+    match io::stdin().lock().read_to_end(&mut buffer) {
+        Ok(_) => buffer,
+        Err(_) => buffer,
+    }
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -263,22 +274,46 @@ fn main() {
     }
 
     // Retrieve target from source and output result
-    match create_monolithic_document(cli.target, &options, &mut cache) {
-        Ok((result, title)) => {
-            // Define output
-            let mut output = Output::new(
-                &destination.unwrap_or(String::new()),
-                &title.unwrap_or_default(),
-            )
-            .expect("could not prepare output");
+    if cli.target == "-" {
+        // Read input from pipe (STDIN)
+        let data: Vec<u8> = read_stdin();
 
-            // Write result into STDOUT or file
-            output.write(&result).expect("could not write output");
+        match create_monolithic_document_from_data(data, &options, &mut cache, None, None) {
+            Ok((result, title)) => {
+                // Define output
+                let mut output = Output::new(
+                    &destination.unwrap_or(String::new()),
+                    &title.unwrap_or_default(),
+                )
+                .expect("could not prepare output");
+
+                // Write result into STDOUT or file
+                output.write(&result).expect("could not write output");
+            }
+            Err(error) => {
+                print_error_message(&format!("Error: {}", error), &options);
+
+                exit_code = 1;
+            }
         }
-        Err(error) => {
-            print_error_message(&format!("Error: {}", error), &options);
+    } else {
+        match create_monolithic_document(cli.target, &mut options, &mut cache) {
+            Ok((result, title)) => {
+                // Define output
+                let mut output = Output::new(
+                    &destination.unwrap_or(String::new()),
+                    &title.unwrap_or_default(),
+                )
+                .expect("could not prepare output");
 
-            exit_code = 1;
+                // Write result into STDOUT or file
+                output.write(&result).expect("could not write output");
+            }
+            Err(error) => {
+                print_error_message(&format!("Error: {}", error), &options);
+
+                exit_code = 1;
+            }
         }
     }
 

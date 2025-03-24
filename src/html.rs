@@ -1,5 +1,5 @@
-use base64::prelude::*;
-use chrono::prelude::*;
+use base64::{prelude::BASE64_STANDARD, Engine};
+use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use html5ever::interface::{Attribute, QualName};
 use html5ever::parse_document;
@@ -34,11 +34,11 @@ pub enum LinkType {
 
 struct SrcSetItem<'a> {
     path: &'a str,
-    descriptor: &'a str,
+    descriptor: &'a str, // Width or pixel density descriptor
 }
 
 const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
-const WHITESPACES: &[char] = &['\t', '\n', '\x0c', '\r', ' '];
+const WHITESPACES: &[char] = &[' ', '\t', '\n', '\x0c', '\r']; // ASCII whitespaces
 
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
@@ -154,55 +154,16 @@ pub fn embed_srcset(
     srcset: &str,
     options: &Options,
 ) -> String {
-    let mut array: Vec<SrcSetItem> = vec![];
+    let srcset_items: Vec<SrcSetItem> = parse_srcset(srcset);
 
-    // Parse srcset attribute according to the specs
-    // https://html.spec.whatwg.org/multipage/images.html#srcset-attribute
-    let mut offset = 0;
-    let size = srcset.chars().count();
-
-    while offset < size {
-        let mut has_descriptor = true;
-        // Zero or more whitespaces + skip leading comma
-        let url_start = offset
-            + srcset[offset..]
-                .chars()
-                .take_while(|&c| WHITESPACES.contains(&c) || c == ',')
-                .count();
-        if url_start >= size {
-            break;
-        }
-        // A valid non-empty URL that does not start or end with comma
-        let mut url_end = url_start
-            + srcset[url_start..]
-                .chars()
-                .take_while(|&c| !WHITESPACES.contains(&c))
-                .count();
-        while (url_end - 1) > url_start && srcset.chars().nth(url_end - 1).unwrap() == ',' {
-            has_descriptor = false;
-            url_end -= 1;
-        }
-        offset = url_end;
-        // If the URL wasn't terminated by comma there may also be a descriptor
-        if has_descriptor {
-            offset += srcset[url_end..].chars().take_while(|&c| c != ',').count();
-        }
-        // Collect SrcSetItem
-        if url_end > url_start {
-            let path = &srcset[url_start..url_end];
-            let descriptor = &srcset[url_end..offset].trim();
-            let srcset_real_item = SrcSetItem { path, descriptor };
-            array.push(srcset_real_item);
-        }
-    }
-
+    // Embed assets
     let mut result: String = "".to_string();
-    let mut i: usize = array.len();
-    for part in array {
+    let mut i: usize = srcset_items.len();
+    for srcset_item in srcset_items {
         if options.no_images {
             result.push_str(EMPTY_IMAGE_DATA_URL);
         } else {
-            let image_full_url: Url = resolve_url(document_url, part.path);
+            let image_full_url: Url = resolve_url(document_url, srcset_item.path);
             match retrieve_asset(cache, client, document_url, &image_full_url, options) {
                 Ok((image_data, image_final_url, image_media_type, image_charset)) => {
                     let mut image_data_url = create_data_url(
@@ -227,9 +188,9 @@ pub fn embed_srcset(
             }
         }
 
-        if !part.descriptor.is_empty() {
+        if !srcset_item.descriptor.is_empty() {
             result.push(' ');
-            result.push_str(part.descriptor);
+            result.push_str(srcset_item.descriptor);
         }
 
         if i > 1 {
@@ -406,6 +367,73 @@ pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
     }
 
     types
+}
+
+pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem> {
+    let mut srcset_items: Vec<SrcSetItem> = vec![];
+
+    // Parse srcset
+    let mut partials: Vec<&str> = srcset.split(WHITESPACES).collect();
+    let mut path: Option<&str> = None;
+    let mut descriptor: Option<&str> = None;
+    let mut i = 0;
+    while i < partials.len() {
+        let partial = partials[i];
+
+        // Skip empty strings
+        if partial.is_empty() {
+            continue;
+        }
+
+        if partial.ends_with(',') {
+            if path.is_none() {
+                path = Some(partial.strip_suffix(',').unwrap());
+                descriptor = Some("")
+            } else {
+                descriptor = Some(partial.strip_suffix(',').unwrap());
+            }
+        } else if path.is_none() {
+            path = Some(partial);
+        } else {
+            let mut chunks: Vec<&str> = partial.split(',').collect();
+
+            if !chunks.is_empty() && chunks.first().unwrap().ends_with(['x', 'w']) {
+                descriptor = Some(chunks.first().unwrap());
+
+                chunks.remove(0);
+            }
+
+            if !chunks.is_empty() {
+                if descriptor.is_some() {
+                    partials.insert(0, &partial[descriptor.unwrap().len()..]);
+                } else {
+                    partials.insert(0, partial);
+                }
+            }
+        }
+
+        if path.is_some() && descriptor.is_some() {
+            srcset_items.push(SrcSetItem {
+                path: path.unwrap(),
+                descriptor: descriptor.unwrap(),
+            });
+
+            path = None;
+            descriptor = None;
+        }
+
+        i += 1;
+    }
+
+    // Final attempt to process what was found
+    if path.is_some() {
+        srcset_items.push(SrcSetItem {
+            path: path.unwrap(),
+            descriptor: descriptor.unwrap_or_default(),
+        });
+    }
+
+    srcset_items
 }
 
 pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
