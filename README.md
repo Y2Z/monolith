@@ -264,7 +264,7 @@ echo '{"urls": ["https://news.ycombinator.com/"]}' | apify call -so netmilk/mono
 }]
 ```
 
-Read more about the [Docling Actor](.actor/README.md), including how to use it via the Apify API and CLI.
+Read more about the [Monolith Actor](.actor/README.md), including how to use it via the Apify UI, API and CLI without installation.
 
 ---------------------------------------------------
 
