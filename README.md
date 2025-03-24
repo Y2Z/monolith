@@ -172,7 +172,7 @@ Every release contains pre-built binaries for Windows, GNU/Linux, as well as pla
 ## Usage
 
 ```console
-monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o portishead-roads-lyrics.html
+monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o %title%.%timestamp%.html
 ```
 
 ```console
