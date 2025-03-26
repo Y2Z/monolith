@@ -15,8 +15,9 @@ use url::Url;
 use crate::cache::Cache;
 use crate::cookies::Cookie;
 use crate::html::{
-    add_favicon, create_metadata_tag, get_base_url, get_charset, get_title, has_favicon,
-    html_to_dom, serialize_document, set_base_url, set_charset, walk_and_embed_assets,
+    add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
+    has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots,
+    walk_and_embed_assets,
 };
 use crate::url::{clean_url, create_data_url, get_referer_url, parse_data_url, resolve_url};
 
@@ -260,6 +261,13 @@ pub fn create_monolithic_document_from_data(
             Err(_) => {
                 // Failed to retrieve /favicon.ico
             }
+        }
+    }
+
+    // Append noindex META-tag
+    if let meta_robots_content_value = get_robots(&dom.document).unwrap_or_default() {
+        if meta_robots_content_value.trim().is_empty() || meta_robots_content_value != "none" {
+            dom = set_robots(dom, "none");
         }
     }
 
