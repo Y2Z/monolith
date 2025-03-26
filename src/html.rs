@@ -300,6 +300,20 @@ pub fn get_parent_node(child: &Handle) -> Handle {
     parent.and_then(|node| node.upgrade()).unwrap()
 }
 
+pub fn get_robots(handle: &Handle) -> Option<String> {
+    for meta_node in find_nodes(handle, vec!["html", "head", "meta"]).iter() {
+        // Only the first base tag matters (we ignore the rest, if there's any)
+        if get_node_attr(meta_node, "name")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("robots")
+        {
+            return get_node_attr(meta_node, "content");
+        }
+    }
+
+    None
+}
+
 pub fn get_title(node: &Handle) -> Option<String> {
     for title_node in find_nodes(node, vec!["html", "head", "title"]).iter() {
         for child_node in title_node.children.borrow().iter() {
@@ -436,7 +450,7 @@ pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem> {
     srcset_items
 }
 
-pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
+pub fn set_base_url(document: &Handle, base_href_value: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
     serialize(
         &mut buf,
@@ -450,14 +464,14 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
         if let Some(head_node) = get_child_node_by_name(&html_node, "head") {
             // Check if BASE node already exists in the DOM tree
             if let Some(base_node) = get_child_node_by_name(&head_node, "base") {
-                set_node_attr(&base_node, "href", Some(desired_base_href));
+                set_node_attr(&base_node, "href", Some(base_href_value));
             } else {
                 let base_node = create_element(
                     &dom,
                     QualName::new(None, ns!(), LocalName::from("base")),
                     vec![Attribute {
                         name: QualName::new(None, ns!(), LocalName::from("href")),
-                        value: format_tendril!("{}", desired_base_href),
+                        value: format_tendril!("{}", base_href_value),
                     }],
                 );
 
@@ -470,10 +484,10 @@ pub fn set_base_url(document: &Handle, desired_base_href: String) -> RcDom {
     dom
 }
 
-pub fn set_charset(dom: RcDom, desired_charset: String) -> RcDom {
+pub fn set_charset(dom: RcDom, charset: String) -> RcDom {
     for meta_node in find_nodes(&dom.document, vec!["html", "head", "meta"]).iter() {
         if get_node_attr(meta_node, "charset").is_some() {
-            set_node_attr(meta_node, "charset", Some(desired_charset));
+            set_node_attr(meta_node, "charset", Some(charset));
             return dom;
         }
 
@@ -485,7 +499,7 @@ pub fn set_charset(dom: RcDom, desired_charset: String) -> RcDom {
             set_node_attr(
                 meta_node,
                 "content",
-                Some(format!("text/html;charset={}", desired_charset)),
+                Some(format!("text/html;charset={}", charset)),
             );
             return dom;
         }
@@ -498,7 +512,7 @@ pub fn set_charset(dom: RcDom, desired_charset: String) -> RcDom {
             QualName::new(None, ns!(), LocalName::from("meta")),
             vec![Attribute {
                 name: QualName::new(None, ns!(), LocalName::from("charset")),
-                value: format_tendril!("{}", desired_charset),
+                value: format_tendril!("{}", charset),
             }],
         );
 
@@ -508,6 +522,7 @@ pub fn set_charset(dom: RcDom, desired_charset: String) -> RcDom {
                 .children
                 .borrow_mut()
                 .push(meta_charset_node.clone());
+            break;
         }
     }
 
@@ -549,6 +564,47 @@ pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>)
             }
         }
     };
+}
+
+pub fn set_robots(dom: RcDom, content_value: &str) -> RcDom {
+    for meta_node in find_nodes(&dom.document, vec!["html", "head", "meta"]).iter() {
+        if get_node_attr(meta_node, "name")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("robots")
+        {
+            set_node_attr(meta_node, "content", Some(content_value.to_string()));
+            return dom;
+        }
+    }
+
+    // Manually append robots META node to HEAD
+    {
+        let meta_charset_node: Handle = create_element(
+            &dom,
+            QualName::new(None, ns!(), LocalName::from("meta")),
+            vec![
+                Attribute {
+                    name: QualName::new(None, ns!(), LocalName::from("name")),
+                    value: format_tendril!("robots"),
+                },
+                Attribute {
+                    name: QualName::new(None, ns!(), LocalName::from("content")),
+                    value: format_tendril!("{}", content_value),
+                },
+            ],
+        );
+
+        // Insert newly created META charset node into HEAD
+        for head_node in find_nodes(&dom.document, vec!["html", "head"]).iter() {
+            head_node
+                .children
+                .borrow_mut()
+                .push(meta_charset_node.clone());
+            break;
+        }
+    }
+
+    dom
 }
 
 pub fn serialize_document(dom: RcDom, document_encoding: String, options: &Options) -> Vec<u8> {

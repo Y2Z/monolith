@@ -29,7 +29,7 @@ mod passing {
         // STDOUT should contain isolated HTML
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-eval' 'unsafe-inline' data:;"></meta></head><body>Hello, World!</body></html>
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-eval' 'unsafe-inline' data:;"></meta><meta name="robots" content="none"></meta></head><body>Hello, World!</body></html>
 "#
         );
 
@@ -53,7 +53,7 @@ mod passing {
         // STDOUT should contain HTML with no CSS
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><meta http-equiv="Content-Security-Policy" content="style-src 'none';"></meta><style></style></head><body>Hello</body></html>
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="style-src 'none';"></meta><style></style><meta name="robots" content="none"></meta></head><body>Hello</body></html>
 "#
         );
 
@@ -77,7 +77,7 @@ mod passing {
         // STDOUT should contain HTML with no web fonts
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><meta http-equiv="Content-Security-Policy" content="font-src 'none';"></meta><style></style></head><body>Hi</body></html>
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="font-src 'none';"></meta><style></style><meta name="robots" content="none"></meta></head><body>Hi</body></html>
 "#
         );
 
@@ -101,7 +101,7 @@ mod passing {
         // STDOUT should contain HTML with no iframes
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none';"></meta></head><body><iframe src=""></iframe>Hi</body></html>
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none';"></meta><meta name="robots" content="none"></meta></head><body><iframe src=""></iframe>Hi</body></html>
 "#
         );
 
@@ -126,7 +126,7 @@ mod passing {
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
             format!(
-                r#"<html><head><meta http-equiv="Content-Security-Policy" content="img-src data:;"></meta></head><body><img src="{empty_image}">Hi</body></html>
+                r#"<html><head><meta http-equiv="Content-Security-Policy" content="img-src data:;"></meta><meta name="robots" content="none"></meta></head><body><img src="{empty_image}">Hi</body></html>
 "#,
                 empty_image = EMPTY_IMAGE_DATA_URL,
             )
@@ -152,7 +152,7 @@ mod passing {
         // STDOUT should contain HTML with no JS
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none';"></meta><script></script></head><body>Hi</body></html>
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none';"></meta><script></script><meta name="robots" content="none"></meta></head><body>Hi</body></html>
 "#
         );
 
@@ -204,7 +204,8 @@ mod failing {
         // STDOUT should contain HTML without contents of local JS file
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head><script></script></head><body></body></html>\n"
+            r#"<html><head><script></script><meta name="robots" content="none"></meta></head><body></body></html>
+"#
         );
 
         // Exit code should be 0

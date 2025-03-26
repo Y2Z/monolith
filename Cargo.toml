@@ -10,7 +10,7 @@ authors = [
     "Andriy Rakhnin <a@rakhnin.com>",
 ]
 edition = "2021"
-description = "CLI tool for saving web pages as a single HTML file"
+description = "CLI tool and library for saving web pages as a single HTML file"
 homepage = "https://github.com/Y2Z/monolith"
 repository = "https://github.com/Y2Z/monolith"
 readme = "README.md"

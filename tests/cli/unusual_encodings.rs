@@ -48,15 +48,16 @@ mod passing {
         }
         assert_eq!(
             s,
-            "<html>\
-                <head>\n    \
-                    <meta http-equiv=\"content-type\" content=\"text/html;charset=GB2312\">\n    \
-                    <title>近七成人减少线下需求\u{3000}银行数字化转型提速--经济·科技--人民网 </title>\n\
-                </head>\n\
-                <body>\n    \
-                    <h1>近七成人减少线下需求\u{3000}银行数字化转型提速</h1>\n\n\n\
-                </body>\
-            </html>\n"
+            r##"<html><head>
+    <meta http-equiv="content-type" content="text/html;charset=GB2312">
+    <title>近七成人减少线下需求　银行数字化转型提速--经济·科技--人民网 </title>
+<meta name="robots" content="none"></meta></head>
+<body>
+    <h1>近七成人减少线下需求　银行数字化转型提速</h1>
+
+
+</body></html>
+"##
         );
 
         // Exit code should be 0
@@ -93,15 +94,16 @@ mod passing {
         }
         assert_eq!(
             s,
-            "<html>\
-                <head>\n    \
-                    <meta http-equiv=\"content-type\" content=\"text/html;charset=GB2312\">\n    \
-                    <title>近七成人减少线下需求\u{3000}银行数字化转型提速--经济·科技--人民网 </title>\n\
-                </head>\n\
-                <body>\n    \
-                    <h1>近七成人减少线下需求\u{3000}银行数字化转型提速</h1>\n\n\n\
-                </body>\
-            </html>\n"
+            r##"<html><head>
+    <meta http-equiv="content-type" content="text/html;charset=GB2312">
+    <title>近七成人减少线下需求　银行数字化转型提速--经济·科技--人民网 </title>
+<meta name="robots" content="none"></meta></head>
+<body>
+    <h1>近七成人减少线下需求　银行数字化转型提速</h1>
+
+
+</body></html>
+"##
         );
 
         // Exit code should be 0
@@ -138,15 +140,16 @@ mod passing {
         // STDOUT should contain original document without any modifications
         assert_eq!(
             String::from_utf8_lossy(&out.stdout).to_string(),
-            "<html>\
-                <head>\n    \
-                    <meta http-equiv=\"content-type\" content=\"text/html;charset=utf8\">\n    \
-                    <title>近七成人减少线下需求\u{3000}银行数字化转型提速--经济·科技--人民网 </title>\n\
-                </head>\n\
-                <body>\n    \
-                    <h1>近七成人减少线下需求\u{3000}银行数字化转型提速</h1>\n\n\n\
-                </body>\
-            </html>\n"
+            r#"<html><head>
+    <meta http-equiv="content-type" content="text/html;charset=utf8">
+    <title>近七成人减少线下需求　银行数字化转型提速--经济·科技--人民网 </title>
+<meta name="robots" content="none"></meta></head>
+<body>
+    <h1>近七成人减少线下需求　银行数字化转型提速</h1>
+
+
+</body></html>
+"#
         );
 
         // Exit code should be 0
@@ -223,14 +226,15 @@ mod failing {
         // STDOUT should contain original document but with UTF-8 charset
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html>\
-                <head>\n        \
-                    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=iso-8859-1\">\n    \
-                </head>\n    \
-                <body>\n        \
-                    � Some Company\n    \
-                \n\n</body>\
-            </html>\n"
+            r##"<html><head>
+        <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+    <meta name="robots" content="none"></meta></head>
+    <body>
+        � Some Company
+    
+
+</body></html>
+"##
         );
 
         // Exit code should be 0

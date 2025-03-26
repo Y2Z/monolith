@@ -67,7 +67,7 @@ mod passing {
         // STDOUT should contain HTML created out of STDIN
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head></head><body>Hello from STDIN
+            r#"<html><head><meta name="robots" content="none"></meta></head><body>Hello from STDIN
 </body></html>
 "#
         );
@@ -116,7 +116,7 @@ mod passing {
     @import url("data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K");
 
 </style>
-</head><body></body></html>
+<meta name="robots" content="none"></meta></head><body></body></html>
 "##
         );
 
