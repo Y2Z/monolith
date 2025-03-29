@@ -6,6 +6,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
 use reqwest::blocking::Client;
@@ -520,6 +521,35 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
     }
 
     ok
+}
+
+pub fn format_output_path(destination: &str, document_title: &str) -> String {
+    let datetime: &str = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+
+    destination
+        .replace("%timestamp%", &datetime.replace(':', "_"))
+        .replace(
+            "%title%",
+            document_title
+                .to_string()
+                .replace(['/', '\\'], "_")
+                .replace('<', "[")
+                .replace('>', "]")
+                .replace(':', " - ")
+                .replace('\"', "")
+                .replace('|', "-")
+                .replace('?', "")
+                .trim_start_matches('.'),
+        )
+        .to_string()
+        .replace('<', "[")
+        .replace('>', "]")
+        .replace(':', " - ")
+        .replace('\"', "")
+        .replace('|', "-")
+        .replace('?', "")
+        .trim_start_matches('.')
+        .to_string()
 }
 
 pub fn is_plaintext_media_type(media_type: &str) -> bool {

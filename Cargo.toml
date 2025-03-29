@@ -28,6 +28,7 @@ base64 = "0.22.1"  # Used for integrity attributes
 chrono = "0.4.40"  # Used for formatting timestamps
 clap = { version = "4.5.32", features = ["derive"], optional = true }  # Used for processing CLI arguments
 cssparser = "0.34.0"  # Used for dealing with CSS
+druid = { version = "0.8.3", optional = true }  # Used for GUI
 encoding_rs = "0.8.35"  # Used for parsing and converting document charsets
 html5ever = "0.28.0"  # Used for all things DOM
 markup5ever_rcdom = "=0.4.0-unofficial"  # Used for manipulating DOM
@@ -56,6 +57,7 @@ assert_cmd = "2.0.16"
 [features]
 default = ["cli", "vendored-openssl"]
 cli = ["clap", "tempfile"]  # Build a CLI tool that includes main() function
+gui = ["druid", "tempfile"]  # Build a GUI executable that includes main() function
 vendored-openssl = ["openssl/vendored"]  # Compile and statically link a copy of OpenSSL
 
 [lib]
@@ -66,3 +68,8 @@ path = "src/lib.rs"
 name = "monolith"
 path = "src/main.rs"
 required-features = ["cli"]
+
+[[bin]]
+name = "monolith-gui"
+path = "src/gui.rs"
+required-features = ["gui"]

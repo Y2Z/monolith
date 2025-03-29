@@ -2,14 +2,14 @@ use std::fs;
 use std::io::{self, Error as IoError, Read, Write};
 use std::process;
 
-use chrono::{SecondsFormat, Utc};
 use clap::Parser;
-use tempfile::Builder;
+use tempfile::{Builder, NamedTempFile};
 
 use monolith::cache::Cache;
 use monolith::cookies::parse_cookie_file_contents;
 use monolith::core::{
-    create_monolithic_document, create_monolithic_document_from_data, print_error_message, Options,
+    create_monolithic_document, create_monolithic_document_from_data, format_output_path,
+    print_error_message, Options,
 };
 
 const ASCII: &str = " \
@@ -21,6 +21,10 @@ const ASCII: &str = " \
 |   | \\__/ |          |\\                    |   |   |   |   |  |   |
 |___|      |__________| \\___________________|   |___|   |___|  |___|
 ";
+const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 10; // Minimum file size for on-disk caching (in bytes)
+const DEFAULT_NETWORK_TIMEOUT: u64 = 120; // Maximum time to retrieve each remote asset (in seconds)
+const DEFAULT_USER_AGENT: &str =
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
 
 #[derive(Parser)]
 #[command(name = env!("CARGO_PKG_NAME"))]
@@ -115,7 +119,7 @@ struct Cli {
     target: String,
 }
 
-enum Output {
+pub enum Output {
     Stdout(io::Stdout),
     File(fs::File),
 }
@@ -125,23 +129,7 @@ impl Output {
         if destination.is_empty() || destination.eq("-") {
             Ok(Output::Stdout(io::stdout()))
         } else {
-            let datetime: &str = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-            let final_destination = &destination
-                .replace("%timestamp%", &datetime.replace(':', "_"))
-                .replace(
-                    "%title%",
-                    document_title
-                        .to_string()
-                        .replace('/', "∕")
-                        .replace('\\', "⧵")
-                        .replace('<', "[")
-                        .replace('>', "]")
-                        .replace(':', "_")
-                        .replace('\"', "''")
-                        .replace('|', "_")
-                        .replace('?', "")
-                        .trim_start_matches('.'),
-                );
+            let final_destination = format_output_path(destination, document_title);
             Ok(Output::File(fs::File::create(final_destination)?))
         }
     }
@@ -167,11 +155,6 @@ impl Output {
         }
     }
 }
-
-const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 10; // Minimum file size for on-disk caching (in bytes)
-const DEFAULT_NETWORK_TIMEOUT: u64 = 120; // Maximum time to retrieve each remote asset (in seconds)
-const DEFAULT_USER_AGENT: &str =
-    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
 
 pub fn read_stdin() -> Vec<u8> {
     let mut buffer: Vec<u8> = vec![];
@@ -222,7 +205,8 @@ fn main() {
     }
 
     // Set up cache (attempt to create temporary file)
-    let temp_cache_file = match Builder::new().prefix("monolith-").tempfile() {
+    let temp_cache_file: Option<NamedTempFile> = match Builder::new().prefix("monolith-").tempfile()
+    {
         Ok(tempfile) => Some(tempfile),
         Err(_) => None,
     };
