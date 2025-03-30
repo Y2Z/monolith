@@ -1621,7 +1621,7 @@ dependencies = [
 
 [[package]]
 name = "monolith"
-version = "2.10.0"
+version = "2.10.1"
 dependencies = [
  "assert_cmd",
  "atty",
