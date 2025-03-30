@@ -22,6 +22,9 @@ use crate::url::{
     clean_url, create_data_url, is_url_and_has_protocol, resolve_url, EMPTY_IMAGE_DATA_URL,
 };
 
+const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
+const WHITESPACES: &[char] = &[' ', '\t', '\n', '\x0c', '\r']; // ASCII whitespaces
+
 #[derive(PartialEq, Eq)]
 pub enum LinkType {
     Alternate,
@@ -32,13 +35,10 @@ pub enum LinkType {
     Stylesheet,
 }
 
-struct SrcSetItem<'a> {
-    path: &'a str,
-    descriptor: &'a str, // Width or pixel density descriptor
+pub struct SrcSetItem<'a> {
+    pub path: &'a str,
+    pub descriptor: &'a str, // Width or pixel density descriptor
 }
-
-const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
-const WHITESPACES: &[char] = &[' ', '\t', '\n', '\x0c', '\r']; // ASCII whitespaces
 
 pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     let mut buf: Vec<u8> = Vec::new();
@@ -394,6 +394,8 @@ pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem> {
     while i < partials.len() {
         let partial = partials[i];
 
+        i += 1;
+
         // Skip empty strings
         if partial.is_empty() {
             continue;
@@ -435,8 +437,6 @@ pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem> {
             path = None;
             descriptor = None;
         }
-
-        i += 1;
     }
 
     // Final attempt to process what was found
