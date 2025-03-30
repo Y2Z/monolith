@@ -52,4 +52,11 @@ mod passing {
             r#"/home/username/Downloads/[] - -/__[] - -.html"#
         );
     }
+
+    #[test]
+    fn level_up() {
+        let final_destination = format_output_path(r#"../%title%.html"#, r#".Title"#);
+
+        assert_eq!(final_destination, r#"../Title.html"#);
+    }
 }
