@@ -548,7 +548,6 @@ pub fn format_output_path(destination: &str, document_title: &str) -> String {
         .replace('\"', "")
         .replace('|', "-")
         .replace('?', "")
-        .trim_start_matches('.')
         .to_string()
 }
 
