@@ -14,21 +14,22 @@ use tempfile::{Builder, NamedTempFile};
 use monolith::cache::Cache;
 use monolith::core::{create_monolithic_document, format_output_path, MonolithError, Options};
 
-const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 10; // Minimum file size for on-disk caching (in bytes)
+const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 20; // Minimum file size for on-disk caching (in bytes)
 
 struct Delegate;
 
 #[derive(Clone, Data, Lens)]
 struct AppState {
-    busy: bool,
-    isolate: bool,
+    target: String,
     keep_fonts: bool,
     keep_frames: bool,
     keep_images: bool,
     keep_scripts: bool,
     keep_styles: bool,
-    target: String,
     output_path: String,
+    isolate: bool,
+    unwrap_noscript: bool,
+    busy: bool,
 }
 
 const MONOLITH_GUI_WRITE_OUTPUT: druid::Selector<(Vec<u8>, Option<String>)> =
@@ -41,17 +42,20 @@ fn main() -> Result<(), PlatformError> {
     if let Some(l) = program_name.get_mut(0..1) {
         l.make_ascii_uppercase();
     }
-    let main_window = WindowDesc::new(ui_builder()).title(program_name);
+    let main_window = WindowDesc::new(ui_builder())
+        .title(program_name)
+        .with_min_size((640., 320.));
     let state = AppState {
-        busy: false,
-        isolate: false,
+        target: "".to_string(),
         keep_fonts: true,
         keep_frames: true,
         keep_images: true,
         keep_scripts: true,
         keep_styles: true,
-        target: "".to_string(),
-        output_path: "".to_string(),
+        output_path: "".to_string(), // TODO: set it to ~/Downloads/%title%.html by default
+        isolate: false,
+        unwrap_noscript: false,
+        busy: false,
     };
 
     AppLauncher::with_window(main_window)
@@ -61,18 +65,22 @@ fn main() -> Result<(), PlatformError> {
 
 fn ui_builder() -> impl Widget<AppState> {
     let target_input = TextBox::new()
-        .with_placeholder("URL (http:, https:, file:, data:) or local filesystem path")
+        .with_placeholder("Target (http:/https:/file:/data: URL) or filesystem path")
         .lens(AppState::target)
         .disabled_if(|state: &AppState, _env| state.busy);
-    let text = LocalizedString::new("hello-counter").with_arg("count", |state: &AppState, _env| {
-        state.output_path.clone().into()
-    });
-    let label = Label::new(text).center();
-    let output_path_button = Button::new(LocalizedString::new("browse"))
+    let target_button = Button::new(LocalizedString::new("Open file"))
         .on_click(|ctx, _, _| {
-            ctx.submit_command(commands::SHOW_SAVE_PANEL.with(
-                FileDialogOptions::new().default_name("%title% - %timestamp%.html"), // .lens(AppState::output_path)
-            ))
+            ctx.submit_command(commands::SHOW_OPEN_PANEL.with(FileDialogOptions::new()))
+        })
+        .disabled_if(|state: &AppState, _env| state.busy);
+    let output_path_label: Label<AppState> =
+        Label::new(|state: &AppState, _env: &_| format!("Output path: {}", state.output_path));
+    let output_path_button = Button::new(LocalizedString::new("Browse"))
+        .on_click(|ctx, _, _| {
+            ctx.submit_command(
+                commands::SHOW_SAVE_PANEL
+                    .with(FileDialogOptions::new().default_name("%title% - %timestamp%.html")),
+            )
         })
         .disabled_if(|state: &AppState, _env| state.busy);
     let fonts_checkbox = Checkbox::new("Fonts")
@@ -99,7 +107,11 @@ fn ui_builder() -> impl Widget<AppState> {
         .lens(AppState::isolate)
         .disabled_if(|state: &AppState, _env| state.busy)
         .padding(5.0);
-    let button = Button::new(LocalizedString::new("start"))
+    let unwrap_noscript_checkbox = Checkbox::new("Unwrap NOSCRIPTs")
+        .lens(AppState::unwrap_noscript)
+        .disabled_if(|state: &AppState, _env| state.busy)
+        .padding(5.0);
+    let start_stop_button = Button::new(LocalizedString::new("Start"))
         .on_click(|ctx, state: &mut AppState, _env| {
             if state.busy {
                 return;
@@ -115,6 +127,7 @@ fn ui_builder() -> impl Widget<AppState> {
             options.no_css = !state.keep_styles;
             options.no_js = !state.keep_scripts;
             options.isolate = state.isolate;
+            options.unwrap_noscript = state.unwrap_noscript;
 
             let handle = ctx.get_external_handle();
             let thread_state = state.clone();
@@ -167,16 +180,27 @@ fn ui_builder() -> impl Widget<AppState> {
         });
 
     Flex::column()
-        .with_child(target_input)
-        .with_child(label)
-        .with_child(output_path_button)
+        .with_child(
+            Flex::row()
+                .with_child(target_input)
+                .with_child(target_button),
+        )
         .with_child(fonts_checkbox)
         .with_child(frames_checkbox)
         .with_child(images_checkbox)
         .with_child(scripts_checkbox)
         .with_child(styles_checkbox)
-        .with_child(isolate_checkbox)
-        .with_child(button)
+        .with_child(
+            Flex::row()
+                .with_child(output_path_label)
+                .with_child(output_path_button),
+        )
+        .with_child(
+            Flex::row()
+                .with_child(isolate_checkbox)
+                .with_child(unwrap_noscript_checkbox),
+        )
+        .with_child(start_stop_button)
 }
 
 impl AppDelegate<AppState> for Delegate {
@@ -216,7 +240,9 @@ impl AppDelegate<AppState> for Delegate {
             return Handled::Yes;
         }
 
-        if let Some(_file_info) = cmd.get(commands::OPEN_FILE) {
+        if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
+            state.target = file_info.path().display().to_string();
+
             return Handled::Yes;
         }
 
