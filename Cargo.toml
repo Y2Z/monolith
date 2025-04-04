@@ -37,7 +37,7 @@ sha2 = "0.10.8"  # Used for calculating checksums during integrity checks
 redb = "2.4.0"  # Used for on-disk caching of remote assets
 tempfile = { version = "3.19.1", optional = true }  # Used for on-disk caching of remote assets
 url = "2.5.4"  # Used for parsing URLs
-openssl = "0.10.71"  # Used for static linking of the OpenSSL library
+openssl = "0.10.72"  # Used for static linking of the OpenSSL library
 
 # Used for parsing srcset and NOSCRIPT
 [dependencies.regex]
