@@ -1,20 +1,28 @@
 use std::fs;
 use std::io::Write;
+use std::path;
 use std::thread;
 
-use druid::commands;
-use druid::widget::{Button, Checkbox, Flex, Label, TextBox};
+use directories::UserDirs;
+use druid::widget::{Button, Checkbox, Either, Flex, Label, Spinner, TextBox};
 use druid::{
-    AppDelegate, AppLauncher, Command, DelegateCtx, Env, FileDialogOptions, Handled,
-    LocalizedString, PlatformError, Target, Widget, WidgetExt, WindowDesc,
+    commands, AppDelegate, AppLauncher, Command, Data, DelegateCtx, Env, FileDialogOptions,
+    FileSpec, Handled, Lens, LocalizedString, PlatformError, Target, Widget, WidgetExt, WindowDesc,
 };
-use druid::{Data, Lens};
 use tempfile::{Builder, NamedTempFile};
 
 use monolith::cache::Cache;
-use monolith::core::{create_monolithic_document, format_output_path, MonolithError, Options};
+use monolith::core::{
+    create_monolithic_document, format_output_path, MonolithError, MonolithOutputFormat, Options,
+};
 
 const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 20; // Minimum file size for on-disk caching (in bytes)
+const FILESPEC_HTML: FileSpec = FileSpec::new("HTML files", &["html"]);
+const MONOLITH_GUI_WRITE_OUTPUT: druid::Selector<(Vec<u8>, Option<String>)> =
+    druid::Selector::new("monolith-gui.write-output");
+const MONOLITH_GUI_ERROR: druid::Selector<MonolithError> =
+    druid::Selector::new("monolith-gui.error");
+const TEXT_BOX_WIDTH: f64 = 512_f64;
 
 struct Delegate;
 
@@ -32,11 +40,6 @@ struct AppState {
     busy: bool,
 }
 
-const MONOLITH_GUI_WRITE_OUTPUT: druid::Selector<(Vec<u8>, Option<String>)> =
-    druid::Selector::new("monolith-gui.write-output");
-const MONOLITH_GUI_ERROR: druid::Selector<MonolithError> =
-    druid::Selector::new("monolith-gui.error");
-
 fn main() -> Result<(), PlatformError> {
     let mut program_name: String = env!("CARGO_PKG_NAME").to_string();
     if let Some(l) = program_name.get_mut(0..1) {
@@ -44,16 +47,22 @@ fn main() -> Result<(), PlatformError> {
     }
     let main_window = WindowDesc::new(ui_builder())
         .title(program_name)
-        .with_min_size((640., 320.));
+        .with_min_size((720_f64, 360_f64));
     let state = AppState {
         target: "".to_string(),
-        keep_fonts: true,
+        keep_fonts: false,
         keep_frames: true,
         keep_images: true,
         keep_scripts: true,
         keep_styles: true,
-        output_path: "".to_string(), // TODO: set it to ~/Downloads/%title%.html by default
-        isolate: false,
+        output_path: if let Some(base_dirs) = UserDirs::new() {
+            base_dirs.download_dir().unwrap().display().to_string()
+                + &path::MAIN_SEPARATOR.to_string()
+                + "%title%.%ext%"
+        } else {
+            "%title%.%ext%".to_string()
+        },
+        isolate: true,
         unwrap_noscript: false,
         busy: false,
     };
@@ -64,50 +73,79 @@ fn main() -> Result<(), PlatformError> {
 }
 
 fn ui_builder() -> impl Widget<AppState> {
+    let target_label: Label<AppState> = Label::new("Target:");
     let target_input = TextBox::new()
-        .with_placeholder("Target (http:/https:/file:/data: URL) or filesystem path")
+        .with_placeholder("URL or filesystem path")
+        .fix_width(TEXT_BOX_WIDTH)
         .lens(AppState::target)
         .disabled_if(|state: &AppState, _env| state.busy);
     let target_button = Button::new(LocalizedString::new("Open file"))
         .on_click(|ctx, _, _| {
-            ctx.submit_command(commands::SHOW_OPEN_PANEL.with(FileDialogOptions::new()))
-        })
-        .disabled_if(|state: &AppState, _env| state.busy);
-    let output_path_label: Label<AppState> =
-        Label::new(|state: &AppState, _env: &_| format!("Output path: {}", state.output_path));
-    let output_path_button = Button::new(LocalizedString::new("Browse"))
-        .on_click(|ctx, _, _| {
             ctx.submit_command(
-                commands::SHOW_SAVE_PANEL
-                    .with(FileDialogOptions::new().default_name("%title% - %timestamp%.html")),
+                commands::SHOW_OPEN_PANEL.with(
+                    FileDialogOptions::new()
+                        .allowed_types(vec![FILESPEC_HTML])
+                        .default_type(FILESPEC_HTML),
+                ),
             )
         })
+        .disabled_if(|state: &AppState, _env| state.busy)
+        .padding(5.0);
+    let output_path_label: Label<AppState> = Label::new("Output path:");
+    let output_path_input = TextBox::new()
+        .with_placeholder("Filesystem path")
+        .fix_width(TEXT_BOX_WIDTH)
+        .lens(AppState::output_path)
         .disabled_if(|state: &AppState, _env| state.busy);
-    let fonts_checkbox = Checkbox::new("Fonts")
+    let output_path_button = Button::new(LocalizedString::new("Browse"))
+        .on_click(|ctx, state: &mut AppState, _env| {
+            ctx.submit_command(
+                commands::SHOW_SAVE_PANEL.with(
+                    FileDialogOptions::new()
+                        // .force_starting_directory(
+                        //     state
+                        //         .output_path.clone()
+                        //         .split(path::MAIN_SEPARATOR).collect::<Vec<&str>>()[..2]
+                        //         .join(&path::MAIN_SEPARATOR.to_string())
+                        // )
+                        .default_name(
+                            state
+                                .output_path
+                                .clone()
+                                .split(path::MAIN_SEPARATOR)
+                                .last()
+                                .unwrap_or_default(),
+                        ),
+                ),
+            )
+        })
+        .disabled_if(|state: &AppState, _env| state.busy)
+        .padding(5.0);
+    let fonts_checkbox = Checkbox::new("Include fonts")
         .lens(AppState::keep_fonts)
         .disabled_if(|state: &AppState, _env| state.busy)
         .padding(5.0);
-    let frames_checkbox = Checkbox::new("Frames")
+    let frames_checkbox = Checkbox::new("Include frames")
         .lens(AppState::keep_frames)
         .disabled_if(|state: &AppState, _env| state.busy)
         .padding(5.0);
-    let images_checkbox = Checkbox::new("Images")
+    let images_checkbox = Checkbox::new("Include images")
         .lens(AppState::keep_images)
         .disabled_if(|state: &AppState, _env| state.busy)
         .padding(5.0);
-    let styles_checkbox = Checkbox::new("Styles")
+    let styles_checkbox = Checkbox::new("Include styles")
         .lens(AppState::keep_styles)
         .disabled_if(|state: &AppState, _env| state.busy)
         .padding(5.0);
-    let scripts_checkbox = Checkbox::new("Scripts")
+    let scripts_checkbox = Checkbox::new("Include scripts")
         .lens(AppState::keep_scripts)
         .disabled_if(|state: &AppState, _env| state.busy)
         .padding(5.0);
-    let isolate_checkbox = Checkbox::new("Isolate")
+    let isolate_checkbox = Checkbox::new("Isolate document")
         .lens(AppState::isolate)
         .disabled_if(|state: &AppState, _env| state.busy)
         .padding(5.0);
-    let unwrap_noscript_checkbox = Checkbox::new("Unwrap NOSCRIPTs")
+    let unwrap_noscript_checkbox = Checkbox::new("Unwrap NOSCRIPT")
         .lens(AppState::unwrap_noscript)
         .disabled_if(|state: &AppState, _env| state.busy)
         .padding(5.0);
@@ -177,11 +215,21 @@ fn ui_builder() -> impl Widget<AppState> {
         })
         .disabled_if(|state: &AppState, _env| {
             state.busy || state.target.is_empty() || state.output_path.is_empty()
-        });
+        })
+        .padding(5.0);
+    let spinner = Either::new(
+        |sate: &AppState, _env| sate.busy,
+        Spinner::new(),
+        Label::new(""),
+    )
+    .padding(5.0);
 
     Flex::column()
+        .with_spacer(5_f64)
         .with_child(
             Flex::row()
+                .with_child(target_label)
+                .with_spacer(5_f64)
                 .with_child(target_input)
                 .with_child(target_button),
         )
@@ -193,6 +241,8 @@ fn ui_builder() -> impl Widget<AppState> {
         .with_child(
             Flex::row()
                 .with_child(output_path_label)
+                .with_spacer(5_f64)
+                .with_child(output_path_input)
                 .with_child(output_path_button),
         )
         .with_child(
@@ -201,6 +251,8 @@ fn ui_builder() -> impl Widget<AppState> {
                 .with_child(unwrap_noscript_checkbox),
         )
         .with_child(start_stop_button)
+        .with_child(spinner)
+        .with_spacer(5_f64)
 }
 
 impl AppDelegate<AppState> for Delegate {
@@ -212,13 +264,27 @@ impl AppDelegate<AppState> for Delegate {
         state: &mut AppState,
         _env: &Env,
     ) -> Handled {
-        if let Some(result) = cmd.get(MONOLITH_GUI_WRITE_OUTPUT) {
+        // Handle "Open file" button next to target input
+        if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
+            state.target = file_info.path().display().to_string();
+
+            return Handled::Yes;
+        }
+        // Handle "Browse" button next to output path input
+        else if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
+            state.output_path = file_info.path().display().to_string();
+
+            return Handled::Yes;
+        }
+        // Write output
+        else if let Some(result) = cmd.get(MONOLITH_GUI_WRITE_OUTPUT) {
             let (html, title) = result;
 
             if !state.output_path.is_empty() {
                 match fs::File::create(format_output_path(
                     &state.output_path,
                     &title.clone().unwrap_or_default(),
+                    MonolithOutputFormat::HTML,
                 )) {
                     Ok(mut file) => {
                         let _ = file.write(&html);
@@ -234,21 +300,9 @@ impl AppDelegate<AppState> for Delegate {
             state.busy = false;
             return Handled::Yes;
         }
-
-        if let Some(_error) = cmd.get(MONOLITH_GUI_ERROR) {
+        // Handle errors
+        else if let Some(_error) = cmd.get(MONOLITH_GUI_ERROR) {
             state.busy = false;
-            return Handled::Yes;
-        }
-
-        if let Some(file_info) = cmd.get(commands::OPEN_FILE) {
-            state.target = file_info.path().display().to_string();
-
-            return Handled::Yes;
-        }
-
-        if let Some(file_info) = cmd.get(commands::SAVE_FILE_AS) {
-            state.output_path = file_info.path().display().to_string();
-
             return Handled::Yes;
         }
 

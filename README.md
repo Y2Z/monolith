@@ -4,8 +4,6 @@
 [![Monolith Actor on Apify](https://apify.com/actor-badge?actor=netmilk/monolith)](https://apify.com/netmilk/monolith?fpr=monolith)
 
 
-
-
 ```
  _____    _____________   __________     ___________________    ___
 |     \  /             \ |          |   |                   |  |   |
@@ -225,6 +223,7 @@ monolith -I -d example.com -d www.example.com https://example.com -o example-onl
 monolith -I -B -d .googleusercontent.com -d googleanalytics.com -d .google.com https://example.com -o example-no-ads.html
 ```
 
+
 ---------------------------------------------------
 
 
@@ -236,6 +235,16 @@ For example, Chromium (Chrome) can be used to act as a pre-processor for such pa
 
 ```console
 chromium --headless --window-size=1920,1080 --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --incognito --dump-dom https://github.com | monolith - -I -b https://github.com -o github.html
+```
+
+
+---------------------------------------------------
+
+
+## Authentication
+
+```console
+monolith https://username:password@example.com -o example-basic-auth.html
 ```
 
 

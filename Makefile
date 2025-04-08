@@ -29,6 +29,7 @@ install:
 
 lint:
 	@cargo clippy --fix --allow-dirty --allow-staged
+# 	@cargo fix --allow-dirty --allow-staged
 .PHONY: lint
 
 lint_check:

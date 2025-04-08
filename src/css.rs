@@ -229,8 +229,10 @@ pub fn process_css<'a>(
                         result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                     } else {
                         let resolved_url: Url = resolve_url(document_url, value);
+
                         match retrieve_asset(cache, client, document_url, &resolved_url, options) {
                             Ok((data, final_url, media_type, charset)) => {
+                                // TODO: if it's @font-face, exclude definitions of non-woff/woff-2 fonts (if woff/woff-2 are present)
                                 let mut data_url =
                                     create_data_url(&media_type, &charset, &data, &final_url);
                                 data_url.set_fragment(resolved_url.fragment());
