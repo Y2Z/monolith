@@ -9,7 +9,7 @@ use monolith::cache::Cache;
 use monolith::cookies::parse_cookie_file_contents;
 use monolith::core::{
     create_monolithic_document, create_monolithic_document_from_data, format_output_path,
-    print_error_message, Options,
+    print_error_message, MonolithOutputFormat, Options,
 };
 
 const ASCII: &str = " \
@@ -129,7 +129,8 @@ impl Output {
         if destination.is_empty() || destination.eq("-") {
             Ok(Output::Stdout(io::stdout()))
         } else {
-            let final_destination = format_output_path(destination, document_title);
+            let final_destination =
+                format_output_path(destination, document_title, MonolithOutputFormat::HTML);
             Ok(Output::File(fs::File::create(final_destination)?))
         }
     }

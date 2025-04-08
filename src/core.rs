@@ -266,10 +266,9 @@ pub fn create_monolithic_document_from_data(
     }
 
     // Append noindex META-tag
-    if let meta_robots_content_value = get_robots(&dom.document).unwrap_or_default() {
-        if meta_robots_content_value.trim().is_empty() || meta_robots_content_value != "none" {
-            dom = set_robots(dom, "none");
-        }
+    let meta_robots_content_value = get_robots(&dom.document).unwrap_or_default();
+    if meta_robots_content_value.trim().is_empty() || meta_robots_content_value != "none" {
+        dom = set_robots(dom, "none");
     }
 
     // Save using specified charset, if given
@@ -523,11 +522,14 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
     ok
 }
 
-pub fn format_output_path(destination: &str, document_title: &str) -> String {
+pub fn format_output_path(
+    path: &str,
+    document_title: &str,
+    output_format: MonolithOutputFormat,
+) -> String {
     let datetime: &str = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
-    destination
-        .replace("%timestamp%", &datetime.replace(':', "_"))
+    path.replace("%timestamp%", &datetime.replace(':', "_"))
         .replace(
             "%title%",
             document_title
@@ -541,13 +543,22 @@ pub fn format_output_path(destination: &str, document_title: &str) -> String {
                 .replace('?', "")
                 .trim_start_matches('.'),
         )
-        .to_string()
-        .replace('<', "[")
-        .replace('>', "]")
-        .replace(':', " - ")
-        .replace('\"', "")
-        .replace('|', "-")
-        .replace('?', "")
+        .replace(
+            "%ext%",
+            if output_format == MonolithOutputFormat::HTML {
+                "html"
+            } else {
+                ""
+            },
+        )
+        .replace(
+            "%extension%",
+            if output_format == MonolithOutputFormat::HTML {
+                "html"
+            } else {
+                ""
+            },
+        )
         .to_string()
 }
 
