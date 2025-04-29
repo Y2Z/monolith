@@ -2,7 +2,7 @@
 
 [![Monolith Actor](https://apify.com/actor-badge?actor=snshn/monolith)](https://apify.com/snshn/monolith?fpr=snshn)
 
-This Actor wraps the [Monolith Project](https://monolithproject.xyz/) to crawl a web page URL and bundle the entire content in a single HTML file, without installing and running the tool locally.
+This Actor wraps [Monolith](https://crates.io/crates/monolith) to crawl a web page URL and bundle the entire content in a single HTML file, without installing and running the tool locally.
 
 ## What are Actors?
 [Actors](https://docs.apify.com/platform/actors?fpr=snshn) are serverless microservices running on the [Apify Platform](https://apify.com/?fpr=snshn). They are based on the [Actor SDK](https://docs.apify.com/sdk/js?fpr=snshn) and can be found in the [Apify Store](https://apify.com/store?fpr=snshn). Learn more about Actors in the [Apify Whitepaper](https://whitepaper.actor?fpr=snshn).
