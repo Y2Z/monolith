@@ -1,11 +1,11 @@
 # Monolith Actor on Apify
 
-[![Monolith Actor](https://apify.com/actor-badge?actor=netmilk/monolith)](https://apify.com/netmilk/monolith?fpr=monolith)
+[![Monolith Actor](https://apify.com/actor-badge?actor=snshn/monolith)](https://apify.com/snshn/monolith?fpr=snshn)
 
 This Actor wraps the [Monolith Project](https://monolithproject.xyz/) to crawl a web page URL and bundle the entire content in a single HTML file, without installing and running the tool locally.
 
 ## What are Actors?
-[Actors](https://docs.apify.com/platform/actors?fpr=monolith) are serverless microservices running on the [Apify Platform](https://apify.com/?fpr=monolith). They are based on the [Actor SDK](https://docs.apify.com/sdk/js?fpr=monolith) and can be found in the [Apify Store](https://apify.com/store?fpr=monolith). Learn more about Actors in the [Apify Whitepaper](https://whitepaper.actor?fpr=monolith).
+[Actors](https://docs.apify.com/platform/actors?fpr=snshn) are serverless microservices running on the [Apify Platform](https://apify.com/?fpr=snshn). They are based on the [Actor SDK](https://docs.apify.com/sdk/js?fpr=snshn) and can be found in the [Apify Store](https://apify.com/store?fpr=snshn). Learn more about Actors in the [Apify Whitepaper](https://whitepaper.actor?fpr=snshn).
 
 ## Usage
 
@@ -22,7 +22,7 @@ This Actor wraps the [Monolith Project](https://monolithproject.xyz/) to crawl a
 ### Apify CLI
 
 ```bash
-apify call netmilk/monolith --input='{
+apify call snshn/monolith --input='{
   "urls": ["https://news.ycombinator.com/"]
 }'
 ```
@@ -31,7 +31,7 @@ apify call netmilk/monolith --input='{
 
 ```bash
 curl --request POST \
-  --url "https://api.apify.com/v2/acts/netmilk~monolith/run" \
+  --url "https://api.apify.com/v2/acts/snshn~monolith/run" \
   --header 'Content-Type: application/json' \
   --header 'Authorization: Bearer YOUR_API_TOKEN' \
   --data '{
@@ -88,6 +88,6 @@ The Actor provides three types of outputs:
   - 30s per compex page like [bbc.co.uk](https://bbc.co.uk)
 
 
-For more help, check the [Monolith Project documentation](https://github.com/Y2Z/monolith) or raise an issue in the [Actor page detail](https://apify.com/netmilk/monolith?fpr=monolith) on Apify.
+For more help, check the [Monolith Project documentation](https://github.com/Y2Z/monolith) or raise an issue in the [Actor page detail](https://apify.com/snshn/monolith?fpr=snshn) on Apify.
 
 
