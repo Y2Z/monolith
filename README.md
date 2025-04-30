@@ -138,13 +138,13 @@ Dependencies: `libssl`, `cargo`
 <details>
   <summary>Install cargo (GNU/Linux)</summary>
  Check if cargo is installed
- 
+
  ```console
  cargo -v
  ```
 
  If cargo is not already installed, install and add it to your existing ```$PATH``` (paraphrasing the [official installation instructions](https://doc.rust-lang.org/cargo/getting-started/installation.html)):
- 
+
  ```console
  curl https://sh.rustup.rs -sSf | sh
  . "$HOME/.cargo/env"
@@ -198,6 +198,7 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
+ - `-m`: Output in MHTML format instead of HTML
  - `-M`: Don't add timestamp and URL information
  - `-n`: Extract contents of NOSCRIPT elements
  - `-o`: Write output to `file` (use “-” for STDOUT)
@@ -258,7 +259,7 @@ Please set `https_proxy`, `http_proxy`, and `no_proxy` environment variables.
 
 ---------------------------------------------------
 
-### Apify Actor Usage 
+### Apify Actor Usage
 
 <a href="https://apify.com/snshn/monolith?fpr=snshn"><img src="https://apify.com/ext/run-on-apify.png" alt="Run Monolith Actor on Apify" width="176" height="39" /></a>
 

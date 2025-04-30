@@ -88,7 +88,7 @@ struct Cli {
     #[arg(short = 'k', long)]
     insecure: bool,
 
-    /// Output in MHTML format instead of HTML
+    /// Use MHTML as output format
     #[arg(short = 'm', long)]
     mhtml: bool,
 
