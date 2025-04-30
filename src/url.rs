@@ -1,6 +1,6 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
 use percent_encoding::percent_decode_str;
-use url::Url;
+pub use url::Url;
 
 use crate::core::{detect_media_type, parse_content_type};
 
@@ -44,6 +44,62 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
     );
 
     data_url
+}
+
+pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> bool {
+    if domain_to_match_against.is_empty() {
+        return false;
+    }
+
+    if domain_to_match_against == "." {
+        return true;
+    }
+
+    let domain_partials: Vec<&str> = domain.trim_end_matches(".").rsplit(".").collect();
+    let domain_to_match_against_partials: Vec<&str> = domain_to_match_against
+        .trim_end_matches(".")
+        .rsplit(".")
+        .collect();
+    let domain_to_match_against_starts_with_a_dot = domain_to_match_against.starts_with(".");
+
+    let mut i: usize = 0;
+    let l: usize = std::cmp::max(
+        domain_partials.len(),
+        domain_to_match_against_partials.len(),
+    );
+    let mut ok: bool = true;
+
+    while i < l {
+        // Exit and return false if went out of bounds of domain to match against, and it didn't start with a dot
+        if !domain_to_match_against_starts_with_a_dot
+            && domain_to_match_against_partials.len() < i + 1
+        {
+            ok = false;
+            break;
+        }
+
+        let domain_partial = if domain_partials.len() < i + 1 {
+            ""
+        } else {
+            domain_partials.get(i).unwrap()
+        };
+        let domain_to_match_against_partial = if domain_to_match_against_partials.len() < i + 1 {
+            ""
+        } else {
+            domain_to_match_against_partials.get(i).unwrap()
+        };
+
+        let parts_match = domain_to_match_against_partial.eq_ignore_ascii_case(domain_partial);
+
+        if !parts_match && !domain_to_match_against_partial.is_empty() {
+            ok = false;
+            break;
+        }
+
+        i += 1;
+    }
+
+    ok
 }
 
 pub fn is_url_and_has_protocol(input: &str) -> bool {

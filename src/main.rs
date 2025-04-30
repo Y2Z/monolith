@@ -6,11 +6,12 @@ use clap::Parser;
 use tempfile::{Builder, NamedTempFile};
 
 use monolith::cache::Cache;
-use monolith::cookies::parse_cookie_file_contents;
+use monolith::cookies::{parse_cookie_file_contents, Cookie};
 use monolith::core::{
     create_monolithic_document, create_monolithic_document_from_data, format_output_path,
-    print_error_message, MonolithOutputFormat, Options,
+    print_error_message, MonolithOptions, MonolithOutputFormat,
 };
+use monolith::session::Session;
 
 const ASCII: &str = " \
  _____    _____________   __________     ___________________    ___
@@ -87,6 +88,10 @@ struct Cli {
     #[arg(short = 'k', long)]
     insecure: bool,
 
+    /// Output in MHTML format instead of HTML
+    #[arg(short = 'm', long)]
+    mhtml: bool,
+
     /// Exclude timestamp and source information
     #[arg(short = 'M', long)]
     no_metadata: bool,
@@ -125,12 +130,15 @@ pub enum Output {
 }
 
 impl Output {
-    fn new(destination: &str, document_title: &str) -> Result<Output, IoError> {
+    fn new(
+        destination: &str,
+        document_title: &str,
+        format: MonolithOutputFormat,
+    ) -> Result<Output, IoError> {
         if destination.is_empty() || destination.eq("-") {
             Ok(Output::Stdout(io::stdout()))
         } else {
-            let final_destination =
-                format_output_path(destination, document_title, MonolithOutputFormat::HTML);
+            let final_destination = format_output_path(destination, document_title, format);
             Ok(Output::File(fs::File::create(final_destination)?))
         }
     }
@@ -139,18 +147,10 @@ impl Output {
         match self {
             Output::Stdout(stdout) => {
                 stdout.write_all(bytes)?;
-                // Ensure newline at end of output
-                if bytes.last() != Some(&b"\n"[0]) {
-                    stdout.write_all(b"\n")?;
-                }
                 stdout.flush()
             }
             Output::File(file) => {
                 file.write_all(bytes)?;
-                // Ensure newline at end of output
-                if bytes.last() != Some(&b"\n"[0]) {
-                    file.write_all(b"\n")?;
-                }
                 file.flush()
             }
         }
@@ -170,7 +170,7 @@ fn main() {
     let cli = Cli::parse();
     let cookie_file_path;
     let mut exit_code = 0;
-    let mut options: Options = Options::default();
+    let mut options: MonolithOptions = MonolithOptions::default();
     let destination;
 
     // Process the command
@@ -190,6 +190,11 @@ fn main() {
         options.no_frames = cli.no_frames;
         options.no_images = cli.no_images;
         options.no_js = cli.no_js;
+        if cli.mhtml {
+            options.output_format = MonolithOutputFormat::MHTML;
+            // The MHTML format doesn't allow JavaScript
+            options.no_js = true;
+        }
         options.no_metadata = cli.no_metadata;
         options.no_video = cli.no_video;
         options.silent = cli.quiet;
@@ -211,7 +216,7 @@ fn main() {
         Ok(tempfile) => Some(tempfile),
         Err(_) => None,
     };
-    let mut cache = Some(Cache::new(
+    let cache = Some(Cache::new(
         CACHE_ASSET_FILE_SIZE_THRESHOLD,
         if temp_cache_file.is_some() {
             Some(
@@ -228,47 +233,52 @@ fn main() {
     ));
 
     // Read and parse cookie file
+    let mut cookies: Option<Vec<Cookie>> = None;
     if let Some(opt_cookie_file) = cookie_file_path.clone() {
         match fs::read_to_string(&opt_cookie_file) {
             Ok(str) => match parse_cookie_file_contents(&str) {
                 Ok(parsed_cookies_from_file) => {
-                    options.cookies = parsed_cookies_from_file;
+                    cookies = Some(parsed_cookies_from_file);
                 }
                 Err(_) => {
-                    print_error_message(
-                        &format!(
+                    if !options.silent {
+                        print_error_message(&format!(
                             "could not parse specified cookie file \"{}\"",
                             opt_cookie_file
-                        ),
-                        &options,
-                    );
+                        ));
+                    }
                     process::exit(1);
                 }
             },
             Err(_) => {
-                print_error_message(
-                    &format!(
+                if !options.silent {
+                    print_error_message(&format!(
                         "could not read specified cookie file \"{}\"",
                         opt_cookie_file
-                    ),
-                    &options,
-                );
+                    ));
+                }
                 process::exit(1);
             }
         }
     }
+
+    // Initiate session
+    let ouptput_format = options.output_format.clone();
+    let silent = options.silent;
+    let session: Session = Session::new(cache, cookies, options);
 
     // Retrieve target from source and output result
     if cli.target == "-" {
         // Read input from pipe (STDIN)
         let data: Vec<u8> = read_stdin();
 
-        match create_monolithic_document_from_data(data, &options, &mut cache, None, None) {
+        match create_monolithic_document_from_data(session, data, None, None) {
             Ok((result, title)) => {
                 // Define output
                 let mut output = Output::new(
                     &destination.unwrap_or(String::new()),
                     &title.unwrap_or_default(),
+                    ouptput_format,
                 )
                 .expect("could not prepare output");
 
@@ -276,18 +286,21 @@ fn main() {
                 output.write(&result).expect("could not write output");
             }
             Err(error) => {
-                print_error_message(&format!("Error: {}", error), &options);
+                if !silent {
+                    print_error_message(&format!("Error: {}", error));
+                }
 
                 exit_code = 1;
             }
         }
     } else {
-        match create_monolithic_document(cli.target, &mut options, &mut cache) {
+        match create_monolithic_document(session, cli.target) {
             Ok((result, title)) => {
                 // Define output
                 let mut output = Output::new(
                     &destination.unwrap_or(String::new()),
                     &title.unwrap_or_default(),
+                    ouptput_format,
                 )
                 .expect("could not prepare output");
 
@@ -295,15 +308,18 @@ fn main() {
                 output.write(&result).expect("could not write output");
             }
             Err(error) => {
-                print_error_message(&format!("Error: {}", error), &options);
+                if !silent {
+                    print_error_message(&format!("Error: {}", error));
+                }
 
                 exit_code = 1;
             }
         }
     }
 
+    // TODO: bring this back
     // Clean up (shred database file)
-    cache.unwrap().destroy_database_file();
+    //cache.unwrap().destroy_database_file();
 
     if exit_code > 0 {
         process::exit(exit_code);

@@ -287,7 +287,7 @@ document.body.style.color = "red";
         <svg height="24" width="24">
             <image href="data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=" width="24" height="24">
         </image></svg>
-    
+    "##.to_owned() + r##"
 
 </body></html>
 "##
@@ -343,26 +343,26 @@ document.body.style.color = "red";
         // STDOUT should contain HTML from the local file; integrity attributes should be missing
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            format!(
-                r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="img-src data:;"></meta>
-  <title>Local HTML file</title>
-  <link href="data:text/css;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNGRkY7Cn0K" rel="stylesheet" type="text/css" crossorigin="anonymous">
-  <link href="style.css" rel="stylesheet" type="text/css" crossorigin="anonymous">
-<meta name="robots" content="none"></meta></head>
+            r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="img-src data:;"></meta>
+        <title>Local HTML file</title>
+        <link href="data:text/css;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNGRkY7Cn0K" rel="stylesheet" type="text/css" crossorigin="anonymous">
+        <link href="style.css" rel="stylesheet" type="text/css" crossorigin="anonymous">
+    <meta name="robots" content="none"></meta></head>
 
-<body>
-  <p>This page should have black background and white foreground, but only when served via http: (not via file:)</p>
-  <script>function noop() {{
-    console.log("monolith");
-}}
+    <body>
+        <p>
+            This page should have black background and white foreground, but
+            only when served via http: (not via file:)
+        </p>
+        <script>function noop() {
+  console.log("<\/script>");
+}
 </script>
-  <script src="script.js"></script>
-
-
+        <script src="script.js"></script>
+    "##.to_owned() + r##"
 
 </body></html>
 "##
-            )
         );
 
         // Exit code should be 0

@@ -13,8 +13,10 @@ use tempfile::{Builder, NamedTempFile};
 
 use monolith::cache::Cache;
 use monolith::core::{
-    create_monolithic_document, format_output_path, MonolithError, MonolithOutputFormat, Options,
+    create_monolithic_document, format_output_path, MonolithError, MonolithOptions,
+    MonolithOutputFormat,
 };
+use monolith::session::Session;
 
 const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 20; // Minimum file size for on-disk caching (in bytes)
 const FILESPEC_HTML: FileSpec = FileSpec::new("HTML files", &["html"]);
@@ -155,7 +157,7 @@ fn ui_builder() -> impl Widget<AppState> {
                 return;
             }
 
-            let mut options: Options = Options::default();
+            let mut options: MonolithOptions = MonolithOptions::default();
             options.ignore_errors = true;
             options.insecure = true;
             options.silent = true;
@@ -178,7 +180,7 @@ fn ui_builder() -> impl Widget<AppState> {
                     Ok(tempfile) => Some(tempfile),
                     Err(_) => None,
                 };
-            let mut cache = Some(Cache::new(
+            let cache = Some(Cache::new(
                 CACHE_ASSET_FILE_SIZE_THRESHOLD,
                 if temp_cache_file.is_some() {
                     Some(
@@ -194,24 +196,28 @@ fn ui_builder() -> impl Widget<AppState> {
                 },
             ));
 
-            thread::spawn(move || {
-                match create_monolithic_document(thread_state.target, &mut options, &mut cache) {
+            let session: Session = Session::new(cache, None, options);
+
+            thread::spawn(
+                move || match create_monolithic_document(session, thread_state.target) {
                     Ok(result) => {
                         handle
                             .submit_command(MONOLITH_GUI_WRITE_OUTPUT, result, Target::Auto)
                             .unwrap();
 
-                        cache.unwrap().destroy_database_file();
+                        // TODO: make it work again
+                        //cache.unwrap().destroy_database_file();
                     }
                     Err(error) => {
                         handle
                             .submit_command(MONOLITH_GUI_ERROR, error, Target::Auto)
                             .unwrap();
 
-                        cache.unwrap().destroy_database_file();
+                        // TODO: make it work again
+                        //cache.unwrap().destroy_database_file();
                     }
-                }
-            });
+                },
+            );
         })
         .disabled_if(|state: &AppState, _env| {
             state.busy || state.target.is_empty() || state.output_path.is_empty()

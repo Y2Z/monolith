@@ -183,7 +183,7 @@ mod failing {
         assert_eq!(String::from_utf8_lossy(&out.stderr), "");
 
         // STDOUT should contain text
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "Hello, World!\n");
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "Hello, World!");
 
         // Exit code should be 0
         out.assert().code(0);

@@ -1,13 +1,13 @@
 # Makefile for monolith
 
-all: build build_gui
+all: build build-gui
 .PHONY: all
 
 build:
 	@cargo build --locked
 .PHONY: build
 
-build_gui:
+build-gui:
 	@cargo build --locked --bin monolith-gui --features="gui"
 .PHONY: build_gui
 
@@ -19,7 +19,7 @@ format:
 	@cargo fmt --all --
 .PHONY: format
 
-format_check:
+format-check:
 	@cargo fmt --all -- --check
 .PHONY: format
 
@@ -32,7 +32,7 @@ lint:
 # 	@cargo fix --allow-dirty --allow-staged
 .PHONY: lint
 
-lint_check:
+lint-check:
 	@cargo clippy --
 .PHONY: lint_check
 

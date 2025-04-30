@@ -79,10 +79,26 @@ mod passing {
     }
 
     #[test]
+    fn file_name_extension_mhtml() {
+        let final_destination =
+            format_output_path("%title%.%extension%", "Title", MonolithOutputFormat::MHTML);
+
+        assert_eq!(final_destination, r#"Title.mhtml"#);
+    }
+
+    #[test]
     fn file_name_extension_short() {
         let final_destination =
             format_output_path("%title%.%ext%", "Title", MonolithOutputFormat::HTML);
 
-        assert_eq!(final_destination, r#"Title.html"#);
+        assert_eq!(final_destination, r#"Title.htm"#);
+    }
+
+    #[test]
+    fn file_name_extension_short_mhtml() {
+        let final_destination =
+            format_output_path("%title%.%ext%", "Title", MonolithOutputFormat::MHTML);
+
+        assert_eq!(final_destination, r#"Title.mht"#);
     }
 }

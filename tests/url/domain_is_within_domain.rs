@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use monolith::core::domain_is_within_domain;
+    use monolith::url::domain_is_within_domain;
 
     #[test]
     fn sub_domain_is_within_dotted_sub_domain() {
@@ -92,7 +92,7 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use monolith::core::domain_is_within_domain;
+    use monolith::url::domain_is_within_domain;
 
     #[test]
     fn sub_domain_must_not_be_within_domain() {

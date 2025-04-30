@@ -9,28 +9,25 @@
 mod passing {
     use html5ever::serialize::{serialize, SerializeOpts};
     use markup5ever_rcdom::SerializableHandle;
-    use reqwest::blocking::Client;
     use url::Url;
 
-    use monolith::cache::Cache;
-    use monolith::core::Options;
+    use monolith::core::MonolithOptions;
     use monolith::html;
+    use monolith::session::Session;
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
     #[test]
     fn basic() {
-        let cache = &mut Some(Cache::new(0, None));
-
         let html: &str = "<div><P></P></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -51,14 +48,13 @@ mod passing {
         let html = "<div><P></P><iframe src=\"\"></iframe></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -79,14 +75,13 @@ mod passing {
         let html = "<frameset><frame src=\"\"></frameset>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -112,15 +107,14 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_css = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -153,15 +147,14 @@ mod passing {
                     <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_images = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -195,15 +188,14 @@ mod passing {
             "<body background=\"no/such/image.png\" background=\"no/such/image2.png\"></body>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_images = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -224,15 +216,14 @@ mod passing {
         let html = "<frameset><frame src=\"http://trackbook.com\"></frameset>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_frames = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -261,15 +252,14 @@ mod passing {
         let html = "<iframe src=\"http://trackbook.com\"></iframe>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_frames = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -302,15 +292,14 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_js = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -342,14 +331,13 @@ mod passing {
                     <link integrity=\"sha384-12345\" rel=\"something\" href=\"https://some-site.com/some-file.ext\" />";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -382,16 +370,15 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_css = true;
         options.no_js = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -425,16 +412,15 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_css = true;
         options.no_js = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -474,18 +460,17 @@ mod passing {
         ";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_css = true;
         options.no_frames = true;
         options.no_js = true;
         options.no_images = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -521,15 +506,14 @@ mod passing {
         </html>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.no_images = true;
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(
@@ -562,14 +546,13 @@ mod passing {
         let html = "<script id=\"data\" type=\"application/json\">{\"mono\":\"lith\"}</script>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
-        let cache = &mut Some(Cache::new(0, None));
 
-        let mut options = Options::default();
+        let mut options = MonolithOptions::default();
         options.silent = true;
 
-        let client = Client::new();
+        let mut session: Session = Session::new(None, None, options);
 
-        html::walk_and_embed_assets(cache, &client, &url, &dom.document, &options);
+        html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
         serialize(

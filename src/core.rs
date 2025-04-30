@@ -3,24 +3,19 @@ use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::path::Path;
 
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
-use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE, REFERER, USER_AGENT};
 use url::Url;
 
-use crate::cache::Cache;
-use crate::cookies::Cookie;
 use crate::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
-    has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots,
-    walk_and_embed_assets,
+    has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots, walk,
 };
-use crate::url::{clean_url, create_data_url, get_referer_url, parse_data_url, resolve_url};
+use crate::session::Session;
+use crate::url::{create_data_url, resolve_url};
 
 #[derive(Debug)]
 pub struct MonolithError {
@@ -47,21 +42,20 @@ impl Error for MonolithError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum MonolithOutputFormat {
     #[default]
     HTML,
-    // MHT,
+    MHTML,
     // WARC,
     // ZIM,
     // HAR,
 }
 
 #[derive(Default)]
-pub struct Options {
+pub struct MonolithOptions {
     pub base_url: Option<String>,
     pub blacklist_domains: bool,
-    pub cookies: Vec<Cookie>, // TODO: move out of this struct?
     pub domains: Option<Vec<String>>,
     pub encoding: Option<String>,
     pub ignore_errors: bool,
@@ -119,39 +113,16 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "image/svg+xml",                   // .svg
 ];
 
-pub fn init_client(options: &Options) -> Client {
-    let mut header_map = HeaderMap::new();
-    if let Some(user_agent) = &options.user_agent {
-        header_map.insert(
-            USER_AGENT,
-            HeaderValue::from_str(user_agent).expect("Invalid User-Agent header specified"),
-        );
-    }
-    Client::builder()
-        .timeout(Duration::from_secs(if options.timeout > 0 {
-            options.timeout
-        } else {
-            // We have to specify something that eventually makes the program fail
-            // (to prevent it from hanging forever)
-            600
-        }))
-        .danger_accept_invalid_certs(options.insecure)
-        .default_headers(header_map)
-        .build()
-        .expect("Failed to initialize HTTP client")
-}
-
 pub fn create_monolithic_document_from_data(
+    mut session: Session,
     input_data: Vec<u8>,
-    options: &Options,
-    cache: &mut Option<Cache>,
     input_encoding: Option<String>,
     input_target: Option<String>,
 ) -> Result<(Vec<u8>, Option<String>), MonolithError> {
     // Validate options
     {
         // Check if custom encoding value is acceptable
-        if let Some(custom_output_encoding) = options.encoding.clone() {
+        if let Some(custom_output_encoding) = session.options.encoding.clone() {
             if Encoding::for_label_no_replacement(custom_output_encoding.as_bytes()).is_none() {
                 return Err(MonolithError::new(&format!(
                     "unknown encoding \"{}\"",
@@ -161,7 +132,6 @@ pub fn create_monolithic_document_from_data(
         }
     }
 
-    let client: Client = init_client(options);
     let mut base_url: Url = if input_target.is_some() {
         Url::parse(&input_target.clone().unwrap()).unwrap()
     } else {
@@ -187,7 +157,7 @@ pub fn create_monolithic_document_from_data(
     }
 
     // Use custom base URL if specified; read and use what's in the DOM otherwise
-    let custom_base_url: String = options.base_url.clone().unwrap_or_default();
+    let custom_base_url: String = session.options.base_url.clone().unwrap_or_default();
     if custom_base_url.is_empty() {
         // No custom base URL is specified; try to see if document has BASE element
         if let Some(existing_base_url) = get_base_url(&dom.document) {
@@ -230,15 +200,15 @@ pub fn create_monolithic_document_from_data(
     }
 
     // Traverse through the document and embed remote assets
-    walk_and_embed_assets(cache, &client, &base_url, &dom.document, options);
+    walk(&mut session, &base_url, &dom.document);
 
     // Update or add new BASE element to reroute network requests and hash-links
-    if let Some(new_base_url) = options.base_url.clone() {
+    if let Some(new_base_url) = session.options.base_url.clone() {
         dom = set_base_url(&dom.document, new_base_url);
     }
 
     // Request and embed /favicon.ico (unless it's already linked in the document)
-    if !options.no_images
+    if !session.options.no_images
         && (base_url.scheme() == "http" || base_url.scheme() == "https")
         && (input_target.is_some()
             && (input_target.as_ref().unwrap().starts_with("http:")
@@ -247,13 +217,7 @@ pub fn create_monolithic_document_from_data(
     {
         let favicon_ico_url: Url = resolve_url(&base_url, "/favicon.ico");
 
-        match retrieve_asset(
-            cache,
-            &client,
-            /*&target_url, */ &base_url,
-            &favicon_ico_url,
-            options,
-        ) {
+        match session.retrieve_asset(/*&target_url, */ &base_url, &favicon_ico_url) {
             Ok((data, final_url, media_type, charset)) => {
                 let favicon_data_url: Url =
                     create_data_url(&media_type, &charset, &data, &final_url);
@@ -272,25 +236,59 @@ pub fn create_monolithic_document_from_data(
     }
 
     // Save using specified charset, if given
-    if let Some(custom_encoding) = options.encoding.clone() {
+    if let Some(custom_encoding) = session.options.encoding.clone() {
         document_encoding = custom_encoding;
         dom = set_charset(dom, document_encoding.clone());
     }
 
     let document_title: Option<String> = get_title(&dom.document);
 
-    if options.output_format == MonolithOutputFormat::HTML {
+    if session.options.output_format == MonolithOutputFormat::HTML {
         // Serialize DOM tree
-        let mut result: Vec<u8> = serialize_document(dom, document_encoding, options);
+        let mut result: Vec<u8> = serialize_document(dom, document_encoding, &session.options);
 
         // Prepend metadata comment tag
-        if !options.no_metadata && !input_target.clone().unwrap_or_default().is_empty() {
+        if !session.options.no_metadata && !input_target.clone().unwrap_or_default().is_empty() {
             let mut metadata_comment: String =
                 create_metadata_tag(&Url::parse(&input_target.unwrap_or_default()).unwrap());
             // let mut metadata_comment: String = create_metadata_tag(target);
             metadata_comment += "\n";
             result.splice(0..0, metadata_comment.as_bytes().to_vec());
         }
+
+        // Ensure newline at end of result
+        if result.last() != Some(&b"\n"[0]) {
+            result.extend_from_slice(b"\n");
+        }
+
+        Ok((result, document_title))
+    } else if session.options.output_format == MonolithOutputFormat::MHTML {
+        // Serialize DOM tree
+        let mut result: Vec<u8> = serialize_document(dom, document_encoding, &session.options);
+
+        // Prepend metadata comment tag
+        if !session.options.no_metadata && !input_target.clone().unwrap_or_default().is_empty() {
+            let mut metadata_comment: String =
+                create_metadata_tag(&Url::parse(&input_target.unwrap_or_default()).unwrap());
+            // let mut metadata_comment: String = create_metadata_tag(target);
+            metadata_comment += "\n";
+            result.splice(0..0, metadata_comment.as_bytes().to_vec());
+        }
+
+        // Extremely hacky way to convert output to MIME
+        let mime = "MIME-Version: 1.0\r\n\
+Content-Type: multipart/related; boundary=\"----=_NextPart_000_0000\"\r\n\
+\r\n\
+------=_NextPart_000_0000\r\n\
+Content-Type: text/html; charset=\"utf-8\"\r\n\
+Content-Location: http://example.com/\r\n\
+\r\n";
+
+        result.splice(0..0, mime.as_bytes().to_vec());
+
+        let mime = "\r\n------=_NextPart_000_0000--\r\n";
+
+        result.extend_from_slice(mime.as_bytes());
 
         Ok((result, document_title))
     } else {
@@ -299,9 +297,8 @@ pub fn create_monolithic_document_from_data(
 }
 
 pub fn create_monolithic_document(
+    mut session: Session,
     target: String,
-    options: &mut Options,
-    cache: &mut Option<Cache>,
 ) -> Result<(Vec<u8>, Option<String>), MonolithError> {
     // Check if target was provided
     if target.is_empty() {
@@ -311,7 +308,7 @@ pub fn create_monolithic_document(
     // Validate options
     {
         // Check if custom encoding value is acceptable
-        if let Some(custom_encoding) = options.encoding.clone() {
+        if let Some(custom_encoding) = session.options.encoding.clone() {
             if Encoding::for_label_no_replacement(custom_encoding.as_bytes()).is_none() {
                 return Err(MonolithError::new(&format!(
                     "unknown encoding \"{}\"",
@@ -368,7 +365,6 @@ pub fn create_monolithic_document(
         },
     };
 
-    let client: Client = init_client(options);
     let data: Vec<u8>;
     let document_encoding: Option<String>;
 
@@ -378,7 +374,7 @@ pub fn create_monolithic_document(
         || target_url.scheme() == "https"
         || target_url.scheme() == "data"
     {
-        match retrieve_asset(cache, &client, &target_url, &target_url, options) {
+        match session.retrieve_asset(&target_url, &target_url) {
             Ok((retrieved_data, final_url, media_type, charset)) => {
                 if !media_type.eq_ignore_ascii_case("text/html")
                     && !media_type.eq_ignore_ascii_case("application/xhtml+xml")
@@ -404,9 +400,8 @@ pub fn create_monolithic_document(
     }
 
     create_monolithic_document_from_data(
+        session,
         data,
-        options,
-        cache,
         document_encoding,
         Some(target_url.to_string()),
     )
@@ -466,62 +461,6 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
     mime.to_string()
 }
 
-pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> bool {
-    if domain_to_match_against.is_empty() {
-        return false;
-    }
-
-    if domain_to_match_against == "." {
-        return true;
-    }
-
-    let domain_partials: Vec<&str> = domain.trim_end_matches(".").rsplit(".").collect();
-    let domain_to_match_against_partials: Vec<&str> = domain_to_match_against
-        .trim_end_matches(".")
-        .rsplit(".")
-        .collect();
-    let domain_to_match_against_starts_with_a_dot = domain_to_match_against.starts_with(".");
-
-    let mut i: usize = 0;
-    let l: usize = std::cmp::max(
-        domain_partials.len(),
-        domain_to_match_against_partials.len(),
-    );
-    let mut ok: bool = true;
-
-    while i < l {
-        // Exit and return false if went out of bounds of domain to match against, and it didn't start with a dot
-        if !domain_to_match_against_starts_with_a_dot
-            && domain_to_match_against_partials.len() < i + 1
-        {
-            ok = false;
-            break;
-        }
-
-        let domain_partial = if domain_partials.len() < i + 1 {
-            ""
-        } else {
-            domain_partials.get(i).unwrap()
-        };
-        let domain_to_match_against_partial = if domain_to_match_against_partials.len() < i + 1 {
-            ""
-        } else {
-            domain_to_match_against_partials.get(i).unwrap()
-        };
-
-        let parts_match = domain_to_match_against_partial.eq_ignore_ascii_case(domain_partial);
-
-        if !parts_match && !domain_to_match_against_partial.is_empty() {
-            ok = false;
-            break;
-        }
-
-        i += 1;
-    }
-
-    ok
-}
-
 pub fn format_output_path(
     path: &str,
     document_title: &str,
@@ -546,7 +485,9 @@ pub fn format_output_path(
         .replace(
             "%ext%",
             if output_format == MonolithOutputFormat::HTML {
-                "html"
+                "htm"
+            } else if output_format == MonolithOutputFormat::MHTML {
+                "mht"
             } else {
                 ""
             },
@@ -555,6 +496,8 @@ pub fn format_output_path(
             "%extension%",
             if output_format == MonolithOutputFormat::HTML {
                 "html"
+            } else if output_format == MonolithOutputFormat::MHTML {
+                "mhtml"
             } else {
                 ""
             },
@@ -592,200 +535,37 @@ pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
     (media_type, charset, is_base64)
 }
 
-pub fn retrieve_asset(
-    cache: &mut Option<Cache>,
-    client: &Client,
-    parent_url: &Url,
-    url: &Url,
-    options: &Options,
-) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
-    if url.scheme() == "data" {
-        let (media_type, charset, data) = parse_data_url(url);
-        Ok((data, url.clone(), media_type, charset))
-    } else if url.scheme() == "file" {
-        let cache_key: String = clean_url(url.clone()).as_str().to_string();
+pub fn print_error_message(text: &str) {
+    let stderr = io::stderr();
+    let mut handle = stderr.lock();
 
-        // Check if parent_url is also a file: URL (if not, then we don't embed the asset)
-        if parent_url.scheme() != "file" {
-            print_error_message(&format!("{} (security error)", &cache_key), options);
+    const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
+    const ENV_VAR_TERM: &str = "TERM";
 
-            // Provoke error
-            client.get("").send()?;
-        }
-
-        let path_buf: PathBuf = url.to_file_path().unwrap().clone();
-        let path: &Path = path_buf.as_path();
-        if path.exists() {
-            if path.is_dir() {
-                print_error_message(&format!("{} (is a directory)", &cache_key), options);
-
-                // Provoke error
-                Err(client.get("").send().unwrap_err())
-            } else {
-                print_info_message(&cache_key.to_string(), options);
-
-                let file_blob: Vec<u8> = fs::read(path).expect("unable to read file");
-
-                Ok((
-                    file_blob.clone(),
-                    url.clone(),
-                    detect_media_type(&file_blob, url),
-                    "".to_string(),
-                ))
-            }
-        } else {
-            print_error_message(&format!("{} (file not found)", &url), options);
-
-            // Provoke error
-            Err(client.get("").send().unwrap_err())
-        }
-    } else {
-        let cache_key: String = clean_url(url.clone()).as_str().to_string();
-
-        if cache.is_some() && cache.as_ref().unwrap().contains_key(&cache_key) {
-            // URL is in cache, we get and return it
-            print_info_message(&format!("{} (from cache)", &cache_key), options);
-
-            Ok((
-                cache.as_ref().unwrap().get(&cache_key).unwrap().0.to_vec(),
-                url.clone(),
-                cache.as_ref().unwrap().get(&cache_key).unwrap().1,
-                cache.as_ref().unwrap().get(&cache_key).unwrap().2,
-            ))
-        } else {
-            if let Some(domains) = &options.domains {
-                let domain_matches = domains
-                    .iter()
-                    .any(|d| domain_is_within_domain(url.host_str().unwrap(), d.trim()));
-                if (options.blacklist_domains && domain_matches)
-                    || (!options.blacklist_domains && !domain_matches)
-                {
-                    return Err(client.get("").send().unwrap_err());
-                }
-            }
-
-            // URL not in cache, we retrieve the file
-            let mut headers = HeaderMap::new();
-            if !options.cookies.is_empty() {
-                for cookie in &options.cookies {
-                    if !cookie.is_expired() && cookie.matches_url(url.as_str()) {
-                        let cookie_header_value: String = cookie.name.clone() + "=" + &cookie.value;
-                        headers
-                            .insert(COOKIE, HeaderValue::from_str(&cookie_header_value).unwrap());
-                    }
-                }
-            }
-            // Add referer header for page resource requests
-            if ["https", "http"].contains(&parent_url.scheme()) && parent_url != url {
-                headers.insert(
-                    REFERER,
-                    HeaderValue::from_str(get_referer_url(parent_url.clone()).as_str()).unwrap(),
-                );
-            }
-            match client.get(url.as_str()).headers(headers).send() {
-                Ok(response) => {
-                    if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
-                        print_error_message(
-                            &format!("{} ({})", &cache_key, response.status()),
-                            options,
-                        );
-
-                        // Provoke error
-                        return Err(client.get("").send().unwrap_err());
-                    }
-
-                    let response_url: Url = response.url().clone();
-
-                    if url.as_str() == response_url.as_str() {
-                        print_info_message(&cache_key.to_string(), options);
-                    } else {
-                        print_info_message(
-                            &format!("{} -> {}", &cache_key, &response_url),
-                            options,
-                        );
-                    }
-
-                    let new_cache_key: String = clean_url(response_url.clone()).to_string();
-
-                    // Attempt to obtain media type and charset by reading Content-Type header
-                    let content_type: &str = response
-                        .headers()
-                        .get(CONTENT_TYPE)
-                        .and_then(|header| header.to_str().ok())
-                        .unwrap_or("");
-
-                    let (media_type, charset, _is_base64) = parse_content_type(content_type);
-
-                    // Convert response into a byte array
-                    let mut data: Vec<u8> = vec![];
-                    match response.bytes() {
-                        Ok(b) => {
-                            data = b.to_vec();
-                        }
-                        Err(error) => {
-                            print_error_message(&format!("{}", error), options);
-                        }
-                    }
-
-                    // Add retrieved resource to cache
-                    if cache.is_some() {
-                        cache.as_mut().unwrap().set(
-                            &new_cache_key,
-                            &data,
-                            media_type.clone(),
-                            charset.clone(),
-                        );
-                    }
-
-                    // Return
-                    Ok((data, response_url, media_type, charset))
-                }
-                Err(error) => {
-                    print_error_message(&format!("{} ({})", &cache_key, error), options);
-
-                    Err(client.get("").send().unwrap_err())
-                }
-            }
+    let mut no_color = env::var_os(ENV_VAR_NO_COLOR).is_some() || atty::isnt(atty::Stream::Stderr);
+    if let Some(term) = env::var_os(ENV_VAR_TERM) {
+        if term == "dumb" {
+            no_color = true;
         }
     }
-}
 
-pub fn print_error_message(text: &str, options: &Options) {
-    if !options.silent {
-        let stderr = io::stderr();
-        let mut handle = stderr.lock();
-
-        const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
-        const ENV_VAR_TERM: &str = "TERM";
-
-        let mut no_color =
-            env::var_os(ENV_VAR_NO_COLOR).is_some() || atty::isnt(atty::Stream::Stderr);
-        if let Some(term) = env::var_os(ENV_VAR_TERM) {
-            if term == "dumb" {
-                no_color = true;
-            }
-        }
-
-        if handle
-            .write_all(
-                format!(
-                    "{}{}{}\n",
-                    if no_color { "" } else { ANSI_COLOR_RED },
-                    &text,
-                    if no_color { "" } else { ANSI_COLOR_RESET },
-                )
-                .as_bytes(),
+    if handle
+        .write_all(
+            format!(
+                "{}{}{}\n",
+                if no_color { "" } else { ANSI_COLOR_RED },
+                &text,
+                if no_color { "" } else { ANSI_COLOR_RESET },
             )
-            .is_ok()
-        {}
-    }
+            .as_bytes(),
+        )
+        .is_ok()
+    {}
 }
 
-pub fn print_info_message(text: &str, options: &Options) {
-    if !options.silent {
-        let stderr = io::stderr();
-        let mut handle = stderr.lock();
+pub fn print_info_message(text: &str) {
+    let stderr = io::stderr();
+    let mut handle = stderr.lock();
 
-        if handle.write_all(format!("{}\n", &text).as_bytes()).is_ok() {}
-    }
+    if handle.write_all(format!("{}\n", &text).as_bytes()).is_ok() {}
 }
