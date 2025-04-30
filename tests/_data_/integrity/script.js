@@ -1,3 +1,3 @@
 function noop() {
-    console.log("monolith");
+  console.log("</script>");
 }
