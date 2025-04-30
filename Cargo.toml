@@ -34,7 +34,7 @@ html5ever = "0.29.1" # Used for all things DOM
 markup5ever_rcdom = "=0.5.0-unofficial" # Used for manipulating DOM
 percent-encoding = "2.3.1" # Used for encoding URLs
 sha2 = "0.10.9" # Used for calculating checksums during integrity checks
-redb = "2.5.0" # Used for on-disk caching of remote assets
+redb = "2.4.0" # Used for on-disk caching of remote assets
 tempfile = { version = "3.19.1", optional = true } # Used for on-disk caching of remote assets
 url = "2.5.4" # Used for parsing URLs
 openssl = "0.10.72" # Used for static linking of the OpenSSL library
