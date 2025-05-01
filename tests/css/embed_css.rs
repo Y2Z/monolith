@@ -175,9 +175,9 @@ mod passing {
             "\
             @charset \"UTF-8\";\n\
             \n\
-            @import \"data:text/css;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9\";\n\
+            @import \"data:text/css,html{background-color%3A%23000}\";\n\
             \n\
-            @import url(\"data:text/css;base64,aHRtbHtjb2xvcjojZmZmfQ==\")\n\
+            @import url(\"data:text/css,html{color%3A%23fff}\")\n\
             "
         );
     }
