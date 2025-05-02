@@ -1,11 +1,35 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
-use percent_encoding::percent_decode_str;
+use percent_encoding::{percent_decode_str, percent_encode, AsciiSet, CONTROLS};
 pub use url::Url;
 
 use crate::core::{detect_media_type, parse_content_type};
 
 pub const EMPTY_IMAGE_DATA_URL: &str = "data:image/png,\
 %89PNG%0D%0A%1A%0A%00%00%00%0DIHDR%00%00%00%0D%00%00%00%0D%08%04%00%00%00%D8%E2%2C%F7%00%00%00%11IDATx%DAcd%C0%09%18G%A5%28%96%02%00%0A%F8%00%0E%CB%8A%EB%16%00%00%00%00IEND%AEB%60%82";
+// https://datatracker.ietf.org/doc/html/rfc3986#section-2.2
+const DATA_ESC: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b':')
+    .add(b'/')
+    .add(b'?')
+    .add(b'#')
+    .add(b'[')
+    .add(b']')
+    .add(b'@')
+    .add(b'!')
+    .add(b'$')
+    .add(b'&')
+    .add(b'\'')
+    .add(b'(')
+    .add(b')')
+    .add(b'*')
+    .add(b'+')
+    .add(b',')
+    .add(b';')
+    .add(b'=')
+    // make nesting and HTML embedding safe
+    .add(b'"')
+    .add(b'%');
 
 pub fn clean_url(url: Url) -> Url {
     let mut url = url.clone();
@@ -33,15 +57,14 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
             "".to_string()
         };
 
-    data_url.set_path(
-        format!(
-            "{}{};base64,{}",
-            media_type,
-            c,
-            BASE64_STANDARD.encode(data)
-        )
-        .as_str(),
-    );
+    let base64 = BASE64_STANDARD.encode(data);
+    let urlenc = percent_encode(data, DATA_ESC).to_string();
+
+    if urlenc.len() < base64.len() {
+        data_url.set_path(format!("{}{},{}", media_type, c, urlenc).as_str());
+    } else {
+        data_url.set_path(format!("{}{};base64,{}", media_type, c, base64).as_str());
+    }
 
     data_url
 }
