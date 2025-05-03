@@ -18,5 +18,7 @@ RUN apk update && \
   rm -rf "/var/cache/apk/*"
 
 COPY --from=builder /root/.cargo/bin/monolith /usr/bin/monolith
-WORKDIR /tmp
+
+WORKDIR /mnt
+
 ENTRYPOINT ["/usr/bin/monolith"]
