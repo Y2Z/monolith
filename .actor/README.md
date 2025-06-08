@@ -85,7 +85,7 @@ The Actor provides three types of outputs:
 - **Memory Requirements**:
   - Minimum: 4168 MB RAM
 - **Processing Time**:
-  - 30s per compex page like [bbc.co.uk](https://bbc.co.uk)
+  - 30s per complex page like [bbc.co.uk](https://bbc.co.uk)
 
 
 For more help, check the [Monolith Project documentation](https://github.com/Y2Z/monolith) or raise an issue in the [Actor page detail](https://apify.com/snshn/monolith?fpr=snshn) on Apify.

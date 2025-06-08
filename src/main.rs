@@ -263,7 +263,7 @@ fn main() {
     }
 
     // Initiate session
-    let ouptput_format = options.output_format.clone();
+    let output_format = options.output_format.clone();
     let silent = options.silent;
     let session: Session = Session::new(cache, cookies, options);
 
@@ -278,7 +278,7 @@ fn main() {
                 let mut output = Output::new(
                     &destination.unwrap_or(String::new()),
                     &title.unwrap_or_default(),
-                    ouptput_format,
+                    output_format,
                 )
                 .expect("could not prepare output");
 
@@ -300,7 +300,7 @@ fn main() {
                 let mut output = Output::new(
                     &destination.unwrap_or(String::new()),
                     &title.unwrap_or_default(),
-                    ouptput_format,
+                    output_format,
                 )
                 .expect("could not prepare output");
 
