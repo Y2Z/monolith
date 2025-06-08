@@ -16,7 +16,7 @@ pub struct Cache {
     min_file_size: usize, // Only use database for assets larger than this size (in bytes), otherwise keep them in RAM
     metadata: HashMap<String, CacheMetadataItem>, // Dictionary of metadata (and occasionally data [mostly for very small files])
     db: Option<Database>, // Pointer to database instance; None if not yet initialized or if failed to initialize
-    db_ok: Option<bool>, // None by default, Some(true) if was able to initialize database, Some (false) if an error occured
+    db_ok: Option<bool>, // None by default, Some(true) if was able to initialize database, Some (false) if an error occurred
     db_file_path: Option<String>, // Filesystem path to file used for storing database
 }
 
