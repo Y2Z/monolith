@@ -54,3 +54,8 @@ fn as_text_css() {
 fn as_text_svg() {
     as_text("svg");
 }
+
+#[test]
+fn as_text_png() {
+    as_text("png");
+}
