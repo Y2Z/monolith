@@ -5,8 +5,6 @@ use markup5ever_rcdom::SerializableHandle;
 use monolith::{core::MonolithOptions, html, session::Session};
 use url::Url;
 
-const PREFIX: &str = "-old";
-
 fn as_text(name: &str) {
     // Construct the path to the as_text directory
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("tests/as_text/{name}"));
@@ -38,7 +36,7 @@ fn as_text(name: &str) {
     )
     .unwrap();
 
-    let contents = fs::read_to_string(dir.join(format!("result{PREFIX}.html")))
+    let contents = fs::read_to_string(dir.join("result.html"))
         .unwrap();
 
     assert_eq!(
