@@ -5,11 +5,13 @@ use markup5ever_rcdom::SerializableHandle;
 use monolith::{core::MonolithOptions, html, session::Session};
 use url::Url;
 
+const PREFIX: &str = "-old";
+
 #[test]
-fn as_text_test() {
+fn as_text_style() {
     // Construct the path to the as_text directory
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/as_text");
-    let html_path = dir.join("source.html");
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/as_text/style");
+    let html_path = dir.join("index.html");
 
     // Read the HTML input
     let html = fs::read_to_string(html_path.clone()).unwrap();
@@ -29,7 +31,7 @@ fn as_text_test() {
     html::walk(&mut session, &url, &dom.document);
 
     // Serialize the DOM back to HTML
-    let mut buf: Vec<u8> = Vec::new();
+    let mut buf = Vec::new();
     serialize(
         &mut buf,
         &SerializableHandle::from(dom.document.clone()),
@@ -37,9 +39,11 @@ fn as_text_test() {
     )
     .unwrap();
 
+    let contents = fs::read_to_string(dir.join(format!("result{}.html", PREFIX)))
+        .unwrap();
+
     assert_eq!(
         buf.iter().map(|&c| c as char).collect::<String>(),
-        // include_str!("as_text/source-result.html")
-        include_str!("as_text/source-result-old.html")
+        contents
     );
 }
