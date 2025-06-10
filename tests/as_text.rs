@@ -46,8 +46,8 @@ fn as_text(name: &str) {
 }
 
 #[test]
-fn as_text_css() {
-    as_text("css");
+fn as_text_png() {
+    as_text("png");
 }
 
 #[test]
@@ -56,6 +56,16 @@ fn as_text_svg() {
 }
 
 #[test]
-fn as_text_png() {
-    as_text("png");
+fn as_text_css() {
+    as_text("css");
+}
+
+#[test]
+fn as_text_css_close() {
+    as_text("css-close");
+}
+
+#[test]
+fn as_text_script() {
+    as_text("script");
 }

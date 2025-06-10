@@ -1,0 +1,1 @@
+document.getElementById('x').textContent='</script>'
