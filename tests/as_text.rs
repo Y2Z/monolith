@@ -7,10 +7,9 @@ use url::Url;
 
 const PREFIX: &str = "-old";
 
-#[test]
-fn as_text_style() {
+fn as_text(name: &str) {
     // Construct the path to the as_text directory
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/as_text/style");
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("tests/as_text/{name}"));
     let html_path = dir.join("index.html");
 
     // Read the HTML input
@@ -39,11 +38,21 @@ fn as_text_style() {
     )
     .unwrap();
 
-    let contents = fs::read_to_string(dir.join(format!("result{}.html", PREFIX)))
+    let contents = fs::read_to_string(dir.join(format!("result{PREFIX}.html")))
         .unwrap();
 
     assert_eq!(
         buf.iter().map(|&c| c as char).collect::<String>(),
         contents
     );
+}
+
+#[test]
+fn as_text_css() {
+    as_text("css");
+}
+
+#[test]
+fn as_text_svg() {
+    as_text("svg");
 }
