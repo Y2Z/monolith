@@ -33,7 +33,7 @@ mod passing {
         assert_eq!(&charset, "US-ASCII");
         assert_eq!(
             url::create_data_url(&media_type, &charset, &data, &final_url),
-            Url::parse("data:text/html;base64,dGFyZ2V0").unwrap(),
+            Url::parse("data:text/html,target").unwrap(),
         );
         assert_eq!(
             final_url,
@@ -70,7 +70,7 @@ mod passing {
             .unwrap();
         assert_eq!(&media_type, "text/javascript");
         assert_eq!(&charset, "");
-        let data_url = "data:text/javascript;base64,ZG9jdW1lbnQuYm9keS5zdHlsZS5iYWNrZ3JvdW5kQ29sb3IgPSAiZ3JlZW4iOwpkb2N1bWVudC5ib2R5LnN0eWxlLmNvbG9yID0gInJlZCI7Cg==";
+        let data_url = "data:text/javascript,document.body.style.backgroundColor%20%3D%20%22green%22%3B%0Adocument.body.style.color%20%3D%20%22red%22%3B%0A";
         assert_eq!(
             url::create_data_url(&media_type, &charset, &data, &final_url),
             Url::parse(data_url).unwrap()
