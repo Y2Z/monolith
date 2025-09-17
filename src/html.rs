@@ -728,8 +728,23 @@ pub fn retrieve_and_embed_asset(
 
                     // Parse media type for SCRIPT elements
                     if node_name == "script" {
-                        let script_media_type =
+                        let mut script_media_type =
                             get_node_attr(node, "type").unwrap_or(String::from("text/javascript"));
+
+                        // JavaScript modules are a special case that uses `module` instead of a
+                        // MIME type.
+                        if script_media_type == "module" {
+                            script_media_type = String::from("text/javascript");
+                        } else if script_media_type == "importmap" {
+                            // JavaScript import maps are another special case that uses `importmap`
+                            // instead of a MIME type.
+                            // An import map is a JSON object.
+                            // There is ongoing work to register the MIME type
+                            // `application/importmap+json` for it, but this has not been accepted
+                            // yet.
+                            script_media_type = String::from("application/json");
+                        }
+                        // TODO: There is also `speculationrules` but this is not yet standard.
 
                         if script_media_type == "text/javascript"
                             || script_media_type == "application/javascript"
