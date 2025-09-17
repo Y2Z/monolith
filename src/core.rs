@@ -449,6 +449,7 @@ pub fn detect_media_type_by_file_name(filename: &str) -> String {
             "tif" | "tiff" => "image/tiff",
             "txt" => "text/plain",
             "wav" => "audio/wav",
+            "webmanifest" => "application/manifest+json",
             "webp" => "image/webp",
             "woff" => "font/woff",
             "woff2" => "font/woff2",

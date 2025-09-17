@@ -31,6 +31,7 @@ pub enum LinkType {
     Favicon,
     Preload,
     Stylesheet,
+    Manifest,
 }
 
 pub struct SrcSetItem<'a> {
@@ -369,6 +370,8 @@ pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
             types.push(LinkType::Favicon);
         } else if link_attr_rel_type.eq_ignore_ascii_case("apple-touch-icon") {
             types.push(LinkType::AppleTouchIcon);
+        } else if link_attr_rel_type.eq_ignore_ascii_case("manifest") {
+            types.push(LinkType::Manifest);
         }
     }
 
@@ -839,6 +842,19 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 // Wipe integrity attribute
                                 set_node_attr(node, "integrity", None);
                             } else if !link_attr_href_value.is_empty() {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "href",
+                                    &link_attr_href_value,
+                                );
+                            }
+                        }
+                    } else if link_node_types.contains(&LinkType::Manifest) {
+                        // Resolve LINK's href attribute
+                        if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                            if !link_attr_href_value.is_empty() {
                                 retrieve_and_embed_asset(
                                     session,
                                     document_url,
