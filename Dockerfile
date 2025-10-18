@@ -13,9 +13,7 @@ RUN make install
 
 FROM alpine
 
-RUN apk update && \
-  apk add --no-cache openssl && \
-  rm -rf "/var/cache/apk/*"
+RUN apk add --no-cache openssl
 
 COPY --from=builder /root/.cargo/bin/monolith /usr/bin/monolith
 WORKDIR /tmp
