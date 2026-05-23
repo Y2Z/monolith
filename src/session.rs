@@ -145,12 +145,17 @@ impl Session {
             // URL not in cache, we retrieve the file
             let mut headers = HeaderMap::new();
             if self.cookies.is_some() && !self.cookies.as_ref().unwrap().is_empty() {
+                let mut cookie_values: Vec<String> = Vec::new();
                 for cookie in self.cookies.as_ref().unwrap() {
                     if !cookie.is_expired() && cookie.matches_url(url.as_str()) {
-                        let cookie_header_value: String = cookie.name.clone() + "=" + &cookie.value;
-                        headers
-                            .insert(COOKIE, HeaderValue::from_str(&cookie_header_value).unwrap());
+                        cookie_values.push(cookie.name.clone() + "=" + &cookie.value);
                     }
+                }
+                if !cookie_values.is_empty() {
+                    headers.insert(
+                        COOKIE,
+                        HeaderValue::from_str(&cookie_values.join("; ")).unwrap(),
+                    );
                 }
             }
             // Add referer header for page resource requests
