@@ -1022,11 +1022,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 set_node_attr(node, attr_name, None);
                             } else if use_attr_href_value.clone().starts_with('#') {
                                 // Relative symbol that resolves to its own URL; keep as-is.
-                                set_node_attr(
-                                    node,
-                                    attr_name,
-                                    Some(use_attr_href_value),
-                                );
+                                set_node_attr(node, attr_name, Some(use_attr_href_value));
                             } else {
                                 let image_asset_url: Url =
                                     resolve_url(document_url, &use_attr_href_value);
