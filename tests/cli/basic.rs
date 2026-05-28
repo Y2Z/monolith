@@ -109,11 +109,11 @@ mod passing {
 
     @charset "UTF-8";
 
-    @import "data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K";
+    @import "data:text/css,body{background-color%3A%23000%3Bcolor%3A%23fff}%0A";
 
-    @import url("data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K");
+    @import url("data:text/css,body{background-color%3A%23000%3Bcolor%3A%23fff}%0A");
 
-    @import url("data:text/css;base64,Ym9keXtiYWNrZ3JvdW5kLWNvbG9yOiMwMDA7Y29sb3I6I2ZmZn0K");
+    @import url("data:text/css,body{background-color%3A%23000%3Bcolor%3A%23fff}%0A");
 
 </style>
 <meta name="robots" content="none"></meta></head><body></body></html>
