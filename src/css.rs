@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use sha2::{Digest, Sha256};
+
 use cssparser::{
     serialize_identifier, serialize_string, ParseError, Parser, ParserInput, SourcePosition, Token,
 };
@@ -29,8 +33,17 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
 pub fn embed_css(session: &mut Session, document_url: &Url, css: &str) -> String {
     let mut input = ParserInput::new(css);
     let mut parser = Parser::new(&mut input);
+    let mut assets: HashMap<String, CssPropAsset> = HashMap::new();
 
-    process_css(session, document_url, &mut parser, "", "", "").unwrap()
+    let mut out = process_css(session, document_url, &mut parser, "", "", "", &mut assets).unwrap();
+
+    if !assets.is_empty() {
+        for asset in assets.values() {
+            out.push_str(&format!("@property --{} {{inherits: false; syntax: \"<url>\"; initial-value: url({});}}", asset.prop_name, asset.data_url));
+        }
+    }
+
+    out
 }
 
 pub fn format_ident(ident: &str) -> String {
@@ -52,6 +65,18 @@ pub fn is_image_url_prop(prop_name: &str) -> bool {
         .any(|p| prop_name.eq_ignore_ascii_case(p))
 }
 
+pub fn hash_url(url: String) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(url.as_str().as_bytes());
+    let hash = hasher.finalize();
+    return format!("{:x}", hash);
+}
+
+pub struct CssPropAsset {
+    prop_name: String,
+    data_url: String,
+}
+
 pub fn process_css<'a>(
     session: &mut Session,
     document_url: &Url,
@@ -59,6 +84,8 @@ pub fn process_css<'a>(
     rule_name: &str,
     prop_name: &str,
     func_name: &str,
+    css_assets: &mut HashMap<String, CssPropAsset>,
+
 ) -> Result<String, ParseError<'a, String>> {
     let mut result: String = "".to_string();
 
@@ -110,6 +137,7 @@ pub fn process_css<'a>(
                             rule_name,
                             curr_prop.as_str(),
                             func_name,
+                            css_assets
                         )
                     })
                     .unwrap();
@@ -207,20 +235,50 @@ pub fn process_css<'a>(
 
                         match session.retrieve_asset(document_url, &resolved_url) {
                             Ok((data, final_url, media_type, charset)) => {
-                                // TODO: if it's @font-face, exclude definitions of non-woff/woff-2 fonts (if woff/woff-2 are present)
-                                let mut data_url =
-                                    create_data_url(&media_type, &charset, &data, &final_url);
-                                data_url.set_fragment(resolved_url.fragment());
-                                result.push_str(format_quoted_string(data_url.as_ref()).as_str());
+                                // hash the url and create a css custom prop to use as the background
+                                // all the props are written after fully processing the css
+                                if is_image_url_prop(curr_prop.as_str()) && session.options.exp_css_prop_assets {
+                                    if let Some(asset) = css_assets.get(final_url.as_str()) {
+                                        // Replace entire url(...) with var(--id)
+                                        result.push_str("var(--");
+                                        result.push_str(&asset.prop_name);
+                                        result.push(')');
+                                    } else {
+                                        let mut data_url =
+                                            create_data_url(&media_type, &charset, &data, &final_url);
+                                        data_url.set_fragment(resolved_url.fragment());
+
+                                        let var_name = format!("img-{}", hash_url(final_url.to_string()));
+                                        let asset = CssPropAsset {
+                                            prop_name: var_name.clone(),
+                                            data_url: format_quoted_string(data_url.as_ref()),
+                                        };
+                                        css_assets.insert(final_url.to_string(), asset);
+
+                                        result.push_str("var(--");
+                                        result.push_str(&var_name);
+                                        result.push(')');
+                                    }
+                                } else {
+                                    // TODO: if it's @font-face, exclude definitions of non-woff/woff-2 fonts (if woff/woff-2 are present)
+                                    let mut data_url =
+                                        create_data_url(&media_type, &charset, &data, &final_url);
+                                    data_url.set_fragment(resolved_url.fragment());
+                                    result.push_str("url(");
+                                    result.push_str(&format_quoted_string(data_url.as_ref()));
+                                    result.push(')');
+                                }
                             }
                             Err(_) => {
                                 // Keep remote reference if unable to retrieve the asset
                                 if resolved_url.scheme() == "http"
                                     || resolved_url.scheme() == "https"
                                 {
+                                    result.push_str("url(");
                                     result.push_str(
                                         format_quoted_string(resolved_url.as_ref()).as_str(),
                                     );
+                                    result.push(')');
                                 }
                             }
                         }
@@ -314,12 +372,41 @@ pub fn process_css<'a>(
                     result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                 } else {
                     let full_url: Url = resolve_url(document_url, value);
+                    // same css custom property approach as above
                     match session.retrieve_asset(document_url, &full_url) {
                         Ok((data, final_url, media_type, charset)) => {
-                            let mut data_url =
-                                create_data_url(&media_type, &charset, &data, &final_url);
-                            data_url.set_fragment(full_url.fragment());
-                            result.push_str(format_quoted_string(data_url.as_ref()).as_str());
+                            if is_image_url_prop(curr_prop.as_str()) && session.options.exp_css_prop_assets {
+                                    if let Some(asset) = css_assets.get(final_url.as_str()) {
+                                        // switch url( to var(
+                                        // end ) is closed before next token
+                                        result.truncate(result.len() - "url(".len());
+                                        result.push_str("var(--");
+                                        result.push_str(&asset.prop_name);
+                                    } else {
+                                        // create a new data url and save its rnd name
+                                        let mut data_url =
+                                            create_data_url(&media_type, &charset, &data, &final_url);
+                                        data_url.set_fragment(final_url.fragment());
+
+                                        let var_name = format!("img-{}", hash_url(final_url.to_string()));
+                                        let asset = CssPropAsset {
+                                            prop_name: var_name.clone(),
+                                            data_url: format_quoted_string(data_url.as_ref())
+                                        };
+
+                                        css_assets.insert(final_url.to_string(), asset);
+
+                                        result.truncate(result.len() - "url(".len());
+                                        result.push_str("var(--");
+                                        result.push_str(&var_name);
+                                        // end ) is closed before next token
+                                    }
+                                } else {
+                                let mut data_url =
+                                    create_data_url(&media_type, &charset, &data, &final_url);
+                                data_url.set_fragment(full_url.fragment());
+                                result.push_str(format_quoted_string(data_url.as_ref()).as_str());
+                            }
                         }
                         Err(_) => {
                             // Keep remote reference if unable to retrieve the asset
@@ -329,30 +416,62 @@ pub fn process_css<'a>(
                         }
                     }
                 }
+
                 result.push(')');
             }
             // =
             Token::Delim(ref value) => result.push(*value),
             Token::Function(ref name) => {
                 let function_name: &str = &name.clone();
-                result.push_str(function_name);
-                result.push('(');
 
-                let block_css: String = parser
-                    .parse_nested_block(|parser| {
-                        process_css(
-                            session,
-                            document_url,
-                            parser,
-                            curr_rule.as_str(),
-                            curr_prop.as_str(),
-                            function_name,
-                        )
-                    })
-                    .unwrap();
-                result.push_str(block_css.as_str());
+                if function_name.eq_ignore_ascii_case("url") {
+                    // Parse the inner content and then decide whether to wrap it in url(...)
+                    let inner = parser
+                        .parse_nested_block(|parser| {
+                            process_css(
+                                session,
+                                document_url,
+                                parser,
+                                curr_rule.as_str(),
+                                curr_prop.as_str(),
+                                function_name,
+                                css_assets,
+                            )
+                        })
+                        .unwrap();
 
-                result.push(')');
+                    let inner_trimmed = inner.trim();
+
+                    if inner_trimmed.is_empty() {
+                        // nothing inside
+                        result.push_str("url()");
+                    } else if inner_trimmed.starts_with("url(") || inner_trimmed.starts_with("var(") {
+                        // already a url(...) or var(...)
+                        result.push_str(&inner);
+                    } else {
+                        result.push_str("url(");
+                        result.push_str(&inner);
+                        result.push(')');
+                    }
+                } else {
+                    result.push_str(function_name);
+                    result.push('(');
+                    let block_css: String = parser
+                        .parse_nested_block(|parser| {
+                            process_css(
+                                session,
+                                document_url,
+                                parser,
+                                curr_rule.as_str(),
+                                curr_prop.as_str(),
+                                function_name,
+                                css_assets,
+                            )
+                        })
+                        .unwrap();
+                    result.push_str(block_css.as_str());
+                    result.push(')');
+                }
             }
             Token::BadUrl(_) | Token::BadString(_) => {}
         }

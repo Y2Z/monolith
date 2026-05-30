@@ -120,6 +120,10 @@ struct Cli {
     #[arg(short = 'v', long)]
     no_video: bool,
 
+    /// Enable experimental CSS image variable substitution
+    #[arg(short = 'x', long)]
+    exp_css_prop_assets: bool,
+
     /// URL or file path, use - for STDIN
     target: String,
 }
@@ -205,6 +209,7 @@ fn main() {
         } else {
             options.user_agent = cli.user_agent;
         }
+        options.exp_css_prop_assets = cli.exp_css_prop_assets;
 
         cookie_file_path = cli.cookie_file;
         destination = cli.output.clone();

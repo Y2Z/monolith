@@ -74,6 +74,7 @@ pub struct MonolithOptions {
     pub timeout: u64,
     pub unwrap_noscript: bool,
     pub user_agent: Option<String>,
+    pub exp_css_prop_assets: bool,
 }
 
 const ANSI_COLOR_RED: &str = "\x1b[31m";
