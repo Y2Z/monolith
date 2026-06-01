@@ -191,7 +191,7 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-d`: Allow retrieving assets only from specified `domain(s)`
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
- - `-f`: Omit frames
+ - `-f`: Omit frames and iframes
  - `-F`: Exclude web fonts
  - `-h`: Print help information
  - `-i`: Remove images
