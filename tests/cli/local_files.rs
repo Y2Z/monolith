@@ -416,4 +416,55 @@ document.body.style.color = "red";
         // Exit code should be 0
         out.assert().code(0);
     }
+
+    #[test]
+    fn escape_script_end_tag_variants_in_local_asset() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let cwd_normalized: String = env::current_dir()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace("\\", "/");
+        let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
+        let out = cmd
+            .arg("-M")
+            .arg("tests/_data_/script-escape/index.html")
+            .output()
+            .unwrap();
+
+        // STDERR should contain list of retrieved file URLs
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                r#"{file}{cwd}/tests/_data_/script-escape/index.html
+{file}{cwd}/tests/_data_/script-escape/script.js
+"#,
+                file = file_url_protocol,
+                cwd = cwd_normalized,
+            )
+        );
+
+        // STDOUT should contain every closing SCRIPT tag variant escaped,
+        // while the longer tag name in `</scripts>` stays untouched
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            r##"<!DOCTYPE html><html><head>
+    <title>Script end tag escaping</title>
+    <script>var a = "<\/script>";
+var b = "<\/SCRIPT>";
+var c = "<\/script >";
+var d = "<\/script/>";
+var e = "</scripts>";
+</script>
+<meta name="robots" content="none"></meta></head>
+<body>
+
+
+</body></html>
+"##
+        );
+
+        // Exit code should be 0
+        out.assert().code(0);
+    }
 }
