@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 use crate::core::{MonolithOptions, MonolithOutputFormat, parse_content_type};
 use crate::css::embed_css;
-use crate::js::attr_is_event_handler;
+use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::session::Session;
 use crate::url::{
     EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, is_url_and_has_protocol, resolve_url,
@@ -862,10 +862,9 @@ pub fn retrieve_and_embed_asset(
                                 if let NodeData::Text { ref contents } = text_node.data {
                                     let mut tendril = contents.borrow_mut();
                                     tendril.clear();
-                                    tendril.push_slice(
-                                        &String::from_utf8_lossy(&data)
-                                            .replace("</script>", "<\\/script>"),
-                                    );
+                                    tendril.push_slice(&escape_script_end_tag(
+                                        &String::from_utf8_lossy(&data),
+                                    ));
                                 }
 
                                 node.children.borrow_mut().push(text_node.clone());
