@@ -98,6 +98,14 @@ pacman -S monolith
 apk add monolith
 ```
 
+#### Using [pkg.haus APT archive](https://pkg.haus) (Debian)
+
+Set up the archive per the instructions on [pkg.haus](https://pkg.haus), then:
+
+```console
+sudo apt install monolith
+```
+
 #### Using [XBPS Package Manager](https://voidlinux.org/packages/?q=monolith) (Void Linux)
 
 ```console
