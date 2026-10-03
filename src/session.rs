@@ -13,11 +13,11 @@ use crate::core::{
 use crate::url::{clean_url, domain_is_within_domain, get_referer_url, parse_data_url, Url};
 
 pub struct Session {
+    pub asset_urls: Vec<String>,
     cache: Option<Cache>,
     client: Client,
     cookies: Option<Vec<Cookie>>,
     pub options: MonolithOptions,
-    urls: Vec<String>,
 }
 
 impl Session {
@@ -47,11 +47,17 @@ impl Session {
             .expect("Failed to initialize HTTP client");
 
         Session {
+            asset_urls: Vec::new(),
             cache,
             cookies,
             client,
             options,
-            urls: Vec::new(),
+        }
+    }
+
+    pub fn log_asset_url(&mut self, url: &Url) {
+        if !self.asset_urls.contains(&url.as_str().to_string()) {
+            self.asset_urls.push(url.as_str().to_string());
         }
     }
 
@@ -62,9 +68,7 @@ impl Session {
     ) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
         let cache_key: String = clean_url(url.clone()).as_str().to_string();
 
-        if !self.urls.contains(&url.as_str().to_string()) {
-            self.urls.push(url.as_str().to_string());
-        }
+        // self.log_asset_url(url);
 
         if url.scheme() == "data" {
             let (media_type, charset, data) = parse_data_url(url);

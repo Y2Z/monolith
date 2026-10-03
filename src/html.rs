@@ -12,7 +12,7 @@ use regex::Regex;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
 
-use crate::core::{parse_content_type, MonolithOptions};
+use crate::core::{parse_content_type, MonolithOptions, MonolithOutputFormat};
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::session::Session;
@@ -159,15 +159,20 @@ pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> 
             let image_full_url: Url = resolve_url(document_url, srcset_item.path);
             match session.retrieve_asset(document_url, &image_full_url) {
                 Ok((image_data, image_final_url, image_media_type, image_charset)) => {
-                    let mut image_data_url = create_data_url(
-                        &image_media_type,
-                        &image_charset,
-                        &image_data,
-                        &image_final_url,
-                    );
-                    // Append retrieved asset as a data URL
-                    image_data_url.set_fragment(image_full_url.fragment());
-                    result.push_str(image_data_url.as_ref());
+                    if session.options.output_format == MonolithOutputFormat::HTML {
+                        let mut image_data_url = create_data_url(
+                            &image_media_type,
+                            &image_charset,
+                            &image_data,
+                            &image_final_url,
+                        );
+                        // Append retrieved asset as a data URL
+                        image_data_url.set_fragment(image_full_url.fragment());
+                        result.push_str(image_data_url.as_ref());
+                    } else {
+                        // MHTML
+                        result.push_str(image_full_url.as_ref());
+                    }
                 }
                 Err(_) => {
                     // Keep remote reference if unable to retrieve the asset
@@ -922,37 +927,38 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 }
                 "img" => {
                     // Find src and data-src attribute(s)
-                    let img_attr_src_value: Option<String> = get_node_attr(node, "src");
-                    let img_attr_data_src_value: Option<String> = get_node_attr(node, "data-src");
+                    let img_src: Option<String> = get_node_attr(node, "src");
+                    let img_data_src: Option<String> = get_node_attr(node, "data-src");
 
                     if session.options.no_images {
                         // Put empty images into src and data-src attributes
-                        if img_attr_src_value.is_some() {
+                        if img_src.is_some() {
                             set_node_attr(node, "src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
-                        if img_attr_data_src_value.is_some() {
+                        if img_data_src.is_some() {
                             set_node_attr(node, "data-src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
-                    } else if img_attr_src_value.clone().unwrap_or_default().is_empty()
-                        && img_attr_data_src_value
-                            .clone()
-                            .unwrap_or_default()
-                            .is_empty()
+                    } else if img_src.clone().unwrap_or_default().is_empty()
+                        && img_data_src.clone().unwrap_or_default().is_empty()
                     {
                         // Add empty src attribute
                         set_node_attr(node, "src", Some("".to_string()));
                     } else {
                         // Add data URL src attribute
-                        let img_full_url: String = if !img_attr_data_src_value
-                            .clone()
-                            .unwrap_or_default()
-                            .is_empty()
-                        {
-                            img_attr_data_src_value.unwrap_or_default()
+                        let img_src: String =
+                            if !img_data_src.clone().unwrap_or_default().is_empty() {
+                                img_data_src.unwrap_or_default()
+                            } else {
+                                img_src.unwrap_or_default()
+                            };
+
+                        if session.options.output_format == MonolithOutputFormat::HTML {
+                            retrieve_and_embed_asset(session, document_url, node, "src", &img_src);
                         } else {
-                            img_attr_src_value.unwrap_or_default()
-                        };
-                        retrieve_and_embed_asset(session, document_url, node, "src", &img_full_url);
+                            let img_src_full_url: Url = resolve_url(document_url, &img_src);
+                            set_node_attr(node, "src", Some(img_src_full_url.to_string()));
+                            session.log_asset_url(&img_src_full_url);
+                        }
                     }
 
                     // Resolve srcset attribute
@@ -1135,30 +1141,25 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     let parent_node = get_parent_node(node);
                     let parent_node_name: &str = get_node_name(&parent_node).unwrap_or_default();
 
-                    if let Some(source_attr_src_value) = get_node_attr(node, "src") {
-                        if parent_node_name == "audio" {
-                            if session.options.no_audio {
-                                set_node_attr(node, "src", None);
-                            } else {
+                    if let Some(source_src) = get_node_attr(node, "src") {
+                        if session.options.no_audio && parent_node_name == "audio"
+                            || session.options.no_video && parent_node_name == "video"
+                        {
+                            set_node_attr(node, "src", None);
+                        } else {
+                            if session.options.output_format == MonolithOutputFormat::HTML {
                                 retrieve_and_embed_asset(
                                     session,
                                     document_url,
                                     node,
                                     "src",
-                                    &source_attr_src_value,
+                                    &source_src,
                                 );
-                            }
-                        } else if parent_node_name == "video" {
-                            if session.options.no_video {
-                                set_node_attr(node, "src", None);
                             } else {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "src",
-                                    &source_attr_src_value,
-                                );
+                                let source_src_full_url: Url =
+                                    resolve_url(document_url, &source_src);
+                                set_node_attr(node, "src", Some(source_src_full_url.to_string()));
+                                session.log_asset_url(&source_src_full_url);
                             }
                         }
                     }
@@ -1203,26 +1204,34 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "script" => {
-                    // Read values of integrity and src attributes
-                    let script_attr_src: &str = &get_node_attr(node, "src").unwrap_or_default();
-
                     if session.options.no_js {
-                        // Empty inner content
+                        // TODO: remove this whole node from DOM instead of messing with it
+                        // Empty contents
                         node.children.borrow_mut().clear();
                         // Remove src attribute
-                        if !script_attr_src.is_empty() {
-                            set_node_attr(node, "src", None);
-                            // Wipe integrity attribute
-                            set_node_attr(node, "integrity", None);
+                        set_node_attr(node, "src", None);
+                        // Wipe integrity attribute
+                        set_node_attr(node, "integrity", None);
+                    } else {
+                        // Read values of integrity and src attributes
+                        let script_src: &str = &get_node_attr(node, "src").unwrap_or_default();
+
+                        if !script_src.is_empty() {
+                            if session.options.output_format == MonolithOutputFormat::HTML {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    script_src,
+                                );
+                            } else {
+                                let script_src_full_url: Url =
+                                    resolve_url(document_url, &script_src);
+                                set_node_attr(node, "src", Some(script_src_full_url.to_string()));
+                                session.log_asset_url(&script_src_full_url);
+                            }
                         }
-                    } else if !script_attr_src.is_empty() {
-                        retrieve_and_embed_asset(
-                            session,
-                            document_url,
-                            node,
-                            "src",
-                            script_attr_src,
-                        );
                     }
                 }
                 "style" => {
@@ -1255,15 +1264,27 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             // Empty the src attribute
                             set_node_attr(node, "src", Some("".to_string()));
                         } else {
-                            // Ignore (i)frames with empty source (they cause infinite loops)
-                            if !frame_attr_src_value.trim().is_empty() {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "src",
-                                    &frame_attr_src_value,
-                                );
+                            if session.options.output_format == MonolithOutputFormat::HTML {
+                                // Ignore (i)frames with empty source (they cause infinite loops)
+                                if !frame_attr_src_value.trim().is_empty() {
+                                    retrieve_and_embed_asset(
+                                        session,
+                                        document_url,
+                                        node,
+                                        "src",
+                                        &frame_attr_src_value,
+                                    );
+                                }
+                            } else {
+                                let frame_src_full_url: Url =
+                                    resolve_url(document_url, &frame_attr_src_value);
+                                set_node_attr(node, "src", Some(frame_src_full_url.to_string()));
+                                session.log_asset_url(&frame_src_full_url);
+                            }
+
+                            // Sandbox iframe if JS is disabled
+                            if name.local.as_ref() == "iframe" && session.options.no_js {
+                                set_node_attr(node, "sandbox", Some("allow-forms".to_string()));
                             }
                         }
                     }
@@ -1274,13 +1295,20 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         if session.options.no_audio {
                             set_node_attr(node, "src", None);
                         } else {
-                            retrieve_and_embed_asset(
-                                session,
-                                document_url,
-                                node,
-                                "src",
-                                &audio_attr_src_value,
-                            );
+                            if session.options.output_format == MonolithOutputFormat::HTML {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    &audio_attr_src_value,
+                                );
+                            } else {
+                                let audio_src_full_url: Url =
+                                    resolve_url(document_url, &audio_attr_src_value);
+                                set_node_attr(node, "src", Some(audio_src_full_url.to_string()));
+                                session.log_asset_url(&audio_src_full_url);
+                            }
                         }
                     }
                 }
@@ -1290,13 +1318,20 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         if session.options.no_video {
                             set_node_attr(node, "src", None);
                         } else {
-                            retrieve_and_embed_asset(
-                                session,
-                                document_url,
-                                node,
-                                "src",
-                                &video_attr_src_value,
-                            );
+                            if session.options.output_format == MonolithOutputFormat::HTML {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    &video_attr_src_value,
+                                );
+                            } else {
+                                let video_src_full_url: Url =
+                                    resolve_url(document_url, &video_attr_src_value);
+                                set_node_attr(node, "src", Some(video_src_full_url.to_string()));
+                                session.log_asset_url(&video_src_full_url);
+                            }
                         }
                     }
 
@@ -1311,13 +1346,24 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     Some(EMPTY_IMAGE_DATA_URL.to_string()),
                                 );
                             } else {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "poster",
-                                    &video_attr_poster_value,
-                                );
+                                if session.options.output_format == MonolithOutputFormat::HTML {
+                                    retrieve_and_embed_asset(
+                                        session,
+                                        document_url,
+                                        node,
+                                        "poster",
+                                        &video_attr_poster_value,
+                                    );
+                                } else {
+                                    let video_poster_full_url: Url =
+                                        resolve_url(document_url, &video_attr_poster_value);
+                                    set_node_attr(
+                                        node,
+                                        "poster",
+                                        Some(video_poster_full_url.to_string()),
+                                    );
+                                    session.log_asset_url(&video_poster_full_url);
+                                }
                             }
                         }
                     }

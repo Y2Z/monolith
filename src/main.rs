@@ -220,8 +220,6 @@ fn main() {
         options.no_js = cli.no_js;
         if cli.mhtml {
             options.output_format = MonolithOutputFormat::MHTML;
-            // The MHTML format doesn't allow JavaScript
-            options.no_js = true;
         }
         options.no_metadata = cli.no_metadata;
         options.no_video = cli.no_video;
