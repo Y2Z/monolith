@@ -5,6 +5,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
 
+use base64::{prelude::BASE64_STANDARD, Engine};
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
@@ -242,57 +243,86 @@ pub fn create_monolithic_document_from_data(
     }
 
     let document_title: Option<String> = get_title(&dom.document);
+    // Serialize DOM tree
+    let mut html: Vec<u8> = serialize_document(dom, document_encoding, &session.options);
 
-    if session.options.output_format == MonolithOutputFormat::HTML {
-        // Serialize DOM tree
-        let mut result: Vec<u8> = serialize_document(dom, document_encoding, &session.options);
+    // Prepend metadata comment tag
+    if !session.options.no_metadata && !input_target.clone().unwrap_or_default().is_empty() {
+        let mut metadata_comment: String =
+            create_metadata_tag(&Url::parse(&input_target.unwrap_or_default()).unwrap());
+        // let mut metadata_comment: String = create_metadata_tag(target);
+        metadata_comment += "\n";
+        html.splice(0..0, metadata_comment.as_bytes().to_vec());
+    }
 
-        // Prepend metadata comment tag
-        if !session.options.no_metadata && !input_target.clone().unwrap_or_default().is_empty() {
-            let mut metadata_comment: String =
-                create_metadata_tag(&Url::parse(&input_target.unwrap_or_default()).unwrap());
-            // let mut metadata_comment: String = create_metadata_tag(target);
-            metadata_comment += "\n";
-            result.splice(0..0, metadata_comment.as_bytes().to_vec());
+    if session.options.output_format == MonolithOutputFormat::MHTML {
+        // Outputting in MHTML format
+
+        let mut mhtml: Vec<u8> = vec![];
+
+        let mime = "MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary=\"----=_NextPart_000_0000\"\r\n";
+        mhtml.splice(0..0, mime.as_bytes().to_vec());
+
+        // Target document
+        let mime = format!(
+            "\r\n------=_NextPart_000_0000\r\nContent-Type: {}; charset=\"{}\"\r\nContent-Location: {}\r\n\r\n",
+            "text/html",
+            "utf-8",
+            // input_target.unwrap_or("data:;".to_string())
+            "data:;",
+        );
+        mhtml.extend_from_slice(mime.as_bytes());
+        mhtml.append(&mut html);
+
+        // Assets
+        for asset_url in session.asset_urls.clone().iter_mut() {
+            // TODO: skip if file: (?)
+
+            match session.retrieve_asset(
+                &Url::parse(&asset_url).unwrap(),
+                &Url::parse(&asset_url).unwrap(),
+            ) {
+                Ok((retrieved_data, final_url, media_type, _charset)) => {
+                    if is_plaintext_media_type(&media_type) {
+                        let mime = format!(
+                                "\r\n------=_NextPart_000_0000\r\nContent-Type: {}\r\nContent-Transfer-Encoding: 7bit\r\nContent-Location: {}\r\n\r\n",
+                                media_type, final_url
+                            );
+                        mhtml.extend_from_slice(mime.as_bytes());
+                        // Append plaintext contents
+                        mhtml = vec![mhtml, retrieved_data].concat();
+                    } else {
+                        let mime = format!(
+                                "\r\n------=_NextPart_000_0000\r\nContent-Type: {}\r\nContent-Transfer-Encoding: base64\r\nContent-Location: {}\r\n\r\n",
+                                media_type, final_url
+                            );
+                        mhtml.extend_from_slice(mime.as_bytes());
+                        // Append base64-encoded blob
+                        mhtml.extend_from_slice(BASE64_STANDARD.encode(retrieved_data).as_bytes());
+                    }
+                }
+                Err(_) => {
+                    // TODO: if not silent, print red message
+                }
+            }
         }
+
+        // End of MIME
+        let mime = "\r\n------=_NextPart_000_0000--\r\n";
+        mhtml.extend_from_slice(mime.as_bytes());
+
+        // Return
+        Ok((mhtml, document_title))
+    } else {
+        // Outputting in HTML format
 
         // Ensure newline at end of result
-        if result.last() != Some(&b"\n"[0]) {
-            result.extend_from_slice(b"\n");
+        if html.last() != Some(&b"\n"[0]) {
+            html.extend_from_slice(b"\n");
         }
 
-        Ok((result, document_title))
-    } else if session.options.output_format == MonolithOutputFormat::MHTML {
-        // Serialize DOM tree
-        let mut result: Vec<u8> = serialize_document(dom, document_encoding, &session.options);
-
-        // Prepend metadata comment tag
-        if !session.options.no_metadata && !input_target.clone().unwrap_or_default().is_empty() {
-            let mut metadata_comment: String =
-                create_metadata_tag(&Url::parse(&input_target.unwrap_or_default()).unwrap());
-            // let mut metadata_comment: String = create_metadata_tag(target);
-            metadata_comment += "\n";
-            result.splice(0..0, metadata_comment.as_bytes().to_vec());
-        }
-
-        // Extremely hacky way to convert output to MIME
-        let mime = "MIME-Version: 1.0\r\n\
-Content-Type: multipart/related; boundary=\"----=_NextPart_000_0000\"\r\n\
-\r\n\
-------=_NextPart_000_0000\r\n\
-Content-Type: text/html; charset=\"utf-8\"\r\n\
-Content-Location: http://example.com/\r\n\
-\r\n";
-
-        result.splice(0..0, mime.as_bytes().to_vec());
-
-        let mime = "\r\n------=_NextPart_000_0000--\r\n";
-
-        result.extend_from_slice(mime.as_bytes());
-
-        Ok((result, document_title))
-    } else {
-        Ok((vec![], document_title))
+        // Return
+        Ok((html, document_title))
     }
 }
 

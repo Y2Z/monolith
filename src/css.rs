@@ -2,6 +2,7 @@ use cssparser::{
     serialize_identifier, serialize_string, ParseError, Parser, ParserInput, SourcePosition, Token,
 };
 
+use crate::core::MonolithOutputFormat;
 use crate::session::Session;
 use crate::url::{create_data_url, resolve_url, Url, EMPTY_IMAGE_DATA_URL};
 
@@ -205,24 +206,30 @@ pub fn process_css<'a>(
                     } else {
                         let resolved_url: Url = resolve_url(document_url, value);
 
-                        match session.retrieve_asset(document_url, &resolved_url) {
-                            Ok((data, final_url, media_type, charset)) => {
-                                // TODO: if it's @font-face, exclude definitions of non-woff/woff-2 fonts (if woff/woff-2 are present)
-                                let mut data_url =
-                                    create_data_url(&media_type, &charset, &data, &final_url);
-                                data_url.set_fragment(resolved_url.fragment());
-                                result.push_str(format_quoted_string(data_url.as_ref()).as_str());
-                            }
-                            Err(_) => {
-                                // Keep remote reference if unable to retrieve the asset
-                                if resolved_url.scheme() == "http"
-                                    || resolved_url.scheme() == "https"
-                                {
-                                    result.push_str(
-                                        format_quoted_string(resolved_url.as_ref()).as_str(),
-                                    );
+                        if session.options.output_format == MonolithOutputFormat::HTML {
+                            match session.retrieve_asset(document_url, &resolved_url) {
+                                Ok((data, final_url, media_type, charset)) => {
+                                    // TODO: if it's @font-face, exclude definitions of non-woff/woff-2 fonts (if woff/woff-2 are present)
+                                    let mut data_url =
+                                        create_data_url(&media_type, &charset, &data, &final_url);
+                                    data_url.set_fragment(resolved_url.fragment());
+                                    result
+                                        .push_str(format_quoted_string(data_url.as_ref()).as_str());
+                                }
+                                Err(_) => {
+                                    // Keep remote reference if unable to retrieve the asset
+                                    if resolved_url.scheme() == "http"
+                                        || resolved_url.scheme() == "https"
+                                    {
+                                        result.push_str(
+                                            format_quoted_string(resolved_url.as_ref()).as_str(),
+                                        );
+                                    }
                                 }
                             }
+                        } else {
+                            result.push_str(format_quoted_string(resolved_url.as_ref()).as_str());
+                            session.log_asset_url(&resolved_url);
                         }
                     }
                 } else {
@@ -314,19 +321,26 @@ pub fn process_css<'a>(
                     result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                 } else {
                     let full_url: Url = resolve_url(document_url, value);
-                    match session.retrieve_asset(document_url, &full_url) {
-                        Ok((data, final_url, media_type, charset)) => {
-                            let mut data_url =
-                                create_data_url(&media_type, &charset, &data, &final_url);
-                            data_url.set_fragment(full_url.fragment());
-                            result.push_str(format_quoted_string(data_url.as_ref()).as_str());
-                        }
-                        Err(_) => {
-                            // Keep remote reference if unable to retrieve the asset
-                            if full_url.scheme() == "http" || full_url.scheme() == "https" {
-                                result.push_str(format_quoted_string(full_url.as_ref()).as_str());
+
+                    if session.options.output_format == MonolithOutputFormat::HTML {
+                        match session.retrieve_asset(document_url, &full_url) {
+                            Ok((data, final_url, media_type, charset)) => {
+                                let mut data_url =
+                                    create_data_url(&media_type, &charset, &data, &final_url);
+                                data_url.set_fragment(full_url.fragment());
+                                result.push_str(format_quoted_string(data_url.as_ref()).as_str());
+                            }
+                            Err(_) => {
+                                // Keep remote reference if unable to retrieve the asset
+                                if full_url.scheme() == "http" || full_url.scheme() == "https" {
+                                    result
+                                        .push_str(format_quoted_string(full_url.as_ref()).as_str());
+                                }
                             }
                         }
+                    } else {
+                        result.push_str(format_quoted_string(full_url.as_ref()).as_str());
+                        session.log_asset_url(&full_url);
                     }
                 }
                 result.push(')');
