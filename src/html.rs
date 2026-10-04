@@ -2,15 +2,15 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use html5ever::interface::{Attribute, QualName};
-use html5ever::parse_document;
 use html5ever::serialize::{SerializeOpts, serialize};
-use html5ever::tendril::{TendrilSink, format_tendril};
+use html5ever::tendril::{StrTendril, TendrilSink, format_tendril};
 use html5ever::tree_builder::{TreeSink, create_element};
 use html5ever::{LocalName, ns};
+use html5ever::{parse_document, parse_fragment};
 use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
-use regex::Regex;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
+use std::rc::Rc;
 
 use crate::core::{MonolithOptions, MonolithOutputFormat, parse_content_type};
 use crate::css::embed_css;
@@ -359,6 +359,26 @@ pub fn is_favicon(attr_value: &str) -> bool {
     FAVICON_VALUES.contains(&attr_value.to_lowercase().as_str())
 }
 
+fn is_noscript(node: &Handle) -> bool {
+    matches!(&node.data, NodeData::Element { name, .. } if name.ns == ns!(html) && &*name.local == "noscript")
+}
+
+fn parse_html_fragment(context: &QualName, html: StrTendril) -> Vec<Handle> {
+    let fragment: RcDom = parse_fragment(
+        RcDom::default(),
+        Default::default(),
+        context.clone(),
+        vec![],
+        true,
+    )
+    .one(html);
+
+    // Fragment parsing yields Document -> <html> -> [parsed nodes]
+    let root: Option<Handle> = fragment.document.children.borrow().first().cloned();
+    root.map(|html_node| html_node.children.take())
+        .unwrap_or_default()
+}
+
 pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
     let mut types: Vec<LinkType> = vec![];
 
@@ -607,6 +627,58 @@ pub fn set_robots(dom: RcDom, content_value: &str) -> RcDom {
     dom
 }
 
+/// Replaces every NOSCRIPT element with its contents parsed as real DOM nodes
+pub fn unwrap_noscripts(dom: &RcDom, node: &Handle) {
+    // NOSCRIPT contents get parsed in the context of the NOSCRIPT's parent,
+    // which is what a browser with JS disabled would effectively do
+    let context: QualName = match &node.data {
+        NodeData::Element { name, .. } => name.clone(),
+        _ => QualName::new(None, ns!(html), LocalName::from("body")),
+    };
+
+    let old_children: Vec<Handle> = node.children.take();
+    let mut new_children: Vec<Handle> = Vec::with_capacity(old_children.len());
+
+    for child in old_children {
+        if !is_noscript(&child) {
+            new_children.push(child);
+            continue;
+        }
+
+        // With scripting enabled, NOSCRIPT holds a raw text node;
+        // anything that's already a real node gets moved over as-is
+        for grandchild in child.children.take() {
+            let text: Option<StrTendril> = match &grandchild.data {
+                NodeData::Text { contents } => Some(contents.borrow().clone()),
+                _ => None,
+            };
+            match text {
+                Some(html) => new_children.extend(parse_html_fragment(&context, html)),
+                None => new_children.push(grandchild),
+            }
+        }
+    }
+
+    for child in new_children.iter() {
+        child.parent.set(Some(Rc::downgrade(node)));
+    }
+    *node.children.borrow_mut() = new_children;
+
+    // Recurse, including into freshly unwrapped nodes (handles nested NOSCRIPTs)
+    for child in node.children.borrow().iter() {
+        unwrap_noscripts(dom, child);
+    }
+    if let NodeData::Element {
+        ref template_contents,
+        ..
+    } = node.data
+    {
+        if let Some(ref contents) = *template_contents.borrow() {
+            unwrap_noscripts(dom, contents);
+        }
+    }
+}
+
 pub fn serialize_document(
     dom: RcDom,
     document_encoding: String,
@@ -648,16 +720,13 @@ pub fn serialize_document(
         }
     }
 
+    if options.unwrap_noscript {
+        unwrap_noscripts(&dom, &dom.document);
+    }
+
     let serializable: SerializableHandle = dom.document.into();
     serialize(&mut buf, &serializable, SerializeOpts::default())
         .expect("Unable to serialize DOM into buffer");
-
-    // Unwrap NOSCRIPT elements
-    if options.unwrap_noscript {
-        let s: &str = &String::from_utf8_lossy(&buf);
-        let noscript_re = Regex::new(r"<(?P<c>/?noscript[^>]*)>").unwrap();
-        buf = noscript_re.replace_all(s, "<!--$c-->").as_bytes().to_vec();
-    }
 
     if !document_encoding.is_empty() {
         if let Some(encoding) = Encoding::for_label(document_encoding.as_bytes()) {
