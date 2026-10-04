@@ -39,12 +39,6 @@ tempfile = { version = "=3.27.0", optional = true } # Used for on-disk caching o
 url = "=2.5.8" # Used for parsing URLs
 openssl = "=0.10.81" # Used for static linking of the OpenSSL library
 
-# Used for unwrapping NOSCRIPT
-[dependencies.regex]
-version = "=1.13.1"
-default-features = false
-features = ["std", "perf-dfa", "unicode-perl"]
-
 # Used for making network requests
 [dependencies.reqwest]
 version = "=0.13.5"
