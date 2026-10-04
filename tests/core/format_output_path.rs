@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use monolith::core::{format_output_path, MonolithOutputFormat};
+    use monolith::core::{MonolithOutputFormat, format_output_path};
 
     #[test]
     fn as_is() {

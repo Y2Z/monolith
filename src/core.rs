@@ -5,7 +5,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
 
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
@@ -285,17 +285,17 @@ pub fn create_monolithic_document_from_data(
                 Ok((retrieved_data, final_url, media_type, _charset)) => {
                     if is_plaintext_media_type(&media_type) {
                         let mime = format!(
-                                "\r\n------=_NextPart_000_0000\r\nContent-Type: {}\r\nContent-Transfer-Encoding: 7bit\r\nContent-Location: {}\r\n\r\n",
-                                media_type, final_url
-                            );
+                            "\r\n------=_NextPart_000_0000\r\nContent-Type: {}\r\nContent-Transfer-Encoding: 7bit\r\nContent-Location: {}\r\n\r\n",
+                            media_type, final_url
+                        );
                         mhtml.extend_from_slice(mime.as_bytes());
                         // Append plaintext contents
                         mhtml = vec![mhtml, retrieved_data].concat();
                     } else {
                         let mime = format!(
-                                "\r\n------=_NextPart_000_0000\r\nContent-Type: {}\r\nContent-Transfer-Encoding: base64\r\nContent-Location: {}\r\n\r\n",
-                                media_type, final_url
-                            );
+                            "\r\n------=_NextPart_000_0000\r\nContent-Type: {}\r\nContent-Transfer-Encoding: base64\r\nContent-Location: {}\r\n\r\n",
+                            media_type, final_url
+                        );
                         mhtml.extend_from_slice(mime.as_bytes());
                         // Append base64-encoded blob
                         mhtml.extend_from_slice(BASE64_STANDARD.encode(retrieved_data).as_bytes());

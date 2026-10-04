@@ -1,23 +1,23 @@
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use html5ever::interface::{Attribute, QualName};
 use html5ever::parse_document;
-use html5ever::serialize::{serialize, SerializeOpts};
-use html5ever::tendril::{format_tendril, TendrilSink};
-use html5ever::tree_builder::{create_element, TreeSink};
-use html5ever::{namespace_url, ns, LocalName};
+use html5ever::serialize::{SerializeOpts, serialize};
+use html5ever::tendril::{TendrilSink, format_tendril};
+use html5ever::tree_builder::{TreeSink, create_element};
+use html5ever::{LocalName, namespace_url, ns};
 use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
 use regex::Regex;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
 
-use crate::core::{parse_content_type, MonolithOptions, MonolithOutputFormat};
+use crate::core::{MonolithOptions, MonolithOutputFormat, parse_content_type};
 use crate::css::embed_css;
 use crate::js::attr_is_event_handler;
 use crate::session::Session;
 use crate::url::{
-    clean_url, create_data_url, is_url_and_has_protocol, resolve_url, Url, EMPTY_IMAGE_DATA_URL,
+    EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, is_url_and_has_protocol, resolve_url,
 };
 
 const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];

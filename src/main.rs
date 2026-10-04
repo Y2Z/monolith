@@ -7,10 +7,10 @@ use clap::Parser;
 use tempfile::{Builder, NamedTempFile};
 
 use monolith::cache::Cache;
-use monolith::cookies::{parse_cookie_file_contents, Cookie};
+use monolith::cookies::{Cookie, parse_cookie_file_contents};
 use monolith::core::{
-    create_monolithic_document, create_monolithic_document_from_data, format_output_path,
-    print_error_message, MonolithOptions, MonolithOutputFormat,
+    MonolithOptions, MonolithOutputFormat, create_monolithic_document,
+    create_monolithic_document_from_data, format_output_path, print_error_message,
 };
 use monolith::session::Session;
 

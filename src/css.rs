@@ -1,10 +1,10 @@
 use cssparser::{
-    serialize_identifier, serialize_string, ParseError, Parser, SourcePosition, Token,
+    ParseError, Parser, SourcePosition, Token, serialize_identifier, serialize_string,
 };
 
 use crate::core::MonolithOutputFormat;
 use crate::session::Session;
-use crate::url::{create_data_url, resolve_url, Url, EMPTY_IMAGE_DATA_URL};
+use crate::url::{EMPTY_IMAGE_DATA_URL, Url, create_data_url, resolve_url};
 
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     // Universal

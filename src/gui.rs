@@ -6,15 +6,15 @@ use std::thread;
 use directories::UserDirs;
 use druid::widget::{Button, Checkbox, Either, Flex, Label, Spinner, TextBox};
 use druid::{
-    commands, AppDelegate, AppLauncher, Command, Data, DelegateCtx, Env, FileDialogOptions,
-    FileSpec, Handled, Lens, LocalizedString, PlatformError, Target, Widget, WidgetExt, WindowDesc,
+    AppDelegate, AppLauncher, Command, Data, DelegateCtx, Env, FileDialogOptions, FileSpec,
+    Handled, Lens, LocalizedString, PlatformError, Target, Widget, WidgetExt, WindowDesc, commands,
 };
 use tempfile::{Builder, NamedTempFile};
 
 use monolith::cache::Cache;
 use monolith::core::{
-    create_monolithic_document, format_output_path, MonolithError, MonolithOptions,
-    MonolithOutputFormat,
+    MonolithError, MonolithOptions, MonolithOutputFormat, create_monolithic_document,
+    format_output_path,
 };
 use monolith::session::Session;
 
