@@ -1,5 +1,5 @@
 use cssparser::{
-    serialize_identifier, serialize_string, ParseError, Parser, ParserInput, SourcePosition, Token,
+    serialize_identifier, serialize_string, ParseError, Parser, SourcePosition, Token,
 };
 
 use crate::core::MonolithOutputFormat;
@@ -28,8 +28,7 @@ const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
 ];
 
 pub fn embed_css(session: &mut Session, document_url: &Url, css: &str) -> String {
-    let mut input = ParserInput::new(css);
-    let mut parser = Parser::new(&mut input);
+    let mut parser = Parser::new(css);
 
     process_css(session, document_url, &mut parser, "", "", "").unwrap()
 }
@@ -60,7 +59,7 @@ pub fn process_css<'a>(
     rule_name: &str,
     prop_name: &str,
     func_name: &str,
-) -> Result<String, ParseError<'a, String>> {
+) -> Result<String, ParseError<String>> {
     let mut result: String = "".to_string();
 
     let mut curr_rule: String = rule_name.to_string();

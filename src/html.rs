@@ -383,7 +383,7 @@ pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
     types
 }
 
-pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem> {
+pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem<'_>> {
     let mut srcset_items: Vec<SrcSetItem> = vec![];
 
     // Parse srcset
