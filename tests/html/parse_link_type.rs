@@ -31,7 +31,9 @@ mod passing {
 
     #[test]
     fn apple_touch_icon() {
-        assert!(html::parse_link_type("apple-touch-icon").contains(&html::LinkType::AppleTouchIcon));
+        assert!(
+            html::parse_link_type("apple-touch-icon").contains(&html::LinkType::AppleTouchIcon)
+        );
     }
 }
 

@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE, COOKIE, REFERER, USER_AGENT};
+use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, REFERER, USER_AGENT};
 
 use crate::cache::Cache;
 use crate::cookies::Cookie;
 use crate::core::{
-    detect_media_type, parse_content_type, print_error_message, print_info_message, MonolithOptions,
+    MonolithOptions, detect_media_type, parse_content_type, print_error_message, print_info_message,
 };
-use crate::url::{clean_url, domain_is_within_domain, get_referer_url, parse_data_url, Url};
+use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, parse_data_url};
 
 pub struct Session {
     pub asset_urls: Vec<String>,
