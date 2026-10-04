@@ -294,8 +294,13 @@ pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
 }
 
 pub fn get_parent_node(child: &Handle) -> Handle {
-    let parent = child.parent.take().clone();
-    parent.and_then(|node| node.upgrade()).unwrap()
+    let weak_parent = child.parent.take();
+    let parent: Handle = weak_parent
+        .as_ref()
+        .and_then(|weak| weak.upgrade())
+        .unwrap();
+    child.parent.set(weak_parent);
+    parent
 }
 
 pub fn get_robots(handle: &Handle) -> Option<String> {
@@ -363,17 +368,23 @@ fn is_noscript(node: &Handle) -> bool {
     matches!(&node.data, NodeData::Element { name, .. } if name.ns == ns!(html) && &*name.local == "noscript")
 }
 
-fn parse_html_fragment(context: &QualName, html: StrTendril) -> Vec<Handle> {
-    let fragment: RcDom = parse_fragment(
+/// Parses HTML as a fragment, as if it were the inner HTML of a `context` element.
+/// Resulting tree is always: Document -> <html> -> [parsed nodes]
+fn parse_fragment_dom(context: &QualName, html: StrTendril) -> RcDom {
+    parse_fragment(
         RcDom::default(),
         Default::default(),
         context.clone(),
         vec![],
         true,
     )
-    .one(html);
+    .one(html)
+}
 
-    // Fragment parsing yields Document -> <html> -> [parsed nodes]
+/// Same as parse_fragment_dom(), but returns the parsed nodes detached from the throwaway DOM
+/// (callers are responsible for setting their parent pointers)
+fn parse_html_fragment(context: &QualName, html: StrTendril) -> Vec<Handle> {
+    let fragment: RcDom = parse_fragment_dom(context, html);
     let root: Option<Handle> = fragment.document.children.borrow().first().cloned();
     root.map(|html_node| html_node.children.take())
         .unwrap_or_default()
@@ -628,45 +639,57 @@ pub fn set_robots(dom: RcDom, content_value: &str) -> RcDom {
 }
 
 /// Replaces every NOSCRIPT element with its contents parsed as real DOM nodes
-pub fn unwrap_noscripts(dom: &RcDom, node: &Handle) {
-    // NOSCRIPT contents get parsed in the context of the NOSCRIPT's parent,
-    // which is what a browser with JS disabled would effectively do
-    let context: QualName = match &node.data {
-        NodeData::Element { name, .. } => name.clone(),
-        _ => QualName::new(None, ns!(html), LocalName::from("body")),
-    };
+pub fn unwrap_noscripts(node: &Handle) {
+    fn has_noscript_child(node: &Handle) -> bool {
+        node.children.borrow().iter().any(is_noscript)
+    }
 
-    let old_children: Vec<Handle> = node.children.take();
-    let mut new_children: Vec<Handle> = Vec::with_capacity(old_children.len());
+    // (3) Only nodes that actually have NOSCRIPT children get their children rebuilt.
+    // It's a loop rather than an `if` because unwrapping can surface another NOSCRIPT
+    // at this same level (e.g. text like `<noscript>` inside the original NOSCRIPT);
+    // each pass consumes the text it parses, so this always terminates.
+    if has_noscript_child(node) {
+        // NOSCRIPT contents get parsed in the context of the NOSCRIPT's parent,
+        // which is what a browser with JS disabled would effectively do
+        let context: QualName = match &node.data {
+            NodeData::Element { name, .. } => name.clone(),
+            _ => QualName::new(None, ns!(html), LocalName::from("body")),
+        };
 
-    for child in old_children {
-        if !is_noscript(&child) {
-            new_children.push(child);
-            continue;
-        }
+        while has_noscript_child(node) {
+            let old_children: Vec<Handle> = node.children.take();
+            let mut new_children: Vec<Handle> = Vec::with_capacity(old_children.len());
 
-        // With scripting enabled, NOSCRIPT holds a raw text node;
-        // anything that's already a real node gets moved over as-is
-        for grandchild in child.children.take() {
-            let text: Option<StrTendril> = match &grandchild.data {
-                NodeData::Text { contents } => Some(contents.borrow().clone()),
-                _ => None,
-            };
-            match text {
-                Some(html) => new_children.extend(parse_html_fragment(&context, html)),
-                None => new_children.push(grandchild),
+            for child in old_children {
+                if !is_noscript(&child) {
+                    new_children.push(child);
+                    continue;
+                }
+
+                // With scripting enabled, NOSCRIPT holds a raw text node;
+                // anything that's already a real node gets moved over as-is
+                for grandchild in child.children.take() {
+                    let text: Option<StrTendril> = match &grandchild.data {
+                        NodeData::Text { contents } => Some(contents.borrow().clone()),
+                        _ => None,
+                    };
+                    match text {
+                        Some(html) => new_children.extend(parse_html_fragment(&context, html)),
+                        None => new_children.push(grandchild),
+                    }
+                }
             }
+
+            for child in new_children.iter() {
+                child.parent.set(Some(Rc::downgrade(node)));
+            }
+            *node.children.borrow_mut() = new_children;
         }
     }
 
-    for child in new_children.iter() {
-        child.parent.set(Some(Rc::downgrade(node)));
-    }
-    *node.children.borrow_mut() = new_children;
-
-    // Recurse, including into freshly unwrapped nodes (handles nested NOSCRIPTs)
+    // Recurse into children (including freshly unwrapped ones)
     for child in node.children.borrow().iter() {
-        unwrap_noscripts(dom, child);
+        unwrap_noscripts(child);
     }
     if let NodeData::Element {
         ref template_contents,
@@ -674,7 +697,7 @@ pub fn unwrap_noscripts(dom: &RcDom, node: &Handle) {
     } = node.data
     {
         if let Some(ref contents) = *template_contents.borrow() {
-            unwrap_noscripts(dom, contents);
+            unwrap_noscripts(contents);
         }
     }
 }
@@ -721,7 +744,7 @@ pub fn serialize_document(
     }
 
     if options.unwrap_noscript {
-        unwrap_noscripts(&dom, &dom.document);
+        unwrap_noscripts(&dom.document);
     }
 
     let serializable: SerializableHandle = dom.document.into();
@@ -1438,30 +1461,32 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "noscript" => {
-                    for child_node in node.children.borrow_mut().iter_mut() {
+                    let context = QualName::new(None, ns!(html), LocalName::from("body"));
+
+                    for child_node in node.children.borrow().iter() {
                         if let NodeData::Text { ref contents } = child_node.data {
                             // Get contents of NOSCRIPT node
                             let mut noscript_contents = contents.borrow_mut();
-                            // Parse contents of NOSCRIPT node as DOM
-                            let noscript_contents_dom: RcDom =
-                                html_to_dom(&noscript_contents.as_bytes().to_vec(), "".to_string());
+                            // Parse contents of NOSCRIPT node as a DOM fragment
+                            let fragment: RcDom =
+                                parse_fragment_dom(&context, noscript_contents.clone());
                             // Embed assets of NOSCRIPT node contents
-                            walk(session, document_url, &noscript_contents_dom.document);
-                            // Get rid of original contents
-                            noscript_contents.clear();
-                            // Insert HTML containing embedded assets into NOSCRIPT node
-                            if let Some(html) =
-                                get_child_node_by_name(&noscript_contents_dom.document, "html")
-                            {
-                                if let Some(body) = get_child_node_by_name(&html, "body") {
-                                    let mut buf: Vec<u8> = Vec::new();
-                                    let serializable: SerializableHandle = body.into();
-                                    serialize(&mut buf, &serializable, SerializeOpts::default())
-                                        .expect("Unable to serialize DOM into buffer");
-                                    let result = String::from_utf8_lossy(&buf);
-                                    noscript_contents.push_slice(&result);
-                                }
+                            walk(session, document_url, &fragment.document);
+                            // Serialize the fragment's root; default SerializeOpts use
+                            // TraversalScope::ChildrenOnly, so the <html> wrapper itself
+                            // isn't written out
+                            let mut buf: Vec<u8> = Vec::new();
+                            if let Some(root) = fragment.document.children.borrow().first() {
+                                serialize(
+                                    &mut buf,
+                                    &SerializableHandle::from(root.clone()),
+                                    SerializeOpts::default(),
+                                )
+                                .expect("Unable to serialize DOM into buffer");
                             }
+                            // Replace original contents with HTML containing embedded assets
+                            noscript_contents.clear();
+                            noscript_contents.push_slice(&String::from_utf8_lossy(&buf));
                         }
                     }
                 }
