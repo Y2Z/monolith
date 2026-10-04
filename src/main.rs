@@ -49,10 +49,6 @@ struct Cli {
     #[arg(short = 'c', long)]
     no_css: bool,
 
-    /// Create missing directories in the output file path
-    #[arg(long)]
-    create_dirs: bool,
-
     /// Specify cookie file
     #[arg(short = 'C', long, value_name = "cookies.txt")]
     cookie_file: Option<String>,
@@ -60,6 +56,10 @@ struct Cli {
     /// Specify domains to use for white/black-listing
     #[arg(short = 'd', long = "domain", value_name = "example.com")]
     domains: Vec<String>,
+
+    /// Create missing directories in the output file path
+    #[arg(short = 'D', long)]
+    create_dirs: bool,
 
     /// Ignore network errors
     #[arg(short = 'e', long)]

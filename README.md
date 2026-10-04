@@ -196,8 +196,8 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-B`: Forbid retrieving assets from specified domain(s)
  - `-c`: Exclude CSS
  - `-C`: Read cookies from `file`
- - `--create-dirs`: Create missing directories in the output file path
  - `-d`: Allow retrieving assets only from specified `domain(s)`
+ - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
  - `-f`: Omit frames
