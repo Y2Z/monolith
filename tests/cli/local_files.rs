@@ -444,8 +444,7 @@ document.body.style.color = "red";
             )
         );
 
-        // STDOUT should contain every closing SCRIPT tag variant escaped,
-        // while the longer tag name in `</scripts>` stays untouched
+        // STDOUT should contain every closing SCRIPT tag variant escaped
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
             r##"<!DOCTYPE html><html><head>
