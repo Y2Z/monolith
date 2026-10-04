@@ -78,10 +78,10 @@ mod passing {
     }
 
     #[test]
-    fn longer_tag_name_stays_untouched() {
+    fn longer_tag_name_gets_escaped() {
         assert_eq!(
             js::escape_script_end_tag(r#"s = "</scripts>"; t = "</scriptx>";"#),
-            r#"s = "</scripts>"; t = "</scriptx>";"#,
+            r#"s = "<\/scripts>"; t = "<\/scriptx>";"#,
         );
     }
 
