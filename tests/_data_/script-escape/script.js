@@ -3,3 +3,4 @@ var b = "</SCRIPT>";
 var c = "</script >";
 var d = "</script/>";
 var e = "</scripts>";
+var f = "<!--<script>";
