@@ -6,7 +6,7 @@ use html5ever::parse_document;
 use html5ever::serialize::{SerializeOpts, serialize};
 use html5ever::tendril::{TendrilSink, format_tendril};
 use html5ever::tree_builder::{TreeSink, create_element};
-use html5ever::{LocalName, namespace_url, ns};
+use html5ever::{LocalName, ns};
 use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
 use regex::Regex;
 use sha2::{Digest, Sha256, Sha384, Sha512};
