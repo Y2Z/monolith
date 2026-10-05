@@ -200,7 +200,7 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
- - `-f`: Omit frames
+ - `-f`: Omit (i)frames
  - `-F`: Exclude web fonts
  - `-h`: Print help information
  - `-i`: Remove images
