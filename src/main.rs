@@ -117,6 +117,10 @@ struct Cli {
     #[arg(short, long, value_name = "60")]
     timeout: Option<u64>,
 
+    /// Number of parallel connections
+    #[arg(short = 'T', long, value_name = "30")]
+    threads: Option<usize>,
+
     /// Set custom User-Agent string
     #[arg(short, long, value_name = "Firefox")]
     user_agent: Option<String>,
@@ -225,6 +229,7 @@ fn main() {
         options.no_video = cli.no_video;
         options.silent = cli.quiet;
         options.timeout = cli.timeout.unwrap_or(DEFAULT_NETWORK_TIMEOUT);
+        options.threads = cli.threads.unwrap_or(30);
         options.unwrap_noscript = cli.unwrap_noscript;
         if cli.user_agent.is_none() {
             options.user_agent = Some(DEFAULT_USER_AGENT.to_string());

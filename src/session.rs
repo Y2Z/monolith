@@ -2,15 +2,18 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use markup5ever_rcdom::Handle;
 use reqwest::blocking::Client;
-use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, REFERER, USER_AGENT};
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 
 use crate::cache::Cache;
 use crate::cookies::Cookie;
 use crate::core::{
-    MonolithOptions, detect_media_type, parse_content_type, print_error_message, print_info_message,
+    MonolithOptions, MonolithOutputFormat, detect_media_type, print_error_message,
+    print_info_message,
 };
-use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, parse_data_url};
+use crate::net;
+use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
 
 pub struct Session {
     pub asset_urls: Vec<String>,
@@ -43,6 +46,29 @@ impl Session {
             }))
             .danger_accept_invalid_certs(options.insecure)
             .default_headers(header_map)
+            .redirect({
+                // Stop redirects into blocked domains before the request is even made
+                let domains = options.domains.clone();
+                let blacklist_domains = options.blacklist_domains;
+                reqwest::redirect::Policy::custom(move |attempt| {
+                    let allowed = match (&domains, attempt.url().host_str()) {
+                        (Some(domains), Some(host)) => {
+                            domains
+                                .iter()
+                                .any(|d| domain_is_within_domain(host, d.trim()))
+                                != blacklist_domains
+                        }
+                        _ => true,
+                    };
+                    if !allowed {
+                        attempt.error("redirect target is blacklisted")
+                    } else if attempt.previous().len() >= 10 {
+                        attempt.error("too many redirects")
+                    } else {
+                        attempt.follow()
+                    }
+                })
+            })
             .build()
             .expect("Failed to initialize HTTP client");
 
@@ -61,14 +87,39 @@ impl Session {
         }
     }
 
+    /// Downloads every asset the walk is about to request on a thread pool and puts
+    /// the results into the cache. A no-op without a cache, with fewer than 2 threads,
+    /// or for non-HTML output (MHTML handles assets differently, see css.rs).
+    pub fn prefetch_assets(&mut self, document_url: &Url, document: &Handle) {
+        if self.options.threads < 2
+            || self.options.output_format != MonolithOutputFormat::HTML
+            || self.cache.is_none()
+        {
+            return;
+        }
+
+        let cache = self.cache.as_ref().unwrap();
+        let entries = net::prefetch_assets(
+            &self.client,
+            self.cookies.as_deref(),
+            &self.options,
+            document_url,
+            document,
+            |key| cache.contains_key(key),
+        );
+
+        let cache = self.cache.as_mut().unwrap();
+        for entry in entries {
+            cache.set(&entry.key, &entry.data, entry.media_type, entry.charset);
+        }
+    }
+
     pub fn retrieve_asset(
         &mut self,
         parent_url: &Url,
         url: &Url,
     ) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
         let cache_key: String = clean_url(url.clone()).as_str().to_string();
-
-        // self.log_asset_url(url);
 
         if url.scheme() == "data" {
             let (media_type, charset, data) = parse_data_url(url);
@@ -116,11 +167,11 @@ impl Session {
                 // Provoke error
                 Err(self.client.get("").send().unwrap_err())
             }
+        } else if !net::is_domain_allowed(url, &self.options) {
+            // Provoke error
+            Err(self.client.get("").send().unwrap_err())
         } else if self.cache.is_some() && self.cache.as_ref().unwrap().contains_key(&cache_key) {
             // URL is in cache, we get and return it
-            if !self.options.silent {
-                print_info_message(&format!("{} (from cache)", &cache_key));
-            }
 
             Ok((
                 self.cache
@@ -146,95 +197,21 @@ impl Session {
                 }
             }
 
-            // URL not in cache, we retrieve the file
-            let mut headers = HeaderMap::new();
-            if self.cookies.is_some() && !self.cookies.as_ref().unwrap().is_empty() {
-                let mut cookie_values: Vec<String> = Vec::new();
-                for cookie in self.cookies.as_ref().unwrap() {
-                    if !cookie.is_expired() && cookie.matches_url(url.as_str()) {
-                        cookie_values.push(cookie.name.clone() + "=" + &cookie.value);
-                    }
-                }
-                if !cookie_values.is_empty() {
-                    headers.insert(
-                        COOKIE,
-                        HeaderValue::from_str(&cookie_values.join("; ")).unwrap(),
-                    );
-                }
+            let (data, response_url, media_type, charset) = net::fetch_remote_asset(
+                &self.client,
+                self.cookies.as_deref(),
+                &self.options,
+                parent_url,
+                url,
+            )?;
+
+            // Add retrieved resource to cache
+            if let Some(cache) = self.cache.as_mut() {
+                let new_cache_key: String = clean_url(response_url.clone()).to_string();
+                cache.set(&new_cache_key, &data, media_type.clone(), charset.clone());
             }
-            // Add referer header for page resource requests
-            if ["https", "http"].contains(&parent_url.scheme()) && parent_url != url {
-                headers.insert(
-                    REFERER,
-                    HeaderValue::from_str(get_referer_url(parent_url.clone()).as_str()).unwrap(),
-                );
-            }
-            match self.client.get(url.as_str()).headers(headers).send() {
-                Ok(response) => {
-                    if !self.options.ignore_errors && response.status() != reqwest::StatusCode::OK {
-                        if !self.options.silent {
-                            print_error_message(&format!("{} ({})", &cache_key, response.status()));
-                        }
 
-                        // Provoke error
-                        return Err(self.client.get("").send().unwrap_err());
-                    }
-
-                    let response_url: Url = response.url().clone();
-
-                    if !self.options.silent {
-                        if url.as_str() == response_url.as_str() {
-                            print_info_message(&cache_key.to_string());
-                        } else {
-                            print_info_message(&format!("{} -> {}", &cache_key, &response_url));
-                        }
-                    }
-
-                    // Attempt to obtain media type and charset by reading Content-Type header
-                    let content_type: &str = response
-                        .headers()
-                        .get(CONTENT_TYPE)
-                        .and_then(|header| header.to_str().ok())
-                        .unwrap_or("");
-
-                    let (media_type, charset, _is_base64) = parse_content_type(content_type);
-
-                    // Convert response into a byte array
-                    let mut data: Vec<u8> = vec![];
-                    match response.bytes() {
-                        Ok(b) => {
-                            data = b.to_vec();
-                        }
-                        Err(error) => {
-                            if !self.options.silent {
-                                print_error_message(&format!("{}", error));
-                            }
-                        }
-                    }
-
-                    // Add retrieved resource to cache
-                    if self.cache.is_some() {
-                        let new_cache_key: String = clean_url(response_url.clone()).to_string();
-
-                        self.cache.as_mut().unwrap().set(
-                            &new_cache_key,
-                            &data,
-                            media_type.clone(),
-                            charset.clone(),
-                        );
-                    }
-
-                    // Return
-                    Ok((data, response_url, media_type, charset))
-                }
-                Err(error) => {
-                    if !self.options.silent {
-                        print_error_message(&format!("{} ({})", &cache_key, error));
-                    }
-
-                    Err(self.client.get("").send().unwrap_err())
-                }
-            }
+            Ok((data, response_url, media_type, charset))
         }
     }
 }
