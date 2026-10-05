@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use redb::{Database, Error, TableDefinition};
+use redb::{Database, Error, ReadableDatabase, TableDefinition};
 
 pub struct CacheMetadataItem {
     data: Option<Vec<u8>>, // Asset's blob; used for caching small files or if on-disk database isn't utilized
@@ -67,8 +67,9 @@ impl Cache {
             cache_metadata_item.data = Some(data.to_owned().to_vec());
         } else {
             match self.db.as_ref().unwrap().begin_write() {
-                Ok(write_txn) => {
+                Ok(mut write_txn) => {
                     {
+                        let _ = write_txn.set_durability(redb::Durability::None);
                         let mut table = write_txn.open_table(TABLE).unwrap();
                         table.insert(key, &*data.to_owned()).unwrap();
                     }
