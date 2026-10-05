@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
+use std::sync::mpsc;
 
 use cssparser::{ParseError, Parser, Token};
 use markup5ever_rcdom::{Handle, NodeData};
@@ -49,7 +50,7 @@ struct Ctx<'a> {
     cookies: Option<&'a [Cookie]>,
     options: &'a MonolithOptions,
     seen: Mutex<HashSet<String>>,
-    results: Mutex<Vec<Fetched>>,
+    results_tx: mpsc::Sender<Fetched>,
 }
 
 fn cache_key(url: &Url) -> String {
@@ -183,6 +184,7 @@ pub fn prefetch_assets(
         Err(_) => return vec![], // Not fatal: the walk will just fetch everything itself
     };
 
+    let (tx, rx) = mpsc::channel();
     let mut seen: HashSet<String> = HashSet::new();
     seen.insert(cache_key(document_url));
     let ctx = Ctx {
@@ -190,7 +192,7 @@ pub fn prefetch_assets(
         cookies,
         options,
         seen: Mutex::new(seen),
-        results: Mutex::new(vec![]),
+        results_tx: tx,
     };
 
     pool.scope(|s| {
@@ -199,8 +201,11 @@ pub fn prefetch_assets(
         }
     });
 
+    // Drop the sender so the receiver knows when all workers are done
+    drop(ctx.results_tx);
+
     let mut entries: Vec<CacheEntry> = vec![];
-    for fetched in ctx.results.into_inner().unwrap() {
+    for fetched in rx {
         let final_key = cache_key(&fetched.final_url);
 
         // Session::retrieve_asset() looks assets up by their *request* URL and, on a
@@ -275,7 +280,7 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             AssetKind::Other => {}
         }
 
-        ctx.results.lock().unwrap().push(Fetched {
+        let _ = ctx.results_tx.send(Fetched {
             request_key,
             data,
             final_url,
