@@ -1,8 +1,8 @@
 name: monolith
-base: core18 
+base: core18
 # Version data defined inside the monolith part below
 adopt-info: monolith
-summary: Monolith - Save HTML pages with ease 
+summary: Monolith - Save HTML pages with ease
 description: |
   A data hoarder's dream come true: bundle any web page into a single
   HTML file. You can finally replace that gazillion of open tabs with
@@ -31,7 +31,6 @@ parts:
     plugin: rust
     source: .
     build-packages:
-      - libssl-dev
       - pkg-config
     override-pull: |
       snapcraftctl pull
