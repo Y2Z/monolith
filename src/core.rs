@@ -72,6 +72,7 @@ pub struct MonolithOptions {
     pub no_video: bool,
     pub output_format: MonolithOutputFormat,
     pub silent: bool,
+    pub threads: usize,
     pub timeout: u64,
     pub unwrap_noscript: bool,
     pub user_agent: Option<String>,
@@ -199,6 +200,8 @@ pub fn create_monolithic_document_from_data(
             }
         }
     }
+
+    session.prefetch_assets(&base_url, &dom.document);
 
     // Traverse through the document and embed remote assets
     walk(&mut session, &base_url, &dom.document);

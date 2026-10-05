@@ -202,7 +202,7 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-E`: Save document using `custom encoding`
  - `-f`: Omit (i)frames
  - `-F`: Exclude web fonts
- - `-h`: Print help information
+ - `-h`: Print usage information
  - `-i`: Remove images
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
@@ -213,7 +213,8 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-q`: Be quiet
  - `-t`: Adjust `network request timeout`
- - `-u`: Provide `custom User-Agent`
+ - `-T`: Specify `thread count`
+ - `-u`: Use `custom User-Agent`
  - `-v`: Exclude videos
  - `-V`: Print version number
 

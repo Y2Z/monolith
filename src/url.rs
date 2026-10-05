@@ -10,7 +10,7 @@ pub const EMPTY_IMAGE_DATA_URL: &str = "data:image/png,\
 pub fn clean_url(url: Url) -> Url {
     let mut url = url.clone();
 
-    // Clear fragment (if any)
+    // Remove fragment (if any)
     url.set_fragment(None);
 
     url

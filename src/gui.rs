@@ -167,6 +167,7 @@ fn ui_builder() -> impl Widget<AppState> {
             options.no_css = !state.keep_styles;
             options.no_js = !state.keep_scripts;
             options.isolate = state.isolate;
+            options.threads = 30;
             options.unwrap_noscript = state.unwrap_noscript;
 
             let handle = ctx.get_external_handle();
