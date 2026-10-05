@@ -13,8 +13,6 @@ RUN make install
 
 FROM alpine
 
-RUN apk add --no-cache openssl
-
 COPY --from=builder /root/.cargo/bin/monolith /usr/bin/monolith
 WORKDIR /tmp
 ENTRYPOINT ["/usr/bin/monolith"]

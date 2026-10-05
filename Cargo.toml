@@ -38,28 +38,31 @@ rayon = "=1.12.0" # Used for thread pooling
 redb = "=2.6.4" # Used for on-disk caching of remote assets
 tempfile = { version = "=3.27.0", optional = true } # Used for on-disk caching of remote assets
 url = "=2.5.8" # Used for parsing URLs
-openssl = "=0.10.81" # Used for static linking of the OpenSSL library
 
 # Used for making network requests
 [dependencies.reqwest]
 version = "=0.13.5"
 default-features = false
-features = ["default-tls", "blocking", "gzip", "brotli", "deflate"]
+features = [
+    "blocking",
+    "gzip",
+    "brotli",
+    "deflate",
+    "rustls"
+]
 
 [dev-dependencies]
 assert_cmd = "=2.2.2"
 
 [features]
-default = ["cli", "vendored-openssl"]
+default = ["cli"]
 cli = ["clap", "tempfile"] # Build a CLI tool that includes main() function
 gui = [
     "directories",
     "druid",
     "tempfile",
 ] # Build a GUI executable that includes main() function
-vendored-openssl = [
-    "openssl/vendored",
-] # Compile and statically link a copy of OpenSSL
+vendored-openssl = [] # Deprecated, being kept as a remnant (probably until 2.15.x/3.x.x)
 
 [lib]
 name = "monolith"
