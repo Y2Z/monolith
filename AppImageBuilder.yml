@@ -38,11 +38,6 @@ AppDir:
       - libssl3
       - ca-certificates
 
-  files:
-    include:
-      - target/release/monolith-gui: usr/bin/monolith-gui
-      - assets/icon/icon-128.png: usr/share/icons/hicolor/128x128/apps/monolith.png
-
 AppImage:
   arch: x86_64
   sign-key: null
