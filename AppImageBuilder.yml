@@ -14,7 +14,7 @@ AppDir:
   apt:
     arch: amd64
     sources:
-      - sourceline: "deb http://archive.ubuntu.com/ubuntu/ noble main universe multiverse"
+      - sourceline: "deb http://archive.ubuntu.com/ubuntu/ jammy main universe multiverse"
     include:
       - libglib2.0-0
       - libgtk-3-0
@@ -32,13 +32,11 @@ AppDir:
       - libatk1.0-0
       - libatk-bridge2.0-0
       - libgdk-pixbuf-2.0-0
-      - libgtk-3-dev
-      - pkg-config
+      - libwayland-client0
+      - libwayland-cursor0
+      - libwayland-egl1
       - libssl3
       - ca-certificates
-      - make
-      - cargo
-      - rustc
 
   files:
     include:
@@ -49,14 +47,3 @@ AppImage:
   arch: x86_64
   sign-key: null
   update-information: null
-
-script: |
-  set -euo pipefail
-
-  cargo build --locked --release --bin monolith-gui --features="gui"
-
-  mkdir -p "${APPDIR}/usr/bin"
-  mkdir -p "${APPDIR}/usr/share/icons/hicolor/128x128/apps"
-
-  install -Dm755 "target/release/monolith-gui" "${APPDIR}/usr/bin/monolith-gui"
-  install -Dm644 "assets/icon/icon-128.png" "${APPDIR}/usr/share/icons/hicolor/128x128/apps/monolith.png"
