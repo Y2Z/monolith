@@ -80,40 +80,6 @@ jobs:
         path: target/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  windows:
-    runs-on: windows-2022
-    steps:
-    - run: git config --global core.autocrlf false
-
-    - name: Checkout the repository
-      uses: actions/checkout@v4
-
-    - name: Build the executable
-      run: cargo build --release --features cli
-
-    - uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: monolith.exe
-        path: target\release\monolith.exe
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-  windows_gui:
-    runs-on: windows-2022
-    steps:
-    - run: git config --global core.autocrlf false
-
-    - name: Checkout the repository
-      uses: actions/checkout@v4
-
-    - name: Build the GUI executable
-      run: cargo build --locked --release --bin monolith-gui.exe --features="gui"
-
-    - uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: Monolith.exe
-        path: target\release\monolith-gui.exe
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-
   gnu_linux_x86_64_gui_appimage:
     runs-on: ubuntu-22.04
     steps:
@@ -143,6 +109,12 @@ jobs:
         VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
         sed -i "s/^    version: .*/    version: ${VERSION}/" AppImageBuilder.yml
 
+    - name: Copy files into AppDir
+      run: |
+        mkdir -p AppDir/usr/bin AppDir/usr/share/icons/hicolor/128x128/apps
+        cp target/release/monolith-gui AppDir/usr/bin/monolith-gui
+        cp assets/icon/icon-128.png AppDir/usr/share/icons/hicolor/128x128/apps/monolith.png
+
     - name: Build the AppImage
       run: appimage-builder --recipe AppImageBuilder.yml --skip-test
 
@@ -156,4 +128,38 @@ jobs:
       with:
         name: Monolith-x86_64.AppImage
         path: monolith-gui-gnu-linux-x86_64.AppImage
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    runs-on: windows-2022
+    steps:
+    - run: git config --global core.autocrlf false
+
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Build the executable
+      run: cargo build --release --features cli
+
+    - uses: Shopify/upload-to-release@v2.0.0
+      with:
+        name: monolith.exe
+        path: target\release\monolith.exe
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  windows_gui:
+    runs-on: windows-2022
+    steps:
+    - run: git config --global core.autocrlf false
+
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Build the GUI executable
+      run: cargo build --locked --release --bin monolith-gui --features="gui"
+
+    - uses: Shopify/upload-to-release@v2.0.0
+      with:
+        name: Monolith.exe
+        path: target\release\monolith-gui.exe
         repo-token: ${{ secrets.GITHUB_TOKEN }}
