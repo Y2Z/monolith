@@ -20,6 +20,7 @@ Unlike the conventional “Save page as”, `monolith` not only saves the target
 
 If compared to saving websites with `wget -mpk`, this tool embeds all assets as data URLs and therefore lets browsers render the saved page exactly the way it was on the Internet, even when no network connection is available.
 
+![Monolith GUI screenshot](assets/screenshots/gui.png)
 
 ---------------------------------------------------
 
