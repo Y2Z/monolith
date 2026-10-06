@@ -7,16 +7,16 @@
 
 #[cfg(test)]
 mod passing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
     use std::fs;
     use std::path::Path;
-    use std::process::Command;
     use url::Url;
 
     #[test]
     fn parse_noscript_contents() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/noscript/index.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -47,7 +47,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/noscript/index.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -78,7 +78,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_nested() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/noscript/nested.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -109,7 +109,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_with_script() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/noscript/script.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -142,7 +142,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_attr_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-n")

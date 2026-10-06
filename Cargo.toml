@@ -26,7 +26,6 @@ include = [
 license = "CC0-1.0"
 
 [dependencies]
-atty = "=0.2.14" # Used for highlighting network errors
 base64 = "=0.23.1" # Used for integrity attributes
 chrono = "=0.4.45" # Used for formatting timestamps
 clap = { version = "=4.6.7", features = [

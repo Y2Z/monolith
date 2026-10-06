@@ -7,13 +7,13 @@
 
 #[cfg(test)]
 mod passing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
-    use std::process::Command;
 
     #[test]
     fn add_new_when_provided() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-b")
@@ -38,7 +38,7 @@ mod passing {
 
     #[test]
     fn keep_existing_when_none_provided() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("data:text/html,<base href=\"http://localhost:30701/\" />Hello%2C%20World!")
@@ -61,7 +61,7 @@ mod passing {
 
     #[test]
     fn override_existing_when_provided() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-b")
@@ -86,7 +86,7 @@ mod passing {
 
     #[test]
     fn set_existing_to_empty_when_empty_provided() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-b")
