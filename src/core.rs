@@ -2,7 +2,7 @@ use std::env;
 use std::error::Error;
 use std::fmt;
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 
 use base64::{Engine, prelude::BASE64_STANDARD};
@@ -576,7 +576,7 @@ pub fn print_error_message(text: &str) {
     const ENV_VAR_NO_COLOR: &str = "NO_COLOR";
     const ENV_VAR_TERM: &str = "TERM";
 
-    let mut no_color = env::var_os(ENV_VAR_NO_COLOR).is_some() || atty::isnt(atty::Stream::Stderr);
+    let mut no_color = env::var_os(ENV_VAR_NO_COLOR).is_some() || !std::io::stderr().is_terminal();
     if let Some(term) = env::var_os(ENV_VAR_TERM) {
         if term == "dumb" {
             no_color = true;

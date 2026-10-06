@@ -7,15 +7,15 @@
 
 #[cfg(test)]
 mod passing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
-    use std::process::Command;
 
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
     #[test]
     fn isolate_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-I")
@@ -39,7 +39,7 @@ mod passing {
 
     #[test]
     fn remove_css_from_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-c")
@@ -63,7 +63,7 @@ mod passing {
 
     #[test]
     fn remove_fonts_from_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-F")
@@ -87,7 +87,7 @@ mod passing {
 
     #[test]
     fn remove_frames_from_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-f")
@@ -111,7 +111,7 @@ mod passing {
 
     #[test]
     fn remove_images_from_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-i")
@@ -138,7 +138,7 @@ mod passing {
 
     #[test]
     fn remove_js_from_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-j")
@@ -170,13 +170,13 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
-    use std::process::Command;
 
     #[test]
     fn bad_input_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd.arg("data:,Hello%2C%20World!").output().unwrap();
 
         // STDERR should be empty
@@ -191,7 +191,7 @@ mod failing {
 
     #[test]
     fn security_disallow_local_assets_within_data_url_targets() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg(r#"data:text/html,%3Cscript%20src="src/tests/data/basic/local-script.js"%3E%3C/script%3E"#)

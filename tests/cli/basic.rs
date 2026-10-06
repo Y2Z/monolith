@@ -7,6 +7,7 @@
 
 #[cfg(test)]
 mod passing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
     use std::fs;
@@ -16,7 +17,7 @@ mod passing {
 
     #[test]
     fn print_help_information() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd.arg("-h").output().unwrap();
 
         // STDERR should be empty
@@ -31,7 +32,7 @@ mod passing {
 
     #[test]
     fn print_version() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd.arg("-V").output().unwrap();
 
         // STDERR should be empty
@@ -49,16 +50,14 @@ mod passing {
 
     #[test]
     fn stdin_target_input() {
-        let mut echo = Command::new("echo")
+        let echo = Command::new("echo")
             .arg("Hello from STDIN")
             .stdout(Stdio::piped())
-            .spawn()
+            .output()
             .unwrap();
-        let echo_out = echo.stdout.take().unwrap();
-        echo.wait().unwrap();
 
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.stdin(echo_out);
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        cmd.write_stdin(echo.stdout);
         let out = cmd.arg("-M").arg("-").output().unwrap();
 
         // STDERR should be empty
@@ -78,7 +77,7 @@ mod passing {
 
     #[test]
     fn css_import_string() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/css/index.html");
         let path_css: &Path = Path::new("tests/_data_/css/style.css");
 
@@ -126,7 +125,7 @@ mod passing {
 
     #[test]
     fn output_file_into_missing_directories() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
         let dir_tmp: PathBuf =
             env::temp_dir().join(format!("monolith-test-{}", std::process::id()));
@@ -156,7 +155,7 @@ mod passing {
 
     #[test]
     fn output_file_into_missing_directories_without_create_dirs_flag() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
         let dir_tmp: PathBuf =
             env::temp_dir().join(format!("monolith-test-noflag-{}", std::process::id()));
@@ -192,13 +191,13 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
-    use std::process::Command;
 
     #[test]
     fn bad_input_empty_target() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd.arg("").output().unwrap();
 
         // STDERR should contain error description
@@ -216,7 +215,7 @@ mod failing {
 
     #[test]
     fn unsupported_scheme() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd.arg("mailto:snshn@tutanota.com").output().unwrap();
 
         // STDERR should contain error description
