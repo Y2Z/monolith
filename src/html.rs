@@ -1036,12 +1036,12 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         set_node_attr(node, "src", Some("".to_string()));
                     } else {
                         // Add data URL src attribute
-                        let img_src: String =
-                            if !img_data_src.clone().unwrap_or_default().is_empty() {
-                                img_data_src.unwrap_or_default()
-                            } else {
-                                img_src.unwrap_or_default()
-                            };
+                        let use_data_src = !img_data_src.clone().unwrap_or_default().is_empty();
+                        let img_src: String = if use_data_src {
+                            img_data_src.unwrap_or_default()
+                        } else {
+                            img_src.unwrap_or_default()
+                        };
 
                         if session.options.output_format == MonolithOutputFormat::HTML {
                             retrieve_and_embed_asset(session, document_url, node, "src", &img_src);
@@ -1049,6 +1049,11 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             let img_src_full_url: Url = resolve_url(document_url, &img_src);
                             set_node_attr(node, "src", Some(img_src_full_url.to_string()));
                             session.log_asset_url(&img_src_full_url);
+                        }
+
+                        if use_data_src {
+                            // Lazy loaders may copy data-src over src after the page loads.
+                            set_node_attr(node, "data-src", get_node_attr(node, "src"));
                         }
                     }
 
