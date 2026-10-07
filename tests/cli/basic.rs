@@ -16,6 +16,17 @@ mod passing {
     use url::Url;
 
     #[test]
+    fn malformed_srcset_descriptor_does_not_hang() {
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        cmd.arg("-M")
+            .arg("-")
+            .write_stdin("<img srcset=\"data:,image invalid\">")
+            .timeout(std::time::Duration::from_secs(5))
+            .assert()
+            .success();
+    }
+
+    #[test]
     fn print_help_information() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd.arg("-h").output().unwrap();
