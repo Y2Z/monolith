@@ -442,19 +442,13 @@ pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem<'_>> {
         } else if path.is_none() {
             path = Some(partial);
         } else {
-            let mut chunks: Vec<&str> = partial.split(',').collect();
+            let mut chunks = partial.splitn(2, ',');
+            descriptor = chunks.next();
 
-            if !chunks.is_empty() && chunks.first().unwrap().ends_with(['x', 'w']) {
-                descriptor = Some(chunks.first().unwrap());
-
-                chunks.remove(0);
-            }
-
-            if !chunks.is_empty() {
-                if descriptor.is_some() {
-                    partials.insert(0, &partial[descriptor.unwrap().len()..]);
-                } else {
-                    partials.insert(0, partial);
+            // Process the next candidate after this descriptor, without revisiting it.
+            if let Some(next_path) = chunks.next() {
+                if !next_path.is_empty() {
+                    partials.insert(i, next_path);
                 }
             }
         }
