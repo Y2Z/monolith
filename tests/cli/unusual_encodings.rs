@@ -7,6 +7,7 @@
 
 #[cfg(test)]
 mod passing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use encoding_rs::Encoding;
     use std::env;
@@ -17,7 +18,7 @@ mod passing {
     fn properly_save_document_with_gb2312() {
         let cwd = env::current_dir().unwrap();
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg(format!(
@@ -66,19 +67,17 @@ mod passing {
 
     #[test]
     fn properly_save_document_with_gb2312_from_stdin() {
-        let mut echo = Command::new("cat")
+        let echo = Command::new("cat")
             .arg(format!(
                 "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
                 s = MAIN_SEPARATOR
             ))
             .stdout(Stdio::piped())
-            .spawn()
+            .output()
             .unwrap();
-        let echo_out = echo.stdout.take().unwrap();
-        echo.wait().unwrap();
 
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.stdin(echo_out);
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        cmd.write_stdin(echo.stdout);
         let out = cmd.arg("-M").arg("-").output().unwrap();
 
         // STDERR should be empty
@@ -114,7 +113,7 @@ mod passing {
     fn properly_save_document_with_gb2312_custom_charset() {
         let cwd = env::current_dir().unwrap();
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-E")
@@ -158,7 +157,7 @@ mod passing {
 
     #[test]
     fn properly_save_document_with_gb2312_custom_charset_bad() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-E")
@@ -193,16 +192,16 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
     use std::path::MAIN_SEPARATOR;
-    use std::process::Command;
 
     #[test]
     fn change_iso88591_to_utf8_to_properly_display_html_entities() {
         let cwd = env::current_dir().unwrap();
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg(format!(
@@ -229,9 +228,7 @@ mod failing {
             r##"<html><head>
         <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
     <meta name="robots" content="none"></meta></head>
-    <body>
-        � Some Company
-    
+    <body>� Some Company
 
 </body></html>
 "##

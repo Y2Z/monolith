@@ -20,6 +20,7 @@ Unlike the conventional “Save page as”, `monolith` not only saves the target
 
 If compared to saving websites with `wget -mpk`, this tool embeds all assets as data URLs and therefore lets browsers render the saved page exactly the way it was on the Internet, even when no network connection is available.
 
+![Monolith GUI screenshot](assets/screenshots/gui.png)
 
 ---------------------------------------------------
 
@@ -98,6 +99,14 @@ pacman -S monolith
 apk add monolith
 ```
 
+#### Using [pkg.haus APT archive](https://pkg.haus) (Debian)
+
+Set up the archive per the instructions on [pkg.haus](https://pkg.haus), then:
+
+```console
+sudo apt install monolith
+```
+
 #### Using [XBPS Package Manager](https://voidlinux.org/packages/?q=monolith) (Void Linux)
 
 ```console
@@ -133,7 +142,7 @@ sudo install -b dist/run-in-container.sh /usr/local/bin/monolith
 
 #### From [source](https://github.com/Y2Z/monolith)
 
-Dependencies: `libssl`, `cargo`
+Dependencies: `cargo`
 
 <details>
   <summary>Install cargo (GNU/Linux)</summary>
@@ -189,11 +198,12 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-c`: Exclude CSS
  - `-C`: Read cookies from `file`
  - `-d`: Allow retrieving assets only from specified `domain(s)`
+ - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
- - `-f`: Omit frames
+ - `-f`: Omit (i)frames
  - `-F`: Exclude web fonts
- - `-h`: Print help information
+ - `-h`: Print usage information
  - `-i`: Remove images
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
@@ -204,7 +214,7 @@ cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site
  - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-q`: Be quiet
  - `-t`: Adjust `network request timeout`
- - `-u`: Provide `custom User-Agent`
+ - `-u`: Use `custom User-Agent`
  - `-v`: Exclude videos
  - `-V`: Print version number
 

@@ -7,16 +7,16 @@
 
 #[cfg(test)]
 mod passing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
     use std::fs;
     use std::path::Path;
-    use std::process::Command;
     use url::Url;
 
     #[test]
     fn parse_noscript_contents() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/noscript/index.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -47,7 +47,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/noscript/index.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -69,7 +69,7 @@ mod passing {
         // STDOUT should contain HTML with no CSS
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head><meta name=\"robots\" content=\"none\"></meta></head><body><!--noscript--><img src=\"data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=\"><!--/noscript-->\n</body></html>\n"
+            "<html><head><meta name=\"robots\" content=\"none\"></meta></head><body><img src=\"data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=\">\n</body></html>\n"
         );
 
         // Exit code should be 0
@@ -78,7 +78,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_nested() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/noscript/nested.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -100,7 +100,7 @@ mod passing {
         // STDOUT should contain HTML with no CSS
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            "<html><head><meta name=\"robots\" content=\"none\"></meta></head><body><!--noscript--><h1>JS is not active</h1><!--noscript--><img src=\"data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=\"><!--/noscript--><!--/noscript-->\n</body></html>\n"
+            "<html><head><meta name=\"robots\" content=\"none\"></meta></head><body><h1>JS is not active</h1><img src=\"data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=\">\n</body></html>\n"
         );
 
         // Exit code should be 0
@@ -109,7 +109,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_with_script() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/noscript/script.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -131,7 +131,7 @@ mod passing {
         // STDOUT should contain HTML with no CSS
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><meta name="robots" content="none"></meta></head><body><!--noscript--><img src="data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo="><!--/noscript-->
+            r#"<html><head><meta name="robots" content="none"></meta></head><body><script>alert(1);</script><img src="data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=">
 </body></html>
 "#
         );
@@ -142,7 +142,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_attr_data_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
             .arg("-n")
@@ -156,7 +156,7 @@ mod passing {
         // STDOUT should contain unwrapped contents of NOSCRIPT element
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><!--noscript class=""-->test<!--/noscript--><meta name="robots" content="none"></meta></head><body></body></html>
+            r#"<html><head>test<meta name="robots" content="none"></meta></head><body></body></html>
 "#
         );
 

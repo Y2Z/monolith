@@ -1,15 +1,16 @@
 use std::fs;
 use std::io::{self, Error as IoError, Read, Write};
+use std::path::Path;
 use std::process;
 
 use clap::Parser;
 use tempfile::{Builder, NamedTempFile};
 
 use monolith::cache::Cache;
-use monolith::cookies::{parse_cookie_file_contents, Cookie};
+use monolith::cookies::{Cookie, parse_cookie_file_contents};
 use monolith::core::{
-    create_monolithic_document, create_monolithic_document_from_data, format_output_path,
-    print_error_message, MonolithOptions, MonolithOutputFormat,
+    MonolithOptions, MonolithOutputFormat, create_monolithic_document,
+    create_monolithic_document_from_data, format_output_path, print_error_message,
 };
 use monolith::session::Session;
 
@@ -55,6 +56,10 @@ struct Cli {
     /// Specify domains to use for white/black-listing
     #[arg(short = 'd', long = "domain", value_name = "example.com")]
     domains: Vec<String>,
+
+    /// Create missing directories in the output file path
+    #[arg(short = 'D', long)]
+    create_dirs: bool,
 
     /// Ignore network errors
     #[arg(short = 'e', long)]
@@ -134,11 +139,34 @@ impl Output {
         destination: &str,
         document_title: &str,
         format: MonolithOutputFormat,
+        create_dirs: bool,
     ) -> Result<Output, IoError> {
         if destination.is_empty() || destination.eq("-") {
             Ok(Output::Stdout(io::stdout()))
         } else {
             let final_destination = format_output_path(destination, document_title, format);
+
+            // Create directories in the path to output file if they are
+            // missing and the user opted in via --create-dirs (like curl).
+            // Without the flag a clear error is reported instead of creating
+            // directory trees the user did not ask for.
+            if let Some(parent) = Path::new(&final_destination).parent() {
+                if !parent.as_os_str().is_empty() && !parent.exists() {
+                    if create_dirs {
+                        fs::create_dir_all(parent)?;
+                    } else {
+                        return Err(IoError::new(
+                            io::ErrorKind::NotFound,
+                            format!(
+                                "cannot write to '{}': directory '{}' does not exist (use --create-dirs to create it)",
+                                final_destination,
+                                parent.display()
+                            ),
+                        ));
+                    }
+                }
+            }
+
             Ok(Output::File(fs::File::create(final_destination)?))
         }
     }
@@ -192,13 +220,12 @@ fn main() {
         options.no_js = cli.no_js;
         if cli.mhtml {
             options.output_format = MonolithOutputFormat::MHTML;
-            // The MHTML format doesn't allow JavaScript
-            options.no_js = true;
         }
         options.no_metadata = cli.no_metadata;
         options.no_video = cli.no_video;
         options.silent = cli.quiet;
         options.timeout = cli.timeout.unwrap_or(DEFAULT_NETWORK_TIMEOUT);
+        options.threads = 30;
         options.unwrap_noscript = cli.unwrap_noscript;
         if cli.user_agent.is_none() {
             options.user_agent = Some(DEFAULT_USER_AGENT.to_string());
@@ -263,7 +290,7 @@ fn main() {
     }
 
     // Initiate session
-    let ouptput_format = options.output_format.clone();
+    let output_format = options.output_format.clone();
     let silent = options.silent;
     let session: Session = Session::new(cache, cookies, options);
 
@@ -275,15 +302,24 @@ fn main() {
         match create_monolithic_document_from_data(session, data, None, None) {
             Ok((result, title)) => {
                 // Define output
-                let mut output = Output::new(
+                match Output::new(
                     &destination.unwrap_or(String::new()),
                     &title.unwrap_or_default(),
-                    ouptput_format,
-                )
-                .expect("could not prepare output");
+                    output_format,
+                    cli.create_dirs,
+                ) {
+                    Ok(mut output) => {
+                        // Write result into STDOUT or file
+                        output.write(&result).expect("could not write output");
+                    }
+                    Err(error) => {
+                        if !silent {
+                            print_error_message(&format!("Error: {}", error));
+                        }
 
-                // Write result into STDOUT or file
-                output.write(&result).expect("could not write output");
+                        exit_code = 1;
+                    }
+                }
             }
             Err(error) => {
                 if !silent {
@@ -297,15 +333,24 @@ fn main() {
         match create_monolithic_document(session, cli.target) {
             Ok((result, title)) => {
                 // Define output
-                let mut output = Output::new(
+                match Output::new(
                     &destination.unwrap_or(String::new()),
                     &title.unwrap_or_default(),
-                    ouptput_format,
-                )
-                .expect("could not prepare output");
+                    output_format,
+                    cli.create_dirs,
+                ) {
+                    Ok(mut output) => {
+                        // Write result into STDOUT or file
+                        output.write(&result).expect("could not write output");
+                    }
+                    Err(error) => {
+                        if !silent {
+                            print_error_message(&format!("Error: {}", error));
+                        }
 
-                // Write result into STDOUT or file
-                output.write(&result).expect("could not write output");
+                        exit_code = 1;
+                    }
+                }
             }
             Err(error) => {
                 if !silent {

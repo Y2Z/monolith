@@ -1,23 +1,23 @@
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use html5ever::interface::{Attribute, QualName};
-use html5ever::parse_document;
-use html5ever::serialize::{serialize, SerializeOpts};
-use html5ever::tendril::{format_tendril, TendrilSink};
-use html5ever::tree_builder::{create_element, TreeSink};
-use html5ever::{namespace_url, ns, LocalName};
+use html5ever::serialize::{SerializeOpts, serialize};
+use html5ever::tendril::{StrTendril, TendrilSink, format_tendril};
+use html5ever::tree_builder::{TreeSink, create_element};
+use html5ever::{LocalName, ns};
+use html5ever::{parse_document, parse_fragment};
 use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
-use regex::Regex;
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
+use std::rc::Rc;
 
-use crate::core::{parse_content_type, MonolithOptions};
+use crate::core::{MonolithOptions, MonolithOutputFormat, parse_content_type};
 use crate::css::embed_css;
-use crate::js::attr_is_event_handler;
+use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::session::Session;
 use crate::url::{
-    clean_url, create_data_url, is_url_and_has_protocol, resolve_url, Url, EMPTY_IMAGE_DATA_URL,
+    EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, is_url_and_has_protocol, resolve_url,
 };
 
 const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
@@ -31,6 +31,7 @@ pub enum LinkType {
     Favicon,
     Preload,
     Stylesheet,
+    Manifest,
 }
 
 pub struct SrcSetItem<'a> {
@@ -158,15 +159,20 @@ pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> 
             let image_full_url: Url = resolve_url(document_url, srcset_item.path);
             match session.retrieve_asset(document_url, &image_full_url) {
                 Ok((image_data, image_final_url, image_media_type, image_charset)) => {
-                    let mut image_data_url = create_data_url(
-                        &image_media_type,
-                        &image_charset,
-                        &image_data,
-                        &image_final_url,
-                    );
-                    // Append retrieved asset as a data URL
-                    image_data_url.set_fragment(image_full_url.fragment());
-                    result.push_str(image_data_url.as_ref());
+                    if session.options.output_format == MonolithOutputFormat::HTML {
+                        let mut image_data_url = create_data_url(
+                            &image_media_type,
+                            &image_charset,
+                            &image_data,
+                            &image_final_url,
+                        );
+                        // Append retrieved asset as a data URL
+                        image_data_url.set_fragment(image_full_url.fragment());
+                        result.push_str(image_data_url.as_ref());
+                    } else {
+                        // MHTML
+                        result.push_str(image_full_url.as_ref());
+                    }
                 }
                 Err(_) => {
                     // Keep remote reference if unable to retrieve the asset
@@ -288,8 +294,13 @@ pub fn get_node_name(node: &Handle) -> Option<&'_ str> {
 }
 
 pub fn get_parent_node(child: &Handle) -> Handle {
-    let parent = child.parent.take().clone();
-    parent.and_then(|node| node.upgrade()).unwrap()
+    let weak_parent = child.parent.take();
+    let parent: Handle = weak_parent
+        .as_ref()
+        .and_then(|weak| weak.upgrade())
+        .unwrap();
+    child.parent.set(weak_parent);
+    parent
 }
 
 pub fn get_robots(handle: &Handle) -> Option<String> {
@@ -353,6 +364,32 @@ pub fn is_favicon(attr_value: &str) -> bool {
     FAVICON_VALUES.contains(&attr_value.to_lowercase().as_str())
 }
 
+fn is_noscript(node: &Handle) -> bool {
+    matches!(&node.data, NodeData::Element { name, .. } if name.ns == ns!(html) && &*name.local == "noscript")
+}
+
+/// Parses HTML as a fragment, as if it were the inner HTML of a `context` element.
+/// Resulting tree is always: Document -> <html> -> [parsed nodes]
+fn parse_fragment_dom(context: &QualName, html: StrTendril) -> RcDom {
+    parse_fragment(
+        RcDom::default(),
+        Default::default(),
+        context.clone(),
+        vec![],
+        true,
+    )
+    .one(html)
+}
+
+/// Same as parse_fragment_dom(), but returns the parsed nodes detached from the throwaway DOM
+/// (callers are responsible for setting their parent pointers)
+fn parse_html_fragment(context: &QualName, html: StrTendril) -> Vec<Handle> {
+    let fragment: RcDom = parse_fragment_dom(context, html);
+    let root: Option<Handle> = fragment.document.children.borrow().first().cloned();
+    root.map(|html_node| html_node.children.take())
+        .unwrap_or_default()
+}
+
 pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
     let mut types: Vec<LinkType> = vec![];
 
@@ -369,13 +406,15 @@ pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
             types.push(LinkType::Favicon);
         } else if link_attr_rel_type.eq_ignore_ascii_case("apple-touch-icon") {
             types.push(LinkType::AppleTouchIcon);
+        } else if link_attr_rel_type.eq_ignore_ascii_case("manifest") {
+            types.push(LinkType::Manifest);
         }
     }
 
     types
 }
 
-pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem> {
+pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem<'_>> {
     let mut srcset_items: Vec<SrcSetItem> = vec![];
 
     // Parse srcset
@@ -599,6 +638,70 @@ pub fn set_robots(dom: RcDom, content_value: &str) -> RcDom {
     dom
 }
 
+/// Replaces every NOSCRIPT element with its contents parsed as real DOM nodes
+pub fn unwrap_noscripts(node: &Handle) {
+    fn has_noscript_child(node: &Handle) -> bool {
+        node.children.borrow().iter().any(is_noscript)
+    }
+
+    // (3) Only nodes that actually have NOSCRIPT children get their children rebuilt.
+    // It's a loop rather than an `if` because unwrapping can surface another NOSCRIPT
+    // at this same level (e.g. text like `<noscript>` inside the original NOSCRIPT);
+    // each pass consumes the text it parses, so this always terminates.
+    if has_noscript_child(node) {
+        // NOSCRIPT contents get parsed in the context of the NOSCRIPT's parent,
+        // which is what a browser with JS disabled would effectively do
+        let context: QualName = match &node.data {
+            NodeData::Element { name, .. } => name.clone(),
+            _ => QualName::new(None, ns!(html), LocalName::from("body")),
+        };
+
+        while has_noscript_child(node) {
+            let old_children: Vec<Handle> = node.children.take();
+            let mut new_children: Vec<Handle> = Vec::with_capacity(old_children.len());
+
+            for child in old_children {
+                if !is_noscript(&child) {
+                    new_children.push(child);
+                    continue;
+                }
+
+                // With scripting enabled, NOSCRIPT holds a raw text node;
+                // anything that's already a real node gets moved over as-is
+                for grandchild in child.children.take() {
+                    let text: Option<StrTendril> = match &grandchild.data {
+                        NodeData::Text { contents } => Some(contents.borrow().clone()),
+                        _ => None,
+                    };
+                    match text {
+                        Some(html) => new_children.extend(parse_html_fragment(&context, html)),
+                        None => new_children.push(grandchild),
+                    }
+                }
+            }
+
+            for child in new_children.iter() {
+                child.parent.set(Some(Rc::downgrade(node)));
+            }
+            *node.children.borrow_mut() = new_children;
+        }
+    }
+
+    // Recurse into children (including freshly unwrapped ones)
+    for child in node.children.borrow().iter() {
+        unwrap_noscripts(child);
+    }
+    if let NodeData::Element {
+        ref template_contents,
+        ..
+    } = node.data
+    {
+        if let Some(ref contents) = *template_contents.borrow() {
+            unwrap_noscripts(contents);
+        }
+    }
+}
+
 pub fn serialize_document(
     dom: RcDom,
     document_encoding: String,
@@ -640,16 +743,13 @@ pub fn serialize_document(
         }
     }
 
+    if options.unwrap_noscript {
+        unwrap_noscripts(&dom.document);
+    }
+
     let serializable: SerializableHandle = dom.document.into();
     serialize(&mut buf, &serializable, SerializeOpts::default())
         .expect("Unable to serialize DOM into buffer");
-
-    // Unwrap NOSCRIPT elements
-    if options.unwrap_noscript {
-        let s: &str = &String::from_utf8_lossy(&buf);
-        let noscript_re = Regex::new(r"<(?P<c>/?noscript[^>]*)>").unwrap();
-        buf = noscript_re.replace_all(s, "<!--$c-->").as_bytes().to_vec();
-    }
 
     if !document_encoding.is_empty() {
         if let Some(encoding) = Encoding::for_label(document_encoding.as_bytes()) {
@@ -728,8 +828,23 @@ pub fn retrieve_and_embed_asset(
 
                     // Parse media type for SCRIPT elements
                     if node_name == "script" {
-                        let script_media_type =
+                        let mut script_media_type =
                             get_node_attr(node, "type").unwrap_or(String::from("text/javascript"));
+
+                        // JavaScript modules are a special case that uses `module` instead of a
+                        // MIME type.
+                        if script_media_type == "module" {
+                            script_media_type = String::from("text/javascript");
+                        } else if script_media_type == "importmap" {
+                            // JavaScript import maps are another special case that uses `importmap`
+                            // instead of a MIME type.
+                            // An import map is a JSON object.
+                            // There is ongoing work to register the MIME type
+                            // `application/importmap+json` for it, but this has not been accepted
+                            // yet.
+                            script_media_type = String::from("application/json");
+                        }
+                        // TODO: There is also `speculationrules` but this is not yet standard.
 
                         if script_media_type == "text/javascript"
                             || script_media_type == "application/javascript"
@@ -747,10 +862,9 @@ pub fn retrieve_and_embed_asset(
                                 if let NodeData::Text { ref contents } = text_node.data {
                                     let mut tendril = contents.borrow_mut();
                                     tendril.clear();
-                                    tendril.push_slice(
-                                        &String::from_utf8_lossy(&data)
-                                            .replace("</script>", "<\\/script>"),
-                                    );
+                                    tendril.push_slice(&escape_script_end_tag(
+                                        &String::from_utf8_lossy(&data),
+                                    ));
                                 }
 
                                 node.children.borrow_mut().push(text_node.clone());
@@ -848,6 +962,19 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 );
                             }
                         }
+                    } else if link_node_types.contains(&LinkType::Manifest) {
+                        // Resolve LINK's href attribute
+                        if let Some(link_attr_href_value) = get_node_attr(node, "href") {
+                            if !link_attr_href_value.is_empty() {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "href",
+                                    &link_attr_href_value,
+                                );
+                            }
+                        }
                     } else if link_node_types.contains(&LinkType::Preload)
                         || link_node_types.contains(&LinkType::DnsPrefetch)
                     {
@@ -891,37 +1018,38 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 }
                 "img" => {
                     // Find src and data-src attribute(s)
-                    let img_attr_src_value: Option<String> = get_node_attr(node, "src");
-                    let img_attr_data_src_value: Option<String> = get_node_attr(node, "data-src");
+                    let img_src: Option<String> = get_node_attr(node, "src");
+                    let img_data_src: Option<String> = get_node_attr(node, "data-src");
 
                     if session.options.no_images {
                         // Put empty images into src and data-src attributes
-                        if img_attr_src_value.is_some() {
+                        if img_src.is_some() {
                             set_node_attr(node, "src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
-                        if img_attr_data_src_value.is_some() {
+                        if img_data_src.is_some() {
                             set_node_attr(node, "data-src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
-                    } else if img_attr_src_value.clone().unwrap_or_default().is_empty()
-                        && img_attr_data_src_value
-                            .clone()
-                            .unwrap_or_default()
-                            .is_empty()
+                    } else if img_src.clone().unwrap_or_default().is_empty()
+                        && img_data_src.clone().unwrap_or_default().is_empty()
                     {
                         // Add empty src attribute
                         set_node_attr(node, "src", Some("".to_string()));
                     } else {
                         // Add data URL src attribute
-                        let img_full_url: String = if !img_attr_data_src_value
-                            .clone()
-                            .unwrap_or_default()
-                            .is_empty()
-                        {
-                            img_attr_data_src_value.unwrap_or_default()
+                        let img_src: String =
+                            if !img_data_src.clone().unwrap_or_default().is_empty() {
+                                img_data_src.unwrap_or_default()
+                            } else {
+                                img_src.unwrap_or_default()
+                            };
+
+                        if session.options.output_format == MonolithOutputFormat::HTML {
+                            retrieve_and_embed_asset(session, document_url, node, "src", &img_src);
                         } else {
-                            img_attr_src_value.unwrap_or_default()
-                        };
-                        retrieve_and_embed_asset(session, document_url, node, "src", &img_full_url);
+                            let img_src_full_url: Url = resolve_url(document_url, &img_src);
+                            set_node_attr(node, "src", Some(img_src_full_url.to_string()));
+                            session.log_asset_url(&img_src_full_url);
+                        }
                     }
 
                     // Resolve srcset attribute
@@ -989,6 +1117,9 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         if let Some(use_attr_href_value) = get_node_attr(node, attr_name) {
                             if session.options.no_images {
                                 set_node_attr(node, attr_name, None);
+                            } else if use_attr_href_value.clone().starts_with('#') {
+                                // Relative symbol that resolves to its own URL; keep as-is.
+                                set_node_attr(node, attr_name, Some(use_attr_href_value));
                             } else {
                                 let image_asset_url: Url =
                                     resolve_url(document_url, &use_attr_href_value);
@@ -1101,30 +1232,25 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     let parent_node = get_parent_node(node);
                     let parent_node_name: &str = get_node_name(&parent_node).unwrap_or_default();
 
-                    if let Some(source_attr_src_value) = get_node_attr(node, "src") {
-                        if parent_node_name == "audio" {
-                            if session.options.no_audio {
-                                set_node_attr(node, "src", None);
-                            } else {
+                    if let Some(source_src) = get_node_attr(node, "src") {
+                        if session.options.no_audio && parent_node_name == "audio"
+                            || session.options.no_video && parent_node_name == "video"
+                        {
+                            set_node_attr(node, "src", None);
+                        } else {
+                            if session.options.output_format == MonolithOutputFormat::HTML {
                                 retrieve_and_embed_asset(
                                     session,
                                     document_url,
                                     node,
                                     "src",
-                                    &source_attr_src_value,
+                                    &source_src,
                                 );
-                            }
-                        } else if parent_node_name == "video" {
-                            if session.options.no_video {
-                                set_node_attr(node, "src", None);
                             } else {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "src",
-                                    &source_attr_src_value,
-                                );
+                                let source_src_full_url: Url =
+                                    resolve_url(document_url, &source_src);
+                                set_node_attr(node, "src", Some(source_src_full_url.to_string()));
+                                session.log_asset_url(&source_src_full_url);
                             }
                         }
                     }
@@ -1169,26 +1295,34 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "script" => {
-                    // Read values of integrity and src attributes
-                    let script_attr_src: &str = &get_node_attr(node, "src").unwrap_or_default();
-
                     if session.options.no_js {
-                        // Empty inner content
+                        // TODO: remove this whole node from DOM instead of messing with it
+                        // Empty contents
                         node.children.borrow_mut().clear();
                         // Remove src attribute
-                        if !script_attr_src.is_empty() {
-                            set_node_attr(node, "src", None);
-                            // Wipe integrity attribute
-                            set_node_attr(node, "integrity", None);
+                        set_node_attr(node, "src", None);
+                        // Wipe integrity attribute
+                        set_node_attr(node, "integrity", None);
+                    } else {
+                        // Read values of integrity and src attributes
+                        let script_src: &str = &get_node_attr(node, "src").unwrap_or_default();
+
+                        if !script_src.is_empty() {
+                            if session.options.output_format == MonolithOutputFormat::HTML {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    script_src,
+                                );
+                            } else {
+                                let script_src_full_url: Url =
+                                    resolve_url(document_url, &script_src);
+                                set_node_attr(node, "src", Some(script_src_full_url.to_string()));
+                                session.log_asset_url(&script_src_full_url);
+                            }
                         }
-                    } else if !script_attr_src.is_empty() {
-                        retrieve_and_embed_asset(
-                            session,
-                            document_url,
-                            node,
-                            "src",
-                            script_attr_src,
-                        );
                     }
                 }
                 "style" => {
@@ -1221,15 +1355,27 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             // Empty the src attribute
                             set_node_attr(node, "src", Some("".to_string()));
                         } else {
-                            // Ignore (i)frames with empty source (they cause infinite loops)
-                            if !frame_attr_src_value.trim().is_empty() {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "src",
-                                    &frame_attr_src_value,
-                                );
+                            if session.options.output_format == MonolithOutputFormat::HTML {
+                                // Ignore (i)frames with empty source (they cause infinite loops)
+                                if !frame_attr_src_value.trim().is_empty() {
+                                    retrieve_and_embed_asset(
+                                        session,
+                                        document_url,
+                                        node,
+                                        "src",
+                                        &frame_attr_src_value,
+                                    );
+                                }
+                            } else {
+                                let frame_src_full_url: Url =
+                                    resolve_url(document_url, &frame_attr_src_value);
+                                set_node_attr(node, "src", Some(frame_src_full_url.to_string()));
+                                session.log_asset_url(&frame_src_full_url);
+                            }
+
+                            // Sandbox iframe if JS is disabled
+                            if name.local.as_ref() == "iframe" && session.options.no_js {
+                                set_node_attr(node, "sandbox", Some("allow-forms".to_string()));
                             }
                         }
                     }
@@ -1240,13 +1386,20 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         if session.options.no_audio {
                             set_node_attr(node, "src", None);
                         } else {
-                            retrieve_and_embed_asset(
-                                session,
-                                document_url,
-                                node,
-                                "src",
-                                &audio_attr_src_value,
-                            );
+                            if session.options.output_format == MonolithOutputFormat::HTML {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    &audio_attr_src_value,
+                                );
+                            } else {
+                                let audio_src_full_url: Url =
+                                    resolve_url(document_url, &audio_attr_src_value);
+                                set_node_attr(node, "src", Some(audio_src_full_url.to_string()));
+                                session.log_asset_url(&audio_src_full_url);
+                            }
                         }
                     }
                 }
@@ -1256,13 +1409,20 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         if session.options.no_video {
                             set_node_attr(node, "src", None);
                         } else {
-                            retrieve_and_embed_asset(
-                                session,
-                                document_url,
-                                node,
-                                "src",
-                                &video_attr_src_value,
-                            );
+                            if session.options.output_format == MonolithOutputFormat::HTML {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    &video_attr_src_value,
+                                );
+                            } else {
+                                let video_src_full_url: Url =
+                                    resolve_url(document_url, &video_attr_src_value);
+                                set_node_attr(node, "src", Some(video_src_full_url.to_string()));
+                                session.log_asset_url(&video_src_full_url);
+                            }
                         }
                     }
 
@@ -1277,42 +1437,55 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     Some(EMPTY_IMAGE_DATA_URL.to_string()),
                                 );
                             } else {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "poster",
-                                    &video_attr_poster_value,
-                                );
+                                if session.options.output_format == MonolithOutputFormat::HTML {
+                                    retrieve_and_embed_asset(
+                                        session,
+                                        document_url,
+                                        node,
+                                        "poster",
+                                        &video_attr_poster_value,
+                                    );
+                                } else {
+                                    let video_poster_full_url: Url =
+                                        resolve_url(document_url, &video_attr_poster_value);
+                                    set_node_attr(
+                                        node,
+                                        "poster",
+                                        Some(video_poster_full_url.to_string()),
+                                    );
+                                    session.log_asset_url(&video_poster_full_url);
+                                }
                             }
                         }
                     }
                 }
                 "noscript" => {
-                    for child_node in node.children.borrow_mut().iter_mut() {
+                    let context = QualName::new(None, ns!(html), LocalName::from("body"));
+
+                    for child_node in node.children.borrow().iter() {
                         if let NodeData::Text { ref contents } = child_node.data {
                             // Get contents of NOSCRIPT node
                             let mut noscript_contents = contents.borrow_mut();
-                            // Parse contents of NOSCRIPT node as DOM
-                            let noscript_contents_dom: RcDom =
-                                html_to_dom(&noscript_contents.as_bytes().to_vec(), "".to_string());
+                            // Parse contents of NOSCRIPT node as a DOM fragment
+                            let fragment: RcDom =
+                                parse_fragment_dom(&context, noscript_contents.clone());
                             // Embed assets of NOSCRIPT node contents
-                            walk(session, document_url, &noscript_contents_dom.document);
-                            // Get rid of original contents
-                            noscript_contents.clear();
-                            // Insert HTML containing embedded assets into NOSCRIPT node
-                            if let Some(html) =
-                                get_child_node_by_name(&noscript_contents_dom.document, "html")
-                            {
-                                if let Some(body) = get_child_node_by_name(&html, "body") {
-                                    let mut buf: Vec<u8> = Vec::new();
-                                    let serializable: SerializableHandle = body.into();
-                                    serialize(&mut buf, &serializable, SerializeOpts::default())
-                                        .expect("Unable to serialize DOM into buffer");
-                                    let result = String::from_utf8_lossy(&buf);
-                                    noscript_contents.push_slice(&result);
-                                }
+                            walk(session, document_url, &fragment.document);
+                            // Serialize the fragment's root; default SerializeOpts use
+                            // TraversalScope::ChildrenOnly, so the <html> wrapper itself
+                            // isn't written out
+                            let mut buf: Vec<u8> = Vec::new();
+                            if let Some(root) = fragment.document.children.borrow().first() {
+                                serialize(
+                                    &mut buf,
+                                    &SerializableHandle::from(root.clone()),
+                                    SerializeOpts::default(),
+                                )
+                                .expect("Unable to serialize DOM into buffer");
                             }
+                            // Replace original contents with HTML containing embedded assets
+                            noscript_contents.clear();
+                            noscript_contents.push_slice(&String::from_utf8_lossy(&buf));
                         }
                     }
                 }

@@ -100,3 +100,27 @@ pub fn attr_is_event_handler(attr_name: &str) -> bool {
         .iter()
         .any(|a| attr_name.eq_ignore_ascii_case(a))
 }
+
+// Neutralizes the only two sequences that let script content affect the
+// HTML tokenizer: "</script" (ends the element) and "<!--" (the way into the
+// double-escaped state, where the real end tag stops working).
+// https://html.spec.whatwg.org/#restrictions-for-contents-of-script-elements
+pub fn escape_script_end_tag(code: &str) -> String {
+    let bytes = code.as_bytes();
+    let mut result = String::with_capacity(code.len());
+    let mut copied = 0;
+
+    for (i, _) in code.match_indices('<') {
+        let rest = &bytes[i + 1..];
+        let end_tag =
+            rest.len() >= 7 && rest[0] == b'/' && rest[1..7].eq_ignore_ascii_case(b"script");
+        if end_tag || rest.starts_with(b"!--") {
+            result.push_str(&code[copied..=i]);
+            result.push('\\');
+            copied = i + 1;
+        }
+    }
+
+    result.push_str(&code[copied..]);
+    result
+}

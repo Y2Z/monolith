@@ -7,18 +7,18 @@
 
 #[cfg(test)]
 mod passing {
+    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
     use std::fs;
-    use std::path::{Path, MAIN_SEPARATOR};
-    use std::process::Command;
+    use std::path::{MAIN_SEPARATOR, Path};
     use url::Url;
 
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
     #[test]
     fn local_file_target_input_relative_target_path() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let cwd_normalized: String = env::current_dir()
             .unwrap()
             .to_str()
@@ -79,7 +79,7 @@ document.body.style.color = "red";
 
     #[test]
     fn local_file_target_input_absolute_target_path() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
 
         let out = cmd
@@ -129,7 +129,7 @@ document.body.style.color = "red";
 
     #[test]
     fn local_file_url_target_input() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let cwd_normalized: String = env::current_dir()
             .unwrap()
             .to_str()
@@ -188,7 +188,7 @@ document.body.style.color = "red";
 
     #[test]
     fn embed_file_url_local_asset_within_style_attribute() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/svg/index.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/image.svg");
 
@@ -220,7 +220,7 @@ document.body.style.color = "red";
 
     #[test]
     fn embed_svg_local_asset_via_use() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/svg/svg.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/icons.svg");
 
@@ -261,8 +261,56 @@ document.body.style.color = "red";
     }
 
     #[test]
+    fn embed_svg_symbol_asset_via_use() {
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let path_html: &Path = Path::new("tests/_data_/svg/svg_inline_symbol_use.html");
+
+        let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
+
+        // STDERR should list files that got retrieved (only 1; no self-embedding for the relative xlink)
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                r#"{file_url_html}
+"#,
+                file_url_html = Url::from_file_path(fs::canonicalize(path_html).unwrap()).unwrap(),
+            )
+        );
+
+        // STDOUT should contain HTML with the use id kept the same because it
+        // references an inlined SVG symbol in the same document
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            r##"<html><head><meta name="robots" content="none"></meta></head><body>
+  <svg xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <symbol id="icon-1" viewBox="0 0 24 24">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M10 20h4V10h3l-5-6.5L7 10h3v10Z"></path>
+      </symbol>
+      <symbol id="icon-2" viewBox="0 0 24 24">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M10 20h4V10h3l-5-6.5L7 10h3v10Z"></path>
+      </symbol>
+    </defs>
+  </svg>
+
+  <button class="tm-votes-lever__button" data-test-id="votes-lever-upvote-button" title="Like" type="button">
+    <svg class="icon">
+      <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#icon-1" href="#icon-1">
+      </use>
+    </svg>
+  </button>
+
+</body></html>
+"##
+        );
+
+        // Exit code should be 0
+        out.assert().code(0);
+    }
+
+    #[test]
     fn embed_svg_local_asset_via_image() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/svg/image.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/image.svg");
 
@@ -299,7 +347,7 @@ document.body.style.color = "red";
 
     #[test]
     fn discard_integrity_for_local_files() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let cwd_normalized: String = env::current_dir()
             .unwrap()
             .to_str()
@@ -360,6 +408,56 @@ document.body.style.color = "red";
 </script>
         <script src="script.js"></script>
     "##.to_owned() + r##"
+
+</body></html>
+"##
+        );
+
+        // Exit code should be 0
+        out.assert().code(0);
+    }
+
+    #[test]
+    fn escape_script_end_tag_variants_in_local_asset() {
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let cwd_normalized: String = env::current_dir()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace("\\", "/");
+        let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
+        let out = cmd
+            .arg("-M")
+            .arg("tests/_data_/script-escape/index.html")
+            .output()
+            .unwrap();
+
+        // STDERR should contain list of retrieved file URLs
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                r#"{file}{cwd}/tests/_data_/script-escape/index.html
+{file}{cwd}/tests/_data_/script-escape/script.js
+"#,
+                file = file_url_protocol,
+                cwd = cwd_normalized,
+            )
+        );
+
+        // STDOUT should contain every closing SCRIPT tag variant escaped
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            r##"<!DOCTYPE html><html><head>
+    <title>Script end tag escaping</title>
+    <script>var a = "<\/script>";
+var b = "<\/SCRIPT>";
+var c = "<\/script >";
+var d = "<\/script/>";
+var e = "<\/scripts>";
+</script>
+<meta name="robots" content="none"></meta></head>
+<body>
+
 
 </body></html>
 "##

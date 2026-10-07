@@ -1,4 +1,4 @@
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use percent_encoding::{percent_decode_str, percent_encode, AsciiSet, CONTROLS};
 pub use url::Url;
 
@@ -34,7 +34,7 @@ const DATA_ESC: &AsciiSet = &CONTROLS
 pub fn clean_url(url: Url) -> Url {
     let mut url = url.clone();
 
-    // Clear fragment (if any)
+    // Remove fragment (if any)
     url.set_fragment(None);
 
     url
