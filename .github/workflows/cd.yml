@@ -9,8 +9,9 @@ on:
 
 jobs:
 
-  gnu_linux_aarch64:
+  linux_aarch64:
     runs-on: ubuntu-22.04
+
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v4
@@ -33,12 +34,13 @@ jobs:
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@v2.0.0
       with:
-        name: monolith-gnu-linux-aarch64
+        name: monolith-linux-aarch64
         path: target/aarch64-unknown-linux-gnu/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  gnu_linux_armhf:
+  linux_armhf:
     runs-on: ubuntu-22.04
+
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v4
@@ -61,12 +63,13 @@ jobs:
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@v2.0.0
       with:
-        name: monolith-gnu-linux-armhf
+        name: monolith-linux-armhf
         path: target/arm-unknown-linux-gnueabihf/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  gnu_linux_x86_64:
+  linux_x86_64:
     runs-on: ubuntu-22.04
+
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v4
@@ -74,14 +77,16 @@ jobs:
     - name: Build the executable
       run: cargo build --release --features cli
 
-    - uses: Shopify/upload-to-release@v2.0.0
+    - name: Attach artifact to the release
+      uses: Shopify/upload-to-release@v2.0.0
       with:
-        name: monolith-gnu-linux-x86_64
+        name: monolith-linux-x86_64
         path: target/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  gnu_linux_x86_64_gui_appimage:
+  linux_x86_64_gui_appimage:
     runs-on: ubuntu-22.04
+
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v4
@@ -120,18 +125,43 @@ jobs:
 
     - name: Rename the AppImage
       run: |
-        mv monolith-*-x86_64.AppImage monolith-gui-gnu-linux-x86_64.AppImage \
-          || mv *.AppImage monolith-gui-gnu-linux-x86_64.AppImage
+        mv monolith-*-x86_64.AppImage monolith-gui-linux-x86_64.AppImage \
+          || mv *.AppImage monolith-gui-linux-x86_64.AppImage
 
-    - name: Attach AppImage to the release
+    - name: Attach artifact to the release
       uses: Shopify/upload-to-release@v2.0.0
       with:
         name: Monolith-x86_64.AppImage
-        path: monolith-gui-gnu-linux-x86_64.AppImage
+        path: monolith-gui-linux-x86_64.AppImage
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  macos:
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Install Rust target
+      run: rustup target add ${{ matrix.target }}
+
+    - name: Build
+      run: cargo build --release --features cli --target ${{ matrix.target }}
+
+    - name: Attach artifact to the release
+      uses: Shopify/upload-to-release@v2.0.0
+      with:
+        name: monolith-macos-${{ matrix.target }}
+        path: target/${{ matrix.target }}/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
   windows:
     runs-on: windows-2022
+
     steps:
     - run: git config --global core.autocrlf false
 
@@ -141,7 +171,8 @@ jobs:
     - name: Build the executable
       run: cargo build --release --features cli
 
-    - uses: Shopify/upload-to-release@v2.0.0
+    - name: Attach artifact to the release
+      uses: Shopify/upload-to-release@v2.0.0
       with:
         name: monolith.exe
         path: target\release\monolith.exe
@@ -149,6 +180,7 @@ jobs:
 
   windows_gui:
     runs-on: windows-2022
+
     steps:
     - run: git config --global core.autocrlf false
 
@@ -158,7 +190,8 @@ jobs:
     - name: Build the GUI executable
       run: cargo build --locked --release --bin monolith-gui --features="gui"
 
-    - uses: Shopify/upload-to-release@v2.0.0
+    - name: Attach artifact to the release
+      uses: Shopify/upload-to-release@v2.0.0
       with:
         name: Monolith.exe
         path: target\release\monolith-gui.exe
