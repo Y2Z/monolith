@@ -1052,8 +1052,8 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         }
 
                         if use_data_src {
-                            // Lazy loaders may copy data-src over src after the page loads.
-                            set_node_attr(node, "data-src", get_node_attr(node, "src"));
+                            // The image is already loaded; remove the lazy source without duplicating it.
+                            set_node_attr(node, "data-src", None);
                         }
                     }
 

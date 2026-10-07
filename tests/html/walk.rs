@@ -34,16 +34,14 @@ mod passing {
                 html::walk(&mut session, &url, &dom.document);
 
                 let nodes = html::find_nodes(&dom.document, vec!["html", "body", "img"]);
-                let data_src = html::get_node_attr(&nodes[0], "data-src").unwrap();
+                let data_src = html::get_node_attr(&nodes[0], "data-src");
                 if no_images {
-                    assert_eq!(data_src, EMPTY_IMAGE_DATA_URL);
+                    assert_eq!(data_src, Some(EMPTY_IMAGE_DATA_URL.to_string()));
                 } else {
-                    assert_eq!(
-                        Some(data_src.clone()),
-                        html::get_node_attr(&nodes[0], "src")
-                    );
+                    assert_eq!(data_src, None);
+                    let src = html::get_node_attr(&nodes[0], "src").unwrap();
                     let (media_type, _, bytes) =
-                        monolith::url::parse_data_url(&Url::parse(&data_src).unwrap());
+                        monolith::url::parse_data_url(&Url::parse(&src).unwrap());
                     assert_eq!(media_type, "image/svg+xml");
                     assert_eq!(bytes, include_bytes!("../_data_/svg/image.svg"));
                 }
