@@ -87,6 +87,12 @@ nix-env -iA nixpkgs.monolith
 flox install monolith
 ```
 
+#### Using [X-CMD](https://www.x-cmd.com/pkg/monolith)
+
+```console
+x install monolith
+```
+
 #### Using [Pacman](https://archlinux.org/packages/extra/x86_64/monolith) (Arch Linux)
 
 ```console
