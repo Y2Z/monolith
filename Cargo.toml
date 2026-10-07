@@ -10,7 +10,7 @@ authors = [
     "Andriy Rakhnin <a@rakhnin.com>",
 ]
 edition = "2024"
-description = "CLI tool and library for saving web pages as a single HTML file"
+description = "GUI/CLI tool and library for saving web pages as a single (M)HTML file"
 homepage = "https://github.com/Y2Z/monolith"
 repository = "https://github.com/Y2Z/monolith"
 readme = "README.md"
@@ -93,3 +93,9 @@ required-features = ["cli"]
 name = "monolith-gui"
 path = "src/gui.rs"
 required-features = ["gui"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
