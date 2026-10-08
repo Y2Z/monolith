@@ -43,6 +43,39 @@ mod passing {
     }
 
     #[test]
+    fn lazy_image_source_remains_embedded() {
+        let url = Url::from_file_path(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/_data_/svg/index.html"),
+        )
+        .unwrap();
+        for src in ["", "src=\"data:,placeholder\""] {
+            for no_images in [false, true] {
+                let source = format!("<img {} data-src=\"image.svg\">", src);
+                let dom = html::html_to_dom(&source.into_bytes(), "".to_string());
+                let mut options = MonolithOptions::default();
+                options.no_images = no_images;
+                options.silent = true;
+                let mut session = Session::new(None, None, options);
+
+                html::walk(&mut session, &url, &dom.document);
+
+                let nodes = html::find_nodes(&dom.document, vec!["html", "body", "img"]);
+                let data_src = html::get_node_attr(&nodes[0], "data-src");
+                if no_images {
+                    assert_eq!(data_src, Some(EMPTY_IMAGE_DATA_URL.to_string()));
+                } else {
+                    assert_eq!(data_src, None);
+                    let src = html::get_node_attr(&nodes[0], "src").unwrap();
+                    let (media_type, _, bytes) =
+                        monolith::url::parse_data_url(&Url::parse(&src).unwrap());
+                    assert_eq!(media_type, "image/svg+xml");
+                    assert_eq!(bytes, include_bytes!("../_data_/svg/image.svg"));
+                }
+            }
+        }
+    }
+
+    #[test]
     fn basic() {
         let html: &str = "<div><P></P></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());

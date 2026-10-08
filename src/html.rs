@@ -21,7 +21,6 @@ use crate::url::{
 };
 
 const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
-const WHITESPACES: &[char] = &[' ', '\t', '\n', '\x0c', '\r']; // ASCII whitespaces
 
 #[derive(PartialEq, Eq)]
 pub enum LinkType {
@@ -414,67 +413,65 @@ pub fn parse_link_type(link_attr_rel_value: &str) -> Vec<LinkType> {
     types
 }
 
+/// Parses srcset following the WHATWG algorithm:
+/// https://html.spec.whatwg.org/multipage/images.html#parsing-a-srcset-attribute
+/// Descriptors are kept verbatim, not validated (browsers drop invalid candidates themselves)
 pub fn parse_srcset(srcset: &str) -> Vec<SrcSetItem<'_>> {
+    let bytes = srcset.as_bytes();
     let mut srcset_items: Vec<SrcSetItem> = vec![];
+    let mut pos: usize = 0;
 
-    // Parse srcset
-    let mut partials: Vec<&str> = srcset.split(WHITESPACES).collect();
-    let mut path: Option<&str> = None;
-    let mut descriptor: Option<&str> = None;
-    let mut i = 0;
-    while i < partials.len() {
-        let partial = partials[i];
-
-        i += 1;
-
-        // Skip empty strings
-        if partial.is_empty() {
-            continue;
+    loop {
+        // Skip whitespace and commas between candidates
+        while pos < bytes.len() && (bytes[pos].is_ascii_whitespace() || bytes[pos] == b',') {
+            pos += 1;
+        }
+        if pos == bytes.len() {
+            break;
         }
 
-        if partial.ends_with(',') {
-            if path.is_none() {
-                path = Some(partial.strip_suffix(',').unwrap());
-                descriptor = Some("")
-            } else {
-                descriptor = Some(partial.strip_suffix(',').unwrap());
+        // URL is a run of non-whitespace characters (may contain commas, e.g. data URLs)
+        let path_start = pos;
+        while pos < bytes.len() && !bytes[pos].is_ascii_whitespace() {
+            pos += 1;
+        }
+        let mut path_end = pos;
+        let mut descriptor_start = pos;
+        let mut descriptor_end = pos;
+
+        if bytes[path_end - 1] == b',' {
+            // Trailing commas end the candidate, meaning it has no descriptors
+            // (can't underflow: the URL never starts with a comma)
+            while bytes[path_end - 1] == b',' {
+                path_end -= 1;
             }
-        } else if path.is_none() {
-            path = Some(partial);
         } else {
-            let mut chunks: Vec<&str> = partial.split(',').collect();
-
-            if !chunks.is_empty() && chunks.first().unwrap().ends_with(['x', 'w']) {
-                descriptor = Some(chunks.first().unwrap());
-
-                chunks.remove(0);
+            // Descriptors run until a comma that isn't inside parentheses
+            while pos < bytes.len() && bytes[pos].is_ascii_whitespace() {
+                pos += 1;
             }
-
-            if !chunks.is_empty() {
-                if descriptor.is_some() {
-                    partials.insert(0, &partial[descriptor.unwrap().len()..]);
-                } else {
-                    partials.insert(0, partial);
+            descriptor_start = pos;
+            descriptor_end = pos;
+            let mut in_parens = false;
+            while pos < bytes.len() {
+                let b = bytes[pos];
+                pos += 1;
+                if in_parens {
+                    in_parens = b != b')';
+                } else if b == b',' {
+                    break;
+                } else if b == b'(' {
+                    in_parens = true;
+                }
+                if !b.is_ascii_whitespace() {
+                    descriptor_end = pos;
                 }
             }
         }
 
-        if path.is_some() && descriptor.is_some() {
-            srcset_items.push(SrcSetItem {
-                path: path.unwrap(),
-                descriptor: descriptor.unwrap(),
-            });
-
-            path = None;
-            descriptor = None;
-        }
-    }
-
-    // Final attempt to process what was found
-    if path.is_some() {
         srcset_items.push(SrcSetItem {
-            path: path.unwrap(),
-            descriptor: descriptor.unwrap_or_default(),
+            path: &srcset[path_start..path_end],
+            descriptor: &srcset[descriptor_start..descriptor_end],
         });
     }
 
@@ -1028,12 +1025,12 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         set_node_attr(node, "src", Some("".to_string()));
                     } else {
                         // Add data URL src attribute
-                        let img_src: String =
-                            if !img_data_src.clone().unwrap_or_default().is_empty() {
-                                img_data_src.unwrap_or_default()
-                            } else {
-                                img_src.unwrap_or_default()
-                            };
+                        let use_data_src = !img_data_src.clone().unwrap_or_default().is_empty();
+                        let img_src: String = if use_data_src {
+                            img_data_src.unwrap_or_default()
+                        } else {
+                            img_src.unwrap_or_default()
+                        };
 
                         if session.options.output_format == MonolithOutputFormat::HTML {
                             retrieve_and_embed_asset(session, document_url, node, "src", &img_src);
@@ -1041,6 +1038,11 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             let img_src_full_url: Url = resolve_url(document_url, &img_src);
                             set_node_attr(node, "src", Some(img_src_full_url.to_string()));
                             session.log_asset_url(&img_src_full_url);
+                        }
+
+                        if use_data_src {
+                            // The image is already loaded; remove the lazy source without duplicating it.
+                            set_node_attr(node, "data-src", None);
                         }
                     }
 
