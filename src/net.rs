@@ -81,6 +81,10 @@ pub fn fetch_remote_asset(
     let cache_key: String = clean_url(url.clone()).as_str().to_string();
 
     if !is_domain_allowed(url, options) {
+        if !options.silent {
+            print_error_message(&format!("{} (domain not allowed)", &cache_key));
+        }
+
         return Err(client.get("").send().unwrap_err());
     }
 
