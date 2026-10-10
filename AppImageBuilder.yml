@@ -7,7 +7,7 @@ AppDir:
     id: y2z.monolith
     name: monolith
     icon: monolith
-    version: 2.11.2
+    version: 2.11.3
     exec: usr/bin/monolith-gui
     exec_args: "$@"
 
@@ -40,5 +40,5 @@ AppDir:
 
 AppImage:
   arch: x86_64
-  sign-key: null
-  update-information: null
+  sign-key: None
+  update-information: None
