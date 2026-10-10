@@ -17,6 +17,32 @@ mod passing {
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
     #[test]
+    fn stylesheet_encoding() {
+        for (charset, bytes) in [
+            ("windows-1252", b"p::before{content:'caf\xe9'}".as_slice()),
+            ("utf-8", "p::before{content:'café'}".as_bytes()),
+            ("", "p::before{content:'café'}".as_bytes()),
+        ] {
+            let url = Url::parse("https://example.com/").unwrap();
+            let asset = monolith::url::create_data_url("text/css", charset, bytes, &url);
+            let source = format!("<link rel=\"stylesheet\" href=\"{}\">", asset);
+            let dom = html::html_to_dom(&source.into_bytes(), "utf-8".to_string());
+            let mut session = Session::new(None, None, MonolithOptions::default());
+
+            html::walk(&mut session, &url, &dom.document);
+
+            let nodes = html::find_nodes(&dom.document, vec!["html", "head", "link"]);
+            let href = html::get_node_attr(&nodes[0], "href").unwrap();
+            let (_, charset, bytes) = monolith::url::parse_data_url(&Url::parse(&href).unwrap());
+            assert_eq!(
+                String::from_utf8(bytes).unwrap(),
+                "p::before{content:\"café\"}"
+            );
+            assert_eq!(charset, "utf-8");
+        }
+    }
+
+    #[test]
     fn lazy_image_source_remains_embedded() {
         let url = Url::from_file_path(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/_data_/svg/index.html"),

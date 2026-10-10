@@ -13,7 +13,7 @@ use std::default::Default;
 use std::rc::Rc;
 
 use crate::core::{MonolithOptions, MonolithOutputFormat, parse_content_type};
-use crate::css::embed_css;
+use crate::css::{embed_css, embed_stylesheet};
 use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::session::Session;
 use crate::url::{
@@ -791,20 +791,12 @@ pub fn retrieve_and_embed_asset(
                     && parse_link_type(&get_node_attr(node, "rel").unwrap_or(String::from("")))
                         .contains(&LinkType::Stylesheet)
                 {
-                    let stylesheet: String;
-                    if let Some(encoding) = Encoding::for_label(charset.as_bytes()) {
-                        let (string, _, _) = encoding.decode(&data);
-                        stylesheet = string.to_string();
-                    } else {
-                        stylesheet = String::from_utf8_lossy(&data).to_string();
-                    }
-
                     // Stylesheet LINK elements require special treatment
-                    let css: String = embed_css(session, &final_url, &stylesheet);
+                    let css = embed_stylesheet(session, &final_url, &data, &charset);
 
                     // Create and embed data URL
                     let css_data_url =
-                        create_data_url(&media_type, &charset, css.as_bytes(), &final_url);
+                        create_data_url(&media_type, "utf-8", css.as_bytes(), &final_url);
                     set_node_attr(node, attr_name, Some(css_data_url.to_string()));
                 } else if node_name == "frame" || node_name == "iframe" {
                     // (I)FRAMEs are also quite different from conventional resources

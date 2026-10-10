@@ -15,6 +15,33 @@ mod passing {
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
     #[test]
+    fn imported_stylesheet_encoding() {
+        let url = Url::parse("https://example.com/").unwrap();
+        for (charset, bytes) in [
+            ("windows-1252", b"p::before{content:'caf\xe9'}".as_slice()),
+            ("utf-8", "p::before{content:'café'}".as_bytes()),
+            ("", "p::before{content:'café'}".as_bytes()),
+        ] {
+            let asset = monolith::url::create_data_url("text/css", charset, bytes, &url);
+            for source in [
+                format!("@import \"{}\";", asset),
+                format!("@import url({});", asset),
+                format!("@import url(\"{}\");", asset),
+            ] {
+                let mut session = Session::new(None, None, MonolithOptions::default());
+                let result = css::embed_css(&mut session, &url, &source);
+                let href = result.split('"').nth(1).unwrap();
+                let (_, charset, bytes) = monolith::url::parse_data_url(&Url::parse(href).unwrap());
+                assert_eq!(
+                    String::from_utf8(bytes).unwrap(),
+                    "p::before{content:\"café\"}"
+                );
+                assert_eq!(charset, "utf-8");
+            }
+        }
+    }
+
+    #[test]
     fn empty_input() {
         let document_url: Url = Url::parse("data:,").unwrap();
         let options = MonolithOptions::default();
@@ -175,9 +202,9 @@ mod passing {
             "\
             @charset \"UTF-8\";\n\
             \n\
-            @import \"data:text/css;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9\";\n\
+            @import \"data:text/css;charset=utf-8;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9\";\n\
             \n\
-            @import url(\"data:text/css;base64,aHRtbHtjb2xvcjojZmZmfQ==\")\n\
+            @import url(\"data:text/css;charset=utf-8;base64,aHRtbHtjb2xvcjojZmZmfQ==\")\n\
             "
         );
     }

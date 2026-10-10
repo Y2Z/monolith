@@ -2,6 +2,8 @@ use cssparser::{
     ParseError, Parser, SourcePosition, Token, serialize_identifier, serialize_string,
 };
 
+use encoding_rs::Encoding;
+
 use crate::core::MonolithOutputFormat;
 use crate::session::Session;
 use crate::url::{EMPTY_IMAGE_DATA_URL, Url, create_data_url, resolve_url};
@@ -31,6 +33,26 @@ pub fn embed_css(session: &mut Session, document_url: &Url, css: &str) -> String
     let mut parser = Parser::new(css);
 
     process_css(session, document_url, &mut parser, "", "", "").unwrap()
+}
+
+pub(crate) fn embed_stylesheet(
+    session: &mut Session,
+    url: &Url,
+    data: &[u8],
+    charset: &str,
+) -> String {
+    // Missing charset metadata is reported as US-ASCII; retain the UTF-8 fallback.
+    let charset = if charset.eq_ignore_ascii_case("US-ASCII") {
+        "utf-8"
+    } else {
+        charset
+    };
+    let stylesheet = if let Some(encoding) = Encoding::for_label(charset.as_bytes()) {
+        encoding.decode(data).0
+    } else {
+        String::from_utf8_lossy(data)
+    };
+    embed_css(session, url, &stylesheet)
 }
 
 pub fn format_ident(ident: &str) -> String {
@@ -170,11 +192,12 @@ pub fn process_css<'a>(
                         )) => {
                             let mut import_data_url = create_data_url(
                                 &import_media_type,
-                                &import_charset,
-                                embed_css(
+                                "utf-8",
+                                embed_stylesheet(
                                     session,
                                     &import_final_url,
-                                    &String::from_utf8_lossy(&import_contents),
+                                    &import_contents,
+                                    &import_charset,
                                 )
                                 .as_bytes(),
                                 &import_final_url,
@@ -301,9 +324,8 @@ pub fn process_css<'a>(
                         Ok((css, final_url, media_type, charset)) => {
                             let mut data_url = create_data_url(
                                 &media_type,
-                                &charset,
-                                embed_css(session, &final_url, &String::from_utf8_lossy(&css))
-                                    .as_bytes(),
+                                "utf-8",
+                                embed_stylesheet(session, &final_url, &css, &charset).as_bytes(),
                                 &final_url,
                             );
                             data_url.set_fragment(full_url.fragment());
