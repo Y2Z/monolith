@@ -9,7 +9,7 @@ on:
 
 jobs:
 
-  linux_aarch64:
+  linux_aarch64_cli:
     runs-on: ubuntu-22.04
 
     steps:
@@ -38,7 +38,7 @@ jobs:
         path: target/aarch64-unknown-linux-gnu/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  linux_armhf:
+  linux_armhf_cli:
     runs-on: ubuntu-22.04
 
     steps:
@@ -67,7 +67,7 @@ jobs:
         path: target/arm-unknown-linux-gnueabihf/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  linux_x86_64:
+  linux_x86_64_cli:
     runs-on: ubuntu-22.04
 
     steps:
@@ -135,7 +135,7 @@ jobs:
         path: monolith-gui-linux-x86_64.AppImage
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  macos:
+  macos_cli:
     runs-on: macos-latest
 
     strategy:
@@ -159,7 +159,7 @@ jobs:
         path: target/${{ matrix.target }}/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  windows:
+  windows_cli:
     runs-on: windows-2022
 
     steps:
@@ -174,7 +174,7 @@ jobs:
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@v2.0.0
       with:
-        name: monolith.exe
+        name: monolith-cli.exe
         path: target\release\monolith.exe
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
