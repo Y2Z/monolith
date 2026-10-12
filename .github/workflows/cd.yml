@@ -9,7 +9,7 @@ on:
 
 jobs:
 
-  linux_aarch64_cli:
+  linux_cli_aarch64:
     runs-on: ubuntu-22.04
 
     steps:
@@ -34,11 +34,11 @@ jobs:
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@v2.0.0
       with:
-        name: monolith-linux-aarch64
+        name: monolith-cli-linux-aarch64
         path: target/aarch64-unknown-linux-gnu/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  linux_armhf_cli:
+  linux_cli_armhf:
     runs-on: ubuntu-22.04
 
     steps:
@@ -63,11 +63,11 @@ jobs:
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@v2.0.0
       with:
-        name: monolith-linux-armhf
+        name: monolith-cli-linux-armhf
         path: target/arm-unknown-linux-gnueabihf/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  linux_x86_64_cli:
+  linux_cli_x86_64:
     runs-on: ubuntu-22.04
 
     steps:
@@ -80,11 +80,11 @@ jobs:
     - name: Attach artifact to the release
       uses: Shopify/upload-to-release@v2.0.0
       with:
-        name: monolith-linux-x86_64
+        name: monolith-cli-linux-x86_64
         path: target/release/monolith
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  linux_x86_64_gui_appimage:
+  linux_gui_appimage_x86_64:
     runs-on: ubuntu-22.04
 
     steps:
