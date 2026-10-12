@@ -10,7 +10,7 @@ mod passing {
     use reqwest::Url;
 
     use monolith::core::MonolithOptions;
-    use monolith::css;
+    use monolith::css::embed_css;
     use monolith::session::Session;
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
@@ -44,7 +44,7 @@ mod passing {
                 format!("@import url(\"{}\");", asset),
             ] {
                 let mut session = Session::new(None, None, MonolithOptions::default());
-                let result = css::embed_css(&mut session, &url, &source);
+                let result = embed_css(&mut session, &url, &source);
 
                 assert_eq!(
                     first_embedded_data_url(&result),
@@ -70,7 +70,7 @@ mod passing {
             &url,
         );
         let mut session = Session::new(None, None, MonolithOptions::default());
-        let result = css::embed_css(&mut session, &url, &format!("@import \"{}\";", asset));
+        let result = embed_css(&mut session, &url, &format!("@import \"{}\";", asset));
 
         assert_eq!(
             first_embedded_data_url(&result),
@@ -87,7 +87,7 @@ mod passing {
         let options = MonolithOptions::default();
         let mut session: Session = Session::new(None, None, options);
 
-        assert_eq!(css::embed_css(&mut session, &document_url, ""), "");
+        assert_eq!(embed_css(&mut session, &document_url, ""), "");
     }
 
     #[test]
@@ -96,10 +96,7 @@ mod passing {
         let options = MonolithOptions::default();
         let mut session: Session = Session::new(None, None, options);
 
-        assert_eq!(
-            css::embed_css(&mut session, &document_url, "\t     \t   "),
-            ""
-        );
+        assert_eq!(embed_css(&mut session, &document_url, "\t     \t   "), "");
     }
 
     #[test]
@@ -119,7 +116,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(&mut session, &document_url, STYLE),
+            embed_css(&mut session, &document_url, STYLE),
             format!(
                 "/* border: none;*/\
                 background-image: url(\"{empty_image}\"); \
@@ -150,7 +147,7 @@ mod passing {
             height: calc(100vh - 10pt)";
 
         assert_eq!(
-            css::embed_css(&mut session, &document_url, STYLE),
+            embed_css(&mut session, &document_url, STYLE),
             format!(
                 "/* border: none;*/\
                 background-image: url(\"{empty_image}\"); \
@@ -179,7 +176,7 @@ mod passing {
             \n\
             html > body {}";
 
-        assert_eq!(css::embed_css(&mut session, &document_url, CSS), CSS);
+        assert_eq!(embed_css(&mut session, &document_url, CSS), CSS);
     }
 
     #[test]
@@ -219,7 +216,7 @@ mod passing {
             }
             ";
 
-        assert_eq!(css::embed_css(&mut session, &document_url, CSS), CSS);
+        assert_eq!(embed_css(&mut session, &document_url, CSS), CSS);
     }
 
     #[test]
@@ -238,7 +235,7 @@ mod passing {
             ";
 
         assert_eq!(
-            css::embed_css(&mut session, &document_url, CSS),
+            embed_css(&mut session, &document_url, CSS),
             "\
             @charset \"UTF-8\";\n\
             \n\
@@ -266,7 +263,7 @@ mod passing {
             }\n\
             ";
 
-        assert_eq!(css::embed_css(&mut session, &document_url, CSS), CSS);
+        assert_eq!(embed_css(&mut session, &document_url, CSS), CSS);
     }
 
     #[test]
@@ -284,7 +281,7 @@ mod passing {
             }\n\
             ";
 
-        assert_eq!(css::embed_css(&mut session, &document_url, CSS), CSS);
+        assert_eq!(embed_css(&mut session, &document_url, CSS), CSS);
     }
 
     #[test]
@@ -304,7 +301,7 @@ mod passing {
             }\n\
             ";
 
-        assert_eq!(css::embed_css(&mut session, &document_url, CSS), CSS);
+        assert_eq!(embed_css(&mut session, &document_url, CSS), CSS);
     }
 
     #[test]
@@ -348,7 +345,7 @@ mod passing {
             }\n\
             ";
 
-        assert_eq!(css::embed_css(&mut session, &document_url, CSS), CSS_OUT);
+        assert_eq!(embed_css(&mut session, &document_url, CSS), CSS_OUT);
     }
 
     #[test]
@@ -369,7 +366,7 @@ mod passing {
                 white-space: pre }\n\
             ";
 
-        assert_eq!(css::embed_css(&mut session, &document_url, CSS), CSS_OUT);
+        assert_eq!(embed_css(&mut session, &document_url, CSS), CSS_OUT);
     }
 
     #[test]
@@ -392,6 +389,6 @@ mod passing {
             }\n\
             ";
 
-        assert_eq!(css::embed_css(&mut session, &document_url, CSS), CSS_OUT);
+        assert_eq!(embed_css(&mut session, &document_url, CSS), CSS_OUT);
     }
 }
