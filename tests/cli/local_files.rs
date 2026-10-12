@@ -55,7 +55,7 @@ mod passing {
             r##"<!DOCTYPE html><html lang="en"><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Local HTML file</title>
-  <link href="data:text/css;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNmZmY7Cn0K" rel="stylesheet" type="text/css">
+  <link href="data:text/css;charset=utf-8;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNmZmY7Cn0K" rel="stylesheet" type="text/css">
   <link rel="stylesheet" type="text/css">
 <meta name="robots" content="none"></meta></head>
 
@@ -393,7 +393,7 @@ document.body.style.color = "red";
             String::from_utf8_lossy(&out.stdout),
             r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="img-src data:;"></meta>
         <title>Local HTML file</title>
-        <link href="data:text/css;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNGRkY7Cn0K" rel="stylesheet" type="text/css" crossorigin="anonymous">
+        <link href="data:text/css;charset=utf-8;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNGRkY7Cn0K" rel="stylesheet" type="text/css" crossorigin="anonymous">
         <link href="style.css" rel="stylesheet" type="text/css" crossorigin="anonymous">
     <meta name="robots" content="none"></meta></head>
 
