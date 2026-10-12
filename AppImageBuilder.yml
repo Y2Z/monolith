@@ -15,6 +15,7 @@ AppDir:
     arch: amd64
     sources:
       - sourceline: "deb http://archive.ubuntu.com/ubuntu/ jammy main universe multiverse"
+        key_url: "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C"
     include:
       - libglib2.0-0
       - libgtk-3-0
