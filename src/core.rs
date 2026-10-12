@@ -142,6 +142,10 @@ pub fn create_monolithic_document_from_data(
     let mut document_encoding: String = input_encoding.clone().unwrap_or("utf-8".to_string());
     let mut dom: RcDom;
 
+    // Encoding the document declares (if any), used for decoding unlabeled stylesheets
+    let mut environment_encoding: Option<&'static Encoding> =
+        input_encoding.as_deref().and_then(declared_encoding);
+
     // Initial parse
     dom = html_to_dom(&input_data, document_encoding.clone());
 
@@ -153,6 +157,7 @@ pub fn create_monolithic_document_from_data(
                 Encoding::for_label_no_replacement(html_charset.as_bytes())
             {
                 document_encoding = html_charset;
+                environment_encoding = Some(document_charset);
                 dom = html_to_dom(&input_data, document_charset.name().to_string());
             }
         }
@@ -203,7 +208,13 @@ pub fn create_monolithic_document_from_data(
 
     session.prefetch_assets(&base_url, &dom.document);
 
+    // A byte order mark beats any declaration when it comes to decoding the document
+    if let Some((bom_encoding, _)) = Encoding::for_bom(&input_data) {
+        environment_encoding = Some(bom_encoding);
+    }
+
     // Traverse through the document and embed remote assets
+    session.environment_encoding = environment_encoding;
     walk(&mut session, &base_url, &dom.document);
 
     // Update or add new BASE element to reroute network requests and hash-links
@@ -537,6 +548,19 @@ pub fn format_output_path(
             },
         )
         .to_string()
+}
+
+/// Maps a charset label (Content-Type header, data URL, META element) onto an encoding.
+/// Returns None for labels that don't actually declare anything: empty ones, unknown ones,
+/// and "US-ASCII", which is what parse_content_type() reports when no charset was given.
+pub fn declared_encoding(charset: &str) -> Option<&'static Encoding> {
+    let charset = charset.trim();
+
+    if charset.is_empty() || charset.eq_ignore_ascii_case("US-ASCII") {
+        return None;
+    }
+
+    Encoding::for_label_no_replacement(charset.as_bytes())
 }
 
 pub fn is_plaintext_media_type(media_type: &str) -> bool {

@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use encoding_rs::Encoding;
 use markup5ever_rcdom::Handle;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
@@ -20,6 +21,9 @@ pub struct Session {
     cache: Option<Cache>,
     client: Client,
     cookies: Option<Vec<Cookie>>,
+    /// Encoding of the document (or stylesheet) currently being processed, if it declares one.
+    /// Stylesheets that don't specify their own encoding get decoded using it.
+    pub environment_encoding: Option<&'static Encoding>,
     pub options: MonolithOptions,
 }
 
@@ -77,6 +81,7 @@ impl Session {
             cache,
             cookies,
             client,
+            environment_encoding: None,
             options,
         }
     }

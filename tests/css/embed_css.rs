@@ -82,6 +82,57 @@ mod passing {
     }
 
     #[test]
+    fn imported_stylesheet_environment_encoding() {
+        let url = Url::parse("https://example.com/").unwrap();
+        let asset = monolith::url::create_data_url(
+            "text/css",
+            "",
+            b"p{font-family:'\x83\x81\x83\x43\x83\x8a\x83\x49'}",
+            &url,
+        );
+        let mut session = Session::new(None, None, MonolithOptions::default());
+        session.environment_encoding = Some(encoding_rs::SHIFT_JIS);
+
+        let result = embed_css(&mut session, &url, &format!("@import \"{}\";", asset));
+
+        assert_eq!(
+            first_embedded_data_url(&result),
+            (
+                "utf-8".to_string(),
+                "p{font-family:\"メイリオ\"}".to_string()
+            )
+        );
+        assert_eq!(session.environment_encoding, Some(encoding_rs::SHIFT_JIS));
+    }
+
+    #[test]
+    fn nested_import_inherits_importing_stylesheet_encoding() {
+        let url = Url::parse("https://example.com/").unwrap();
+        // EUC-JP "両", which also happens to be valid UTF-8 ("ξ")
+        let inner =
+            monolith::url::create_data_url("text/css", "", b"p::before{content:'\xce\xbe'}", &url);
+        let outer = monolith::url::create_data_url(
+            "text/css",
+            "",
+            format!("@charset \"EUC-JP\";@import \"{}\";", inner).as_bytes(),
+            &url,
+        );
+        let mut session = Session::new(None, None, MonolithOptions::default());
+        session.environment_encoding = Some(encoding_rs::SHIFT_JIS);
+
+        let result = embed_css(&mut session, &url, &format!("@import \"{}\";", outer));
+
+        let (outer_charset, outer_css) = first_embedded_data_url(&result);
+        assert_eq!(outer_charset, "utf-8");
+        assert!(outer_css.starts_with("@charset \"UTF-8\";@import \"data:"));
+        assert_eq!(
+            first_embedded_data_url(&outer_css),
+            ("utf-8".to_string(), "p::before{content:\"両\"}".to_string())
+        );
+        assert_eq!(session.environment_encoding, Some(encoding_rs::SHIFT_JIS));
+    }
+
+    #[test]
     fn empty_input() {
         let document_url: Url = Url::parse("data:,").unwrap();
         let options = MonolithOptions::default();
