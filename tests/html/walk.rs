@@ -59,6 +59,78 @@ mod passing {
         }
     }
 
+    /// Finds the first data URL of the given media type in serialized markup
+    /// (or in a bare attribute value) and decodes it
+    fn find_data_url(markup: &str, media_type: &str) -> (String, String) {
+        let start = markup
+            .find(&format!("data:{}", media_type))
+            .expect("no data URL found");
+        let end = start + markup[start..].find('"').unwrap_or(markup.len() - start);
+        let (_, charset, data) =
+            monolith::url::parse_data_url(&Url::parse(&markup[start..end]).unwrap());
+        (
+            charset,
+            String::from_utf8(data).expect("embedded data is not UTF-8"),
+        )
+    }
+
+    // "p{font-family:'メイリオ'}" in Shift_JIS, without any charset declared
+    const SHIFT_JIS_CSS: &[u8] = b"p{font-family:'\x83\x81\x83\x43\x83\x8a\x83\x49'}";
+
+    #[test]
+    fn linked_stylesheet_environment_encoding() {
+        let url = Url::parse("https://example.com/").unwrap();
+        let asset = monolith::url::create_data_url("text/css", "", SHIFT_JIS_CSS, &url);
+        let source = format!("<link rel=\"stylesheet\" href=\"{}\">", asset);
+        let dom = html::html_to_dom(&source.into_bytes(), "utf-8".to_string());
+        let mut session = Session::new(None, None, MonolithOptions::default());
+        session.environment_encoding = Some(encoding_rs::SHIFT_JIS);
+
+        html::walk(&mut session, &url, &dom.document);
+
+        let nodes = html::find_nodes(&dom.document, vec!["html", "head", "link"]);
+        let href = html::get_node_attr(&nodes[0], "href").unwrap();
+        assert_eq!(
+            find_data_url(&href, "text/css"),
+            (
+                "utf-8".to_string(),
+                "p{font-family:\"メイリオ\"}".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn frame_encoding() {
+        let url = Url::parse("https://example.com/").unwrap();
+        let css = monolith::url::create_data_url("text/css", "", SHIFT_JIS_CSS, &url);
+        let mut frame_html: Vec<u8> = format!(
+            "<html><head><meta charset=\"Shift_JIS\"><link rel=\"stylesheet\" href=\"{}\"></head><body>",
+            css
+        )
+        .into_bytes();
+        frame_html.extend_from_slice(b"\x83\x81\x83\x43\x83\x8a\x83\x49</body></html>");
+        let frame = monolith::url::create_data_url("text/html", "", &frame_html, &url);
+        let source = format!("<iframe src=\"{}\"></iframe>", frame);
+        let dom = html::html_to_dom(&source.into_bytes(), "utf-8".to_string());
+        let mut session = Session::new(None, None, MonolithOptions::default());
+
+        html::walk(&mut session, &url, &dom.document);
+
+        let nodes = html::find_nodes(&dom.document, vec!["html", "body", "iframe"]);
+        let src = html::get_node_attr(&nodes[0], "src").unwrap();
+        let (frame_charset, frame_markup) = find_data_url(&src, "text/html");
+        assert_eq!(frame_charset, "utf-8");
+        assert!(frame_markup.contains("<body>メイリオ</body>"));
+        assert_eq!(
+            find_data_url(&frame_markup, "text/css"),
+            (
+                "utf-8".to_string(),
+                "p{font-family:\"メイリオ\"}".to_string()
+            )
+        );
+        assert_eq!(session.environment_encoding, None);
+    }
+
     #[test]
     fn lazy_image_source_remains_embedded() {
         let url = Url::from_file_path(

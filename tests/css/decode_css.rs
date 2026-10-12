@@ -7,7 +7,9 @@
 
 #[cfg(test)]
 mod passing {
-    use monolith::css::decode_css;
+    use encoding_rs::{EUC_JP, SHIFT_JIS, UTF_8, WINDOWS_1252};
+
+    use monolith::css::{decode_css, decode_stylesheet};
 
     #[test]
     fn utf8_without_charset() {
@@ -110,6 +112,73 @@ mod passing {
         assert_eq!(
             decode_css(b"@charset  \"koi8-r\";a{content:'caf\xe9'}", ""),
             "@charset  \"koi8-r\";a{content:'café'}"
+        );
+    }
+
+    #[test]
+    fn environment_encoding_is_used_for_unlabeled_stylesheets() {
+        let css = b"p{font-family:'\x83\x81\x83\x43\x83\x8a\x83\x49'}";
+
+        assert_eq!(
+            decode_stylesheet(css, "", Some(SHIFT_JIS)),
+            ("p{font-family:'メイリオ'}".to_string(), SHIFT_JIS)
+        );
+        assert_eq!(
+            decode_stylesheet(css, "US-ASCII", Some(SHIFT_JIS)),
+            ("p{font-family:'メイリオ'}".to_string(), SHIFT_JIS)
+        );
+    }
+
+    #[test]
+    fn environment_encoding_beats_accidentally_valid_utf8() {
+        // EUC-JP "両" is the same two bytes as UTF-8 "ξ"
+        let css = b"p::before{content:'\xce\xbe'}";
+
+        assert_eq!(
+            decode_stylesheet(css, "", Some(EUC_JP)),
+            ("p::before{content:'両'}".to_string(), EUC_JP)
+        );
+        assert_eq!(
+            decode_stylesheet(css, "", None),
+            ("p::before{content:'ξ'}".to_string(), UTF_8)
+        );
+    }
+
+    #[test]
+    fn declarations_beat_environment_encoding() {
+        // Protocol charset
+        assert_eq!(
+            decode_stylesheet("a{content:'café'}".as_bytes(), "utf-8", Some(SHIFT_JIS)),
+            ("a{content:'café'}".to_string(), UTF_8)
+        );
+        // @charset rule
+        assert_eq!(
+            decode_stylesheet(
+                b"@charset \"windows-1252\";a{content:'caf\xe9'}",
+                "",
+                Some(SHIFT_JIS)
+            ),
+            (
+                "@charset \"UTF-8\";a{content:'café'}".to_string(),
+                WINDOWS_1252
+            )
+        );
+        // Byte order mark
+        assert_eq!(
+            decode_stylesheet(b"\xef\xbb\xbfa{content:'caf\xc3\xa9'}", "", Some(SHIFT_JIS)),
+            ("a{content:'café'}".to_string(), UTF_8)
+        );
+    }
+
+    #[test]
+    fn utf8_environment_encoding_changes_nothing() {
+        assert_eq!(
+            decode_stylesheet(b"a{content:'caf\xe9'}", "", Some(UTF_8)),
+            ("a{content:'café'}".to_string(), WINDOWS_1252)
+        );
+        assert_eq!(
+            decode_stylesheet("a{content:'café'}".as_bytes(), "", Some(UTF_8)),
+            ("a{content:'café'}".to_string(), UTF_8)
         );
     }
 }

@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
 use std::rc::Rc;
 
-use crate::core::{MonolithOptions, MonolithOutputFormat, parse_content_type};
+use crate::core::{MonolithOptions, MonolithOutputFormat, declared_encoding, parse_content_type};
 use crate::css::{embed_css, embed_stylesheet};
 use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::session::Session;
@@ -800,16 +800,36 @@ pub fn retrieve_and_embed_asset(
                     set_node_attr(node, attr_name, Some(css_data_url.to_string()));
                 } else if node_name == "frame" || node_name == "iframe" {
                     // (I)FRAMEs are also quite different from conventional resources
-                    let frame_dom = html_to_dom(&data, charset.clone());
+                    let mut frame_dom = html_to_dom(&data, charset.clone());
+                    let mut frame_encoding: Option<&'static Encoding> = declared_encoding(&charset);
+
+                    // Without a charset from the protocol, look for one declared inside the document
+                    if frame_encoding.is_none() {
+                        if let Some(frame_charset) = get_charset(&frame_dom.document) {
+                            if let Some(encoding) = declared_encoding(&frame_charset) {
+                                frame_dom = html_to_dom(&data, encoding.name().to_string());
+                                frame_encoding = Some(encoding);
+                            }
+                        }
+                    }
+
+                    // A byte order mark beats any declaration when it comes to decoding
+                    if let Some((bom_encoding, _)) = Encoding::for_bom(&data) {
+                        frame_encoding = Some(bom_encoding);
+                    }
+
+                    let environment_encoding =
+                        std::mem::replace(&mut session.environment_encoding, frame_encoding);
                     walk(session, &final_url, &frame_dom.document);
+                    session.environment_encoding = environment_encoding;
 
                     let mut frame_data: Vec<u8> = Vec::new();
                     let serializable: SerializableHandle = frame_dom.document.into();
                     serialize(&mut frame_data, &serializable, SerializeOpts::default()).unwrap();
 
-                    // Create and embed data URL
+                    // Create and embed data URL (serialized frames are always UTF-8)
                     let mut frame_data_url =
-                        create_data_url(&media_type, &charset, &frame_data, &final_url);
+                        create_data_url(&media_type, "utf-8", &frame_data, &final_url);
                     frame_data_url.set_fragment(resolved_url.fragment());
                     set_node_attr(node, attr_name, Some(frame_data_url.to_string()));
                 } else {

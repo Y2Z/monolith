@@ -3,10 +3,12 @@ use cssparser::{
 };
 use encoding_rs::{Encoding, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252};
 
-use crate::core::MonolithOutputFormat;
+use crate::core::{MonolithOutputFormat, declared_encoding};
 use crate::session::Session;
 use crate::url::{EMPTY_IMAGE_DATA_URL, Url, create_data_url, resolve_url};
 
+const CHARSET_RULE_PREFIX: &str = "@charset \"";
+const CHARSET_RULE_SUFFIX: &str = "\";";
 const CSS_PROPS_WITH_IMAGE_URLS: &[&str] = &[
     // Universal
     "background",
@@ -34,13 +36,21 @@ pub fn embed_css(session: &mut Session, document_url: &Url, css: &str) -> String
     process_css(session, document_url, &mut parser, "", "", "").unwrap()
 }
 
+/// Decodes a stylesheet's raw bytes into text (see `decode_stylesheet`), without knowing
+/// the encoding of the document that references it.
+pub fn decode_css(data: &[u8], charset: &str) -> String {
+    decode_stylesheet(data, charset, None).0
+}
+
 /// Decodes a stylesheet's raw bytes into text, following the order the CSS Syntax spec uses
 /// to determine a stylesheet's encoding (https://www.w3.org/TR/css-syntax-3/#input-byte-stream):
 ///
 ///   1. byte order mark;
 ///   2. charset given by the protocol (Content-Type header, data URL);
 ///   3. `@charset` rule at the very beginning of the stylesheet;
-///   4. fallback: UTF-8 if the bytes are valid UTF-8, Windows-1252 otherwise.
+///   4. environment encoding: the encoding of whatever references the stylesheet
+///      (the document for LINK elements, the importing stylesheet for @import);
+///   5. fallback: UTF-8 if the bytes are valid UTF-8, Windows-1252 otherwise.
 ///
 /// A charset of "US-ASCII" is treated the same as no charset at all, because that's what asset
 /// retrieval reports when none was given (RFC 2397 default). For text that really is ASCII it
@@ -48,14 +58,30 @@ pub fn embed_css(session: &mut Session, document_url: &Url, css: &str) -> String
 /// maps "us-ascii" onto Windows-1252), while also handling the far more common case of UTF-8
 /// stylesheets served without any charset.
 ///
-/// The returned text no longer carries a byte order mark, and its leading `@charset` rule
-/// (if any) is rewritten to say UTF-8, since that's how the text will be embedded from now on.
-pub fn decode_css(data: &[u8], charset: &str) -> String {
+/// The environment encoding is used even when the bytes happen to be valid UTF-8, the way
+/// browsers do it: short runs of legacy multi-byte text are often valid UTF-8 by accident
+/// (e.g. EUC-JP "両" is the same two bytes as UTF-8 "ξ"). A UTF-8 environment adds nothing
+/// to the fallback, so it only matters for stylesheets that aren't valid UTF-8, and those are
+/// better off read as Windows-1252 than filled with replacement characters.
+///
+/// Returns the text along with the encoding it was decoded from. The text no longer carries
+/// a byte order mark, and its leading `@charset` rule (if any) is rewritten to say UTF-8,
+/// since that's how the text will be embedded from now on.
+pub fn decode_stylesheet(
+    data: &[u8],
+    charset: &str,
+    environment_encoding: Option<&'static Encoding>,
+) -> (String, &'static Encoding) {
+    let environment_encoding =
+        environment_encoding.filter(|encoding| ![UTF_8, UTF_16BE, UTF_16LE].contains(encoding));
+
     let (encoding, bom_length) = if let Some((encoding, bom_length)) = Encoding::for_bom(data) {
         (encoding, bom_length)
-    } else if let Some(encoding) = protocol_encoding(charset) {
+    } else if let Some(encoding) = declared_encoding(charset) {
         (encoding, 0)
     } else if let Some(encoding) = charset_rule_encoding(data) {
+        (encoding, 0)
+    } else if let Some(encoding) = environment_encoding {
         (encoding, 0)
     } else if std::str::from_utf8(data).is_ok() {
         (UTF_8, 0)
@@ -65,26 +91,20 @@ pub fn decode_css(data: &[u8], charset: &str) -> String {
 
     let (text, _) = encoding.decode_without_bom_handling(&data[bom_length..]);
 
-    rewrite_charset_rule(&text)
+    (rewrite_charset_rule(&text), encoding)
 }
 
-/// Decodes a stylesheet (see `decode_css`) and embeds all of its assets.
+/// Decodes a stylesheet (see `decode_stylesheet`) and embeds all of its assets.
 /// The resulting text is meant to be stored as UTF-8.
 pub fn embed_stylesheet(session: &mut Session, url: &Url, data: &[u8], charset: &str) -> String {
-    embed_css(session, url, &decode_css(data, charset))
-}
+    let (css, encoding) = decode_stylesheet(data, charset, session.environment_encoding);
 
-const CHARSET_RULE_PREFIX: &str = "@charset \"";
-const CHARSET_RULE_SUFFIX: &str = "\";";
+    // Stylesheets imported by this one use its encoding as their environment encoding
+    let environment_encoding = session.environment_encoding.replace(encoding);
+    let result = embed_css(session, url, &css);
+    session.environment_encoding = environment_encoding;
 
-fn protocol_encoding(charset: &str) -> Option<&'static Encoding> {
-    let charset = charset.trim();
-
-    if charset.is_empty() || charset.eq_ignore_ascii_case("US-ASCII") {
-        return None;
-    }
-
-    Encoding::for_label_no_replacement(charset.as_bytes())
+    result
 }
 
 /// Extracts the encoding from a leading `@charset "...";` rule.
