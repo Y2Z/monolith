@@ -10,7 +10,7 @@ use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, REFERER};
 
 use crate::cookies::Cookie;
 use crate::core::{MonolithOptions, parse_content_type, print_error_message, print_info_message};
-use crate::css::is_image_url_prop;
+use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset};
 use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, resolve_url};
 
@@ -261,13 +261,8 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             AssetKind::Css => {
                 // TODO: check integrity here to avoid dealing with bad files
 
-                let stylesheet =
-                    if let Some(encoding) = encoding_rs::Encoding::for_label(charset.as_bytes()) {
-                        let (decoded, _, _) = encoding.decode(&data);
-                        decoded.into_owned()
-                    } else {
-                        String::from_utf8_lossy(&data).into_owned()
-                    };
+                // Decode exactly the way the walk will, so both discover the same URLs
+                let stylesheet = decode_css(&data, &charset);
                 collect_css_str(&stylesheet, &final_url, ctx.options, &mut more_jobs);
             }
             AssetKind::Html => {

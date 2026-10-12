@@ -14,6 +14,73 @@ mod passing {
     use monolith::session::Session;
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
+    /// Extracts the first data URL out of serialized CSS and decodes it
+    fn first_embedded_data_url(css: &str) -> (String, String) {
+        let start = css.find("data:").expect("no data URL found");
+        let end = start + css[start..].find('"').expect("unterminated data URL");
+        let (_, charset, data) =
+            monolith::url::parse_data_url(&Url::parse(&css[start..end]).unwrap());
+        (
+            charset,
+            String::from_utf8(data).expect("embedded CSS is not UTF-8"),
+        )
+    }
+
+    #[test]
+    fn imported_stylesheet_encoding() {
+        let url = Url::parse("https://example.com/").unwrap();
+
+        for (charset, bytes) in [
+            ("windows-1252", b"p::before{content:'caf\xe9'}".as_slice()),
+            ("utf-8", "p::before{content:'café'}".as_bytes()),
+            ("", "p::before{content:'café'}".as_bytes()),
+            ("", b"p::before{content:'caf\xe9'}".as_slice()),
+        ] {
+            let asset = monolith::url::create_data_url("text/css", charset, bytes, &url);
+
+            for source in [
+                format!("@import \"{}\";", asset),
+                format!("@import url({});", asset),
+                format!("@import url(\"{}\");", asset),
+            ] {
+                let mut session = Session::new(None, None, MonolithOptions::default());
+                let result = css::embed_css(&mut session, &url, &source);
+
+                assert_eq!(
+                    first_embedded_data_url(&result),
+                    (
+                        "utf-8".to_string(),
+                        "p::before{content:\"café\"}".to_string()
+                    ),
+                    "charset {:?}, source {}",
+                    charset,
+                    source
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn imported_stylesheet_charset_rule() {
+        let url = Url::parse("https://example.com/").unwrap();
+        let asset = monolith::url::create_data_url(
+            "text/css",
+            "",
+            b"@charset \"windows-1252\";p::before{content:'caf\xe9'}",
+            &url,
+        );
+        let mut session = Session::new(None, None, MonolithOptions::default());
+        let result = css::embed_css(&mut session, &url, &format!("@import \"{}\";", asset));
+
+        assert_eq!(
+            first_embedded_data_url(&result),
+            (
+                "utf-8".to_string(),
+                "@charset \"UTF-8\";p::before{content:\"café\"}".to_string()
+            )
+        );
+    }
+
     #[test]
     fn empty_input() {
         let document_url: Url = Url::parse("data:,").unwrap();
@@ -175,9 +242,9 @@ mod passing {
             "\
             @charset \"UTF-8\";\n\
             \n\
-            @import \"data:text/css;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9\";\n\
+            @import \"data:text/css;charset=utf-8;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9\";\n\
             \n\
-            @import url(\"data:text/css;base64,aHRtbHtjb2xvcjojZmZmfQ==\")\n\
+            @import url(\"data:text/css;charset=utf-8;base64,aHRtbHtjb2xvcjojZmZmfQ==\")\n\
             "
         );
     }
