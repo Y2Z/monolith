@@ -228,9 +228,9 @@ pub fn create_monolithic_document_from_data(
 
         match session.retrieve_asset(/*&target_url, */ &base_url, &favicon_ico_url) {
             Ok((data, final_url, media_type, charset)) => {
-                let favicon_data_url: Url =
-                    create_data_url(&media_type, &charset, &data, &final_url);
-                dom = add_favicon(&dom.document, favicon_data_url.to_string());
+                let favicon_data_url: String =
+                    create_data_url(&media_type, &charset, data, &final_url, None);
+                dom = add_favicon(&dom.document, favicon_data_url);
             }
             Err(_) => {
                 // Failed to retrieve /favicon.ico

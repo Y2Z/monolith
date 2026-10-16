@@ -36,7 +36,7 @@ mod passing {
             ("", "p::before{content:'café'}".as_bytes()),
             ("", b"p::before{content:'caf\xe9'}".as_slice()),
         ] {
-            let asset = monolith::url::create_data_url("text/css", charset, bytes, &url);
+            let asset = monolith::url::create_data_url("text/css", charset, bytes, &url, None);
 
             for source in [
                 format!("@import \"{}\";", asset),
@@ -68,6 +68,7 @@ mod passing {
             "",
             b"@charset \"windows-1252\";p::before{content:'caf\xe9'}",
             &url,
+            None,
         );
         let mut session = Session::new(None, None, MonolithOptions::default());
         let result = embed_css(&mut session, &url, &format!("@import \"{}\";", asset));
@@ -89,6 +90,7 @@ mod passing {
             "",
             b"p{font-family:'\x83\x81\x83\x43\x83\x8a\x83\x49'}",
             &url,
+            None,
         );
         let mut session = Session::new(None, None, MonolithOptions::default());
         session.environment_encoding = Some(encoding_rs::SHIFT_JIS);
@@ -109,13 +111,19 @@ mod passing {
     fn nested_import_inherits_importing_stylesheet_encoding() {
         let url = Url::parse("https://example.com/").unwrap();
         // EUC-JP "両", which also happens to be valid UTF-8 ("ξ")
-        let inner =
-            monolith::url::create_data_url("text/css", "", b"p::before{content:'\xce\xbe'}", &url);
+        let inner = monolith::url::create_data_url(
+            "text/css",
+            "",
+            b"p::before{content:'\xce\xbe'}",
+            &url,
+            None,
+        );
         let outer = monolith::url::create_data_url(
             "text/css",
             "",
             format!("@charset \"EUC-JP\";@import \"{}\";", inner).as_bytes(),
             &url,
+            None,
         );
         let mut session = Session::new(None, None, MonolithOptions::default());
         session.environment_encoding = Some(encoding_rs::SHIFT_JIS);

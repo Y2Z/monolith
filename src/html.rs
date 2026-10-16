@@ -159,15 +159,14 @@ pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> 
             match session.retrieve_asset(document_url, &image_full_url) {
                 Ok((image_data, image_final_url, image_media_type, image_charset)) => {
                     if session.options.output_format == MonolithOutputFormat::HTML {
-                        let mut image_data_url = create_data_url(
+                        // Append retrieved asset as a data URL
+                        result.push_str(&create_data_url(
                             &image_media_type,
                             &image_charset,
-                            &image_data,
+                            image_data,
                             &image_final_url,
-                        );
-                        // Append retrieved asset as a data URL
-                        image_data_url.set_fragment(image_full_url.fragment());
-                        result.push_str(image_data_url.as_ref());
+                            image_full_url.fragment(),
+                        ));
                     } else {
                         // MHTML
                         result.push_str(image_full_url.as_ref());
@@ -808,9 +807,8 @@ pub fn retrieve_and_embed_asset(
                     let css: String = embed_stylesheet(session, &final_url, &data, &charset);
 
                     // Create and embed data URL (decoded stylesheets are always stored as UTF-8)
-                    let css_data_url =
-                        create_data_url(&media_type, "utf-8", css.as_bytes(), &final_url);
-                    set_node_attr(node, attr_name, Some(css_data_url.to_string()));
+                    let css_data_url = create_data_url(&media_type, "utf-8", css, &final_url, None);
+                    set_node_attr(node, attr_name, Some(css_data_url));
                 } else if node_name == "frame" || node_name == "iframe" {
                     // (I)FRAMEs are also quite different from conventional resources
                     let mut frame_dom = html_to_dom(&data, charset.clone());
@@ -841,10 +839,14 @@ pub fn retrieve_and_embed_asset(
                     serialize(&mut frame_data, &serializable, SerializeOpts::default()).unwrap();
 
                     // Create and embed data URL (serialized frames are always UTF-8)
-                    let mut frame_data_url =
-                        create_data_url(&media_type, "utf-8", &frame_data, &final_url);
-                    frame_data_url.set_fragment(resolved_url.fragment());
-                    set_node_attr(node, attr_name, Some(frame_data_url.to_string()));
+                    let frame_data_url = create_data_url(
+                        &media_type,
+                        "utf-8",
+                        frame_data,
+                        &final_url,
+                        resolved_url.fragment(),
+                    );
+                    set_node_attr(node, attr_name, Some(frame_data_url));
                 } else {
                     // Every other type of element gets processed here
 
@@ -894,17 +896,25 @@ pub fn retrieve_and_embed_asset(
                             }
                         } else {
                             // Create and embed data URL
-                            let mut data_url =
-                                create_data_url(&script_media_type, &charset, &data, &final_url);
-                            data_url.set_fragment(resolved_url.fragment());
-                            set_node_attr(node, attr_name, Some(data_url.to_string()));
+                            let data_url = create_data_url(
+                                &script_media_type,
+                                &charset,
+                                data,
+                                &final_url,
+                                resolved_url.fragment(),
+                            );
+                            set_node_attr(node, attr_name, Some(data_url));
                         }
                     } else {
                         // Create and embed data URL
-                        let mut data_url =
-                            create_data_url(&media_type, &charset, &data, &final_url);
-                        data_url.set_fragment(resolved_url.fragment());
-                        set_node_attr(node, attr_name, Some(data_url.to_string()));
+                        let data_url = create_data_url(
+                            &media_type,
+                            &charset,
+                            data,
+                            &final_url,
+                            resolved_url.fragment(),
+                        );
+                        set_node_attr(node, attr_name, Some(data_url));
                     }
                 }
             }
@@ -1230,17 +1240,14 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                             }
                                         } else {
                                             // It's likely a raster image; embed it as data URL
-                                            let image_asset_data: Url = create_data_url(
+                                            let image_asset_data: String = create_data_url(
                                                 &media_type,
                                                 &charset,
-                                                &data,
+                                                data,
                                                 &final_url,
+                                                None,
                                             );
-                                            set_node_attr(
-                                                node,
-                                                attr_name,
-                                                Some(image_asset_data.to_string()),
-                                            );
+                                            set_node_attr(node, attr_name, Some(image_asset_data));
                                         }
                                     }
                                     Err(_) => {

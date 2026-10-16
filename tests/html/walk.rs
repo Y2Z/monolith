@@ -42,7 +42,7 @@ mod passing {
                 "@charset \"UTF-8\";p::before{content:\"café\"}",
             ),
         ] {
-            let asset = monolith::url::create_data_url("text/css", charset, bytes, &url);
+            let asset = monolith::url::create_data_url("text/css", charset, bytes, &url, None);
             let source = format!("<link rel=\"stylesheet\" href=\"{}\">", asset);
             let dom = html::html_to_dom(&source.into_bytes(), "utf-8".to_string());
             let mut session = Session::new(None, None, MonolithOptions::default());
@@ -80,7 +80,7 @@ mod passing {
     #[test]
     fn linked_stylesheet_environment_encoding() {
         let url = Url::parse("https://example.com/").unwrap();
-        let asset = monolith::url::create_data_url("text/css", "", SHIFT_JIS_CSS, &url);
+        let asset = monolith::url::create_data_url("text/css", "", SHIFT_JIS_CSS, &url, None);
         let source = format!("<link rel=\"stylesheet\" href=\"{}\">", asset);
         let dom = html::html_to_dom(&source.into_bytes(), "utf-8".to_string());
         let mut session = Session::new(None, None, MonolithOptions::default());
@@ -102,14 +102,14 @@ mod passing {
     #[test]
     fn frame_encoding() {
         let url = Url::parse("https://example.com/").unwrap();
-        let css = monolith::url::create_data_url("text/css", "", SHIFT_JIS_CSS, &url);
+        let css = monolith::url::create_data_url("text/css", "", SHIFT_JIS_CSS, &url, None);
         let mut frame_html: Vec<u8> = format!(
             "<html><head><meta charset=\"Shift_JIS\"><link rel=\"stylesheet\" href=\"{}\"></head><body>",
             css
         )
         .into_bytes();
         frame_html.extend_from_slice(b"\x83\x81\x83\x43\x83\x8a\x83\x49</body></html>");
-        let frame = monolith::url::create_data_url("text/html", "", &frame_html, &url);
+        let frame = monolith::url::create_data_url("text/html", "", frame_html, &url, None);
         let source = format!("<iframe src=\"{}\"></iframe>", frame);
         let dom = html::html_to_dom(&source.into_bytes(), "utf-8".to_string());
         let mut session = Session::new(None, None, MonolithOptions::default());

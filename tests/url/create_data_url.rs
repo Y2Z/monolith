@@ -20,6 +20,7 @@ mod passing {
             "",
             data.as_bytes(),
             &Url::parse("data:,").unwrap(),
+            None,
         );
 
         assert_eq!(
@@ -36,6 +37,7 @@ mod passing {
             "",
             data.as_bytes(),
             &Url::parse("data:,").unwrap(),
+            None,
         );
 
         assert_eq!(
@@ -54,6 +56,7 @@ mod passing {
             charset,
             data.as_bytes(),
             &Url::parse("data:,").unwrap(),
+            None,
         );
 
         assert_eq!(
@@ -72,6 +75,7 @@ mod passing {
             charset,
             data.as_bytes(),
             &Url::parse("data:,").unwrap(),
+            None,
         );
 
         assert_eq!(data_url.as_str(), "data:;base64,");
@@ -87,6 +91,7 @@ mod passing {
             charset,
             data.as_bytes(),
             &Url::parse("data:,").unwrap(),
+            None,
         );
 
         assert_eq!(data_url.as_str(), "data:;charset=utf8;base64,");
@@ -102,6 +107,7 @@ mod passing {
             charset,
             data.as_bytes(),
             &Url::parse("data:,").unwrap(),
+            None,
         );
 
         assert_eq!(data_url.as_str(), "data:text/plain;charset=utf8;base64,");
@@ -113,10 +119,12 @@ mod passing {
         let data_url = url::create_data_url(
             "application/octet-stream",
             "",
-            &data,
+            data.clone(),
             &Url::parse("data:,").unwrap(),
+            None,
         );
-        let (media_type, _charset, parsed_data) = url::parse_data_url(&data_url);
+        let (media_type, _charset, parsed_data) =
+            url::parse_data_url(&Url::parse(&data_url).unwrap());
 
         assert_eq!(media_type, "application/octet-stream");
         assert_eq!(parsed_data, data);
@@ -124,31 +132,73 @@ mod passing {
 
     #[test]
     fn create_data_url_with_lowercased_media_type() {
-        let data_url = url::create_data_url("Image/PNG", "", b"", &Url::parse("data:,").unwrap());
+        let data_url =
+            url::create_data_url("Image/PNG", "", b"", &Url::parse("data:,").unwrap(), None);
 
         assert_eq!(data_url.as_str(), "data:image/png;base64,");
     }
 
     #[test]
     fn create_data_url_with_quoted_charset() {
-        let data_url =
-            url::create_data_url("text/css", "\"utf-8\"", b"", &Url::parse("data:,").unwrap());
+        let data_url = url::create_data_url(
+            "text/css",
+            "\"utf-8\"",
+            b"",
+            &Url::parse("data:,").unwrap(),
+            None,
+        );
 
         assert_eq!(data_url.as_str(), "data:text/css;charset=utf-8;base64,");
     }
 
     #[test]
     fn create_data_url_omits_invalid_media_type() {
-        let data_url = url::create_data_url("wrong", "", b"", &Url::parse("data:,").unwrap());
+        let data_url = url::create_data_url("wrong", "", b"", &Url::parse("data:,").unwrap(), None);
 
         assert_eq!(data_url.as_str(), "data:;base64,");
     }
 
     #[test]
     fn create_data_url_omits_charset_that_would_break_data_url() {
-        let data_url =
-            url::create_data_url("text/css", "utf-8,x", b"", &Url::parse("data:,").unwrap());
+        let data_url = url::create_data_url(
+            "text/css",
+            "utf-8,x",
+            b"",
+            &Url::parse("data:,").unwrap(),
+            None,
+        );
 
         assert_eq!(data_url.as_str(), "data:text/css;base64,");
+    }
+
+    #[test]
+    fn create_data_url_with_fragment() {
+        let asset_url = Url::parse("https://example.com/icons.svg#a%20b").unwrap();
+        let data_url = url::create_data_url(
+            "image/svg+xml",
+            "",
+            b"<svg/>",
+            &asset_url,
+            asset_url.fragment(),
+        );
+
+        assert_eq!(data_url, "data:image/svg+xml;base64,PHN2Zy8+#a%20b");
+    }
+
+    #[test]
+    fn create_data_url_encodes_fragment_like_url_does() {
+        for fragment in ["", "a b", "<\"`>", "caf\u{e9}", "%41%", "x#y"] {
+            let data_url = url::create_data_url(
+                "text/plain",
+                "",
+                b"x",
+                &Url::parse("data:,").unwrap(),
+                Some(fragment),
+            );
+            let mut expected = Url::parse("data:text/plain;base64,eA==").unwrap();
+            expected.set_fragment(Some(fragment));
+
+            assert_eq!(data_url, expected.as_str(), "{fragment:?}");
+        }
     }
 }
