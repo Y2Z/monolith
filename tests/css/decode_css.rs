@@ -32,16 +32,21 @@ mod passing {
     }
 
     #[test]
-    fn us_ascii_is_treated_as_missing_charset() {
+    fn missing_charset_and_us_ascii_label() {
         // UTF-8 stylesheets served without a charset
         assert_eq!(
-            decode_css("a{content:'café'}".as_bytes(), "US-ASCII"),
+            decode_css("a{content:'café'}".as_bytes(), ""),
             "a{content:'café'}"
         );
         // Legacy stylesheets labeled US-ASCII (WHATWG maps that label onto Windows-1252)
         assert_eq!(
             decode_css(b"a{content:'caf\xe9'}", "us-ascii"),
             "a{content:'café'}"
+        );
+        // Like in browsers, the label is taken at its word, even if the data happens to be UTF-8
+        assert_eq!(
+            decode_css("a{content:'café'}".as_bytes(), "US-ASCII"),
+            "a{content:'cafÃ©'}"
         );
     }
 
@@ -123,9 +128,10 @@ mod passing {
             decode_stylesheet(css, "", Some(SHIFT_JIS)),
             ("p{font-family:'メイリオ'}".to_string(), SHIFT_JIS)
         );
+        // A declared charset (US-ASCII included) beats the environment encoding
         assert_eq!(
-            decode_stylesheet(css, "US-ASCII", Some(SHIFT_JIS)),
-            ("p{font-family:'メイリオ'}".to_string(), SHIFT_JIS)
+            decode_stylesheet(css, "US-ASCII", Some(SHIFT_JIS)).1,
+            WINDOWS_1252
         );
     }
 

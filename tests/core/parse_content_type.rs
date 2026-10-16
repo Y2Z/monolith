@@ -109,4 +109,60 @@ mod passing {
             parse_content_type("text/html; charset=UTF-8; charset=Shift_JIS");
         assert_eq!(charset, "UTF-8");
     }
+
+    #[test]
+    fn charset_name_is_case_insensitive() {
+        let (_media_type, charset, _is_base64) = parse_media_type("text/html; CharSet=UTF-8");
+        assert_eq!(charset, Some("UTF-8".to_string()));
+    }
+
+    #[test]
+    fn whitespace_around_equals_sign_makes_charset_invalid() {
+        let (_media_type, charset, _is_base64) = parse_media_type("text/html; charset =UTF-8");
+        assert_eq!(charset, None);
+
+        // Whitespace after "=" is part of the value (encoding labels get trimmed later on)
+        let (_media_type, charset, _is_base64) = parse_media_type("text/html; charset= UTF-8");
+        assert_eq!(charset, Some(" UTF-8".to_string()));
+    }
+
+    #[test]
+    fn trailing_whitespace_is_trimmed_from_unquoted_value() {
+        let (_media_type, charset, _is_base64) = parse_media_type("text/html; charset=UTF-8 ; a=b");
+        assert_eq!(charset, Some("UTF-8".to_string()));
+    }
+
+    #[test]
+    fn quoted_value_gets_unescaped() {
+        let (_media_type, charset, _is_base64) = parse_media_type("text/html; charset=\"utf\\-8\"");
+        assert_eq!(charset, Some("utf-8".to_string()));
+    }
+
+    #[test]
+    fn anything_after_closing_quote_is_ignored() {
+        let (_media_type, charset, _is_base64) =
+            parse_media_type("text/html; charset=\"utf-8\"garbage; a=b");
+        assert_eq!(charset, Some("utf-8".to_string()));
+    }
+
+    #[test]
+    fn unterminated_quoted_value() {
+        let (_media_type, charset, _is_base64) = parse_media_type("text/html; charset=\"utf-8");
+        assert_eq!(charset, Some("utf-8".to_string()));
+    }
+
+    #[test]
+    fn empty_charset_is_ignored() {
+        let (_media_type, charset, _is_base64) =
+            parse_media_type("text/html; charset=; charset=UTF-8");
+        assert_eq!(charset, Some("UTF-8".to_string()));
+    }
+
+    #[test]
+    fn invalid_charset_is_skipped() {
+        // Characters beyond Latin-1 can't be part of a parameter value
+        let (_media_type, charset, _is_base64) =
+            parse_media_type("text/html; charset=utf☃8; charset=UTF-8");
+        assert_eq!(charset, Some("UTF-8".to_string()));
+    }
 }

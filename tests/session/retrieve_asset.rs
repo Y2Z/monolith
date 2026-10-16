@@ -30,7 +30,7 @@ mod passing {
             )
             .unwrap();
         assert_eq!(&media_type, "text/html");
-        assert_eq!(&charset, "US-ASCII");
+        assert_eq!(&charset, "");
         assert_eq!(
             url::create_data_url(&media_type, &charset, &data, &final_url),
             Url::parse("data:text/html;base64,dGFyZ2V0").unwrap(),

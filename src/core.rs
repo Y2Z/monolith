@@ -568,12 +568,12 @@ pub fn format_output_path(
 }
 
 /// Maps a charset label (Content-Type header, data URL, META element) onto an encoding.
-/// Returns None for labels that don't actually declare anything: empty ones, unknown ones,
-/// and "US-ASCII", which is what parse_content_type() reports when no charset was given.
+/// Returns None for labels that don't declare anything usable: empty (no charset given) and unknown ones.
+/// Like in browsers, "US-ASCII" is a valid label, and means windows-1252.
 pub fn declared_encoding(charset: &str) -> Option<&'static Encoding> {
     let charset = charset.trim();
 
-    if charset.is_empty() || charset.eq_ignore_ascii_case("US-ASCII") {
+    if charset.is_empty() {
         return None;
     }
 
@@ -585,6 +585,8 @@ pub fn is_plaintext_media_type(media_type: &str) -> bool {
         || PLAINTEXT_MEDIA_TYPES.contains(&media_type.to_lowercase().as_str())
 }
 
+/// Kept for compatibility: reports "US-ASCII" (the data URL default) when no charset is given,
+/// so use parse_media_type() to tell a missing charset apart (e.g. before calling declared_encoding()).
 pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
     let (media_type, charset, is_base64) = parse_media_type(content_type);
 
@@ -595,39 +597,90 @@ pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
     )
 }
 
-/// Same as parse_content_type(), but returns None if no charset is given.
+/// Parses a Content-Type header (or META content), returning its media type, charset (None if not given),
+/// and whether it has a base64 marker. Parameters are parsed the way the WHATWG MIME Sniffing Standard
+/// does it (https://mimesniff.spec.whatwg.org/#parsing-a-mime-type): quoted values may contain semicolons
+/// and escaped characters, whitespace around "=" makes a parameter invalid, and the first valid charset wins.
 pub fn parse_media_type(content_type: &str) -> (String, Option<String>, bool) {
-    let mut media_type: String = "text/plain".to_string();
+    let is_http_whitespace = |c: char| matches!(c, '\t' | '\n' | '\r' | ' ');
+    let is_quoted_string_token = |c: char| matches!(c, '\t' | ' '..='~' | '\u{80}'..='\u{ff}');
+
+    let s: &str = content_type.trim_matches(is_http_whitespace);
+    let b: &[u8] = s.as_bytes();
+
+    let media_type_end: usize = s.find(';').unwrap_or(s.len());
+    let media_type: &str = s[..media_type_end].trim();
+    let media_type: String = if media_type.is_empty() {
+        "text/plain".to_string()
+    } else {
+        media_type.to_string()
+    };
     let mut charset: Option<String> = None;
     let mut is_base64: bool = false;
 
-    // Split on semicolons outside of quoted strings
-    let mut in_quotes: bool = false;
-    let mut escaped: bool = false;
-    let items = content_type.split(|c: char| {
-        if escaped {
-            escaped = false;
-        } else if in_quotes && c == '\\' {
-            escaped = true;
-        } else if c == '"' {
-            in_quotes = !in_quotes;
+    // All delimiters are ASCII, so byte offsets always land on char boundaries
+    let mut pos: usize = media_type_end;
+    while pos < b.len() {
+        // Skip past the semicolon and any whitespace after it
+        pos += 1;
+        while pos < b.len() && is_http_whitespace(b[pos] as char) {
+            pos += 1;
         }
-        c == ';' && !in_quotes
-    });
 
-    for (i, item) in items.enumerate() {
-        let item = item.trim();
+        let name_start: usize = pos;
+        while pos < b.len() && b[pos] != b';' && b[pos] != b'=' {
+            pos += 1;
+        }
+        let name: &str = &s[name_start..pos];
 
-        if i == 0 {
-            if !item.is_empty() {
-                media_type = item.to_string();
+        if pos >= b.len() || b[pos] == b';' {
+            // A parameter without a value, only meaningful as data URLs' base64 marker
+            if name.trim().eq_ignore_ascii_case("base64") {
+                is_base64 = true;
             }
-        } else if item.eq_ignore_ascii_case("base64") {
-            is_base64 = true;
-        } else if let Some((name, value)) = item.split_once('=') {
-            if charset.is_none() && name.trim().eq_ignore_ascii_case("charset") {
-                charset = Some(value.trim().trim_matches('"').to_string());
+            continue;
+        }
+        pos += 1; // Skip past "="
+
+        let value: String = if pos < b.len() && b[pos] == b'"' {
+            // Quoted string: backslash escapes the next character, anything after the closing quote is ignored
+            let mut value = String::new();
+            pos += 1;
+            while let Some(c) = s[pos..].chars().next() {
+                pos += c.len_utf8();
+                match c {
+                    '"' => break,
+                    '\\' => match s[pos..].chars().next() {
+                        Some(escaped) => {
+                            value.push(escaped);
+                            pos += escaped.len_utf8();
+                        }
+                        None => value.push('\\'),
+                    },
+                    _ => value.push(c),
+                }
             }
+            while pos < b.len() && b[pos] != b';' {
+                pos += 1;
+            }
+            value
+        } else {
+            let value_start: usize = pos;
+            while pos < b.len() && b[pos] != b';' {
+                pos += 1;
+            }
+            let value: &str = s[value_start..pos].trim_end_matches(is_http_whitespace);
+            if value.is_empty() {
+                continue;
+            }
+            value.to_string()
+        };
+
+        if charset.is_none()
+            && name.eq_ignore_ascii_case("charset")
+            && value.chars().all(is_quoted_string_token)
+        {
+            charset = Some(value);
         }
     }
 
