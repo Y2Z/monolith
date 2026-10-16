@@ -730,11 +730,12 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "dataurl"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca0cc47cb545c414a8b85598747bce876feb185880933a79a3ece18f4998e52c"
+checksum = "d9eb38c6189725921cae457d436d26e8d53a5b832e606af8c8734a467e58a256"
 dependencies = [
  "encoding_rs",
+ "infer",
 ]
 
 [[package]]
@@ -1689,6 +1690,12 @@ dependencies = [
  "equivalent",
  "hashbrown",
 ]
+
+[[package]]
+name = "infer"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4200d433cbd5178df7797c9c2e75b348b728e39631cf14520d1e2fc424201f4"
 
 [[package]]
 name = "ipnet"
