@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use dataurl::{DataEncoding, DataUrl};
 pub use url::Url;
 
@@ -15,10 +17,20 @@ pub fn clean_url(url: Url) -> Url {
     url
 }
 
-pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset_url: &Url) -> Url {
+/// Creates a data URL for an asset, with an optional fragment (already percent-encoded, as Url::fragment() returns it).
+/// Passing data as a Vec<u8> moves it in without copying.
+pub fn create_data_url(
+    media_type: &str,
+    charset: &str,
+    data: impl Into<Vec<u8>>,
+    final_asset_url: &Url,
+    fragment: Option<&str>,
+) -> String {
+    let data: Vec<u8> = data.into();
+
     // TODO: move this block out of this function
     let media_type: String = if media_type.is_empty() {
-        detect_media_type(data, final_asset_url)
+        detect_media_type(&data, final_asset_url)
     } else {
         media_type.to_string()
     };
@@ -26,6 +38,7 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
     let mut data_url = DataUrl::new();
     data_url.set_data_encoding(DataEncoding::Base64);
     data_url.set_data(data);
+    data_url.set_fragment(fragment);
 
     // Invalid media types get omitted, which makes browsers treat the data as text/plain, same as they would anyway
     if !media_type.is_empty() {
@@ -39,7 +52,10 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
         let _ = data_url.set_parameter("charset", Some(charset));
     }
 
-    Url::parse(&data_url.to_string()).unwrap()
+    // Allocating the exact size upfront avoids reallocations (and copies) while the string grows
+    let mut result = String::with_capacity(data_url.encoded_len());
+    write!(result, "{data_url}").unwrap();
+    result
 }
 
 pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> bool {

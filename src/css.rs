@@ -272,7 +272,7 @@ pub fn process_css<'a>(
                             import_media_type,
                             import_charset,
                         )) => {
-                            let mut import_data_url = create_data_url(
+                            let import_data_url = create_data_url(
                                 &import_media_type,
                                 "utf-8",
                                 embed_stylesheet(
@@ -280,13 +280,11 @@ pub fn process_css<'a>(
                                     &import_final_url,
                                     &import_contents,
                                     &import_charset,
-                                )
-                                .as_bytes(),
+                                ),
                                 &import_final_url,
+                                import_full_url.fragment(),
                             );
-                            import_data_url.set_fragment(import_full_url.fragment());
-                            result
-                                .push_str(format_quoted_string(import_data_url.as_ref()).as_str());
+                            result.push_str(format_quoted_string(&import_data_url).as_str());
                         }
                         Err(_) => {
                             // Keep remote reference if unable to retrieve the asset
@@ -314,11 +312,14 @@ pub fn process_css<'a>(
                             match session.retrieve_asset(document_url, &resolved_url) {
                                 Ok((data, final_url, media_type, charset)) => {
                                     // TODO: if it's @font-face, exclude definitions of non-woff/woff-2 fonts (if woff/woff-2 are present)
-                                    let mut data_url =
-                                        create_data_url(&media_type, &charset, &data, &final_url);
-                                    data_url.set_fragment(resolved_url.fragment());
-                                    result
-                                        .push_str(format_quoted_string(data_url.as_ref()).as_str());
+                                    let data_url = create_data_url(
+                                        &media_type,
+                                        &charset,
+                                        data,
+                                        &final_url,
+                                        resolved_url.fragment(),
+                                    );
+                                    result.push_str(format_quoted_string(&data_url).as_str());
                                 }
                                 Err(_) => {
                                     // Keep remote reference if unable to retrieve the asset
@@ -404,14 +405,14 @@ pub fn process_css<'a>(
                     let full_url: Url = resolve_url(document_url, value);
                     match session.retrieve_asset(document_url, &full_url) {
                         Ok((css, final_url, media_type, charset)) => {
-                            let mut data_url = create_data_url(
+                            let data_url = create_data_url(
                                 &media_type,
                                 "utf-8",
-                                embed_stylesheet(session, &final_url, &css, &charset).as_bytes(),
+                                embed_stylesheet(session, &final_url, &css, &charset),
                                 &final_url,
+                                full_url.fragment(),
                             );
-                            data_url.set_fragment(full_url.fragment());
-                            result.push_str(format_quoted_string(data_url.as_ref()).as_str());
+                            result.push_str(format_quoted_string(&data_url).as_str());
                         }
                         Err(_) => {
                             // Keep remote reference if unable to retrieve the asset
@@ -428,10 +429,14 @@ pub fn process_css<'a>(
                     if session.options.output_format == MonolithOutputFormat::HTML {
                         match session.retrieve_asset(document_url, &full_url) {
                             Ok((data, final_url, media_type, charset)) => {
-                                let mut data_url =
-                                    create_data_url(&media_type, &charset, &data, &final_url);
-                                data_url.set_fragment(full_url.fragment());
-                                result.push_str(format_quoted_string(data_url.as_ref()).as_str());
+                                let data_url = create_data_url(
+                                    &media_type,
+                                    &charset,
+                                    data,
+                                    &final_url,
+                                    full_url.fragment(),
+                                );
+                                result.push_str(format_quoted_string(&data_url).as_str());
                             }
                             Err(_) => {
                                 // Keep remote reference if unable to retrieve the asset
