@@ -730,9 +730,9 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "dataurl"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9eb38c6189725921cae457d436d26e8d53a5b832e606af8c8734a467e58a256"
+checksum = "cc99c57e476a93a6f2a5918a62c9a193b417b77e3dcf2465be639270ddd82627"
 dependencies = [
  "encoding_rs",
  "infer",

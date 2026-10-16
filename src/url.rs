@@ -1,4 +1,4 @@
-use dataurl::DataUrl;
+use dataurl::{DataEncoding, DataUrl};
 pub use url::Url;
 
 use crate::core::detect_media_type;
@@ -24,7 +24,7 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
     };
 
     let mut data_url = DataUrl::new();
-    data_url.set_is_base64_encoded(true);
+    data_url.set_data_encoding(DataEncoding::Base64);
     data_url.set_data(data);
 
     // Invalid media types get omitted, which makes browsers treat the data as text/plain, same as they would anyway
