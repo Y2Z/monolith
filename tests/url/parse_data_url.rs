@@ -83,6 +83,50 @@ mod passing {
         assert_eq!(charset, "US-ASCII");
         assert_eq!(String::from_utf8_lossy(&data), "test test");
     }
+
+    #[test]
+    fn parse_percent_encoded_binary_data() {
+        // Bytes that aren't valid UTF-8 used to get replaced with U+FFFD, corrupting the image
+        let (media_type, _charset, data) =
+            url::parse_data_url(&Url::parse(url::EMPTY_IMAGE_DATA_URL).unwrap());
+
+        assert_eq!(media_type, "image/png");
+        assert!(data.starts_with(b"\x89PNG\r\n\x1a\n"));
+        assert!(data.ends_with(b"IEND\xAEB\x60\x82"));
+        assert_eq!(data.len(), 74);
+    }
+
+    #[test]
+    fn parse_base64_without_padding() {
+        let (_media_type, _charset, data) =
+            url::parse_data_url(&Url::parse("data:text/plain;base64,dGVzdA").unwrap());
+
+        assert_eq!(String::from_utf8_lossy(&data), "test");
+    }
+
+    #[test]
+    fn parse_base64_with_spaces() {
+        let (_media_type, _charset, data) =
+            url::parse_data_url(&Url::parse("data:text/plain;base64,dGVz dA==").unwrap());
+
+        assert_eq!(String::from_utf8_lossy(&data), "test");
+    }
+
+    #[test]
+    fn parse_charset_after_whitespace() {
+        let (media_type, charset, _data) =
+            url::parse_data_url(&Url::parse("data:Text/HTML; charset=utf-8,x").unwrap());
+
+        assert_eq!(media_type, "text/html");
+        assert_eq!(charset, "utf-8");
+    }
+
+    #[test]
+    fn parse_ignores_fragment() {
+        let (_media_type, _charset, data) = url::parse_data_url(&Url::parse("data:,x#y").unwrap());
+
+        assert_eq!(data, b"x");
+    }
 }
 
 //  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
@@ -105,5 +149,25 @@ mod failing {
         assert_eq!(media_type, "text/plain");
         assert_eq!(charset, "US-ASCII");
         assert_eq!(String::from_utf8_lossy(&data), "");
+    }
+
+    #[test]
+    fn invalid_base64() {
+        let (media_type, charset, data) =
+            url::parse_data_url(&Url::parse("data:text/plain;base64,a").unwrap());
+
+        assert_eq!(media_type, "text/plain");
+        assert_eq!(charset, "US-ASCII");
+        assert_eq!(data, b"");
+    }
+
+    #[test]
+    fn no_comma() {
+        let (media_type, charset, data) =
+            url::parse_data_url(&Url::parse("data:image/png").unwrap());
+
+        assert_eq!(media_type, "text/plain");
+        assert_eq!(charset, "US-ASCII");
+        assert_eq!(data, b"");
     }
 }

@@ -1,8 +1,7 @@
-use base64::{Engine, prelude::BASE64_STANDARD};
-use percent_encoding::percent_decode_str;
+use dataurl::DataUrl;
 pub use url::Url;
 
-use crate::core::{detect_media_type, parse_content_type};
+use crate::core::detect_media_type;
 
 pub const EMPTY_IMAGE_DATA_URL: &str = "data:image/png,\
 %89PNG%0D%0A%1A%0A%00%00%00%0DIHDR%00%00%00%0D%00%00%00%0D%08%04%00%00%00%D8%E2%2C%F7%00%00%00%11IDATx%DAcd%C0%09%18G%A5%28%96%02%00%0A%F8%00%0E%CB%8A%EB%16%00%00%00%00IEND%AEB%60%82";
@@ -24,26 +23,23 @@ pub fn create_data_url(media_type: &str, charset: &str, data: &[u8], final_asset
         media_type.to_string()
     };
 
-    let mut data_url: Url = Url::parse("data:,").unwrap();
+    let mut data_url = DataUrl::new();
+    data_url.set_is_base64_encoded(true);
+    data_url.set_data(data);
 
-    let c: String =
-        if !charset.trim().is_empty() && !charset.trim().eq_ignore_ascii_case("US-ASCII") {
-            format!(";charset={}", charset.trim())
-        } else {
-            "".to_string()
-        };
+    // Invalid media types get omitted, which makes browsers treat the data as text/plain, same as they would anyway
+    if !media_type.is_empty() {
+        let _ = data_url.set_media_type(Some(&media_type));
+    }
 
-    data_url.set_path(
-        format!(
-            "{}{};base64,{}",
-            media_type,
-            c,
-            BASE64_STANDARD.encode(data)
-        )
-        .as_str(),
-    );
+    // The charset is kept as declared (US-ASCII is the default, so it's left out);
+    // values that can't be represented in a data URL (e.g. containing a comma) get omitted
+    let charset: &str = charset.trim().trim_matches('"');
+    if !charset.is_empty() && !charset.eq_ignore_ascii_case("US-ASCII") {
+        let _ = data_url.set_parameter("charset", Some(charset));
+    }
 
-    data_url
+    Url::parse(&data_url.to_string()).unwrap()
 }
 
 pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> bool {
@@ -110,25 +106,15 @@ pub fn is_url_and_has_protocol(input: &str) -> bool {
 }
 
 pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
-    let path: String = url.path().to_string();
-    let comma_loc: usize = path.find(',').unwrap_or(path.len());
-
-    // Split data URL into meta data and raw data
-    let content_type: String = path.chars().take(comma_loc).collect();
-    let data: String = path.chars().skip(comma_loc + 1).collect();
-
-    // Parse meta data
-    let (media_type, charset, is_base64) = parse_content_type(&content_type);
-
-    // Parse raw data into vector of bytes
-    let text: String = percent_decode_str(&data).decode_utf8_lossy().to_string();
-    let blob: Vec<u8> = if is_base64 {
-        BASE64_STANDARD.decode(&text).unwrap_or_default()
-    } else {
-        text.as_bytes().to_vec()
-    };
-
-    (media_type, charset, blob)
+    match DataUrl::parse(url.as_str()) {
+        Ok(data_url) => (
+            data_url.media_type().to_string(),
+            data_url.charset().to_string(),
+            data_url.into_data(),
+        ),
+        // Malformed data URLs (no comma, invalid base64) are treated as empty ones
+        Err(_) => ("text/plain".to_string(), "US-ASCII".to_string(), vec![]),
+    }
 }
 
 pub fn get_referer_url(url: Url) -> Url {

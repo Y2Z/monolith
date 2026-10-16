@@ -106,4 +106,49 @@ mod passing {
 
         assert_eq!(data_url.as_str(), "data:text/plain;charset=utf8;base64,");
     }
+
+    #[test]
+    fn create_data_url_round_trips_binary_data() {
+        let data: Vec<u8> = (0..=255).collect();
+        let data_url = url::create_data_url(
+            "application/octet-stream",
+            "",
+            &data,
+            &Url::parse("data:,").unwrap(),
+        );
+        let (media_type, _charset, parsed_data) = url::parse_data_url(&data_url);
+
+        assert_eq!(media_type, "application/octet-stream");
+        assert_eq!(parsed_data, data);
+    }
+
+    #[test]
+    fn create_data_url_with_lowercased_media_type() {
+        let data_url = url::create_data_url("Image/PNG", "", b"", &Url::parse("data:,").unwrap());
+
+        assert_eq!(data_url.as_str(), "data:image/png;base64,");
+    }
+
+    #[test]
+    fn create_data_url_with_quoted_charset() {
+        let data_url =
+            url::create_data_url("text/css", "\"utf-8\"", b"", &Url::parse("data:,").unwrap());
+
+        assert_eq!(data_url.as_str(), "data:text/css;charset=utf-8;base64,");
+    }
+
+    #[test]
+    fn create_data_url_omits_invalid_media_type() {
+        let data_url = url::create_data_url("wrong", "", b"", &Url::parse("data:,").unwrap());
+
+        assert_eq!(data_url.as_str(), "data:;base64,");
+    }
+
+    #[test]
+    fn create_data_url_omits_charset_that_would_break_data_url() {
+        let data_url =
+            url::create_data_url("text/css", "utf-8,x", b"", &Url::parse("data:,").unwrap());
+
+        assert_eq!(data_url.as_str(), "data:text/css;base64,");
+    }
 }
