@@ -515,18 +515,6 @@ pub fn is_plaintext_media_type(media_type: &str) -> bool {
         || PLAINTEXT_MEDIA_TYPES.contains(&media_type.to_lowercase().as_str())
 }
 
-/// Kept for compatibility: reports "US-ASCII" (the data URL default) when no charset is given,
-/// so use parse_media_type() to tell a missing charset apart (e.g. before calling declared_encoding()).
-pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
-    let (media_type, charset, is_base64) = parse_media_type(content_type);
-
-    (
-        media_type,
-        charset.unwrap_or_else(|| "US-ASCII".to_string()),
-        is_base64,
-    )
-}
-
 /// Parses a Content-Type header (or META content), returning its media type, charset (None if not given),
 /// and whether it has a base64 marker. Parameters are parsed the way the WHATWG MIME Sniffing Standard
 /// does it (https://mimesniff.spec.whatwg.org/#parsing-a-mime-type): quoted values may contain semicolons
