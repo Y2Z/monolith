@@ -9,7 +9,7 @@ use reqwest::blocking::Client;
 use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, REFERER};
 
 use crate::cookies::Cookie;
-use crate::core::{MonolithOptions, parse_content_type, print_error_message, print_info_message};
+use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_info_message};
 use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset};
 use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, resolve_url};
@@ -138,7 +138,9 @@ pub fn fetch_remote_asset(
                 .and_then(|header| header.to_str().ok())
                 .unwrap_or("");
 
-            let (media_type, charset, _is_base64) = parse_content_type(content_type);
+            // Leave charset empty if not given, so that the document's META can be used
+            let (media_type, charset, _is_base64) = parse_media_type(content_type);
+            let charset: String = charset.unwrap_or_default();
 
             // Convert response into a byte array
             let mut data: Vec<u8> = vec![];
