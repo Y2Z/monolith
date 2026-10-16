@@ -36,7 +36,14 @@ mod passing {
             ("", "p::before{content:'café'}".as_bytes()),
             ("", b"p::before{content:'caf\xe9'}".as_slice()),
         ] {
-            let asset = monolith::url::create_data_url("text/css", charset, bytes, &url, None);
+            // Base64, which can go anywhere in CSS, including the unquoted url() below
+            let mut asset = dataurl::DataUrl::new();
+            asset.set_media_type(Some("text/css")).unwrap();
+            if !charset.is_empty() {
+                asset.set_parameter("charset", Some(charset)).unwrap();
+            }
+            asset.set_data_encoding(dataurl::DataEncoding::Base64);
+            asset.set_data(bytes);
 
             for source in [
                 format!("@import \"{}\";", asset),
@@ -298,9 +305,9 @@ mod passing {
             "\
             @charset \"UTF-8\";\n\
             \n\
-            @import \"data:text/css;charset=utf-8;base64,aHRtbHtiYWNrZ3JvdW5kLWNvbG9yOiMwMDB9\";\n\
+            @import \"data:text/css;charset=utf-8,html{background-color:%23000}\";\n\
             \n\
-            @import url(\"data:text/css;charset=utf-8;base64,aHRtbHtjb2xvcjojZmZmfQ==\")\n\
+            @import url(\"data:text/css;charset=utf-8,html{color:%23fff}\")\n\
             "
         );
     }
@@ -421,7 +428,7 @@ mod passing {
             ";
         const CSS_OUT: &str = "\
             #language a[href=\"#translations\"]:before {\n\
-                content: url(\"data:text/plain;base64,\") \"\\a \";\n\
+                content: url(\"data:text/plain,\") \"\\a \";\n\
                 white-space: pre }\n\
             ";
 

@@ -25,7 +25,7 @@ mod passing {
 
         assert_eq!(
             data_url.as_str(),
-            "data:application/javascript;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
+            "data:application/javascript,var word = 'hello';%0Aalert(word);%0A"
         );
     }
 
@@ -42,7 +42,7 @@ mod passing {
 
         assert_eq!(
             data_url.as_str(),
-            "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4K"
+            "data:image/svg+xml,%3Csvg%3E%3C/svg%3E%0A"
         );
     }
 
@@ -61,7 +61,7 @@ mod passing {
 
         assert_eq!(
             data_url.as_str(),
-            "data:application/javascript;charset=utf8;base64,dmFyIHdvcmQgPSAnaGVsbG8nOwphbGVydCh3b3JkKTsK"
+            "data:application/javascript;charset=utf8,var word = 'hello';%0Aalert(word);%0A"
         );
     }
 
@@ -78,7 +78,7 @@ mod passing {
             None,
         );
 
-        assert_eq!(data_url.as_str(), "data:;base64,");
+        assert_eq!(data_url.as_str(), "data:,");
     }
 
     #[test]
@@ -94,7 +94,7 @@ mod passing {
             None,
         );
 
-        assert_eq!(data_url.as_str(), "data:;charset=utf8;base64,");
+        assert_eq!(data_url.as_str(), "data:;charset=utf8,");
     }
 
     #[test]
@@ -110,7 +110,7 @@ mod passing {
             None,
         );
 
-        assert_eq!(data_url.as_str(), "data:text/plain;charset=utf8;base64,");
+        assert_eq!(data_url.as_str(), "data:text/plain;charset=utf8,");
     }
 
     #[test]
@@ -135,7 +135,7 @@ mod passing {
         let data_url =
             url::create_data_url("Image/PNG", "", b"", &Url::parse("data:,").unwrap(), None);
 
-        assert_eq!(data_url.as_str(), "data:image/png;base64,");
+        assert_eq!(data_url.as_str(), "data:image/png,");
     }
 
     #[test]
@@ -148,14 +148,14 @@ mod passing {
             None,
         );
 
-        assert_eq!(data_url.as_str(), "data:text/css;charset=utf-8;base64,");
+        assert_eq!(data_url.as_str(), "data:text/css;charset=utf-8,");
     }
 
     #[test]
     fn create_data_url_omits_invalid_media_type() {
         let data_url = url::create_data_url("wrong", "", b"", &Url::parse("data:,").unwrap(), None);
 
-        assert_eq!(data_url.as_str(), "data:;base64,");
+        assert_eq!(data_url.as_str(), "data:,");
     }
 
     #[test]
@@ -168,7 +168,7 @@ mod passing {
             None,
         );
 
-        assert_eq!(data_url.as_str(), "data:text/css;base64,");
+        assert_eq!(data_url.as_str(), "data:text/css,");
     }
 
     #[test]
@@ -182,7 +182,7 @@ mod passing {
             asset_url.fragment(),
         );
 
-        assert_eq!(data_url, "data:image/svg+xml;base64,PHN2Zy8+#a%20b");
+        assert_eq!(data_url, "data:image/svg+xml,%3Csvg/%3E#a%20b");
     }
 
     #[test]
@@ -195,10 +195,36 @@ mod passing {
                 &Url::parse("data:,").unwrap(),
                 Some(fragment),
             );
-            let mut expected = Url::parse("data:text/plain;base64,eA==").unwrap();
+            let mut expected = Url::parse("data:text/plain,x").unwrap();
             expected.set_fragment(Some(fragment));
 
             assert_eq!(data_url, expected.as_str(), "{fragment:?}");
         }
+    }
+
+    #[test]
+    fn create_data_url_uses_base64_when_shorter() {
+        let data_url = url::create_data_url(
+            "image/png",
+            "",
+            [0u8; 16],
+            &Url::parse("data:,").unwrap(),
+            None,
+        );
+
+        assert_eq!(data_url, "data:image/png;base64,AAAAAAAAAAAAAAAAAAAAAA==");
+    }
+
+    #[test]
+    fn create_srcset_data_url_always_uses_base64() {
+        let data_url = url::create_srcset_data_url(
+            "image/svg+xml",
+            "",
+            b"<svg/>",
+            &Url::parse("data:,").unwrap(),
+            Some("a"),
+        );
+
+        assert_eq!(data_url, "data:image/svg+xml;base64,PHN2Zy8+#a");
     }
 }

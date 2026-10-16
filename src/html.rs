@@ -17,7 +17,8 @@ use crate::css::{embed_css, embed_stylesheet};
 use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::session::Session;
 use crate::url::{
-    EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, is_url_and_has_protocol, resolve_url,
+    EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, create_srcset_data_url,
+    is_url_and_has_protocol, resolve_url,
 };
 
 const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
@@ -160,7 +161,7 @@ pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> 
                 Ok((image_data, image_final_url, image_media_type, image_charset)) => {
                     if session.options.output_format == MonolithOutputFormat::HTML {
                         // Append retrieved asset as a data URL
-                        result.push_str(&create_data_url(
+                        result.push_str(&create_srcset_data_url(
                             &image_media_type,
                             &image_charset,
                             image_data,

@@ -55,7 +55,7 @@ mod passing {
             r##"<!DOCTYPE html><html lang="en"><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Local HTML file</title>
-  <link href="data:text/css;charset=utf-8;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNmZmY7Cn0K" rel="stylesheet" type="text/css">
+  <link href="data:text/css;charset=utf-8,body {%0A    background-color: %23000;%0A    color: %23fff;%0A}%0A" rel="stylesheet" type="text/css">
   <link rel="stylesheet" type="text/css">
 <meta name="robots" content="none"></head>
 
@@ -209,7 +209,7 @@ document.body.style.color = "red";
         // STDOUT should contain HTML with date URL for background-image in it
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r##"<html><head><meta name="robots" content="none"></head><body><div style="background-image: url(&quot;data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=&quot;)"></div>
+            r##"<html><head><meta name="robots" content="none"></head><body><div style="background-image: url(&quot;data:image/svg+xml,%3Csvg version=%221.1%22 baseProfile=%22full%22 width=%22300%22 height=%22200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%0A    %3Crect width=%22100%25%22 height=%22100%25%22 fill=%22red%22 /%3E%0A    %3Ccircle cx=%22150%22 cy=%22100%22 r=%2280%22 fill=%22green%22 /%3E%0A    %3Ctext x=%22150%22 y=%22125%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22%3ESVG%3C/text%3E%0A%3C/svg%3E%0A&quot;)"></div>
 </body></html>
 "##
         );
@@ -333,7 +333,7 @@ document.body.style.color = "red";
             String::from_utf8_lossy(&out.stdout),
             r##"<html><head><meta name="robots" content="none"></head><body>
         <svg height="24" width="24">
-            <image href="data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJmdWxsIiB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICAgIDxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InJlZCIgLz4KICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjEwMCIgcj0iODAiIGZpbGw9ImdyZWVuIiAvPgogICAgPHRleHQgeD0iMTUwIiB5PSIxMjUiIGZvbnQtc2l6ZT0iNjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj5TVkc8L3RleHQ+Cjwvc3ZnPgo=" width="24" height="24">
+            <image href="data:image/svg+xml,%3Csvg version=%221.1%22 baseProfile=%22full%22 width=%22300%22 height=%22200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%0A    %3Crect width=%22100%25%22 height=%22100%25%22 fill=%22red%22 /%3E%0A    %3Ccircle cx=%22150%22 cy=%22100%22 r=%2280%22 fill=%22green%22 /%3E%0A    %3Ctext x=%22150%22 y=%22125%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22%3ESVG%3C/text%3E%0A%3C/svg%3E%0A" width="24" height="24">
         </image></svg>
     "##.to_owned() + r##"
 
@@ -393,7 +393,7 @@ document.body.style.color = "red";
             String::from_utf8_lossy(&out.stdout),
             r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="img-src data:;">
         <title>Local HTML file</title>
-        <link href="data:text/css;charset=utf-8;base64,Ym9keSB7CiAgICBiYWNrZ3JvdW5kLWNvbG9yOiAjMDAwOwogICAgY29sb3I6ICNGRkY7Cn0K" rel="stylesheet" type="text/css" crossorigin="anonymous">
+        <link href="data:text/css;charset=utf-8,body {%0A    background-color: %23000;%0A    color: %23FFF;%0A}%0A" rel="stylesheet" type="text/css" crossorigin="anonymous">
         <link href="style.css" rel="stylesheet" type="text/css" crossorigin="anonymous">
     <meta name="robots" content="none"></head>
 
