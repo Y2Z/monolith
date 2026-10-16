@@ -139,18 +139,25 @@ pub fn create_monolithic_document_from_data(
     } else {
         Url::parse("data:text/html,").unwrap()
     };
-    let mut document_encoding: String = input_encoding.clone().unwrap_or("utf-8".to_string());
+    // A BOM or a charset from the transport layer takes precedence over META
+    let authoritative_encoding = Encoding::for_bom(&input_data)
+        .map(|(encoding, _)| encoding)
+        .or_else(|| input_encoding.as_deref().and_then(declared_encoding));
+    let mut document_encoding = authoritative_encoding
+        .map(|encoding| encoding.name().to_string())
+        .unwrap_or("utf-8".to_string());
     let mut dom: RcDom;
 
     // Encoding the document declares (if any), used for decoding unlabeled stylesheets
-    let mut environment_encoding: Option<&'static Encoding> =
-        input_encoding.as_deref().and_then(declared_encoding);
+    let mut environment_encoding = authoritative_encoding;
 
     // Initial parse
     dom = html_to_dom(&input_data, document_encoding.clone());
 
     // Attempt to determine document's encoding
-    if let Some(html_charset) = get_charset(&dom.document) {
+    if authoritative_encoding.is_none()
+        && let Some(html_charset) = get_charset(&dom.document)
+    {
         if !html_charset.is_empty() {
             // Check if the charset specified inside HTML is valid
             if let Some(document_charset) =
@@ -160,6 +167,16 @@ pub fn create_monolithic_document_from_data(
                 environment_encoding = Some(document_charset);
                 dom = html_to_dom(&input_data, document_charset.name().to_string());
             }
+        }
+    }
+
+    if authoritative_encoding.is_some() {
+        // UTF-16 documents get serialized as UTF-8
+        if document_encoding == "UTF-16LE" || document_encoding == "UTF-16BE" {
+            document_encoding = "UTF-8".to_string();
+        }
+        if get_charset(&dom.document).is_some() || !input_data.is_ascii() {
+            dom = set_charset(dom, document_encoding.clone());
         }
     }
 
@@ -569,25 +586,49 @@ pub fn is_plaintext_media_type(media_type: &str) -> bool {
 }
 
 pub fn parse_content_type(content_type: &str) -> (String, String, bool) {
+    let (media_type, charset, is_base64) = parse_media_type(content_type);
+
+    (
+        media_type,
+        charset.unwrap_or_else(|| "US-ASCII".to_string()),
+        is_base64,
+    )
+}
+
+/// Same as parse_content_type(), but returns None if no charset is given.
+pub fn parse_media_type(content_type: &str) -> (String, Option<String>, bool) {
     let mut media_type: String = "text/plain".to_string();
-    let mut charset: String = "US-ASCII".to_string();
+    let mut charset: Option<String> = None;
     let mut is_base64: bool = false;
 
-    // Parse meta data
-    let content_type_items: Vec<&str> = content_type.split(';').collect();
-    let mut i: i8 = 0;
-    for item in &content_type_items {
-        if i == 0 {
-            if !item.trim().is_empty() {
-                media_type = item.trim().to_string();
-            }
-        } else if item.trim().eq_ignore_ascii_case("base64") {
-            is_base64 = true;
-        } else if item.trim().starts_with("charset=") {
-            charset = item.trim().chars().skip(8).collect();
+    // Split on semicolons outside of quoted strings
+    let mut in_quotes: bool = false;
+    let mut escaped: bool = false;
+    let items = content_type.split(|c: char| {
+        if escaped {
+            escaped = false;
+        } else if in_quotes && c == '\\' {
+            escaped = true;
+        } else if c == '"' {
+            in_quotes = !in_quotes;
         }
+        c == ';' && !in_quotes
+    });
 
-        i += 1;
+    for (i, item) in items.enumerate() {
+        let item = item.trim();
+
+        if i == 0 {
+            if !item.is_empty() {
+                media_type = item.to_string();
+            }
+        } else if item.eq_ignore_ascii_case("base64") {
+            is_base64 = true;
+        } else if let Some((name, value)) = item.split_once('=') {
+            if charset.is_none() && name.trim().eq_ignore_ascii_case("charset") {
+                charset = Some(value.trim().trim_matches('"').to_string());
+            }
+        }
     }
 
     (media_type, charset, is_base64)

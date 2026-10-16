@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use monolith::core::parse_content_type;
+    use monolith::core::{parse_content_type, parse_media_type};
 
     #[test]
     fn text_plain_utf8() {
@@ -81,5 +81,32 @@ mod passing {
         assert_eq!(media_type, "text/html");
         assert_eq!(charset, "GB2312");
         assert!(!is_base64);
+    }
+
+    #[test]
+    fn quoted_parameter_with_semicolon() {
+        let (_media_type, charset, _is_base64) =
+            parse_content_type("text/html; foo=\"a;charset=Shift_JIS\"; charset=UTF-8");
+        assert_eq!(charset, "UTF-8");
+    }
+
+    #[test]
+    fn missing_charset() {
+        let (_media_type, charset, _is_base64) = parse_media_type("text/html");
+        assert_eq!(charset, None);
+    }
+
+    #[test]
+    fn escaped_quote_in_quoted_parameter() {
+        let (_media_type, charset, _is_base64) =
+            parse_content_type("text/html; foo=\"a\\\";b\"; charset=UTF-8");
+        assert_eq!(charset, "UTF-8");
+    }
+
+    #[test]
+    fn first_charset_wins() {
+        let (_media_type, charset, _is_base64) =
+            parse_content_type("text/html; charset=UTF-8; charset=Shift_JIS");
+        assert_eq!(charset, "UTF-8");
     }
 }
