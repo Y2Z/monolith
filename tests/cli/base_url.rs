@@ -28,7 +28,7 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><base href="http://localhost:30701/"></base><meta name="robots" content="none"></meta></head><body>Hello, World!</body></html>
+            r#"<html><head><base href="http://localhost:30701/"><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );
 
@@ -51,7 +51,7 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><base href="http://localhost:30701/"><meta name="robots" content="none"></meta></head><body>Hello, World!</body></html>
+            r#"<html><head><base href="http://localhost:30701/"><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );
 
@@ -76,7 +76,7 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><base href="http://localhost/"><meta name="robots" content="none"></meta></head><body>Hello, World!</body></html>
+            r#"<html><head><base href="http://localhost/"><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );
 
@@ -101,7 +101,7 @@ mod passing {
         // STDOUT should contain newly added base URL
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><base href=""><meta name="robots" content="none"></meta></head><body>Hello, World!</body></html>
+            r#"<html><head><base href=""><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );
 

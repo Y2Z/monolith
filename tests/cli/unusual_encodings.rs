@@ -52,7 +52,7 @@ mod passing {
             r##"<html><head>
     <meta http-equiv="content-type" content="text/html;charset=GB2312">
     <title>近七成人减少线下需求　银行数字化转型提速--经济·科技--人民网 </title>
-<meta name="robots" content="none"></meta></head>
+<meta name="robots" content="none"></head>
 <body>
     <h1>近七成人减少线下需求　银行数字化转型提速</h1>
 
@@ -96,7 +96,7 @@ mod passing {
             r##"<html><head>
     <meta http-equiv="content-type" content="text/html;charset=GB2312">
     <title>近七成人减少线下需求　银行数字化转型提速--经济·科技--人民网 </title>
-<meta name="robots" content="none"></meta></head>
+<meta name="robots" content="none"></head>
 <body>
     <h1>近七成人减少线下需求　银行数字化转型提速</h1>
 
@@ -142,7 +142,7 @@ mod passing {
             r#"<html><head>
     <meta http-equiv="content-type" content="text/html;charset=utf8">
     <title>近七成人减少线下需求　银行数字化转型提速--经济·科技--人民网 </title>
-<meta name="robots" content="none"></meta></head>
+<meta name="robots" content="none"></head>
 <body>
     <h1>近七成人减少线下需求　银行数字化转型提速</h1>
 
@@ -227,7 +227,7 @@ mod failing {
             String::from_utf8_lossy(&out.stdout),
             r##"<html><head>
         <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-    <meta name="robots" content="none"></meta></head>
+    <meta name="robots" content="none"></head>
     <body>� Some Company
 
 </body></html>

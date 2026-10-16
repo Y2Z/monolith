@@ -36,7 +36,7 @@ mod passing {
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
             "<html>\
                 <head>\
-                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:;\"></meta>\
+                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:;\">\
                     <title>Isolated document</title>\
                     <link rel=\"something\" href=\"some.css\">\
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
@@ -65,7 +65,7 @@ mod passing {
             "<!DOCTYPE html>\
             <html>\
             <head>\
-            <meta http-equiv=\"Content-Security-Policy\" content=\"style-src 'none';\"></meta>\
+            <meta http-equiv=\"Content-Security-Policy\" content=\"style-src 'none';\">\
             <title>Unstyled document</title>\
             <link rel=\"stylesheet\" href=\"main.css\">\
             </head>\
@@ -89,7 +89,7 @@ mod passing {
             "<!DOCTYPE html>\
                 <html>\
                 <head>\
-                <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none'; child-src 'none';\"></meta>\
+                <meta http-equiv=\"Content-Security-Policy\" content=\"frame-src 'none'; child-src 'none';\">\
                 <title>Frameless document</title>\
                 <link rel=\"something\">\
                 </head>\
@@ -123,7 +123,7 @@ mod passing {
             "<!DOCTYPE html>\
                 <html>\
                     <head>\
-                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;\"></meta>\
+                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;\">\
                         <title>no-frame no-css no-js no-image isolated document</title>\
                         <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                         <link rel=\"stylesheet\" href=\"some.css\">\

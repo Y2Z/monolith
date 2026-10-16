@@ -51,7 +51,7 @@ pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
     for head in find_nodes(&dom.document, vec!["html", "head"]).iter() {
         let favicon_node = create_element(
             &dom,
-            QualName::new(None, ns!(), LocalName::from("link")),
+            QualName::new(None, ns!(html), LocalName::from("link")),
             vec![
                 Attribute {
                     name: QualName::new(None, ns!(), LocalName::from("rel")),
@@ -499,7 +499,7 @@ pub fn set_base_url(document: &Handle, base_href_value: String) -> RcDom {
             } else {
                 let base_node = create_element(
                     &dom,
-                    QualName::new(None, ns!(), LocalName::from("base")),
+                    QualName::new(None, ns!(html), LocalName::from("base")),
                     vec![Attribute {
                         name: QualName::new(None, ns!(), LocalName::from("href")),
                         value: format_tendril!("{}", base_href_value),
@@ -622,7 +622,7 @@ pub fn set_robots(dom: RcDom, content_value: &str) -> RcDom {
     {
         let meta_charset_node: Handle = create_element(
             &dom,
-            QualName::new(None, ns!(), LocalName::from("meta")),
+            QualName::new(None, ns!(html), LocalName::from("meta")),
             vec![
                 Attribute {
                     name: QualName::new(None, ns!(), LocalName::from("name")),
@@ -731,7 +731,7 @@ pub fn serialize_document(
             if let Some(head) = get_child_node_by_name(&html, "head") {
                 let meta = create_element(
                     &dom,
-                    QualName::new(None, ns!(), LocalName::from("meta")),
+                    QualName::new(None, ns!(html), LocalName::from("meta")),
                     vec![
                         Attribute {
                             name: QualName::new(None, ns!(), LocalName::from("http-equiv")),

@@ -29,7 +29,7 @@ mod passing {
 
         assert_eq!(
             buf.iter().map(|&c| c as char).collect::<String>(),
-            "<html><head><link rel=\"icon\" href=\"I_AM_A_FAVICON_DATA_URL\"></link></head><body><div>text</div></body></html>"
+            "<html><head><link rel=\"icon\" href=\"I_AM_A_FAVICON_DATA_URL\"></head><body><div>text</div></body></html>"
         );
     }
 }
