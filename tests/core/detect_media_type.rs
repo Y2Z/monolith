@@ -11,54 +11,51 @@ mod passing {
 
     use monolith::core::detect_media_type;
 
-    #[test]
-    fn image_gif87() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"GIF87a", &dummy_url), "image/gif");
+    // Signatures are padded, since some formats are only recognized with enough of their header present
+    // (e.g. WebM needs more than 256 bytes to be told apart from other Matroska files)
+    fn header(start: &[u8]) -> Vec<u8> {
+        let mut data = start.to_vec();
+        data.resize(512.max(start.len()), 0);
+        data
     }
 
     #[test]
-    fn image_gif89() {
+    fn by_signature() {
         let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"GIF89a", &dummy_url), "image/gif");
+
+        for (data, expected) in [
+            (header(b"GIF87a"), "image/gif"),
+            (header(b"GIF89a"), "image/gif"),
+            (header(b"\xFF\xD8\xFF\xE0"), "image/jpeg"),
+            (header(b"\x89PNG\x0D\x0A\x1A\x0A"), "image/png"),
+            (header(b"<svg "), "image/svg+xml"),
+            (header(b"RIFF\x24\x00\x00\x00WEBPVP8 "), "image/webp"),
+            (header(b"\x00\x00\x01\x00\x01\x00"), "image/x-icon"),
+            (header(b"ID3\x04\x00"), "audio/mpeg"),
+            (header(b"\xFF\xFB\x90\x00"), "audio/mpeg"),
+            (header(b"OggS\x00\x02"), "audio/ogg"),
+            (header(b"RIFF\x24\x00\x00\x00WAVEfmt "), "audio/wav"),
+            (header(b"fLaC\x00\x00\x00\x22"), "audio/flac"),
+            (header(b"RIFF\x24\x00\x00\x00AVI LIST"), "video/avi"),
+            (header(b"\x00\x00\x00\x18ftypisom"), "video/mp4"),
+            (header(b"\x00\x00\x01\xBA"), "video/mpeg"),
+            (header(b"\x00\x00\x00\x14ftypqt  "), "video/quicktime"),
+            (
+                header(b"\x1A\x45\xDF\xA3\x9F\x42\x86\x81\x01\x42\x82\x84webm"),
+                "video/webm",
+            ),
+            (header(b"wOF2\x00\x01\x00\x00"), "font/woff2"),
+        ] {
+            assert_eq!(detect_media_type(&data, &dummy_url), expected);
+        }
     }
 
     #[test]
-    fn image_jpeg() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"\xFF\xD8\xFF", &dummy_url), "image/jpeg");
-    }
-
-    #[test]
-    fn image_png() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
+    fn signature_beats_file_name() {
+        let file_url: Url = Url::parse("file:///tmp/actually-a-png.jpg").unwrap();
         assert_eq!(
-            detect_media_type(b"\x89PNG\x0D\x0A\x1A\x0A", &dummy_url),
+            detect_media_type(b"\x89PNG\x0D\x0A\x1A\x0A", &file_url),
             "image/png"
-        );
-    }
-
-    #[test]
-    fn image_svg() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"<svg ", &dummy_url), "image/svg+xml");
-    }
-
-    #[test]
-    fn image_webp() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(
-            detect_media_type(b"RIFF....WEBPVP8 ", &dummy_url),
-            "image/webp"
-        );
-    }
-
-    #[test]
-    fn image_icon() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(
-            detect_media_type(b"\x00\x00\x01\x00", &dummy_url),
-            "image/x-icon"
         );
     }
 
@@ -75,83 +72,36 @@ mod passing {
     }
 
     #[test]
-    fn audio_mpeg() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"ID3", &dummy_url), "audio/mpeg");
-    }
-
-    #[test]
-    fn audio_mpeg_2() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"\xFF\x0E", &dummy_url), "audio/mpeg");
-    }
-
-    #[test]
-    fn audio_mpeg_3() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"\xFF\x0F", &dummy_url), "audio/mpeg");
-    }
-
-    #[test]
-    fn audio_ogg() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"OggS", &dummy_url), "audio/ogg");
-    }
-
-    #[test]
-    fn audio_wav() {
+    fn image_svg_after_xml_declaration() {
         let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            detect_media_type(b"RIFF....WAVEfmt ", &dummy_url),
-            "audio/wav"
+            detect_media_type(
+                b"<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+                &dummy_url
+            ),
+            "image/svg+xml"
         );
     }
 
     #[test]
-    fn audio_flac() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"fLaC", &dummy_url), "audio/x-flac");
+    fn text_formats_by_file_name() {
+        for (url, expected) in [
+            ("https://some-site.com/style.css", "text/css"),
+            ("https://some-site.com/app.js", "text/javascript"),
+            ("https://some-site.com/data.json", "application/json"),
+            ("file:///tmp/page.html", "text/html"),
+            ("file:///tmp/My%20Notes.txt", "text/plain"),
+        ] {
+            assert_eq!(detect_media_type(b"", &Url::parse(url).unwrap()), expected);
+        }
     }
 
     #[test]
-    fn video_avi() {
+    fn html_by_content() {
         let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(
-            detect_media_type(b"RIFF....AVI LIST", &dummy_url),
-            "video/avi"
-        );
-    }
-
-    #[test]
-    fn video_mp4() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(detect_media_type(b"....ftyp", &dummy_url), "video/mp4");
-    }
-
-    #[test]
-    fn video_mpeg() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(
-            detect_media_type(b"\x00\x00\x01\x0B", &dummy_url),
-            "video/mpeg"
-        );
-    }
-
-    #[test]
-    fn video_quicktime() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(
-            detect_media_type(b"....moov", &dummy_url),
-            "video/quicktime"
-        );
-    }
-
-    #[test]
-    fn video_webm() {
-        let dummy_url: Url = Url::parse("data:,").unwrap();
-        assert_eq!(
-            detect_media_type(b"\x1A\x45\xDF\xA3", &dummy_url),
-            "video/webm"
+            detect_media_type(b"<!DOCTYPE html><html></html>", &dummy_url),
+            "text/html"
         );
     }
 }
@@ -173,5 +123,17 @@ mod failing {
     fn unknown_media_type() {
         let dummy_url: Url = Url::parse("data:,").unwrap();
         assert_eq!(detect_media_type(b"abcdef0123456789", &dummy_url), "");
+    }
+
+    #[test]
+    fn unknown_file_extension() {
+        let file_url: Url = Url::parse("file:///tmp/archive.unknown").unwrap();
+        assert_eq!(detect_media_type(b"abcdef0123456789", &file_url), "");
+    }
+
+    #[test]
+    fn directory_url() {
+        let https_url: Url = Url::parse("https://some-site.com/images/").unwrap();
+        assert_eq!(detect_media_type(b"", &https_url), "");
     }
 }
