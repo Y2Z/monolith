@@ -16,7 +16,7 @@ mod passing {
         let (media_type, charset, data) = url::parse_data_url(&Url::parse("data:text/html;base64,V29yayBleHBhbmRzIHNvIGFzIHRvIGZpbGwgdGhlIHRpbWUgYXZhaWxhYmxlIGZvciBpdHMgY29tcGxldGlvbg==").unwrap());
 
         assert_eq!(media_type, "text/html");
-        assert_eq!(charset, "US-ASCII");
+        assert_eq!(charset, "");
         assert_eq!(
             String::from_utf8_lossy(&data),
             "Work expands so as to fill the time available for its completion"
@@ -47,7 +47,7 @@ mod passing {
         );
 
         assert_eq!(media_type, "text/html");
-        assert_eq!(charset, "US-ASCII");
+        assert_eq!(charset, "");
         assert_eq!(
             String::from_utf8_lossy(&data),
             "Work expands so as to fill the time available for its completion"
@@ -60,7 +60,7 @@ mod passing {
             url::parse_data_url(&Url::parse("data:text/css,div{background-color:%23000}").unwrap());
 
         assert_eq!(media_type, "text/css");
-        assert_eq!(charset, "US-ASCII");
+        assert_eq!(charset, "");
         assert_eq!(String::from_utf8_lossy(&data), "div{background-color:#000}");
     }
 
@@ -70,7 +70,7 @@ mod passing {
             url::parse_data_url(&Url::parse("data:;base64,dGVzdA==").unwrap());
 
         assert_eq!(media_type, "text/plain");
-        assert_eq!(charset, "US-ASCII");
+        assert_eq!(charset, "");
         assert_eq!(String::from_utf8_lossy(&data), "test");
     }
 
@@ -80,7 +80,7 @@ mod passing {
             url::parse_data_url(&Url::parse("data:;,test%20test").unwrap());
 
         assert_eq!(media_type, "text/plain");
-        assert_eq!(charset, "US-ASCII");
+        assert_eq!(charset, "");
         assert_eq!(String::from_utf8_lossy(&data), "test test");
     }
 
@@ -147,7 +147,7 @@ mod failing {
         let (media_type, charset, data) = url::parse_data_url(&Url::parse("data:,").unwrap());
 
         assert_eq!(media_type, "text/plain");
-        assert_eq!(charset, "US-ASCII");
+        assert_eq!(charset, "");
         assert_eq!(String::from_utf8_lossy(&data), "");
     }
 
@@ -157,7 +157,7 @@ mod failing {
             url::parse_data_url(&Url::parse("data:text/plain;base64,a").unwrap());
 
         assert_eq!(media_type, "text/plain");
-        assert_eq!(charset, "US-ASCII");
+        assert_eq!(charset, "");
         assert_eq!(data, b"");
     }
 
@@ -167,7 +167,7 @@ mod failing {
             url::parse_data_url(&Url::parse("data:image/png").unwrap());
 
         assert_eq!(media_type, "text/plain");
-        assert_eq!(charset, "US-ASCII");
+        assert_eq!(charset, "");
         assert_eq!(data, b"");
     }
 }

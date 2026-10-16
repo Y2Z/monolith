@@ -107,13 +107,17 @@ pub fn is_url_and_has_protocol(input: &str) -> bool {
 
 pub fn parse_data_url(url: &Url) -> (String, String, Vec<u8>) {
     match DataUrl::parse(url.as_str()) {
+        // The charset is empty if not given, same as for other assets
         Ok(data_url) => (
             data_url.media_type().to_string(),
-            data_url.charset().to_string(),
+            data_url
+                .charset_no_default()
+                .unwrap_or_default()
+                .to_string(),
             data_url.into_data(),
         ),
         // Malformed data URLs (no comma, invalid base64) are treated as empty ones
-        Err(_) => ("text/plain".to_string(), "US-ASCII".to_string(), vec![]),
+        Err(_) => ("text/plain".to_string(), "".to_string(), vec![]),
     }
 }
 

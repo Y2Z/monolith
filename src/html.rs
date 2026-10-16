@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::default::Default;
 use std::rc::Rc;
 
-use crate::core::{MonolithOptions, MonolithOutputFormat, declared_encoding, parse_content_type};
+use crate::core::{MonolithOptions, MonolithOutputFormat, declared_encoding, parse_media_type};
 use crate::css::{embed_css, embed_stylesheet};
 use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::session::Session;
@@ -239,23 +239,26 @@ pub fn get_base_url(handle: &Handle) -> Option<String> {
 }
 
 pub fn get_charset(node: &Handle) -> Option<String> {
-    for meta_node in find_nodes(node, vec!["html", "head", "meta"]).iter() {
-        if let Some(meta_charset_node_attr_value) = get_node_attr(meta_node, "charset") {
-            // Processing <meta charset="..." />
-            return Some(meta_charset_node_attr_value);
-        }
+    find_nodes(node, vec!["html", "head", "meta"])
+        .iter()
+        .find_map(get_meta_charset)
+}
 
-        if get_node_attr(meta_node, "http-equiv")
-            .unwrap_or_default()
-            .eq_ignore_ascii_case("content-type")
-        {
-            if let Some(meta_content_type_node_attr_value) = get_node_attr(meta_node, "content") {
-                // Processing <meta http-equiv="content-type" content="text/html; charset=..." />
-                let (_media_type, charset, _is_base64) =
-                    parse_content_type(&meta_content_type_node_attr_value);
-                return Some(charset);
-            }
-        }
+/// Returns the charset a META node declares, either via <meta charset="..." />
+/// or <meta http-equiv="content-type" content="text/html; charset=..." />
+fn get_meta_charset(meta_node: &Handle) -> Option<String> {
+    if let Some(charset) = get_node_attr(meta_node, "charset") {
+        return Some(charset);
+    }
+
+    if get_node_attr(meta_node, "http-equiv")
+        .unwrap_or_default()
+        .eq_ignore_ascii_case("content-type")
+    {
+        // A content type without a charset doesn't declare anything
+        let (_media_type, charset, _is_base64) =
+            parse_media_type(&get_node_attr(meta_node, "content")?);
+        return charset;
     }
 
     None
@@ -513,46 +516,56 @@ pub fn set_base_url(document: &Handle, base_href_value: String) -> RcDom {
 }
 
 pub fn set_charset(dom: RcDom, charset: String) -> RcDom {
-    for meta_node in find_nodes(&dom.document, vec!["html", "head", "meta"]).iter() {
-        if get_node_attr(meta_node, "charset").is_some() {
-            set_node_attr(meta_node, "charset", Some(charset));
-            return dom;
-        }
+    let head_node: Handle = match find_nodes(&dom.document, vec!["html", "head"]).first() {
+        Some(head_node) => head_node.clone(),
+        None => return dom,
+    };
 
-        if get_node_attr(meta_node, "http-equiv")
-            .unwrap_or_default()
-            .eq_ignore_ascii_case("content-type")
-            && get_node_attr(meta_node, "content").is_some()
-        {
-            set_node_attr(
-                meta_node,
-                "content",
-                Some(format!("text/html;charset={}", charset)),
-            );
-            return dom;
-        }
-    }
+    // Reuse the META node that declares the charset (if any), the way browsers would pick it
+    let existing_meta_node: Option<Handle> =
+        find_nodes(&dom.document, vec!["html", "head", "meta"])
+            .into_iter()
+            .find(|meta_node| get_meta_charset(meta_node).is_some());
 
-    // Manually append charset META node to HEAD
-    {
-        let meta_charset_node: Handle = create_element(
+    let meta_charset_node: Handle = match existing_meta_node {
+        Some(meta_node) => {
+            if get_node_attr(&meta_node, "charset").is_some() {
+                set_node_attr(&meta_node, "charset", Some(charset));
+            } else {
+                set_node_attr(
+                    &meta_node,
+                    "content",
+                    Some(format!("text/html;charset={}", charset)),
+                );
+            }
+            meta_node
+        }
+        // The HTML namespace makes it get serialized as a void element (without "</meta>")
+        None => create_element(
             &dom,
-            QualName::new(None, ns!(), LocalName::from("meta")),
+            QualName::new(None, ns!(html), LocalName::from("meta")),
             vec![Attribute {
                 name: QualName::new(None, ns!(), LocalName::from("charset")),
                 value: format_tendril!("{}", charset),
             }],
-        );
+        ),
+    };
 
-        // Insert newly created META charset node into HEAD
-        for head_node in find_nodes(&dom.document, vec!["html", "head"]).iter() {
-            head_node
-                .children
-                .borrow_mut()
-                .push(meta_charset_node.clone());
-            break;
-        }
+    // Browsers only look for the charset within the first 1024 bytes of the document,
+    // and embedded assets can easily push it past that, so it has to be HEAD's first element
+    let mut children = head_node.children.borrow_mut();
+    let is_first_element: bool = children
+        .iter()
+        .find(|child| matches!(child.data, NodeData::Element { .. }))
+        .is_some_and(|first_element| Rc::ptr_eq(first_element, &meta_charset_node));
+    if !is_first_element {
+        children.retain(|child| !Rc::ptr_eq(child, &meta_charset_node));
+        meta_charset_node
+            .parent
+            .set(Some(Rc::downgrade(&head_node)));
+        children.insert(0, meta_charset_node);
     }
+    drop(children);
 
     dom
 }

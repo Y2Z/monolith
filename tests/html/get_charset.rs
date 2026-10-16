@@ -69,4 +69,56 @@ mod passing {
 
         assert_eq!(html::get_charset(&dom.document), Some("GB2312".to_string()));
     }
+
+    #[test]
+    fn meta_content_type_without_charset_then_meta_charset() {
+        let html = "<!doctype html>
+<html>
+    <head>
+        <meta http-equiv=\"content-type\" content=\"text/html\" />
+        <meta charset=\"GB2312\" />
+    </head>
+    <body>
+    </body>
+</html>";
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+
+        assert_eq!(html::get_charset(&dom.document), Some("GB2312".to_string()));
+    }
+}
+
+//  ███████╗ █████╗ ██╗██╗     ██╗███╗   ██╗ ██████╗
+//  ██╔════╝██╔══██╗██║██║     ██║████╗  ██║██╔════╝
+//  █████╗  ███████║██║██║     ██║██╔██╗ ██║██║  ███╗
+//  ██╔══╝  ██╔══██║██║██║     ██║██║╚██╗██║██║   ██║
+//  ██║     ██║  ██║██║███████╗██║██║ ╚████║╚██████╔╝
+//  ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝
+
+#[cfg(test)]
+mod failing {
+    use monolith::html;
+
+    #[test]
+    fn meta_content_type_without_charset() {
+        // Without a charset parameter, this META doesn't declare any encoding
+        let html = "<!doctype html>
+<html>
+    <head>
+        <meta http-equiv=\"content-type\" content=\"text/html\" />
+    </head>
+    <body>
+    </body>
+</html>";
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+
+        assert_eq!(html::get_charset(&dom.document), None);
+    }
+
+    #[test]
+    fn no_meta() {
+        let html = "<!doctype html><html><head><title>x</title></head><body></body></html>";
+        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+
+        assert_eq!(html::get_charset(&dom.document), None);
+    }
 }
