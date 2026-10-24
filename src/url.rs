@@ -147,6 +147,17 @@ pub fn domain_is_within_domain(domain: &str, domain_to_match_against: &str) -> b
     ok
 }
 
+/// Checks if the input is an absolute Windows path (e.g. `C:\dir\page.html` or `C:/dir/page.html`),
+/// which the URL parser would otherwise take for a URL with a one-letter scheme
+pub fn is_windows_drive_path(input: &str) -> bool {
+    let bytes = input.as_bytes();
+
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'\\' || bytes[2] == b'/')
+}
+
 pub fn is_url_and_has_protocol(input: &str) -> bool {
     match Url::parse(input) {
         Ok(parsed_url) => !parsed_url.scheme().is_empty(),
