@@ -128,6 +128,40 @@ document.body.style.color = "red";
     }
 
     #[test]
+    fn local_file_target_input_full_target_path() {
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        // On Windows this is a path that starts with a drive letter, e.g. "C:\...\local-file.html"
+        let path_html = env::current_dir()
+            .unwrap()
+            .join("tests")
+            .join("_data_")
+            .join("basic")
+            .join("local-file.html");
+
+        let out = cmd
+            .arg("-M")
+            .arg("-Ijci")
+            .arg(path_html.as_os_str())
+            .output()
+            .unwrap();
+
+        // STDERR should contain only the target file
+        assert_eq!(
+            String::from_utf8_lossy(&out.stderr),
+            format!(
+                "{file_url_html}\n",
+                file_url_html = Url::from_file_path(fs::canonicalize(&path_html).unwrap()).unwrap(),
+            )
+        );
+
+        // STDOUT should contain HTML from the local file
+        assert!(String::from_utf8_lossy(&out.stdout).contains("<title>Local HTML file</title>"));
+
+        // Exit code should be 0
+        out.assert().code(0);
+    }
+
+    #[test]
     fn local_file_url_target_input() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let cwd_normalized: String = env::current_dir()
