@@ -459,21 +459,25 @@ pub fn format_output_path(
     output_format: MonolithOutputFormat,
 ) -> String {
     let datetime: &str = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    let title: String = document_title
+        .replace(['/', '\\'], "_")
+        .replace('<', "[")
+        .replace('>', "]")
+        .replace(':', " - ")
+        .replace('\"', "")
+        .replace('|', "-")
+        .replace('?', "");
+    // Like browsers do when saving a page, turn newlines, tabs and other whitespace
+    // or control characters into single spaces, then trim leading/trailing spaces and dots
+    let title: String = title
+        .split(|c: char| c.is_whitespace() || c.is_control())
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<&str>>()
+        .join(" ");
+    let title: &str = title.trim_matches(|c: char| c == '.' || c == ' ');
 
     path.replace("%timestamp%", &datetime.replace(':', "_"))
-        .replace(
-            "%title%",
-            document_title
-                .to_string()
-                .replace(['/', '\\'], "_")
-                .replace('<', "[")
-                .replace('>', "]")
-                .replace(':', " - ")
-                .replace('\"', "")
-                .replace('|', "-")
-                .replace('?', "")
-                .trim_start_matches('.'),
-        )
+        .replace("%title%", title)
         .replace(
             "%ext%",
             if output_format == MonolithOutputFormat::HTML {
