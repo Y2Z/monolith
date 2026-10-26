@@ -63,6 +63,42 @@ mod passing {
     }
 
     #[test]
+    fn sanitize_whitespace() {
+        let final_destination = format_output_path(
+            "%title%.%extension%",
+            "\n      Reversing for dummies - x86 assembly and C code (Beginner/ADHD friendly)\n      \u{b7} 0x44.cc\n    ",
+            MonolithOutputFormat::HTML,
+        );
+
+        assert_eq!(
+            final_destination,
+            "Reversing for dummies - x86 assembly and C code (Beginner_ADHD friendly) \u{b7} 0x44.cc.html"
+        );
+    }
+
+    #[test]
+    fn sanitize_control_characters() {
+        let final_destination = format_output_path(
+            "%title%.html",
+            "Tab\there,\r\nnull\0here,\u{a0}nbsp\u{2028}separator",
+            MonolithOutputFormat::HTML,
+        );
+
+        assert_eq!(
+            final_destination,
+            "Tab here, null here, nbsp separator.html"
+        );
+    }
+
+    #[test]
+    fn trim_spaces_and_dots() {
+        let final_destination =
+            format_output_path("%title%.html", " . Title ... ", MonolithOutputFormat::HTML);
+
+        assert_eq!(final_destination, "Title.html");
+    }
+
+    #[test]
     fn level_up() {
         let final_destination =
             format_output_path("../%title%.html", ".Title", MonolithOutputFormat::HTML);
