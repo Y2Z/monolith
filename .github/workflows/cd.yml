@@ -7,6 +7,14 @@ on:
     types:
     - created
 
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  TAG: ${{ github.event.release.tag_name }}
+
 jobs:
 
   linux_cli_aarch64:
@@ -32,11 +40,10 @@ jobs:
       run: cargo build --release --target=aarch64-unknown-linux-gnu --no-default-features --features cli
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: monolith-cli-linux-aarch64
-        path: target/aarch64-unknown-linux-gnu/release/monolith
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        cp target/aarch64-unknown-linux-gnu/release/monolith monolith-cli-linux-aarch64
+        gh release upload "$TAG" monolith-cli-linux-aarch64 --clobber
 
   linux_cli_armhf:
     runs-on: ubuntu-22.04
@@ -61,11 +68,10 @@ jobs:
       run: cargo build --release --target=arm-unknown-linux-gnueabihf --no-default-features --features cli
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: monolith-cli-linux-armhf
-        path: target/arm-unknown-linux-gnueabihf/release/monolith
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        cp target/arm-unknown-linux-gnueabihf/release/monolith monolith-cli-linux-armhf
+        gh release upload "$TAG" monolith-cli-linux-armhf --clobber
 
   linux_cli_x86_64:
     runs-on: ubuntu-22.04
@@ -78,11 +84,10 @@ jobs:
       run: cargo build --release --features cli
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: monolith-cli-linux-x86_64
-        path: target/release/monolith
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        cp target/release/monolith monolith-cli-linux-x86_64
+        gh release upload "$TAG" monolith-cli-linux-x86_64 --clobber
 
   linux_gui_appimage_x86_64:
     runs-on: ubuntu-22.04
@@ -129,11 +134,10 @@ jobs:
           || mv *.AppImage monolith-gui-linux-x86_64.AppImage
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: Monolith-x86_64.AppImage
-        path: monolith-gui-linux-x86_64.AppImage
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        cp monolith-gui-linux-x86_64.AppImage Monolith-x86_64.AppImage
+        gh release upload "$TAG" Monolith-x86_64.AppImage --clobber
 
   macos_cli:
     runs-on: macos-latest
@@ -149,15 +153,16 @@ jobs:
     - name: Install Rust target
       run: rustup target add ${{ matrix.target }}
 
-    - name: Build
+    - name: Build the executable
+      env:
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
       run: cargo build --release --features cli --target ${{ matrix.target }}
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: monolith-macos-${{ matrix.target }}
-        path: target/${{ matrix.target }}/release/monolith
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        cp target/${{ matrix.target }}/release/monolith monolith-cli-macos-${{ matrix.target }}
+        gh release upload "$TAG" monolith-cli-macos-${{ matrix.target }} --clobber
 
   windows_cli:
     runs-on: windows-2022
@@ -172,11 +177,10 @@ jobs:
       run: cargo build --release --features cli
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: monolith-cli.exe
-        path: target\release\monolith.exe
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        cp target/release/monolith.exe monolith-cli.exe
+        gh release upload "$TAG" monolith-cli.exe --clobber
 
   windows_gui:
     runs-on: windows-2022
@@ -191,8 +195,7 @@ jobs:
       run: cargo build --locked --release --bin monolith-gui --features="gui"
 
     - name: Attach artifact to the release
-      uses: Shopify/upload-to-release@v2.0.0
-      with:
-        name: Monolith.exe
-        path: target\release\monolith-gui.exe
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        cp target/release/monolith-gui.exe Monolith.exe
+        gh release upload "$TAG" Monolith.exe --clobber
