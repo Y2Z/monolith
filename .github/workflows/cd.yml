@@ -89,8 +89,20 @@ jobs:
         cp target/release/monolith monolith-cli-linux-x86_64
         gh release upload "$TAG" monolith-cli-linux-x86_64 --clobber
 
-  linux_gui_appimage_x86_64:
-    runs-on: ubuntu-22.04
+  linux_gui_appimage:
+    strategy:
+      matrix:
+        include:
+        - arch: x86_64
+          deb_arch: amd64
+          apt_mirror: http://archive.ubuntu.com/ubuntu/
+          runner: ubuntu-22.04
+        - arch: aarch64
+          deb_arch: arm64
+          apt_mirror: http://ports.ubuntu.com/ubuntu-ports/
+          runner: ubuntu-22.04-arm
+
+    runs-on: ${{ matrix.runner }}
 
     steps:
     - name: Checkout the repository
@@ -108,16 +120,19 @@ jobs:
     - name: Install appimage-builder and appimagetool
       run: |
         sudo pip3 install appimage-builder
-        sudo wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
+        sudo wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage -O /usr/local/bin/appimagetool
         sudo chmod +x /usr/local/bin/appimagetool
 
     - name: Build the GUI executable
       run: cargo build --locked --release --bin monolith-gui --features="gui"
 
-    - name: Sync version
+    - name: Sync version and architecture
       run: |
         VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
         sed -i "s/^    version: .*/    version: ${VERSION}/" AppImageBuilder.yml
+        sed -i "s/^    arch: .*/    arch: ${{ matrix.deb_arch }}/" AppImageBuilder.yml
+        sed -i "s/^  arch: .*/  arch: ${{ matrix.arch }}/" AppImageBuilder.yml
+        sed -i "s|deb http://archive.ubuntu.com/ubuntu/ |deb ${{ matrix.apt_mirror }} |" AppImageBuilder.yml
 
     - name: Copy files into AppDir
       run: |
@@ -128,16 +143,12 @@ jobs:
     - name: Build the AppImage
       run: appimage-builder --recipe AppImageBuilder.yml --skip-test
 
-    - name: Rename the AppImage
-      run: |
-        mv monolith-*-x86_64.AppImage monolith-gui-linux-x86_64.AppImage \
-          || mv *.AppImage monolith-gui-linux-x86_64.AppImage
-
     - name: Attach artifact to the release
       shell: bash
       run: |
-        cp monolith-gui-linux-x86_64.AppImage Monolith-x86_64.AppImage
-        gh release upload "$TAG" Monolith-x86_64.AppImage --clobber
+        mv monolith-*-${{ matrix.arch }}.AppImage Monolith-${{ matrix.arch }}.AppImage \
+          || mv *.AppImage Monolith-${{ matrix.arch }}.AppImage
+        gh release upload "$TAG" Monolith-${{ matrix.arch }}.AppImage --clobber
 
   macos_cli:
     runs-on: macos-latest
