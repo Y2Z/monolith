@@ -175,6 +175,34 @@ jobs:
         cp target/${{ matrix.target }}/release/monolith monolith-cli-macos-${{ matrix.target }}
         gh release upload "$TAG" monolith-cli-macos-${{ matrix.target }} --clobber
 
+  macos_gui:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+
+    - name: Install Rust targets
+      run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+    - name: Build the GUI executable for both architectures and join them
+      env:
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
+      run: |
+        cargo build --locked --release --bin monolith-gui --features="gui" --target aarch64-apple-darwin
+        cargo build --locked --release --bin monolith-gui --features="gui" --target x86_64-apple-darwin
+        mkdir -p target/universal
+        lipo -create -output target/universal/monolith-gui \
+          target/aarch64-apple-darwin/release/monolith-gui \
+          target/x86_64-apple-darwin/release/monolith-gui
+
+    - name: Bundle Monolith.app
+      run: BIN=target/universal/monolith-gui sh dist/macos-app.sh
+
+    - name: Attach artifact to the release
+      shell: bash
+      run: gh release upload "$TAG" target/Monolith-macos.zip --clobber
+
   windows_cli:
     runs-on: windows-2022
 
