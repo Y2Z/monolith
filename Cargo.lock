@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "monolith"
-version = "2.11.6"
+version = "2.11.7"
 dependencies = [
  "assert_cmd",
  "base64",
