@@ -5,7 +5,6 @@ use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 
-use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
@@ -15,6 +14,7 @@ use crate::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
     has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots, walk,
 };
+use crate::mhtml::{create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::session::Session;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
 
@@ -110,6 +110,38 @@ pub fn create_monolithic_document_from_data(
             }
         }
     }
+
+    // MHTML archives get unpacked: the document inside gets processed, the rest of the archive serves as its assets
+    let (input_data, input_encoding, input_target) = if is_mhtml(&input_data) {
+        let archive_url: Option<Url> = input_target.as_deref().and_then(|t| Url::parse(t).ok());
+        let archive = match parse_mhtml(&input_data, archive_url.as_ref()) {
+            Some(archive) => archive,
+            None => return Err(MonolithError::new("could not unpack MHTML archive")),
+        };
+
+        let root = archive.root();
+        if !root.media_type.eq_ignore_ascii_case("text/html")
+            && !root
+                .media_type
+                .eq_ignore_ascii_case("application/xhtml+xml")
+        {
+            // Provide output as is (without processing it, the way browsers do)
+            return Ok((root.data.clone(), None));
+        }
+        let data: Vec<u8> = root.data.clone();
+        let encoding: Option<String> = Some(root.charset.clone()).filter(|c| !c.is_empty());
+        // The document's original URL, unless the archive doesn't have it
+        let target: Option<String> = match &root.url {
+            Some(url) if url.scheme() != "data" => Some(url.to_string()),
+            _ => input_target,
+        };
+
+        session.load_archive(archive);
+
+        (data, encoding, target)
+    } else {
+        (input_data, input_encoding, input_target)
+    };
 
     let mut base_url: Url = if input_target.is_some() {
         Url::parse(&input_target.clone().unwrap()).unwrap()
@@ -218,6 +250,7 @@ pub fn create_monolithic_document_from_data(
 
     // Request and embed /favicon.ico (unless it's already linked in the document)
     if !session.options.no_images
+        && !session.has_archive()
         && (base_url.scheme() == "http" || base_url.scheme() == "https")
         && (input_target.is_some()
             && (input_target.as_ref().unwrap().starts_with("http:")
@@ -252,7 +285,13 @@ pub fn create_monolithic_document_from_data(
 
     let document_title: Option<String> = get_title(&dom.document);
     // Serialize DOM tree
-    let mut html: Vec<u8> = serialize_document(dom, document_encoding, &session.options);
+    let mut html: Vec<u8> = serialize_document(dom, document_encoding.clone(), &session.options);
+
+    // Document's own URL (data URLs aren't of much use in archives)
+    let document_location: Option<Url> = input_target
+        .as_deref()
+        .and_then(|target| Url::parse(target).ok())
+        .filter(|url| url.scheme() != "data");
 
     // Prepend metadata comment tag
     if !session.options.no_metadata && !input_target.clone().unwrap_or_default().is_empty() {
@@ -265,59 +304,14 @@ pub fn create_monolithic_document_from_data(
 
     if session.options.output_format == MonolithOutputFormat::MHTML {
         // Outputting in MHTML format
-
-        let mut mhtml: Vec<u8> = vec![];
-
-        let mime = "MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary=\"----=_NextPart_000_0000\"\r\n";
-        mhtml.splice(0..0, mime.as_bytes().to_vec());
-
-        // Target document
-        let mime = format!(
-            "\r\n------=_NextPart_000_0000\r\nContent-Type: {}; charset=\"{}\"\r\nContent-Location: {}\r\n\r\n",
-            "text/html",
-            "utf-8",
-            // input_target.unwrap_or("data:;".to_string())
-            "data:;",
+        let mhtml: Vec<u8> = create_mhtml_document(
+            &mut session,
+            html,
+            &base_url,
+            document_location.as_ref(),
+            &document_encoding,
+            document_title.as_deref(),
         );
-        mhtml.extend_from_slice(mime.as_bytes());
-        mhtml.append(&mut html);
-
-        // Assets
-        for asset_url in session.asset_urls.clone().iter_mut() {
-            // TODO: skip if file: (?)
-
-            match session.retrieve_asset(
-                &Url::parse(&asset_url).unwrap(),
-                &Url::parse(&asset_url).unwrap(),
-            ) {
-                Ok((retrieved_data, final_url, media_type, _charset)) => {
-                    if is_plaintext_media_type(&media_type) {
-                        let mime = format!(
-                            "\r\n------=_NextPart_000_0000\r\nContent-Type: {}\r\nContent-Transfer-Encoding: 7bit\r\nContent-Location: {}\r\n\r\n",
-                            media_type, final_url
-                        );
-                        mhtml.extend_from_slice(mime.as_bytes());
-                        // Append plaintext contents
-                        mhtml = vec![mhtml, retrieved_data].concat();
-                    } else {
-                        let mime = format!(
-                            "\r\n------=_NextPart_000_0000\r\nContent-Type: {}\r\nContent-Transfer-Encoding: base64\r\nContent-Location: {}\r\n\r\n",
-                            media_type, final_url
-                        );
-                        mhtml.extend_from_slice(mime.as_bytes());
-                        // Append base64-encoded blob
-                        mhtml.extend_from_slice(BASE64_STANDARD.encode(retrieved_data).as_bytes());
-                    }
-                }
-                Err(_) => {
-                    // TODO: if not silent, print red message
-                }
-            }
-        }
-
-        // End of MIME
-        let mime = "\r\n------=_NextPart_000_0000--\r\n";
-        mhtml.extend_from_slice(mime.as_bytes());
 
         // Return
         Ok((mhtml, document_title))
@@ -416,6 +410,7 @@ pub fn create_monolithic_document(
             Ok((retrieved_data, final_url, media_type, charset)) => {
                 if !media_type.eq_ignore_ascii_case("text/html")
                     && !media_type.eq_ignore_ascii_case("application/xhtml+xml")
+                    && !is_mhtml(&retrieved_data)
                 {
                     // Provide output as text (without processing it, the way browsers do)
                     return Ok((retrieved_data, None));

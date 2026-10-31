@@ -4,6 +4,7 @@ pub mod core;
 pub mod css;
 pub mod html;
 pub mod js;
+pub mod mhtml;
 pub mod net;
 pub mod session;
 pub mod url;
