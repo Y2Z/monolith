@@ -13,10 +13,13 @@ use crate::core::{
     MonolithOptions, MonolithOutputFormat, detect_media_type, print_error_message,
     print_info_message,
 };
+use crate::mhtml::MhtmlArchive;
 use crate::net;
 use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
 
 pub struct Session {
+    /// MHTML archive the document came from; when loaded, assets get retrieved from it (and only from it)
+    archive: Option<MhtmlArchive>,
     pub asset_urls: Vec<String>,
     cache: Option<Cache>,
     client: Client,
@@ -77,6 +80,7 @@ impl Session {
             .expect("Failed to initialize HTTP client");
 
         Session {
+            archive: None,
             asset_urls: Vec::new(),
             cache,
             cookies,
@@ -84,6 +88,15 @@ impl Session {
             environment_encoding: None,
             options,
         }
+    }
+
+    /// Makes the session retrieve assets from the given MHTML archive, instead of the network or filesystem.
+    pub fn load_archive(&mut self, archive: MhtmlArchive) {
+        self.archive = Some(archive);
+    }
+
+    pub fn has_archive(&self) -> bool {
+        self.archive.is_some()
     }
 
     pub fn log_asset_url(&mut self, url: &Url) {
@@ -94,11 +107,13 @@ impl Session {
 
     /// Downloads every asset the walk is about to request on a thread pool and puts
     /// the results into the cache. A no-op without a cache, with fewer than 2 threads,
-    /// or for non-HTML output (MHTML handles assets differently, see css.rs).
+    /// for non-HTML output (MHTML handles assets differently, see css.rs), or with an MHTML archive loaded
+    /// (everything is already in there).
     pub fn prefetch_assets(&mut self, document_url: &Url, document: &Handle) {
         if self.options.threads < 2
             || self.options.output_format != MonolithOutputFormat::HTML
             || self.cache.is_none()
+            || self.archive.is_some()
         {
             return;
         }
@@ -129,6 +144,38 @@ impl Session {
         if url.scheme() == "data" {
             let (media_type, charset, data) = parse_data_url(url);
             Ok((data, url.clone(), media_type, charset))
+        } else if let Some(archive) = &self.archive {
+            // Documents that come from MHTML archives get assets from the archive, never from the network or filesystem
+            let asset = archive.get(url).map(|asset| {
+                (
+                    asset.data.clone(),
+                    asset.url.clone().unwrap_or_else(|| url.clone()),
+                    asset.media_type.clone(),
+                    asset.charset.clone(),
+                )
+            });
+
+            match asset {
+                Some(asset) if net::is_domain_allowed(url, &self.options) => {
+                    if !self.options.silent {
+                        print_info_message(&cache_key);
+                    }
+
+                    Ok(asset)
+                }
+                Some(_) => {
+                    // Provoke error
+                    Err(self.client.get("").send().unwrap_err())
+                }
+                None => {
+                    if !self.options.silent {
+                        print_error_message(&format!("{} (not found in archive)", &cache_key));
+                    }
+
+                    // Provoke error
+                    Err(self.client.get("").send().unwrap_err())
+                }
+            }
         } else if url.scheme() == "file" {
             // Check if parent_url is also a file:// URL (if not, then we don't embed the asset)
             if parent_url.scheme() != "file" {

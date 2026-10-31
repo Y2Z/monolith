@@ -4,5 +4,6 @@ mod core;
 mod css;
 mod html;
 mod js;
+mod mhtml;
 mod session;
 mod url;

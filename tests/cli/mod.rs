@@ -3,5 +3,6 @@ mod basic;
 mod data_url;
 mod http_encoding;
 mod local_files;
+mod mhtml;
 mod noscript;
 mod unusual_encodings;

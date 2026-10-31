@@ -192,6 +192,10 @@ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o %title%.%times
 cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site-page-with-assets.html
 ```
 
+```console
+monolith page-saved-by-browser.mhtml -o page.html
+```
+
 
 ---------------------------------------------------
 
