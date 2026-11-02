@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use encoding_rs::Encoding;
@@ -14,7 +15,7 @@ use crate::core::{
     print_info_message,
 };
 use crate::mhtml::MhtmlArchive;
-use crate::net;
+use crate::net::{self, PrefetchProgress};
 use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
 
 pub struct Session {
@@ -28,6 +29,10 @@ pub struct Session {
     /// Stylesheets that don't specify their own encoding get decoded using it.
     pub environment_encoding: Option<&'static Encoding>,
     pub options: MonolithOptions,
+    /// Receives the encoding the document ends up being saved in, if set
+    pub output_encoding: Option<Arc<OnceLock<String>>>,
+    /// Gets updated as assets are being prefetched, if set
+    pub prefetch_progress: Option<Arc<PrefetchProgress>>,
 }
 
 impl Session {
@@ -87,6 +92,8 @@ impl Session {
             client,
             environment_encoding: None,
             options,
+            output_encoding: None,
+            prefetch_progress: None,
         }
     }
 
@@ -125,6 +132,7 @@ impl Session {
             &self.options,
             document_url,
             document,
+            self.prefetch_progress.as_deref(),
             |key| cache.contains_key(key),
         );
 

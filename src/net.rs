@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 
 use cssparser::{ParseError, Parser, Token};
@@ -20,6 +21,24 @@ pub struct CacheEntry {
     pub data: Vec<u8>,
     pub media_type: String,
     pub charset: String,
+}
+
+/// How far along prefetching is; meant to be shared with whoever displays the progress.
+/// The total may keep growing, since stylesheets and frames can reveal more assets.
+#[derive(Default)]
+pub struct PrefetchProgress {
+    done: AtomicUsize,
+    total: AtomicUsize,
+}
+
+impl PrefetchProgress {
+    /// Number of assets processed so far, and how many have been found overall.
+    pub fn counts(&self) -> (usize, usize) {
+        (
+            self.done.load(Ordering::SeqCst),
+            self.total.load(Ordering::SeqCst),
+        )
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -49,8 +68,23 @@ struct Ctx<'a> {
     client: &'a Client,
     cookies: Option<&'a [Cookie]>,
     options: &'a MonolithOptions,
+    progress: Option<&'a PrefetchProgress>,
     seen: Mutex<HashSet<String>>,
     results_tx: mpsc::Sender<Fetched>,
+}
+
+impl Ctx<'_> {
+    fn count_job_found(&self) {
+        if let Some(progress) = self.progress {
+            progress.total.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    fn count_job_done(&self) {
+        if let Some(progress) = self.progress {
+            progress.done.fetch_add(1, Ordering::SeqCst);
+        }
+    }
 }
 
 fn cache_key(url: &Url) -> String {
@@ -173,6 +207,7 @@ pub fn prefetch_assets(
     options: &MonolithOptions,
     document_url: &Url,
     document: &Handle,
+    progress: Option<&PrefetchProgress>,
     is_cached: impl Fn(&str) -> bool,
 ) -> Vec<CacheEntry> {
     let mut jobs: Vec<Job> = vec![];
@@ -197,6 +232,7 @@ pub fn prefetch_assets(
         client,
         cookies,
         options,
+        progress,
         seen: Mutex::new(seen),
         results_tx: tx,
     };
@@ -244,6 +280,7 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
     if !ctx.seen.lock().unwrap().insert(request_key.clone()) {
         return; // Already fetched or in flight
     }
+    ctx.count_job_found();
 
     s.spawn(move |s| {
         let (data, final_url, media_type, charset) = match fetch_remote_asset(
@@ -254,7 +291,10 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             &job.url,
         ) {
             Ok(result) => result,
-            Err(_) => return, // The walk will retry and report the error as usual
+            Err(_) => {
+                ctx.count_job_done();
+                return; // The walk will retry and report the error as usual
+            }
         };
 
         // Discover nested assets while we're still on a worker thread
@@ -290,9 +330,11 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             kind: job.kind,
         });
 
+        // Nested jobs get counted first, so that the total can't be reached too early
         for more_job in more_jobs {
             spawn_job(s, ctx, more_job);
         }
+        ctx.count_job_done();
     });
 }
 
