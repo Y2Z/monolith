@@ -283,6 +283,10 @@ pub fn create_monolithic_document_from_data(
         dom = set_charset(dom, document_encoding.clone());
     }
 
+    if let Some(output_encoding) = &session.output_encoding {
+        let _ = output_encoding.set(document_encoding.clone());
+    }
+
     let document_title: Option<String> = get_title(&dom.document);
     // Serialize DOM tree
     let mut html: Vec<u8> = serialize_document(dom, document_encoding.clone(), &session.options);
