@@ -13,7 +13,7 @@ use crate::cookies::Cookie;
 use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_info_message};
 use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{
-    LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset, remove_elements,
+    LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset, strip_elements,
 };
 use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, resolve_url};
 
@@ -312,7 +312,11 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             AssetKind::Html => {
                 // RcDom is !Send, but it's created and dropped right here on this thread
                 let frame_dom = html_to_dom(&data, charset.clone());
-                remove_elements(&frame_dom.document, &ctx.options.remove_elements);
+                strip_elements(
+                    &frame_dom.document,
+                    &ctx.options.remove_elements,
+                    &ctx.options.wipe_elements,
+                );
                 collect_html(
                     &frame_dom.document,
                     "",
@@ -406,7 +410,7 @@ fn collect_html(
                             if !options.no_images {
                                 push_job(jobs, base_url, &href, AssetKind::Other);
                             }
-                        } else if types.contains(&LinkType::Stylesheet) && !options.no_css {
+                        } else if types.contains(&LinkType::Stylesheet) && !options.no_styles {
                             push_job(jobs, base_url, &href, AssetKind::Css);
                         } else if types.contains(&LinkType::Manifest) {
                             push_job(jobs, base_url, &href, AssetKind::Other);
@@ -475,17 +479,15 @@ fn collect_html(
                     }
                 }
                 "style" => {
-                    if !options.no_css {
+                    if !options.no_styles {
                         for css in node_text(node) {
                             collect_css_str(&css, base_url, options, jobs);
                         }
                     }
                 }
                 "frame" | "iframe" => {
-                    if !options.no_frames {
-                        if let Some(src) = get_node_attr(node, "src") {
-                            push_job(jobs, base_url, &src, AssetKind::Html);
-                        }
+                    if let Some(src) = get_node_attr(node, "src") {
+                        push_job(jobs, base_url, &src, AssetKind::Html);
                     }
                 }
                 "audio" => {
@@ -512,7 +514,7 @@ fn collect_html(
                 _ => {}
             }
 
-            if !options.no_css {
+            if !options.no_styles {
                 if let Some(style) = get_node_attr(node, "style") {
                     collect_css_str(&style, base_url, options, jobs);
                 }

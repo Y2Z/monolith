@@ -21,6 +21,24 @@ use crate::url::{
     is_url_and_has_protocol, resolve_url,
 };
 
+/// Attributes that make elements load something, other than src (which is handled separately)
+const WIPED_ATTRIBUTES: [&str; 8] = [
+    "data",
+    "data-src",
+    "data-srcset",
+    "href",
+    "integrity",
+    "poster",
+    "srcdoc",
+    "srcset",
+];
+/// Wiping these leaves them in place, there's nothing to unwrap
+const ELEMENTS_WIPED_IN_PLACE: [&str; 10] = [
+    "audio", "embed", "frame", "iframe", "image", "img", "object", "source", "track", "video",
+];
+/// Same as above, except their contents would end up on the page as text if they got unwrapped
+const ELEMENTS_WITH_RAW_CONTENTS: [&str; 3] = ["noscript", "script", "style"];
+
 const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
 
 #[derive(PartialEq, Eq)]
@@ -90,6 +108,17 @@ pub fn check_integrity(data: &[u8], integrity: &str) -> bool {
     }
 }
 
+/// Whether elements of any of the given names get removed or wiped no matter where they are,
+/// which makes it possible to also prevent them from loading anything if added by scripts
+fn targets_any_element(options: &MonolithOptions, names: &[&str]) -> bool {
+    parse_selectors(&options.remove_elements)
+        .iter()
+        .chain(parse_selectors(&options.wipe_elements).iter())
+        .any(|selector| {
+            matches!(selector.as_slice(), [step] if names.iter().any(|name| step_matches(step, name)))
+        })
+}
+
 pub fn compose_csp(options: &MonolithOptions) -> String {
     let mut string_list = vec![];
 
@@ -97,7 +126,7 @@ pub fn compose_csp(options: &MonolithOptions) -> String {
         string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data:;");
     }
 
-    if options.no_css {
+    if options.no_styles {
         string_list.push("style-src 'none';");
     }
 
@@ -105,13 +134,17 @@ pub fn compose_csp(options: &MonolithOptions) -> String {
         string_list.push("font-src 'none';");
     }
 
-    if options.no_frames {
+    if targets_any_element(options, &["frame", "iframe"]) {
         string_list.push("frame-src 'none';");
         string_list.push("child-src 'none';");
     }
 
     if options.no_js {
         string_list.push("script-src 'none';");
+    }
+
+    if options.no_js || targets_any_element(options, &["embed", "object"]) {
+        string_list.push("object-src 'none';");
     }
 
     if options.no_images {
@@ -678,17 +711,22 @@ pub fn process_noscript_contents(node: &Handle, mut process: impl FnMut(&RcDom))
     }
 }
 
-/// Removes elements from the document, including whatever is inside of NOSCRIPT elements.
+/// Removes or wipes elements of the document, including whatever is inside of NOSCRIPT elements.
+///
+/// Removing an element makes it disappear along with its contents. Wiping an element that can
+/// load something leaves the element in place without its source, other elements get replaced
+/// with their contents (e.g. links turn into plain text). Removing takes priority over wiping.
 ///
 /// Each selector is a space-separated path of element names, each element in it being
 /// a descendant of the previous one (e.g. "main div iframe"), "*" stands for any element.
 /// Multiple selectors can be given within one string, separated by commas.
 /// Selectors that don't make sense simply don't match anything.
-pub fn remove_elements(document: &Handle, selectors: &[String]) {
-    let selectors: Vec<Vec<String>> = parse_selectors(selectors);
+pub fn strip_elements(document: &Handle, remove: &[String], wipe: &[String]) {
+    let remove: Vec<Vec<String>> = parse_selectors(remove);
+    let wipe: Vec<Vec<String>> = parse_selectors(wipe);
 
-    if !selectors.is_empty() {
-        remove_from_children(document, &selectors, &mut vec![]);
+    if !remove.is_empty() || !wipe.is_empty() {
+        strip_children(document, &remove, &wipe, &mut vec![]);
     }
 }
 
@@ -724,34 +762,78 @@ fn selector_matches(selector: &[String], name: &str, ancestors: &[Handle]) -> bo
         .all(|step| ancestor_names.any(|ancestor_name| step_matches(step, ancestor_name)))
 }
 
+fn any_selector_matches(selectors: &[Vec<String>], name: &str, ancestors: &[Handle]) -> bool {
+    selectors
+        .iter()
+        .any(|selector| selector_matches(selector, name, ancestors))
+}
+
+/// Gets rid of everything that makes the element load anything
+fn wipe_element_in_place(node: &Handle, name: &str) {
+    if name == "img" && get_node_attr(node, "src").is_some() {
+        set_node_attr(node, "src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
+    } else {
+        set_node_attr(node, "src", None);
+    }
+    for attr_name in WIPED_ATTRIBUTES {
+        set_node_attr(node, attr_name, None);
+    }
+
+    if ELEMENTS_WITH_RAW_CONTENTS.contains(&name) {
+        node.children.borrow_mut().clear();
+    }
+}
+
 /// Ancestors are tracked here since get_parent_node() is of no use for parsed NOSCRIPT
 /// contents: they have no connection to the document they came from.
-fn remove_from_children(parent: &Handle, selectors: &[Vec<String>], ancestors: &mut Vec<Handle>) {
-    parent.children.borrow_mut().retain(|child| {
-        get_node_name(child).is_none_or(|name| {
-            !selectors
-                .iter()
-                .any(|selector| selector_matches(selector, name, ancestors))
-        })
-    });
+fn strip_children(
+    parent: &Handle,
+    remove: &[Vec<String>],
+    wipe: &[Vec<String>],
+    ancestors: &mut Vec<Handle>,
+) {
+    let mut children: Vec<Handle> = Vec::new();
 
-    for child in parent.children.borrow().iter() {
-        let Some(name) = get_node_name(child) else {
+    for child in parent.children.take() {
+        let Some(name) = get_node_name(&child) else {
+            children.push(child);
             continue;
         };
+        let name: String = name.to_ascii_lowercase();
+
+        if any_selector_matches(remove, &name, ancestors) {
+            continue;
+        }
+        let is_wiped: bool = any_selector_matches(wipe, &name, ancestors);
 
         ancestors.push(child.clone());
-        if name.eq_ignore_ascii_case("noscript") {
-            process_noscript_contents(child, |fragment| {
+        if name == "noscript" {
+            process_noscript_contents(&child, |fragment| {
                 // The root is just a wrapper that doesn't exist in the document
                 if let Some(root) = fragment.document.children.borrow().first() {
-                    remove_from_children(root, selectors, ancestors);
+                    strip_children(root, remove, wipe, ancestors);
                 }
             });
         }
-        remove_from_children(child, selectors, ancestors);
+        strip_children(&child, remove, wipe, ancestors);
         ancestors.pop();
+
+        if !is_wiped {
+            children.push(child);
+        } else if ELEMENTS_WIPED_IN_PLACE.contains(&name.as_str())
+            || ELEMENTS_WITH_RAW_CONTENTS.contains(&name.as_str())
+        {
+            wipe_element_in_place(&child, &name);
+            children.push(child);
+        } else {
+            for grandchild in child.children.take() {
+                grandchild.parent.set(Some(Rc::downgrade(parent)));
+                children.push(grandchild);
+            }
+        }
     }
+
+    *parent.children.borrow_mut() = children;
 }
 
 /// Replaces every NOSCRIPT element with its contents parsed as real DOM nodes
@@ -825,13 +907,7 @@ pub fn serialize_document(
 ) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
 
-    if options.isolate
-        || options.no_css
-        || options.no_fonts
-        || options.no_frames
-        || options.no_js
-        || options.no_images
-    {
+    if !compose_csp(options).is_empty() {
         // Take care of CSP
         if let Some(html) = get_child_node_by_name(&dom.document, "html") {
             if let Some(head) = get_child_node_by_name(&html, "head") {
@@ -938,7 +1014,11 @@ pub fn retrieve_and_embed_asset(
 
                     let environment_encoding =
                         std::mem::replace(&mut session.environment_encoding, frame_encoding);
-                    remove_elements(&frame_dom.document, &session.options.remove_elements);
+                    strip_elements(
+                        &frame_dom.document,
+                        &session.options.remove_elements,
+                        &session.options.wipe_elements,
+                    );
                     walk(session, &final_url, &frame_dom.document);
                     session.environment_encoding = environment_encoding;
 
@@ -1088,7 +1168,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     } else if link_node_types.contains(&LinkType::Stylesheet) {
                         // Resolve LINK's href attribute
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
-                            if session.options.no_css {
+                            if session.options.no_styles {
                                 set_node_attr(node, "href", None);
                                 // Wipe integrity attribute
                                 set_node_attr(node, "integrity", None);
@@ -1461,7 +1541,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "style" => {
-                    if session.options.no_css {
+                    if session.options.no_styles {
                         // Empty inner content of STYLE tags
                         node.children.borrow_mut().clear();
                     } else {
@@ -1486,32 +1566,27 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 }
                 "frame" | "iframe" => {
                     if let Some(frame_attr_src_value) = get_node_attr(node, "src") {
-                        if session.options.no_frames {
-                            // Empty the src attribute
-                            set_node_attr(node, "src", Some("".to_string()));
+                        if session.options.output_format == MonolithOutputFormat::HTML {
+                            // Ignore (i)frames with empty source (they cause infinite loops)
+                            if !frame_attr_src_value.trim().is_empty() {
+                                retrieve_and_embed_asset(
+                                    session,
+                                    document_url,
+                                    node,
+                                    "src",
+                                    &frame_attr_src_value,
+                                );
+                            }
                         } else {
-                            if session.options.output_format == MonolithOutputFormat::HTML {
-                                // Ignore (i)frames with empty source (they cause infinite loops)
-                                if !frame_attr_src_value.trim().is_empty() {
-                                    retrieve_and_embed_asset(
-                                        session,
-                                        document_url,
-                                        node,
-                                        "src",
-                                        &frame_attr_src_value,
-                                    );
-                                }
-                            } else {
-                                let frame_src_full_url: Url =
-                                    resolve_url(document_url, &frame_attr_src_value);
-                                set_node_attr(node, "src", Some(frame_src_full_url.to_string()));
-                                session.log_asset_url(&frame_src_full_url);
-                            }
+                            let frame_src_full_url: Url =
+                                resolve_url(document_url, &frame_attr_src_value);
+                            set_node_attr(node, "src", Some(frame_src_full_url.to_string()));
+                            session.log_asset_url(&frame_src_full_url);
+                        }
 
-                            // Sandbox iframe if JS is disabled
-                            if name.local.as_ref() == "iframe" && session.options.no_js {
-                                set_node_attr(node, "sandbox", Some("allow-forms".to_string()));
-                            }
+                        // Sandbox iframe if JS is disabled
+                        if name.local.as_ref() == "iframe" && session.options.no_js {
+                            set_node_attr(node, "sandbox", Some("allow-forms".to_string()));
                         }
                     }
                 }
@@ -1596,7 +1671,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
             }
 
             // Process style attributes
-            if session.options.no_css {
+            if session.options.no_styles {
                 // Get rid of style attributes
                 set_node_attr(node, "style", None);
             } else {

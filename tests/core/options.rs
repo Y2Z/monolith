@@ -14,9 +14,8 @@ mod passing {
         let options: MonolithOptions = MonolithOptions::default();
 
         assert_eq!(options.base_url, None);
-        assert!(!options.no_css);
+        assert!(!options.no_styles);
         assert_eq!(options.encoding, None);
-        assert!(!options.no_frames);
         assert!(!options.no_fonts);
         assert!(!options.no_images);
         assert!(!options.isolate);
@@ -25,6 +24,7 @@ mod passing {
         assert!(!options.no_metadata);
         assert_eq!(options.output_format, MonolithOutputFormat::HTML);
         assert!(options.remove_elements.is_empty());
+        assert!(options.wipe_elements.is_empty());
         assert!(!options.silent);
         assert_eq!(options.timeout, 0);
         assert_eq!(options.user_agent, None);

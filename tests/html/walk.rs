@@ -246,7 +246,7 @@ mod passing {
     }
 
     #[test]
-    fn no_css() {
+    fn no_styles() {
         let html = "\
             <link rel=\"stylesheet\" href=\"main.css\">\
             <link rel=\"alternate stylesheet\" href=\"main.css\">\
@@ -257,7 +257,7 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let mut options = MonolithOptions::default();
-        options.no_css = true;
+        options.no_styles = true;
         options.silent = true;
 
         let mut session: Session = Session::new(None, None, options);
@@ -366,11 +366,11 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let mut options = MonolithOptions::default();
-        options.no_frames = true;
         options.silent = true;
 
         let mut session: Session = Session::new(None, None, options);
 
+        html::strip_elements(&dom.document, &[], &["frame".to_string()]);
         html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
@@ -388,7 +388,7 @@ mod passing {
                 <head>\
                 </head>\
                 <frameset>\
-                    <frame src=\"\">\
+                    <frame>\
                 </frameset>\
             </html>\
             "
@@ -402,11 +402,11 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let mut options = MonolithOptions::default();
-        options.no_frames = true;
         options.silent = true;
 
         let mut session: Session = Session::new(None, None, options);
 
+        html::strip_elements(&dom.document, &[], &["iframe".to_string()]);
         html::walk(&mut session, &url, &dom.document);
 
         let mut buf: Vec<u8> = Vec::new();
@@ -423,7 +423,7 @@ mod passing {
             <html>\
                 <head></head>\
                 <body>\
-                    <iframe src=\"\"></iframe>\
+                    <iframe></iframe>\
                 </body>\
             </html>\
             "
@@ -520,7 +520,7 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let mut options = MonolithOptions::default();
-        options.no_css = true;
+        options.no_styles = true;
         options.no_js = true;
         options.silent = true;
 
@@ -562,7 +562,7 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let mut options = MonolithOptions::default();
-        options.no_css = true;
+        options.no_styles = true;
         options.no_js = true;
         options.silent = true;
 
@@ -610,8 +610,7 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let mut options = MonolithOptions::default();
-        options.no_css = true;
-        options.no_frames = true;
+        options.no_styles = true;
         options.no_js = true;
         options.no_images = true;
         options.silent = true;

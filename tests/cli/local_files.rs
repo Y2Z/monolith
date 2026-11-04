@@ -84,7 +84,7 @@ document.body.style.color = "red";
 
         let out = cmd
             .arg("-M")
-            .arg("-Ijci")
+            .arg("-Ijsi")
             .arg(path_html.as_os_str())
             .output()
             .unwrap();
@@ -102,7 +102,7 @@ document.body.style.color = "red";
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
             format!(
-                r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; script-src 'none'; img-src data:;">
+                r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; script-src 'none'; object-src 'none'; img-src data:;">
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Local HTML file</title>
   <link rel="stylesheet" type="text/css">
@@ -140,7 +140,7 @@ document.body.style.color = "red";
 
         let out = cmd
             .arg("-M")
-            .arg("-Ijci")
+            .arg("-Ijsi")
             .arg(path_html.as_os_str())
             .output()
             .unwrap();
@@ -172,7 +172,7 @@ document.body.style.color = "red";
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
         let out = cmd
             .arg("-M")
-            .arg("-cji")
+            .arg("-sji")
             .arg(format!(
                 "{file}{cwd}/tests/_data_/basic/local-file.html",
                 file = file_url_protocol,
@@ -195,7 +195,7 @@ document.body.style.color = "red";
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
             format!(
-                r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="style-src 'none'; script-src 'none'; img-src data:;">
+                r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="style-src 'none'; script-src 'none'; object-src 'none'; img-src data:;">
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Local HTML file</title>
   <link rel="stylesheet" type="text/css">

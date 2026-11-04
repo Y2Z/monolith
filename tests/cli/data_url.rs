@@ -42,7 +42,7 @@ mod passing {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
-            .arg("-c")
+            .arg("-s")
             .arg("data:text/html,<style>body{background-color:pink}</style>Hello")
             .output()
             .unwrap();
@@ -66,7 +66,7 @@ mod passing {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
-            .arg("-F")
+            .arg("-f")
             .arg("data:text/html,<style>@font-face { font-family: myFont; src: url(font.woff); }</style>Hi")
             .output()
             .unwrap();
@@ -90,7 +90,8 @@ mod passing {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
             .arg("-M")
-            .arg("-f")
+            .arg("-w")
+            .arg("frame,iframe")
             .arg(r#"data:text/html,<iframe src="https://duckduckgo.com"></iframe>Hi"#)
             .output()
             .unwrap();
@@ -101,7 +102,7 @@ mod passing {
         // STDOUT should contain HTML with no iframes
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none';"><meta name="robots" content="none"></head><body><iframe src=""></iframe>Hi</body></html>
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none';"><meta name="robots" content="none"></head><body><iframe></iframe>Hi</body></html>
 "#
         );
 
@@ -152,7 +153,7 @@ mod passing {
         // STDOUT should contain HTML with no JS
         assert_eq!(
             String::from_utf8_lossy(&out.stdout),
-            r#"<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none';"><script></script><meta name="robots" content="none"></head><body>Hi</body></html>
+            r#"<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none';"><script></script><meta name="robots" content="none"></head><body>Hi</body></html>
 "#
         );
 
