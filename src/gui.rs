@@ -751,8 +751,9 @@ impl MonolithApp {
         options.insecure = self.insecure;
         options.timeout = self.timeout;
         options.silent = true;
-        options.no_audio = !self.keep_media;
-        options.no_video = !self.keep_media;
+        if !self.keep_media {
+            options.remove_elements = vec!["audio".to_string(), "video".to_string()];
+        }
         options.no_frames = !self.keep_frames;
         options.no_fonts = !self.keep_fonts;
         options.no_images = !self.keep_images;

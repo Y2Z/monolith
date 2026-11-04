@@ -11,6 +11,7 @@ mod has_favicon;
 mod is_favicon;
 mod parse_link_type;
 mod parse_srcset;
+mod remove_elements;
 mod serialize_document;
 mod set_charset;
 mod set_node_attr;

@@ -12,7 +12,9 @@ use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, REFERER};
 use crate::cookies::Cookie;
 use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_info_message};
 use crate::css::{decode_css, is_image_url_prop};
-use crate::html::{LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset};
+use crate::html::{
+    LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset, remove_elements,
+};
 use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, resolve_url};
 
 /// What Session should put into its cache.
@@ -310,6 +312,7 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             AssetKind::Html => {
                 // RcDom is !Send, but it's created and dropped right here on this thread
                 let frame_dom = html_to_dom(&data, charset.clone());
+                remove_elements(&frame_dom.document, &ctx.options.remove_elements);
                 collect_html(
                     &frame_dom.document,
                     "",
@@ -456,11 +459,7 @@ fn collect_html(
                     // Note: html::get_parent_node() take()s the parent pointer,
                     // so we track the parent's name ourselves instead of calling it
                     if let Some(src) = get_node_attr(node, "src") {
-                        if !((parent_name == "audio" && options.no_audio)
-                            || (parent_name == "video" && options.no_video))
-                        {
-                            push_job(jobs, base_url, &src, AssetKind::Other);
-                        }
+                        push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                     if parent_name == "picture" && !options.no_images {
                         if let Some(srcset) = get_node_attr(node, "srcset") {
@@ -490,17 +489,13 @@ fn collect_html(
                     }
                 }
                 "audio" => {
-                    if !options.no_audio {
-                        if let Some(src) = get_node_attr(node, "src") {
-                            push_job(jobs, base_url, &src, AssetKind::Other);
-                        }
+                    if let Some(src) = get_node_attr(node, "src") {
+                        push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                 }
                 "video" => {
-                    if !options.no_video {
-                        if let Some(src) = get_node_attr(node, "src") {
-                            push_job(jobs, base_url, &src, AssetKind::Other);
-                        }
+                    if let Some(src) = get_node_attr(node, "src") {
+                        push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                     if !options.no_images {
                         if let Some(poster) = get_node_attr(node, "poster") {

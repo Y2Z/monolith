@@ -164,3 +164,45 @@ mod passing {
         out.assert().code(0);
     }
 }
+
+#[cfg(test)]
+mod noscript_cleanup {
+    use assert_cmd::cargo_bin_cmd;
+    use std::env;
+    use std::path::Path;
+
+    fn save(args: &[&str]) -> String {
+        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let path_html: &Path = Path::new("tests/_data_/noscript/index.html");
+        let out = cmd
+            .arg("-M")
+            .args(args)
+            .arg(path_html.as_os_str())
+            .output()
+            .unwrap();
+
+        String::from_utf8_lossy(&out.stdout).to_string()
+    }
+
+    #[test]
+    fn no_images_covers_noscript_contents() {
+        assert!(!save(&["-i"]).contains("image.svg"));
+        assert!(!save(&["-i"]).contains("%3Csvg"));
+    }
+
+    #[test]
+    fn no_images_covers_unwrapped_noscript_contents() {
+        assert!(!save(&["-i", "-n"]).contains("image.svg"));
+        assert!(!save(&["-i", "-n"]).contains("%3Csvg"));
+    }
+
+    #[test]
+    fn removing_elements_covers_noscript_contents() {
+        assert!(!save(&["-r", "img"]).contains("<img"));
+    }
+
+    #[test]
+    fn removing_elements_covers_unwrapped_noscript_contents() {
+        assert!(!save(&["-n", "-r", "img"]).contains("<img"));
+    }
+}
