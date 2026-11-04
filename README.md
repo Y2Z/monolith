@@ -189,7 +189,7 @@ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o %title%.%times
 ```
 
 ```console
-cat some-site-page.html | monolith -aIiFfcMv -b https://some.site/ - > some-site-page-with-assets.html
+cat some-site-page.html | monolith -IiFfcM -r audio,video -b https://some.site/ - > some-site-page-with-assets.html
 ```
 
 ```console
@@ -202,7 +202,6 @@ monolith page-saved-by-browser.mhtml -o page.html
 
 ## Options
 
- - `-a`: Exclude audio sources
  - `-b`: Use `custom base URL`
  - `-B`: Forbid retrieving assets from specified domain(s)
  - `-c`: Exclude CSS
@@ -223,9 +222,9 @@ monolith page-saved-by-browser.mhtml -o page.html
  - `-n`: Extract contents of NOSCRIPT elements
  - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-q`: Be quiet
+ - `-r`: Remove elements matching `selector` from the document (can be used multiple times)
  - `-t`: Adjust `network request timeout`
  - `-u`: Use `custom User-Agent`
- - `-v`: Exclude videos
  - `-V`: Print version number
 
 

@@ -33,8 +33,8 @@ const DEFAULT_USER_AGENT: &str =
 #[command(version)] // Read version from Cargo.toml
 #[command(about = ASCII.to_owned() + "\n" + env!("CARGO_PKG_NAME") + " " + env!("CARGO_PKG_VERSION") + "\n\n" + env!("CARGO_PKG_DESCRIPTION"), long_about = None)]
 struct Cli {
-    /// Remove audio sources
-    #[arg(short = 'a', long)]
+    /// Same as -r audio
+    #[arg(short = 'a', long, hide = true)]
     no_audio: bool,
 
     /// Set custom base URL
@@ -113,6 +113,10 @@ struct Cli {
     #[arg(short, long)]
     quiet: bool,
 
+    /// Remove elements from the document, e.g. "audio,video" or "main div iframe"
+    #[arg(short = 'r', long = "remove", value_name = "selector")]
+    remove_elements: Vec<String>,
+
     /// Adjust network request timeout
     #[arg(short, long, value_name = "60")]
     timeout: Option<u64>,
@@ -121,8 +125,8 @@ struct Cli {
     #[arg(short, long, value_name = "Firefox")]
     user_agent: Option<String>,
 
-    /// Remove video sources
-    #[arg(short = 'v', long)]
+    /// Same as -r video
+    #[arg(short = 'v', long, hide = true)]
     no_video: bool,
 
     /// URL or file path, use - for STDIN
@@ -212,7 +216,6 @@ fn main() {
         options.ignore_errors = cli.ignore_errors;
         options.insecure = cli.insecure;
         options.isolate = cli.isolate;
-        options.no_audio = cli.no_audio;
         options.no_css = cli.no_css;
         options.no_fonts = cli.no_fonts;
         options.no_frames = cli.no_frames;
@@ -222,7 +225,13 @@ fn main() {
             options.output_format = MonolithOutputFormat::MHTML;
         }
         options.no_metadata = cli.no_metadata;
-        options.no_video = cli.no_video;
+        options.remove_elements = cli.remove_elements;
+        if cli.no_audio {
+            options.remove_elements.push("audio".to_string());
+        }
+        if cli.no_video {
+            options.remove_elements.push("video".to_string());
+        }
         options.silent = cli.quiet;
         options.timeout = cli.timeout.unwrap_or(DEFAULT_NETWORK_TIMEOUT);
         options.threads = 30;

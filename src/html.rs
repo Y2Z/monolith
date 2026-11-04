@@ -648,6 +648,112 @@ pub fn set_robots(dom: RcDom, content_value: &str) -> RcDom {
     dom
 }
 
+/// Lets the given function modify contents of a NOSCRIPT element, which is otherwise just text
+pub fn process_noscript_contents(node: &Handle, mut process: impl FnMut(&RcDom)) {
+    let context = QualName::new(None, ns!(html), LocalName::from("body"));
+
+    for child_node in node.children.borrow().iter() {
+        if let NodeData::Text { ref contents } = child_node.data {
+            // Get contents of NOSCRIPT node
+            let mut noscript_contents = contents.borrow_mut();
+            // Parse contents of NOSCRIPT node as a DOM fragment
+            let fragment: RcDom = parse_fragment_dom(&context, noscript_contents.clone());
+            process(&fragment);
+            // Serialize the fragment's root; default SerializeOpts use
+            // TraversalScope::ChildrenOnly, so the <html> wrapper itself
+            // isn't written out
+            let mut buf: Vec<u8> = Vec::new();
+            if let Some(root) = fragment.document.children.borrow().first() {
+                serialize(
+                    &mut buf,
+                    &SerializableHandle::from(root.clone()),
+                    SerializeOpts::default(),
+                )
+                .expect("Unable to serialize DOM into buffer");
+            }
+            // Replace original contents with the processed HTML
+            noscript_contents.clear();
+            noscript_contents.push_slice(&String::from_utf8_lossy(&buf));
+        }
+    }
+}
+
+/// Removes elements from the document, including whatever is inside of NOSCRIPT elements.
+///
+/// Each selector is a space-separated path of element names, each element in it being
+/// a descendant of the previous one (e.g. "main div iframe"), "*" stands for any element.
+/// Multiple selectors can be given within one string, separated by commas.
+/// Selectors that don't make sense simply don't match anything.
+pub fn remove_elements(document: &Handle, selectors: &[String]) {
+    let selectors: Vec<Vec<String>> = parse_selectors(selectors);
+
+    if !selectors.is_empty() {
+        remove_from_children(document, &selectors, &mut vec![]);
+    }
+}
+
+fn parse_selectors(selectors: &[String]) -> Vec<Vec<String>> {
+    selectors
+        .iter()
+        .flat_map(|selector_list| selector_list.split(','))
+        .map(|selector| selector.split_whitespace().map(str::to_string).collect())
+        .filter(|path: &Vec<String>| !path.is_empty())
+        .collect()
+}
+
+fn step_matches(step: &str, name: &str) -> bool {
+    step == "*" || step.eq_ignore_ascii_case(name)
+}
+
+/// The closest ancestor that fits is always the best pick, so there's no need to backtrack
+fn selector_matches(selector: &[String], name: &str, ancestors: &[Handle]) -> bool {
+    let Some((last_step, other_steps)) = selector.split_last() else {
+        return false;
+    };
+    if !step_matches(last_step, name) {
+        return false;
+    }
+
+    let mut ancestor_names = ancestors
+        .iter()
+        .rev()
+        .filter_map(|node| get_node_name(node));
+    other_steps
+        .iter()
+        .rev()
+        .all(|step| ancestor_names.any(|ancestor_name| step_matches(step, ancestor_name)))
+}
+
+/// Ancestors are tracked here since get_parent_node() is of no use for parsed NOSCRIPT
+/// contents: they have no connection to the document they came from.
+fn remove_from_children(parent: &Handle, selectors: &[Vec<String>], ancestors: &mut Vec<Handle>) {
+    parent.children.borrow_mut().retain(|child| {
+        get_node_name(child).is_none_or(|name| {
+            !selectors
+                .iter()
+                .any(|selector| selector_matches(selector, name, ancestors))
+        })
+    });
+
+    for child in parent.children.borrow().iter() {
+        let Some(name) = get_node_name(child) else {
+            continue;
+        };
+
+        ancestors.push(child.clone());
+        if name.eq_ignore_ascii_case("noscript") {
+            process_noscript_contents(child, |fragment| {
+                // The root is just a wrapper that doesn't exist in the document
+                if let Some(root) = fragment.document.children.borrow().first() {
+                    remove_from_children(root, selectors, ancestors);
+                }
+            });
+        }
+        remove_from_children(child, selectors, ancestors);
+        ancestors.pop();
+    }
+}
+
 /// Replaces every NOSCRIPT element with its contents parsed as real DOM nodes
 pub fn unwrap_noscripts(node: &Handle) {
     fn has_noscript_child(node: &Handle) -> bool {
@@ -832,6 +938,7 @@ pub fn retrieve_and_embed_asset(
 
                     let environment_encoding =
                         std::mem::replace(&mut session.environment_encoding, frame_encoding);
+                    remove_elements(&frame_dom.document, &session.options.remove_elements);
                     walk(session, &final_url, &frame_dom.document);
                     session.environment_encoding = environment_encoding;
 
@@ -1268,25 +1375,18 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     let parent_node_name: &str = get_node_name(&parent_node).unwrap_or_default();
 
                     if let Some(source_src) = get_node_attr(node, "src") {
-                        if session.options.no_audio && parent_node_name == "audio"
-                            || session.options.no_video && parent_node_name == "video"
-                        {
-                            set_node_attr(node, "src", None);
+                        if session.options.output_format == MonolithOutputFormat::HTML {
+                            retrieve_and_embed_asset(
+                                session,
+                                document_url,
+                                node,
+                                "src",
+                                &source_src,
+                            );
                         } else {
-                            if session.options.output_format == MonolithOutputFormat::HTML {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "src",
-                                    &source_src,
-                                );
-                            } else {
-                                let source_src_full_url: Url =
-                                    resolve_url(document_url, &source_src);
-                                set_node_attr(node, "src", Some(source_src_full_url.to_string()));
-                                session.log_asset_url(&source_src_full_url);
-                            }
+                            let source_src_full_url: Url = resolve_url(document_url, &source_src);
+                            set_node_attr(node, "src", Some(source_src_full_url.to_string()));
+                            session.log_asset_url(&source_src_full_url);
                         }
                     }
 
@@ -1418,46 +1518,38 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 "audio" => {
                     // Embed audio source
                     if let Some(audio_attr_src_value) = get_node_attr(node, "src") {
-                        if session.options.no_audio {
-                            set_node_attr(node, "src", None);
+                        if session.options.output_format == MonolithOutputFormat::HTML {
+                            retrieve_and_embed_asset(
+                                session,
+                                document_url,
+                                node,
+                                "src",
+                                &audio_attr_src_value,
+                            );
                         } else {
-                            if session.options.output_format == MonolithOutputFormat::HTML {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "src",
-                                    &audio_attr_src_value,
-                                );
-                            } else {
-                                let audio_src_full_url: Url =
-                                    resolve_url(document_url, &audio_attr_src_value);
-                                set_node_attr(node, "src", Some(audio_src_full_url.to_string()));
-                                session.log_asset_url(&audio_src_full_url);
-                            }
+                            let audio_src_full_url: Url =
+                                resolve_url(document_url, &audio_attr_src_value);
+                            set_node_attr(node, "src", Some(audio_src_full_url.to_string()));
+                            session.log_asset_url(&audio_src_full_url);
                         }
                     }
                 }
                 "video" => {
                     // Embed video source
                     if let Some(video_attr_src_value) = get_node_attr(node, "src") {
-                        if session.options.no_video {
-                            set_node_attr(node, "src", None);
+                        if session.options.output_format == MonolithOutputFormat::HTML {
+                            retrieve_and_embed_asset(
+                                session,
+                                document_url,
+                                node,
+                                "src",
+                                &video_attr_src_value,
+                            );
                         } else {
-                            if session.options.output_format == MonolithOutputFormat::HTML {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "src",
-                                    &video_attr_src_value,
-                                );
-                            } else {
-                                let video_src_full_url: Url =
-                                    resolve_url(document_url, &video_attr_src_value);
-                                set_node_attr(node, "src", Some(video_src_full_url.to_string()));
-                                session.log_asset_url(&video_src_full_url);
-                            }
+                            let video_src_full_url: Url =
+                                resolve_url(document_url, &video_attr_src_value);
+                            set_node_attr(node, "src", Some(video_src_full_url.to_string()));
+                            session.log_asset_url(&video_src_full_url);
                         }
                     }
 
@@ -1495,34 +1587,10 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "noscript" => {
-                    let context = QualName::new(None, ns!(html), LocalName::from("body"));
-
-                    for child_node in node.children.borrow().iter() {
-                        if let NodeData::Text { ref contents } = child_node.data {
-                            // Get contents of NOSCRIPT node
-                            let mut noscript_contents = contents.borrow_mut();
-                            // Parse contents of NOSCRIPT node as a DOM fragment
-                            let fragment: RcDom =
-                                parse_fragment_dom(&context, noscript_contents.clone());
-                            // Embed assets of NOSCRIPT node contents
-                            walk(session, document_url, &fragment.document);
-                            // Serialize the fragment's root; default SerializeOpts use
-                            // TraversalScope::ChildrenOnly, so the <html> wrapper itself
-                            // isn't written out
-                            let mut buf: Vec<u8> = Vec::new();
-                            if let Some(root) = fragment.document.children.borrow().first() {
-                                serialize(
-                                    &mut buf,
-                                    &SerializableHandle::from(root.clone()),
-                                    SerializeOpts::default(),
-                                )
-                                .expect("Unable to serialize DOM into buffer");
-                            }
-                            // Replace original contents with HTML containing embedded assets
-                            noscript_contents.clear();
-                            noscript_contents.push_slice(&String::from_utf8_lossy(&buf));
-                        }
-                    }
+                    // Embed assets of NOSCRIPT node contents
+                    process_noscript_contents(node, |fragment| {
+                        walk(session, document_url, &fragment.document);
+                    });
                 }
                 _ => {}
             }
