@@ -58,7 +58,7 @@ mod passing {
                     <div style=\"display: none;\"></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let mut options = MonolithOptions::default();
-        options.no_css = true;
+        options.no_styles = true;
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
@@ -82,7 +82,7 @@ mod passing {
                     <div><script src=\"some.js\"></script></div>";
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let mut options = MonolithOptions::default();
-        options.no_frames = true;
+        options.wipe_elements = vec!["frame,iframe".to_string()];
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
@@ -112,9 +112,9 @@ mod passing {
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
         let mut options = MonolithOptions::default();
         options.isolate = true;
-        options.no_css = true;
+        options.no_styles = true;
         options.no_fonts = true;
-        options.no_frames = true;
+        options.wipe_elements = vec!["frame,iframe".to_string()];
         options.no_js = true;
         options.no_images = true;
 
@@ -123,7 +123,7 @@ mod passing {
             "<!DOCTYPE html>\
                 <html>\
                     <head>\
-                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; img-src data:;\">\
+                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; object-src 'none'; img-src data:;\">\
                         <title>no-frame no-css no-js no-image isolated document</title>\
                         <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                         <link rel=\"stylesheet\" href=\"some.css\">\

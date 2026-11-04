@@ -189,7 +189,7 @@ monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o %title%.%times
 ```
 
 ```console
-cat some-site-page.html | monolith -IiFfcM -r audio,video -b https://some.site/ - > some-site-page-with-assets.html
+cat some-site-page.html | monolith -IifsM -r audio,video -w frame,iframe -b https://some.site/ - > some-site-page-with-assets.html
 ```
 
 ```console
@@ -204,14 +204,12 @@ monolith page-saved-by-browser.mhtml -o page.html
 
  - `-b`: Use `custom base URL`
  - `-B`: Forbid retrieving assets from specified domain(s)
- - `-c`: Exclude CSS
  - `-C`: Read cookies from `file`
  - `-d`: Allow retrieving assets only from specified `domain(s)`
  - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
- - `-f`: Omit (i)frames
- - `-F`: Exclude web fonts
+ - `-f`: Exclude web fonts
  - `-h`: Print usage information
  - `-i`: Remove images
  - `-I`: Isolate the document
@@ -223,8 +221,10 @@ monolith page-saved-by-browser.mhtml -o page.html
  - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-q`: Be quiet
  - `-r`: Remove elements matching `selector` from the document (can be used multiple times)
+ - `-s`: Exclude styles
  - `-t`: Adjust `network request timeout`
  - `-u`: Use `custom User-Agent`
+ - `-w`: Wipe elements matching `selector`: links and such turn into their contents, images, frames, and other elements that load something lose their sources (can be used multiple times)
  - `-V`: Print version number
 
 

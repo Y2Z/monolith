@@ -12,8 +12,8 @@ use url::Url;
 
 use crate::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
-    has_favicon, html_to_dom, remove_elements, serialize_document, set_base_url, set_charset,
-    set_robots, walk,
+    has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots,
+    strip_elements, walk,
 };
 use crate::mhtml::{create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::session::Session;
@@ -63,9 +63,8 @@ pub struct MonolithOptions {
     pub ignore_errors: bool,
     pub insecure: bool,
     pub isolate: bool,
-    pub no_css: bool,
+    pub no_styles: bool,
     pub no_fonts: bool,
-    pub no_frames: bool,
     pub no_images: bool,
     pub no_js: bool,
     pub no_metadata: bool,
@@ -76,6 +75,7 @@ pub struct MonolithOptions {
     pub timeout: u64,
     pub unwrap_noscript: bool,
     pub user_agent: Option<String>,
+    pub wipe_elements: Vec<String>,
 }
 
 const ANSI_COLOR_RED: &str = "\x1b[31m";
@@ -232,7 +232,11 @@ pub fn create_monolithic_document_from_data(
         }
     }
 
-    remove_elements(&dom.document, &session.options.remove_elements);
+    strip_elements(
+        &dom.document,
+        &session.options.remove_elements,
+        &session.options.wipe_elements,
+    );
 
     session.prefetch_assets(&base_url, &dom.document);
 

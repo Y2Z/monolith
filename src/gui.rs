@@ -754,10 +754,12 @@ impl MonolithApp {
         if !self.keep_media {
             options.remove_elements = vec!["audio".to_string(), "video".to_string()];
         }
-        options.no_frames = !self.keep_frames;
+        if !self.keep_frames {
+            options.wipe_elements = vec!["frame".to_string(), "iframe".to_string()];
+        }
         options.no_fonts = !self.keep_fonts;
         options.no_images = !self.keep_images;
-        options.no_css = !self.keep_styles;
+        options.no_styles = !self.keep_styles;
         options.no_js = !self.keep_scripts;
         options.isolate = self.isolate;
         options.threads = 30;

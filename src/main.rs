@@ -33,10 +33,6 @@ const DEFAULT_USER_AGENT: &str =
 #[command(version)] // Read version from Cargo.toml
 #[command(about = ASCII.to_owned() + "\n" + env!("CARGO_PKG_NAME") + " " + env!("CARGO_PKG_VERSION") + "\n\n" + env!("CARGO_PKG_DESCRIPTION"), long_about = None)]
 struct Cli {
-    /// Same as -r audio
-    #[arg(short = 'a', long, hide = true)]
-    no_audio: bool,
-
     /// Set custom base URL
     #[arg(short, long, value_name = "http://localhost/")]
     base_url: Option<String>,
@@ -44,10 +40,6 @@ struct Cli {
     /// Treat specified domains as blacklist
     #[arg(short = 'B', long)]
     blacklist_domains: bool,
-
-    /// Remove CSS
-    #[arg(short = 'c', long)]
-    no_css: bool,
 
     /// Specify cookie file
     #[arg(short = 'C', long, value_name = "cookies.txt")]
@@ -69,12 +61,8 @@ struct Cli {
     #[arg(short = 'E', long, value_name = "UTF-8")]
     encoding: Option<String>,
 
-    /// Remove frames and iframes
-    #[arg(short = 'f', long)]
-    no_frames: bool,
-
     /// Remove fonts
-    #[arg(short = 'F', long)]
+    #[arg(short = 'f', long)]
     no_fonts: bool,
 
     /// Remove images
@@ -117,6 +105,10 @@ struct Cli {
     #[arg(short = 'r', long = "remove", value_name = "selector")]
     remove_elements: Vec<String>,
 
+    /// Remove styles
+    #[arg(short = 's', long)]
+    no_styles: bool,
+
     /// Adjust network request timeout
     #[arg(short, long, value_name = "60")]
     timeout: Option<u64>,
@@ -125,9 +117,9 @@ struct Cli {
     #[arg(short, long, value_name = "Firefox")]
     user_agent: Option<String>,
 
-    /// Same as -r video
-    #[arg(short = 'v', long, hide = true)]
-    no_video: bool,
+    /// Wipe elements, e.g. "a" turns links into text, "img,iframe" leaves them without sources
+    #[arg(short = 'w', long = "wipe", value_name = "selector")]
+    wipe_elements: Vec<String>,
 
     /// URL or file path, use - for STDIN
     target: String,
@@ -216,9 +208,8 @@ fn main() {
         options.ignore_errors = cli.ignore_errors;
         options.insecure = cli.insecure;
         options.isolate = cli.isolate;
-        options.no_css = cli.no_css;
+        options.no_styles = cli.no_styles;
         options.no_fonts = cli.no_fonts;
-        options.no_frames = cli.no_frames;
         options.no_images = cli.no_images;
         options.no_js = cli.no_js;
         if cli.mhtml {
@@ -226,12 +217,7 @@ fn main() {
         }
         options.no_metadata = cli.no_metadata;
         options.remove_elements = cli.remove_elements;
-        if cli.no_audio {
-            options.remove_elements.push("audio".to_string());
-        }
-        if cli.no_video {
-            options.remove_elements.push("video".to_string());
-        }
+        options.wipe_elements = cli.wipe_elements;
         options.silent = cli.quiet;
         options.timeout = cli.timeout.unwrap_or(DEFAULT_NETWORK_TIMEOUT);
         options.threads = 30;
