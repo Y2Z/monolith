@@ -13,7 +13,7 @@ use url::Url;
 use crate::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
     has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots,
-    strip_elements, walk,
+    strip_elements, targets_element_anywhere, walk,
 };
 use crate::mhtml::{create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::session::Session;
@@ -232,6 +232,7 @@ pub fn create_monolithic_document_from_data(
         }
     }
 
+    let had_favicon: bool = has_favicon(&dom.document);
     strip_elements(
         &dom.document,
         &session.options.remove_elements,
@@ -256,6 +257,7 @@ pub fn create_monolithic_document_from_data(
 
     // Request and embed /favicon.ico (unless it's already linked in the document)
     if !session.options.no_images
+        && !(had_favicon || targets_element_anywhere(&session.options, &["head", "html", "link"]))
         && !session.has_archive()
         && (base_url.scheme() == "http" || base_url.scheme() == "https")
         && (input_target.is_some()

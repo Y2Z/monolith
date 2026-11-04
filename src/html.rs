@@ -119,6 +119,21 @@ fn targets_any_element(options: &MonolithOptions, names: &[&str]) -> bool {
         })
 }
 
+/// Whether any selector goes after elements of the given names, in any part of the document.
+/// A wildcard only counts on its own, "main *" isn't going after everything there is.
+pub fn targets_element_anywhere(options: &MonolithOptions, names: &[&str]) -> bool {
+    parse_selectors(&options.remove_elements)
+        .iter()
+        .chain(parse_selectors(&options.wipe_elements).iter())
+        .any(|selector| match selector.as_slice() {
+            [step] if step == "*" => true,
+            [.., last_step] => names
+                .iter()
+                .any(|name| last_step.eq_ignore_ascii_case(name)),
+            [] => false,
+        })
+}
+
 pub fn compose_csp(options: &MonolithOptions) -> String {
     let mut string_list = vec![];
 

@@ -169,6 +169,25 @@ mod passing {
     }
 
     #[test]
+    fn detects_targeted_elements() {
+        let mut options = MonolithOptions::default();
+        assert!(!html::targets_element_anywhere(&options, &["link"]));
+
+        options.remove_elements = vec!["html link".to_string()];
+        assert!(html::targets_element_anywhere(&options, &["link"]));
+
+        options.remove_elements = vec!["form, link".to_string()];
+        assert!(html::targets_element_anywhere(&options, &["link"]));
+
+        options.remove_elements = vec!["main *".to_string()];
+        assert!(!html::targets_element_anywhere(&options, &["link"]));
+
+        options.remove_elements = vec![];
+        options.wipe_elements = vec!["*".to_string()];
+        assert!(html::targets_element_anywhere(&options, &["link"]));
+    }
+
+    #[test]
     fn inside_noscript() {
         assert_eq!(
             remove(
