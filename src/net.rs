@@ -99,7 +99,7 @@ pub fn is_domain_allowed(url: &Url, options: &MonolithOptions) -> bool {
             let matches = domains
                 .iter()
                 .any(|d| domain_is_within_domain(host, d.trim()));
-            matches != options.blacklist_domains
+            matches == options.whitelist_domains
         }
         _ => true,
     }

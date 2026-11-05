@@ -1,8 +1,8 @@
 use std::fs;
-use std::path::{MAIN_SEPARATOR, Path};
-use std::process::Command;
+use std::path::{MAIN_SEPARATOR, Path, PathBuf};
+use std::process::{self, Command};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread;
 use std::time::Duration;
 
@@ -11,6 +11,7 @@ use eframe::egui;
 use encoding_rs::Encoding;
 use tempfile::{Builder, NamedTempFile};
 
+use monolith::browser;
 use monolith::cache::Cache;
 use monolith::core::{
     MonolithOptions, MonolithOutputFormat, create_monolithic_document, format_output_path,
@@ -23,6 +24,7 @@ const BORDER_GRAY: u8 = 0x22;
 const BUTTON_ACTIVE_GRAY: u8 = 0xBB; // Fill of pressed buttons
 const BUTTON_DISABLED_GRAY: u8 = 0x22;
 const BUTTON_HOVER_GRAY: u8 = 0xDD; // Fill of buttons under the mouse pointer
+const INTERRUPTED_EXIT_CODE: i32 = 130; // What shells report for programs ended with Ctrl+C
 const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 20; // Minimum file size for on-disk caching (in bytes)
 const CHECKBOX_GAP: f32 = 8.0; // Distance between a checkbox and its label
 const CHECKBOX_MARK_INSET: f32 = 3.5;
@@ -161,6 +163,7 @@ struct MonolithApp {
     keep_images: bool,
     keep_scripts: bool,
     keep_styles: bool,
+    browser: bool,
     isolate: bool,
     unwrap_noscript: bool,
     ignore_errors: bool,
@@ -185,6 +188,7 @@ impl Default for MonolithApp {
             keep_images: true,
             keep_scripts: true,
             keep_styles: true,
+            browser: false,
             isolate: true,
             unwrap_noscript: false,
             ignore_errors: false,
@@ -198,7 +202,28 @@ impl Default for MonolithApp {
     }
 }
 
+// Temporary file of the document being saved, gets deleted if the program exits before that's done
+static TEMP_CACHE_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+fn temp_cache_path() -> MutexGuard<'static, Option<PathBuf>> {
+    TEMP_CACHE_PATH
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn clean_up() {
+    browser::shut_down();
+    if let Some(path) = temp_cache_path().take() {
+        let _ = fs::remove_file(path);
+    }
+}
+
 fn main() -> eframe::Result {
+    let _ = ctrlc::set_handler(|| {
+        clean_up();
+        process::exit(INTERRUPTED_EXIT_CODE);
+    });
+
     let program_name = program_name();
 
     let mut viewport = egui::ViewportBuilder::default()
@@ -761,6 +786,7 @@ impl MonolithApp {
         options.no_images = !self.keep_images;
         options.no_styles = !self.keep_styles;
         options.no_js = !self.keep_scripts;
+        options.browser = self.browser;
         options.isolate = self.isolate;
         options.threads = 30;
         options.unwrap_noscript = self.unwrap_noscript;
@@ -780,6 +806,9 @@ impl MonolithApp {
             // Set up cache (attempt to create temporary file)
             let temp_cache_file: Option<NamedTempFile> =
                 Builder::new().prefix("monolith-").tempfile().ok();
+            *temp_cache_path() = temp_cache_file
+                .as_ref()
+                .map(|file| file.path().to_path_buf());
             let cache = Cache::new(
                 CACHE_ASSET_FILE_SIZE_THRESHOLD,
                 temp_cache_file
@@ -871,6 +900,7 @@ impl MonolithApp {
 
                 checkbox(behavior, &mut self.isolate, "Isolate document");
                 checkbox(behavior, &mut self.unwrap_noscript, "Unwrap NOSCRIPT");
+                checkbox(behavior, &mut self.browser, "Render in browser");
 
                 checkbox(network, &mut self.ignore_errors, "Ignore network errors");
                 checkbox(network, &mut self.insecure, "Accept invalid certificates");
@@ -1047,6 +1077,10 @@ impl MonolithApp {
 }
 
 impl eframe::App for MonolithApp {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        clean_up();
+    }
+
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         egui::Color32::TRANSPARENT.to_normalized_gamma_f32() // Shows through the window corners
     }

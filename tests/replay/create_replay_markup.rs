@@ -1,0 +1,84 @@
+//  ██████╗  █████╗ ███████╗███████╗██╗███╗   ██╗ ██████╗
+//  ██╔══██╗██╔══██╗██╔════╝██╔════╝██║████╗  ██║██╔════╝
+//  ██████╔╝███████║███████╗███████╗██║██╔██╗ ██║██║  ███╗
+//  ██╔═══╝ ██╔══██║╚════██║╚════██║██║██║╚██╗██║██║   ██║
+//  ██║     ██║  ██║███████║███████║██║██║ ╚████║╚██████╔╝
+//  ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝
+
+#[cfg(test)]
+mod passing {
+    use monolith::browser::CapturedAsset;
+    use monolith::replay::create_replay_markup;
+
+    fn asset(url: &str, destination: &str) -> CapturedAsset {
+        CapturedAsset {
+            content_type: "application/json; charset=utf-8".to_string(),
+            data: b"{}".to_vec(),
+            destination: destination.to_string(),
+            is_reusable: true,
+            method: "GET".to_string(),
+            status: 200,
+            urls: vec![url.to_string()],
+        }
+    }
+
+    #[test]
+    fn stores_responses_ahead_of_the_emulator() {
+        let markup = create_replay_markup(
+            &[asset("https://a.b/c?d=1&e=2", "")],
+            &[],
+            "https://a.b/",
+            7,
+        );
+
+        assert!(markup.contains("data-monolith-url=\"https://a.b/c?d=1&amp;e=2\""));
+        assert!(markup.contains("data-monolith-type=\"application/json\""));
+        assert!(markup.contains(">e30=</script>"));
+        assert!(markup.find("e30=").unwrap() < markup.find("CAPTURED_AT=7").unwrap());
+    }
+
+    #[test]
+    fn stores_things_once() {
+        let assets = [asset("https://a.b/c", ""), asset("https://a.b/c", "")];
+        let markup = create_replay_markup(&assets, &[], "https://a.b/", 7);
+
+        assert_eq!(markup.matches("data-monolith-url=\"").count(), 1);
+    }
+
+    #[test]
+    fn stores_modules_separately() {
+        let imports = [(
+            "https://a.b/c".to_string(),
+            "text/javascript".to_string(),
+            "e30=".to_string(),
+        )];
+        let markup = create_replay_markup(
+            &[asset("https://a.b/c", "script")],
+            &imports,
+            "https://a.b/",
+            7,
+        );
+
+        assert!(!markup.contains("data-monolith-url=\""));
+        assert!(markup.contains("data-monolith-modules>[[\"https://a.b/c\""));
+    }
+
+    #[test]
+    fn page_url_can_not_close_the_script() {
+        let markup = create_replay_markup(&[], &[], "https://a.b/</script>", 7);
+
+        assert!(markup.contains("https://a.b/\\u003c/script>"));
+    }
+
+    #[test]
+    fn leaves_out_what_scripts_never_ask_for() {
+        let assets = [
+            asset("https://a.b/", "document"),
+            asset("https://a.b/f", "font"),
+        ];
+
+        assert!(
+            !create_replay_markup(&assets, &[], "https://a.b/", 7).contains("data-monolith-url=\"")
+        );
+    }
+}

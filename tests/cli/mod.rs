@@ -1,5 +1,6 @@
 mod base_url;
 mod basic;
+mod browser;
 mod data_url;
 mod http_encoding;
 mod local_files;

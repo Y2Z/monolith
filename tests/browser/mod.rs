@@ -1,0 +1,14 @@
+mod captured_response;
+mod cookie_to_json;
+mod decode_bytes;
+mod find_browser_in;
+mod is_request_allowed;
+mod is_snap;
+mod is_unsupported_browser;
+mod parse_color_scheme;
+mod parse_endpoint;
+mod parse_gsettings_color_scheme;
+mod parse_macos_color_scheme;
+mod parse_portal_color_scheme;
+mod parse_windows_color_scheme;
+mod profile_preferences;

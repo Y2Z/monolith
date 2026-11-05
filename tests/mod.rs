@@ -1,3 +1,4 @@
+mod browser;
 mod cli;
 mod cookies;
 mod core;
@@ -5,5 +6,6 @@ mod css;
 mod html;
 mod js;
 mod mhtml;
+mod replay;
 mod session;
 mod url;

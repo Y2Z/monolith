@@ -6,6 +6,7 @@ use std::process;
 use clap::Parser;
 use tempfile::{Builder, NamedTempFile};
 
+use monolith::browser;
 use monolith::cache::Cache;
 use monolith::cookies::{Cookie, parse_cookie_file_contents};
 use monolith::core::{
@@ -24,6 +25,7 @@ const ASCII: &str = " \
 |___|      |__________| \\___________________|   |___|   |___|  |___|
 ";
 const CACHE_ASSET_FILE_SIZE_THRESHOLD: usize = 1024 * 10; // Minimum file size for on-disk caching (in bytes)
+const INTERRUPTED_EXIT_CODE: i32 = 130; // What shells report for programs ended with Ctrl+C
 const DEFAULT_NETWORK_TIMEOUT: u64 = 120; // Maximum time to retrieve each remote asset (in seconds)
 const DEFAULT_USER_AGENT: &str =
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0";
@@ -37,15 +39,15 @@ struct Cli {
     #[arg(short, long, value_name = "http://localhost/")]
     base_url: Option<String>,
 
-    /// Treat specified domains as blacklist
+    /// Let a browser render the page first, it runs on its own, with a clean temporary profile
     #[arg(short = 'B', long)]
-    blacklist_domains: bool,
+    browser: bool,
 
     /// Specify cookie file
     #[arg(short = 'C', long, value_name = "cookies.txt")]
     cookie_file: Option<String>,
 
-    /// Specify domains to use for white/black-listing
+    /// Forbid retrieving assets from specified domains, see --whitelist
     #[arg(short = 'd', long = "domain", value_name = "example.com")]
     domains: Vec<String>,
 
@@ -124,6 +126,10 @@ struct Cli {
     /// Wipe elements, e.g. "a" turns links into text, "img,iframe" leaves them without sources
     #[arg(short = 'w', long = "wipe", value_name = "selector")]
     wipe_elements: Vec<String>,
+
+    /// Only retrieve assets from domains specified with --domain
+    #[arg(short = 'W', long, requires = "domains")]
+    whitelist: bool,
 
     /// URL or file path, use - for STDIN
     target: String,
@@ -204,11 +210,13 @@ fn main() {
     // Process the command
     {
         options.base_url = cli.base_url;
-        options.blacklist_domains = cli.blacklist_domains;
+        options.browser = cli.browser;
+        options.browser_user_agent = cli.user_agent.clone();
         options.encoding = cli.encoding;
         if !cli.domains.is_empty() {
             options.domains = Some(cli.domains);
         }
+        options.whitelist_domains = cli.whitelist;
         options.ignore_errors = cli.ignore_errors;
         options.insecure = cli.insecure;
         options.isolate = cli.isolate;
@@ -259,6 +267,18 @@ fn main() {
         },
     ));
 
+    // Clean up if interrupted, none of what's been retrieved is supposed to stay behind
+    let cache_file_path = temp_cache_file
+        .as_ref()
+        .map(|file| file.path().to_path_buf());
+    let _ = ctrlc::set_handler(move || {
+        browser::shut_down();
+        if let Some(path) = &cache_file_path {
+            let _ = fs::remove_file(path);
+        }
+        process::exit(INTERRUPTED_EXIT_CODE);
+    });
+
     // Read and parse cookie file
     let mut cookies: Option<Vec<Cookie>> = None;
     if let Some(opt_cookie_file) = cookie_file_path.clone() {
@@ -274,6 +294,7 @@ fn main() {
                             opt_cookie_file
                         ));
                     }
+                    drop(temp_cache_file);
                     process::exit(1);
                 }
             },
@@ -284,6 +305,7 @@ fn main() {
                         opt_cookie_file
                     ));
                 }
+                drop(temp_cache_file);
                 process::exit(1);
             }
         }
@@ -294,77 +316,60 @@ fn main() {
     let silent = options.silent;
     let session: Session = Session::new(cache, cookies, options);
 
-    // Retrieve target from source and output result
-    if cli.target == "-" {
+    if cli.browser && cli.target == "-" {
+        if !silent {
+            print_error_message("Error: browser can't be used with STDIN");
+        }
+        drop(temp_cache_file);
+        process::exit(1);
+    }
+
+    // Retrieve target from source
+    let result = if cli.target == "-" {
         // Read input from pipe (STDIN)
-        let data: Vec<u8> = read_stdin();
+        create_monolithic_document_from_data(session, read_stdin(), None, None)
+    } else {
+        create_monolithic_document(session, cli.target)
+    };
 
-        match create_monolithic_document_from_data(session, data, None, None) {
-            Ok((result, title)) => {
-                // Define output
-                match Output::new(
-                    &destination.unwrap_or(String::new()),
-                    &title.unwrap_or_default(),
-                    output_format,
-                    cli.create_dirs,
-                ) {
-                    Ok(mut output) => {
-                        // Write result into STDOUT or file
-                        output.write(&result).expect("could not write output");
-                    }
-                    Err(error) => {
-                        if !silent {
-                            print_error_message(&format!("Error: {}", error));
-                        }
-
-                        exit_code = 1;
-                    }
+    // Output result
+    match result {
+        Ok((result, title)) => {
+            // Define output
+            match Output::new(
+                &destination.unwrap_or(String::new()),
+                &title.unwrap_or_default(),
+                output_format,
+                cli.create_dirs,
+            ) {
+                Ok(mut output) => {
+                    // Write result into STDOUT or file
+                    output.write(&result).expect("could not write output");
                 }
-            }
-            Err(error) => {
-                if !silent {
-                    print_error_message(&format!("Error: {}", error));
-                }
+                Err(error) => {
+                    if !silent {
+                        print_error_message(&format!("Error: {}", error));
+                    }
 
-                exit_code = 1;
+                    exit_code = 1;
+                }
             }
         }
-    } else {
-        match create_monolithic_document(session, cli.target) {
-            Ok((result, title)) => {
-                // Define output
-                match Output::new(
-                    &destination.unwrap_or(String::new()),
-                    &title.unwrap_or_default(),
-                    output_format,
-                    cli.create_dirs,
-                ) {
-                    Ok(mut output) => {
-                        // Write result into STDOUT or file
-                        output.write(&result).expect("could not write output");
-                    }
-                    Err(error) => {
-                        if !silent {
-                            print_error_message(&format!("Error: {}", error));
-                        }
-
-                        exit_code = 1;
-                    }
-                }
+        Err(error) => {
+            if !silent {
+                print_error_message(&format!("Error: {}", error));
             }
-            Err(error) => {
-                if !silent {
-                    print_error_message(&format!("Error: {}", error));
-                }
 
-                exit_code = 1;
-            }
+            exit_code = 1;
         }
     }
 
     // TODO: bring this back
     // Clean up (shred database file)
     //cache.unwrap().destroy_database_file();
+
+    // Exiting doesn't run destructors
+    drop(temp_cache_file);
 
     if exit_code > 0 {
         process::exit(exit_code);
