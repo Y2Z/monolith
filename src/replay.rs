@@ -8,7 +8,33 @@ use base64::prelude::BASE64_STANDARD;
 use serde_json::json;
 use url::Url;
 
-use crate::browser::CapturedAsset;
+/// Something a page has received while it was being loaded.
+#[derive(Clone, Debug, Default)]
+pub struct CapturedAsset {
+    pub content_type: String,
+    pub data: Vec<u8>,
+    /// What it was requested for, in terms of the Fetch standard: "document", "script", "style",
+    /// "image", "font", "json", "worker", or nothing for what scripts asked for
+    pub destination: String,
+    /// Whether it's something that can stand in for retrieving the URL
+    pub is_reusable: bool,
+    pub method: String,
+    pub status: u64,
+    /// Where it was requested from, followed by the ones it got redirected to
+    pub urls: Vec<String>,
+}
+
+/// A page that was loaded by something other than Monolith, be that a browser, or a web view of an
+/// app. Assets should be in the order they've been received in.
+#[derive(Clone, Debug, Default)]
+pub struct CapturedPage {
+    pub assets: Vec<CapturedAsset>,
+    pub content_type: String,
+    /// What the page has turned into, for when it gets saved without JavaScript
+    pub html: String,
+    pub title: String,
+    pub url: String,
+}
 
 const EMULATOR: &str = include_str!("replay.js");
 const LOCATION_REPLACEMENT: &str = "__monolithLocation";

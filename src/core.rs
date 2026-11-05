@@ -18,7 +18,10 @@ use crate::html::{
 };
 use crate::mhtml::{create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::reader_mode::simplify_document;
-use crate::replay::{create_replay_markup, insert_replay_markup, is_script, rewrite_scripts};
+use crate::replay::{
+    CapturedAsset, CapturedPage, create_replay_markup, insert_replay_markup, is_script,
+    rewrite_scripts,
+};
 use crate::session::Session;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
 
@@ -430,92 +433,15 @@ pub fn create_monolithic_document(
     };
 
     if session.options.browser {
-        let mut page = render_page(target_url.as_str(), &session)
+        let page = render_page(target_url.as_str(), &session)
             .map_err(|error| MonolithError::new(&error))?;
 
-        let is_document =
-            page.content_type == "text/html" || page.content_type == "application/xhtml+xml";
-        // Documents that keep their JavaScript get to start over, with responses stored inside
-        session.options.replay = is_document
-            && !session.options.no_js
-            && !session.options.reader_mode
-            && session.options.output_format == MonolithOutputFormat::HTML
-            && page
-                .assets
-                .iter()
-                .any(|asset| asset.destination == "document" && asset.status == 200);
-        let imports = match session.options.replay {
-            true => {
-                for asset in page.assets.iter().filter(|asset| is_script(asset)) {
-                    for url in asset.urls.iter().filter_map(|url| Url::parse(url).ok()) {
-                        session.add_original_data(&url, asset.data.clone());
-                    }
-                }
-                rewrite_scripts(&mut page.assets)
-            }
-            false => vec![],
-        };
-
-        // Saves requests, and works for what servers wouldn't give to anyone but that browser
-        for asset in page.assets.iter().filter(|asset| asset.is_reusable) {
-            let (media_type, charset, _) = parse_media_type(&asset.content_type);
-
-            for url in asset.urls.iter().filter_map(|url| Url::parse(url).ok()) {
-                session.add_asset(
-                    &url,
-                    &asset.data,
-                    media_type.clone(),
-                    charset.clone().unwrap_or_default(),
-                );
-            }
+        if is_captured_document(&page) {
+            return create_monolithic_document_from_capture(session, page);
         }
 
         // Images, PDFs, and such have nothing to render, they get saved the usual way
-        if is_document {
-            let source_document = page
-                .assets
-                .iter()
-                .rfind(|asset| asset.destination == "document" && asset.status == 200);
-
-            if session.options.replay
-                && let Some(source_document) = source_document
-            {
-                // Scripts of the document have to find everything right where they found it in
-                // the browser, no other base URL can work for it
-                session.options.base_url = None;
-
-                let markup = create_replay_markup(
-                    &page.assets,
-                    &imports,
-                    &page.url,
-                    Utc::now().timestamp_millis(),
-                );
-                let charset = parse_media_type(&source_document.content_type).1;
-                let source_url = source_document.urls.last().cloned();
-                let (document, _) = create_monolithic_document_from_data(
-                    session,
-                    source_document.data.clone(),
-                    charset,
-                    source_url,
-                )?;
-
-                return Ok((
-                    insert_replay_markup(document, &markup),
-                    Some(page.title).filter(|title| !title.is_empty()),
-                ));
-            }
-
-            // What a browser leaves behind has already been through JavaScript, running it again
-            // would only break it
-            session.options.no_js = true;
-
-            return create_monolithic_document_from_data(
-                session,
-                page.html.into_bytes(),
-                Some("utf-8".to_string()),
-                Some(page.url),
-            );
-        }
+        add_captured_assets(&mut session, &page.assets);
     }
 
     let data: Vec<u8>;
@@ -558,6 +484,94 @@ pub fn create_monolithic_document(
         data,
         document_encoding,
         Some(target_url.to_string()),
+    )
+}
+
+fn is_captured_document(page: &CapturedPage) -> bool {
+    page.content_type == "text/html" || page.content_type == "application/xhtml+xml"
+}
+
+/// Saves requests, and works for what servers wouldn't give to anyone but who received it.
+fn add_captured_assets(session: &mut Session, assets: &[CapturedAsset]) {
+    for asset in assets.iter().filter(|asset| asset.is_reusable) {
+        let (media_type, charset, _) = parse_media_type(&asset.content_type);
+
+        for url in asset.urls.iter().filter_map(|url| Url::parse(url).ok()) {
+            session.add_asset(
+                &url,
+                &asset.data,
+                media_type.clone(),
+                charset.clone().unwrap_or_default(),
+            );
+        }
+    }
+}
+
+/// Creates a document out of a page that has already been loaded by something else.
+///
+/// If scripts are to be kept, and the capture has the original document (an asset with destination
+/// "document" and status 200), the result starts over from it and replays captured responses.
+/// Otherwise it's a frozen copy of what the page has turned into.
+pub fn create_monolithic_document_from_capture(
+    mut session: Session,
+    mut page: CapturedPage,
+) -> Result<(Vec<u8>, Option<String>), MonolithError> {
+    let source_document = page
+        .assets
+        .iter()
+        .rfind(|asset| asset.destination == "document" && asset.status == 200)
+        .cloned();
+
+    if let Some(source_document) = source_document.filter(|_| {
+        !session.options.no_js
+            && !session.options.reader_mode
+            && session.options.output_format == MonolithOutputFormat::HTML
+    }) {
+        session.options.replay = true;
+        // Scripts of the document have to find everything right where they found it in the
+        // browser, no other base URL can work for it
+        session.options.base_url = None;
+
+        for asset in page.assets.iter().filter(|asset| is_script(asset)) {
+            for url in asset.urls.iter().filter_map(|url| Url::parse(url).ok()) {
+                session.add_original_data(&url, asset.data.clone());
+            }
+        }
+        let imports = rewrite_scripts(&mut page.assets);
+        add_captured_assets(&mut session, &page.assets);
+
+        let markup = create_replay_markup(
+            &page.assets,
+            &imports,
+            &page.url,
+            Utc::now().timestamp_millis(),
+        );
+        let charset = parse_media_type(&source_document.content_type).1;
+        let source_url = source_document.urls.last().cloned();
+        let (document, _) = create_monolithic_document_from_data(
+            session,
+            source_document.data,
+            charset,
+            source_url,
+        )?;
+
+        return Ok((
+            insert_replay_markup(document, &markup),
+            Some(page.title).filter(|title| !title.is_empty()),
+        ));
+    }
+
+    add_captured_assets(&mut session, &page.assets);
+
+    // What a browser leaves behind has already been through JavaScript, running it again would
+    // only break it
+    session.options.no_js = true;
+
+    create_monolithic_document_from_data(
+        session,
+        page.html.into_bytes(),
+        Some("utf-8".to_string()),
+        Some(page.url),
     )
 }
 

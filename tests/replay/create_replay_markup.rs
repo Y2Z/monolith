@@ -7,7 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use monolith::browser::CapturedAsset;
+    use monolith::replay::CapturedAsset;
     use monolith::replay::create_replay_markup;
 
     fn asset(url: &str, destination: &str) -> CapturedAsset {

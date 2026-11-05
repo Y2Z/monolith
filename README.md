@@ -203,7 +203,7 @@ monolith page-saved-by-browser.mhtml -o page.html
 ## Options
 
  - `-b`: Use `custom base URL`
- - `-B`: Let a browser render the page first (requires Firefox)
+ - `-B`: Let a browser render the page first (requires Firefox, or anything based on it or Chromium)
  - `-C`: Read cookies from `file`
  - `-d`: Forbid retrieving assets from specified `domain(s)` (can be used multiple times)
  - `-D`: Create missing directories in the output file path
@@ -251,13 +251,13 @@ monolith -I -W -d example.com -d www.example.com https://example.com -o example-
 
 ## Dynamic content
 
-Monolith doesn't feature a JavaScript engine, but it can make use of the one inside of a browser that's already installed: option `-B` opens the page in Firefox, waits for it to finish rendering, and saves what the page has become, e.g.:
+Monolith doesn't feature a JavaScript engine, but it can make use of the one inside of a browser that's already installed: option `-B` opens the page in a browser, waits for it to finish rendering, and saves what the page has become, e.g.:
 
 ```console
 monolith -B https://example.com -o example.html
 ```
 
-The browser runs without a window, from a clean temporary profile which gets deleted afterwards. It never gets access to your own Firefox profile, cookies, or history, gets only those cookies that were passed in using `-C`, and sticks to the same rules as the rest of Monolith: domains forbidden with `-d` and whatever got excluded with `-i`, `-f`, or `-s` don't get requested by the browser either. It identifies itself as what it is, unless told otherwise with `-u`. Set `MONOLITH_BROWSER` to the browser's path to use a specific installation, or a browser based on Firefox, such as LibreWolf or GNU IceCat. Chromium and browsers based on it aren't supported yet.
+The browser runs without a window, from a clean temporary profile which gets deleted afterwards. It never gets access to your own profile, cookies, or history, gets only those cookies that were passed in using `-C`, and sticks to the same rules as the rest of Monolith: domains forbidden with `-d` and whatever got excluded with `-i`, `-f`, or `-s` don't get requested by the browser either. It identifies itself as what it is, unless told otherwise with `-u`. Firefox gets used if it's installed. Set `MONOLITH_BROWSER` to the browser's path to choose another one: anything based on Firefox or Chromium works, such as LibreWolf, GNU IceCat, Chrome, Brave, or Edge.
 
 The browser follows your system's light or dark mode, so pages that adapt to it get saved the way you'd see them. Set `MONOLITH_BROWSER_COLOR_SCHEME` to `dark`, `light`, or `auto` to choose for yourself.
 
@@ -267,7 +267,7 @@ Should the page turn out to be a challenge which doesn't solve itself, such as t
 
 The saved page keeps its JavaScript, along with the responses it has received, which get replayed to it without any network access: buttons, menus, and other things that only rely on the page's own code keep working, but anything that needs a server doesn't. A saved page only contains what it has loaded while being saved, so parts of web apps that were never opened won't be there. Scripts of the saved page get modified to make that work: they're told the page's original URL, and imports get pointed at what's stored inside of the document. They never reach out to the server, and `-b` doesn't apply to them. Add `-j` to save a frozen copy of what the browser had on screen instead; that's also what MHTML output and `-R` always do.
 
-The same is available to the GUI (“Render in browser”) and to programs using Monolith as a library, by setting `browser` in `MonolithOptions`. Apps that have a web view of their own, such as mobile ones, can use `Session::add_asset()` and `create_monolithic_document_from_data()` to save what it has rendered.
+The same is available to the GUI (“Render in browser”) and to programs using Monolith as a library, by setting `browser` in `MonolithOptions`. Apps that have a web view of their own, such as mobile ones, can use `create_monolithic_document_from_capture()` to save what it has loaded.
 
 Any other browser can be used as a pre-processor as well, e.g. Chromium (Chrome):
 

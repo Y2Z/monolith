@@ -31,16 +31,65 @@ use url::Url;
 use crate::cookies::Cookie;
 use crate::core::{MonolithOptions, print_error_message, print_info_message};
 use crate::net::is_domain_allowed;
+use crate::replay::{CapturedAsset, CapturedPage};
 use crate::session::Session;
 
 const BROWSER_COLOR_SCHEME_VARIABLE: &str = "MONOLITH_BROWSER_COLOR_SCHEME";
 const BROWSER_PATH_VARIABLE: &str = "MONOLITH_BROWSER";
 // Firefox and browsers made out of it, the ones that come with WebDriver BiDi
-const BROWSER_NAMES: [&str; 4] = ["firefox", "firefox-esr", "librewolf", "icecat"];
-// These don't speak WebDriver BiDi on their own, what's needed for that doesn't come with them
-const UNSUPPORTED_BROWSERS: [&str; 7] = [
-    "brave", "chrome", "chromium", "edge", "opera", "safari", "vivaldi",
+const BROWSER_NAMES: [&str; 15] = [
+    "firefox",
+    "firefox-esr",
+    "librewolf",
+    "icecat",
+    "chromium",
+    "chromium-browser",
+    "google-chrome",
+    "google-chrome-stable",
+    "brave-browser",
+    "brave",
+    "microsoft-edge",
+    "microsoft-edge-stable",
+    "msedge",
+    "vivaldi",
+    "opera",
 ];
+// Anything that has these in its name speaks DevTools Protocol, instead of WebDriver BiDi
+const DEVTOOLS_BROWSERS: [&str; 6] = ["brave", "chrome", "chromium", "edge", "opera", "vivaldi"];
+// Keeps the browser from contacting anything other than what the page asks for
+const DEVTOOLS_SWITCHES: [&str; 27] = [
+    "--disable-background-networking",
+    "--disable-breakpad",
+    "--disable-client-side-phishing-detection",
+    "--disable-component-extensions-with-background-pages",
+    "--disable-component-update",
+    "--disable-default-apps",
+    "--disable-domain-reliability",
+    "--disable-extensions",
+    "--disable-features=MediaRouter,NetworkTimeServiceQuerying,OptimizationHints,PreconnectToSearch,Translate",
+    "--disable-search-engine-choice-screen",
+    "--disable-sync",
+    "--metrics-recording-only",
+    "--no-default-browser-check",
+    "--no-first-run",
+    "--no-pings",
+    "--no-service-autorun",
+    "--password-store=basic",
+    // These browsers keep talking to their makers regardless of being told not to, so what they
+    // talk to gets replaced with a port that nothing ever answers on
+    "--apps-gallery-update-url=http://127.0.0.1:9",
+    "--component-updater=url-source=http://127.0.0.1:9",
+    "--gaia-url=http://127.0.0.1:9",
+    "--gcm-checkin-url=http://127.0.0.1:9",
+    "--gcm-mcs-endpoint=http://127.0.0.1:9",
+    "--gcm-registration-url=http://127.0.0.1:9",
+    "--google-apis-url=http://127.0.0.1:9",
+    "--google-base-url=http://127.0.0.1:9/",
+    "--lso-url=http://127.0.0.1:9",
+    "--sync-url=http://127.0.0.1:9",
+];
+// There's no way of telling these to listen for commands
+const UNSUPPORTED_BROWSERS: [&str; 1] = ["safari"];
 const MAX_LAUNCHER_SCRIPT_SIZE: u64 = 64 * 1024;
 const BROWSER_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 const BROWSER_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
@@ -145,32 +194,10 @@ const SNAPSHOT_SCRIPT: &str = r#"(() => {
 // Anything larger than this has to be retrieved again by Monolith
 const MAX_CAPTURED_RESPONSE_SIZE: u64 = 200_000_000;
 
-/// Something the page has received, along with all URLs that led to it.
-#[derive(Debug)]
-pub struct CapturedAsset {
-    pub content_type: String,
-    pub data: Vec<u8>,
-    pub destination: String,
-    /// Whether it's something that can stand in for retrieving the URL
-    pub is_reusable: bool,
-    pub method: String,
-    pub status: u64,
-    pub urls: Vec<String>,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ColorScheme {
     Dark,
     Light,
-}
-
-#[derive(Debug)]
-pub struct RenderedPage {
-    pub assets: Vec<CapturedAsset>,
-    pub content_type: String,
-    pub html: String,
-    pub title: String,
-    pub url: String,
 }
 
 /// Opens given URL in a browser that's about to cease to exist, and returns what the page became.
@@ -178,7 +205,7 @@ pub struct RenderedPage {
 ///
 /// The browser stays out of sight, unless the page turns out to be a challenge that someone has to
 /// deal with, in which case it gets opened again in a window.
-pub fn render_page(url: &str, session: &Session) -> Result<RenderedPage, String> {
+pub fn render_page(url: &str, session: &Session) -> Result<CapturedPage, String> {
     let executable = find_browser()?;
 
     if let Some(page) = visit_page(&executable, url, session, false)? {
@@ -201,7 +228,7 @@ fn visit_page(
     url: &str,
     session: &Session,
     is_visible: bool,
-) -> Result<Option<RenderedPage>, String> {
+) -> Result<Option<CapturedPage>, String> {
     let options = &session.options;
     let mut browser = Browser::launch(executable, options, is_visible)?;
     let timeout = match options.timeout {
@@ -438,7 +465,7 @@ fn find_browser() -> Result<PathBuf, String> {
         let path = PathBuf::from(path);
         if is_unsupported_browser(&path) {
             return Err(format!(
-                "\"{}\" is not supported yet, {} has to be Firefox or a browser based on it",
+                "\"{}\" is not supported, {} has to be based on Firefox or Chromium",
                 path.display(),
                 BROWSER_PATH_VARIABLE
             ));
@@ -460,9 +487,70 @@ fn find_browser() -> Result<PathBuf, String> {
     find_browser_in(&directories)
         .or_else(find_installed_browser)
         .ok_or(format!(
-            "could not find Firefox, install it or set {} to its path",
+            "could not find a browser, install Firefox or Chromium, or set {} to one",
             BROWSER_PATH_VARIABLE
         ))
+}
+
+/// Tells the two kinds of browsers apart, they speak different languages.
+#[doc(hidden)]
+pub fn uses_devtools(path: &Path) -> bool {
+    let file_name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+
+    DEVTOOLS_BROWSERS
+        .iter()
+        .any(|browser| file_name.contains(browser))
+}
+
+/// What browsers of the Chromium kind have to be started with.
+#[doc(hidden)]
+pub fn devtools_arguments(
+    profile: &Path,
+    options: &MonolithOptions,
+    is_visible: bool,
+) -> Vec<OsString> {
+    let mut arguments: Vec<OsString> = DEVTOOLS_SWITCHES.iter().map(OsString::from).collect();
+    let mut profile_argument = OsString::from("--user-data-dir=");
+    profile_argument.push(profile);
+    arguments.push(profile_argument);
+    arguments.push("--remote-debugging-port=0".into());
+
+    if !is_visible {
+        arguments.push("--headless=new".into());
+    }
+    if options.insecure {
+        arguments.push("--ignore-certificate-errors".into());
+    }
+    if let Some(user_agent) = &options.browser_user_agent {
+        arguments.push(format!("--user-agent={}", user_agent).into());
+    }
+    // Sandboxes of these browsers refuse to work for the superuser
+    #[cfg(unix)]
+    // SAFETY: it only reads the identifier of the current user
+    if unsafe { libc::geteuid() } == 0 {
+        arguments.push("--no-sandbox".into());
+    }
+    arguments.push("about:blank".into());
+
+    arguments
+}
+
+/// Tells what a request is for, using names from the Fetch standard that BiDi goes by.
+#[doc(hidden)]
+pub fn destination_of(resource_type: &str, is_main_frame: bool) -> &'static str {
+    match resource_type {
+        "Document" if is_main_frame => "document",
+        "Document" => "iframe",
+        "Font" => "font",
+        "Image" => "image",
+        "Media" => "video",
+        "Script" => "script",
+        "Stylesheet" => "style",
+        _ => "",
+    }
 }
 
 #[doc(hidden)]
@@ -497,11 +585,19 @@ pub fn executable_name(name: &str) -> OsString {
 // Browsers don't always make it into PATH on these two
 #[cfg(target_os = "macos")]
 fn find_installed_browser() -> Option<PathBuf> {
-    ["Firefox", "LibreWolf"].iter().find_map(|name| {
+    [
+        ("Firefox", "firefox"),
+        ("LibreWolf", "librewolf"),
+        ("Google Chrome", "Google Chrome"),
+        ("Chromium", "Chromium"),
+        ("Brave Browser", "Brave Browser"),
+        ("Microsoft Edge", "Microsoft Edge"),
+    ]
+    .iter()
+    .find_map(|(application, executable)| {
         let path = PathBuf::from(format!(
             "/Applications/{}.app/Contents/MacOS/{}",
-            name,
-            name.to_lowercase()
+            application, executable
         ));
         path.is_file().then_some(path)
     })
@@ -509,14 +605,21 @@ fn find_installed_browser() -> Option<PathBuf> {
 
 #[cfg(target_os = "windows")]
 fn find_installed_browser() -> Option<PathBuf> {
-    ["ProgramFiles", "ProgramFiles(x86)"]
-        .iter()
-        .find_map(|variable| {
-            let path = PathBuf::from(env::var_os(variable)?)
-                .join("Mozilla Firefox")
-                .join("firefox.exe");
-            path.is_file().then_some(path)
-        })
+    [
+        "Mozilla Firefox\\firefox.exe",
+        "Google\\Chrome\\Application\\chrome.exe",
+        "BraveSoftware\\Brave-Browser\\Application\\brave.exe",
+        "Microsoft\\Edge\\Application\\msedge.exe",
+    ]
+    .iter()
+    .find_map(|executable| {
+        ["ProgramFiles", "ProgramFiles(x86)"]
+            .iter()
+            .find_map(|variable| {
+                let path = PathBuf::from(env::var_os(variable)?).join(executable);
+                path.is_file().then_some(path)
+            })
+    })
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -537,14 +640,30 @@ pub fn is_snap(executable: &Path) -> bool {
         && fs::read(executable).is_ok_and(|script| script.windows(6).any(|part| part == b"/snap/"))
 }
 
+/// Snaps go by the name of what they run, Ubuntu calls its launcher chromium-browser.
+#[doc(hidden)]
+pub fn snap_name(executable: &Path) -> String {
+    executable
+        .file_stem()
+        .map(|name| {
+            name.to_string_lossy()
+                .trim_end_matches("-browser")
+                .to_string()
+        })
+        .unwrap_or_default()
+}
+
 /// Snaps have a /tmp of their own, and can't see the real one.
-fn create_profile_directory(is_snap: bool) -> io::Result<TempDir> {
+fn create_profile_directory(executable: &Path, is_snap: bool) -> io::Result<TempDir> {
     let mut builder = Builder::new();
     builder.prefix("monolith-browser-");
 
     match env::var_os("HOME").filter(|_| is_snap) {
         Some(home) => {
-            let directory = PathBuf::from(home).join("snap/firefox/common");
+            let directory = PathBuf::from(home)
+                .join("snap")
+                .join(snap_name(executable))
+                .join("common");
             fs::create_dir_all(&directory)?;
             builder.tempdir_in(directory)
         }
@@ -555,6 +674,10 @@ fn create_profile_directory(is_snap: bool) -> io::Result<TempDir> {
 #[doc(hidden)]
 /// Looks for the address the browser prints into its error stream upon starting.
 pub fn parse_endpoint(line: &str) -> Option<String> {
+    if let Some((_, endpoint)) = line.split_once("DevTools listening on ") {
+        return endpoint.trim().strip_prefix("ws://").map(str::to_string);
+    }
+
     let (_, endpoint) = line.split_once("WebDriver BiDi listening on ")?;
     let address = endpoint.trim().strip_prefix("ws://")?;
 
@@ -633,16 +756,31 @@ impl<'a> Browser<'a> {
         options: &'a MonolithOptions,
         is_visible: bool,
     ) -> Result<Browser<'a>, String> {
+        let is_devtools = uses_devtools(executable);
         let is_snap = is_snap(executable);
-        let profile = create_profile_directory(is_snap)
-            .map_err(|error| format!("could not create browser profile: {}", error))?;
-        let preferences = profile_preferences(options, choose_color_scheme(options)?);
-        fs::write(profile.path().join("user.js"), preferences)
+        let color_scheme = choose_color_scheme(options)?;
+        let profile = create_profile_directory(executable, is_snap)
             .map_err(|error| format!("could not create browser profile: {}", error))?;
 
         let mut command = Command::new(executable);
-        if !is_visible {
-            command.arg("--headless");
+        if is_devtools {
+            command.args(devtools_arguments(profile.path(), options, is_visible));
+        } else {
+            let preferences = profile_preferences(options, color_scheme);
+            fs::write(profile.path().join("user.js"), preferences)
+                .map_err(|error| format!("could not create browser profile: {}", error))?;
+
+            if !is_visible {
+                command.arg("--headless");
+            }
+            command
+                .args(["--no-remote", "--new-instance", "--profile"])
+                .arg(profile.path())
+                .args(["--remote-debugging-port", "0", "--wait-for-browser"])
+                .arg("about:blank")
+                .env("MOZ_CRASHREPORTER_DISABLE", "1")
+                // Without this one the browser pays no attention to services.settings.server
+                .env("MOZ_REMOTE_SETTINGS_DEVTOOLS", "1");
         }
         // Being moved to another home directory shouldn't cut it off from the display
         if let Some(home) = env::var_os("HOME").filter(|_| env::var_os("XAUTHORITY").is_none()) {
@@ -661,13 +799,6 @@ impl<'a> Browser<'a> {
         #[cfg(unix)]
         command.process_group(0);
         let mut child = command
-            .args(["--no-remote", "--new-instance", "--profile"])
-            .arg(profile.path())
-            .args(["--remote-debugging-port", "0", "--wait-for-browser"])
-            .arg("about:blank")
-            .env("MOZ_CRASHREPORTER_DISABLE", "1")
-            // Without this one the browser pays no attention to services.settings.server
-            .env("MOZ_REMOTE_SETTINGS_DEVTOOLS", "1")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
@@ -720,7 +851,12 @@ impl<'a> Browser<'a> {
                     ),
                 }
             })?;
-        browser.connection = Some(Connection::open(&endpoint, options)?);
+        browser.connection = Some(Connection::open(
+            &endpoint,
+            options,
+            is_devtools,
+            color_scheme,
+        )?);
 
         Ok(browser)
     }
@@ -762,19 +898,32 @@ impl Browser<'_> {
 /// WebDriver BiDi session.
 struct Connection<'a> {
     captured_responses: HashMap<String, CapturedResponse>,
+    color_scheme: Option<ColorScheme>,
+    is_devtools: bool,
+    is_page_loaded: bool,
     last_command_id: u64,
     logged_urls: HashSet<String>,
     options: &'a MonolithOptions,
+    // What DevTools Protocol uses to tell targets apart, none of that applies to BiDi
+    page_session: Option<String>,
+    page_target: String,
     refused_requests: HashSet<String>,
     requests_in_flight: HashSet<String>,
     socket: WebSocket<TcpStream>,
+    worker_urls: Vec<String>,
 }
 
 impl<'a> Connection<'a> {
-    fn open(endpoint: &str, options: &'a MonolithOptions) -> Result<Connection<'a>, String> {
-        let stream = TcpStream::connect(endpoint)
+    fn open(
+        endpoint: &str,
+        options: &'a MonolithOptions,
+        is_devtools: bool,
+        color_scheme: Option<ColorScheme>,
+    ) -> Result<Connection<'a>, String> {
+        let (address, path) = endpoint.split_once('/').unwrap_or((endpoint, "session"));
+        let stream = TcpStream::connect(address)
             .map_err(|error| format!("could not connect to the browser: {}", error))?;
-        let request = format!("ws://{}/session", endpoint)
+        let request = format!("ws://{}/{}", address, path)
             .into_client_request()
             .map_err(|error| format!("could not connect to the browser: {}", error))?;
         // Documents can get bigger than what WebSocket libraries consider reasonable
@@ -786,12 +935,18 @@ impl<'a> Connection<'a> {
 
         Ok(Connection {
             captured_responses: HashMap::new(),
+            color_scheme,
+            is_devtools,
+            is_page_loaded: false,
             last_command_id: 0,
             logged_urls: HashSet::new(),
             options,
+            page_session: None,
+            page_target: String::new(),
             refused_requests: HashSet::new(),
             requests_in_flight: HashSet::new(),
             socket,
+            worker_urls: vec![],
         })
     }
 
@@ -800,6 +955,10 @@ impl<'a> Connection<'a> {
         cookies: Option<&[Cookie]>,
         deadline: Instant,
     ) -> Result<(), String> {
+        if self.is_devtools {
+            return self.start_devtools_session(cookies, deadline);
+        }
+
         self.command(
             "session.new",
             json!({"capabilities": {"alwaysMatch": {"acceptInsecureCerts": self.options.insecure}}}),
@@ -833,11 +992,7 @@ impl<'a> Connection<'a> {
             })?;
         }
         // Has to work, the alternative is contacting what the user has asked not to be contacted
-        if self.options.domains.is_some()
-            || self.options.no_fonts
-            || self.options.no_images
-            || self.options.no_styles
-        {
+        if self.is_filtering_requests() {
             self.command(
                 "network.addIntercept",
                 json!({"phases": ["beforeRequestSent"]}),
@@ -854,8 +1009,98 @@ impl<'a> Connection<'a> {
         Ok(())
     }
 
+    fn is_filtering_requests(&self) -> bool {
+        self.options.domains.is_some()
+            || self.options.no_fonts
+            || self.options.no_images
+            || self.options.no_styles
+    }
+
+    fn start_devtools_session(
+        &mut self,
+        cookies: Option<&[Cookie]>,
+        deadline: Instant,
+    ) -> Result<(), String> {
+        let targets = self.command("Target.getTargets", json!({}), deadline)?;
+        let target = targets["targetInfos"]
+            .as_array()
+            .and_then(|targets| targets.iter().find(|target| target["type"] == "page"))
+            .and_then(|target| target["targetId"].as_str())
+            .ok_or("browser has no window to work with")?
+            .to_string();
+        let attached = self.command(
+            "Target.attachToTarget",
+            json!({"flatten": true, "targetId": target}),
+            deadline,
+        )?;
+        self.page_session = attached["sessionId"].as_str().map(str::to_string);
+        self.page_target = target;
+
+        self.command("Page.enable", json!({}), deadline)?;
+        self.command("Network.enable", network_buffers(), deadline)?;
+        // Has to work, the alternative is contacting what the user has asked not to be contacted
+        if self.is_filtering_requests() {
+            self.command("Fetch.enable", json!({}), deadline)?;
+        }
+        if let Some(color_scheme) = self.color_scheme {
+            let value = match color_scheme {
+                ColorScheme::Dark => "dark",
+                ColorScheme::Light => "light",
+            };
+            self.command(
+                "Emulation.setEmulatedMedia",
+                json!({"features": [{"name": "prefers-color-scheme", "value": value}]}),
+                deadline,
+            )?;
+        }
+        for cookie in cookies
+            .unwrap_or_default()
+            .iter()
+            .filter(|c| !c.is_expired())
+        {
+            self.command("Network.setCookie", devtools_cookie(cookie), deadline)
+                .map_err(|error| {
+                    format!(
+                        "could not set cookie \"{}\": {}",
+                        cookie.name,
+                        String::from(error)
+                    )
+                })?;
+        }
+        // Workers and frames have their own traffic, and have to be stopped until it's being watched
+        self.command(
+            "Target.setAutoAttach",
+            json!({"autoAttach": true, "flatten": true, "waitForDebuggerOnStart": true}),
+            deadline,
+        )?;
+
+        Ok(())
+    }
+
+    fn open_devtools_page(&mut self, url: &str, deadline: Instant) -> Result<String, String> {
+        let result = self.command("Page.navigate", json!({"url": url}), deadline)?;
+        if let Some(reason) = result["errorText"].as_str() {
+            return Err(format!("could not open page: {}", reason));
+        }
+
+        // Something on the page never finishing is no reason not to save the rest of it
+        while !self.is_page_loaded {
+            match self.read(deadline) {
+                Ok(Some(message)) => self.observe(&message),
+                Ok(None) => break,
+                Err(_) => return Err(CommandError::Disconnected.into()),
+            }
+        }
+
+        Ok(self.page_target.clone())
+    }
+
     /// Returns the browsing context the page ended up in.
     fn open_page(&mut self, url: &str, deadline: Instant) -> Result<String, String> {
+        if self.is_devtools {
+            return self.open_devtools_page(url, deadline);
+        }
+
         let tree = self.command("browsingContext.getTree", json!({}), deadline)?;
         let context = tree["contexts"][0]["context"]
             .as_str()
@@ -883,17 +1128,44 @@ impl<'a> Connection<'a> {
     }
 
     fn check_for_challenge(&mut self, context: &str) -> Result<bool, CommandError> {
+        let deadline = Instant::now() + NETWORK_QUIET_TIMEOUT;
+
+        Ok(self.evaluate(CHALLENGE_SCRIPT, context, deadline)? == true)
+    }
+
+    /// Runs given script inside of the page, and provides what comes out of it.
+    fn evaluate(
+        &mut self,
+        script: &str,
+        context: &str,
+        deadline: Instant,
+    ) -> Result<Value, CommandError> {
+        if self.is_devtools {
+            let result = self.command(
+                "Runtime.evaluate",
+                json!({"expression": script, "returnByValue": true}),
+                deadline,
+            )?;
+            return match result.get("exceptionDetails") {
+                Some(_) => Err(CommandError::Failed("script has failed".to_string())),
+                None => Ok(result["result"]["value"].clone()),
+            };
+        }
+
         let result = self.command(
             "script.evaluate",
             json!({
                 "awaitPromise": false,
-                "expression": CHALLENGE_SCRIPT,
+                "expression": script,
                 "target": {"context": context},
             }),
-            Instant::now() + NETWORK_QUIET_TIMEOUT,
+            deadline,
         )?;
 
-        Ok(result["result"]["value"] == true)
+        match result["type"] == "success" {
+            true => Ok(result["result"]["value"].clone()),
+            false => Err(CommandError::Failed("script has failed".to_string())),
+        }
     }
 
     /// Tells whether the page got past the challenge in time.
@@ -942,28 +1214,18 @@ impl<'a> Connection<'a> {
         }
     }
 
-    fn take_snapshot(&mut self, context: &str, deadline: Instant) -> Result<RenderedPage, String> {
+    fn take_snapshot(&mut self, context: &str, deadline: Instant) -> Result<CapturedPage, String> {
         // A page that's taking long to load is better saved than not
         let deadline = deadline.max(Instant::now() + NETWORK_QUIET_TIMEOUT);
-        let result = self.command(
-            "script.evaluate",
-            json!({
-                "awaitPromise": false,
-                "expression": SNAPSHOT_SCRIPT,
-                "target": {"context": context},
-            }),
-            deadline,
-        )?;
-        if result["type"] != "success" {
-            return Err("could not read the rendered page".to_string());
-        }
-
-        let snapshot = result["result"]["value"]
+        let snapshot = self
+            .evaluate(SNAPSHOT_SCRIPT, context, deadline)
+            .map_err(|_| "could not read the rendered page".to_string())?;
+        let snapshot = snapshot
             .as_str()
             .and_then(|value| serde_json::from_str::<Value>(value).ok())
             .ok_or("could not read the rendered page")?;
 
-        Ok(RenderedPage {
+        Ok(CapturedPage {
             assets: vec![],
             content_type: snapshot["contentType"].as_str().unwrap_or("").to_string(),
             html: snapshot["html"].as_str().unwrap_or("").to_string(),
@@ -972,9 +1234,35 @@ impl<'a> Connection<'a> {
         })
     }
 
+    fn response_body(&mut self, request: &str) -> Option<Vec<u8>> {
+        let deadline = Instant::now() + NETWORK_QUIET_TIMEOUT;
+
+        if self.is_devtools {
+            let (session, request) = request.split_once('|')?;
+            let result = self
+                .command_in(
+                    Some(session),
+                    "Network.getResponseBody",
+                    json!({"requestId": request}),
+                    deadline,
+                )
+                .ok()?;
+            let body = result["body"].as_str()?;
+
+            return match result["base64Encoded"] == true {
+                true => BASE64_STANDARD.decode(body).ok(),
+                false => Some(body.as_bytes().to_vec()),
+            };
+        }
+
+        let params = json!({"dataType": "response", "request": request});
+        let result = self.command("network.getData", params, deadline).ok()?;
+
+        decode_bytes(&result["bytes"])
+    }
+
     /// Reports what the browser has received, the same way Monolith does for what it retrieves.
-    fn log_response(&mut self, request: &str, details: &Value) {
-        let status = details["status"].as_u64().unwrap_or(0);
+    fn log_response(&mut self, request: &str, status: u64, status_text: &str) {
         // Whatever is at the end of a redirect gets reported for all of it
         if (300..400).contains(&status) && status != 304 {
             return;
@@ -996,7 +1284,6 @@ impl<'a> Connection<'a> {
                 false => self.log_info(last_url, format!("{} -> {}", first_url, last_url)),
             }
         } else {
-            let status_text = details["statusText"].as_str().unwrap_or("");
             self.log_error(last_url, format!("{} {}", status, status_text).trim());
         }
     }
@@ -1035,12 +1322,8 @@ impl<'a> Connection<'a> {
                 continue;
             }
 
-            let deadline = Instant::now() + NETWORK_QUIET_TIMEOUT;
-            let params = json!({"dataType": "response", "request": request});
             // Whatever is gone from the browser's memory by now gets retrieved by Monolith instead
-            if let Ok(result) = self.command("network.getData", params, deadline)
-                && let Some(data) = decode_bytes(&result["bytes"])
-            {
+            if let Some(data) = self.response_body(&request) {
                 let is_reusable = response.is_usable();
                 assets.push(CapturedAsset {
                     content_type: response.content_type,
@@ -1054,12 +1337,48 @@ impl<'a> Connection<'a> {
             }
         }
 
+        // Scripts that workers start with never show up among the page's requests
+        for url in std::mem::take(&mut self.worker_urls) {
+            let is_missing = !assets.iter().any(|asset| asset.urls.contains(&url));
+            if is_missing && let Some(data) = self.retrieve_from_page(&url) {
+                assets.push(CapturedAsset {
+                    content_type: "text/javascript".to_string(),
+                    data,
+                    destination: "worker".to_string(),
+                    is_reusable: true,
+                    method: "GET".to_string(),
+                    status: 200,
+                    urls: vec![url],
+                });
+            }
+        }
+
         assets
+    }
+
+    fn retrieve_from_page(&mut self, url: &str) -> Option<Vec<u8>> {
+        let expression = format!("fetch({}).then((response) => response.text())", json!(url));
+        let deadline = Instant::now() + NETWORK_QUIET_TIMEOUT;
+        let result = self
+            .command(
+                "Runtime.evaluate",
+                json!({"awaitPromise": true, "expression": expression, "returnByValue": true}),
+                deadline,
+            )
+            .ok()?;
+
+        result["result"]["value"]
+            .as_str()
+            .map(|text| text.as_bytes().to_vec())
     }
 
     fn close(&mut self) {
         let deadline = Instant::now() + BROWSER_SHUTDOWN_TIMEOUT;
-        let _ = self.command("browser.close", json!({}), deadline);
+        let method = match self.is_devtools {
+            true => "Browser.close",
+            false => "browser.close",
+        };
+        let _ = self.command_in(None, method, json!({}), deadline);
     }
 
     fn command(
@@ -1068,8 +1387,20 @@ impl<'a> Connection<'a> {
         params: Value,
         deadline: Instant,
     ) -> Result<Value, CommandError> {
+        let session = self.page_session.clone();
+
+        self.command_in(session.as_deref(), method, params, deadline)
+    }
+
+    fn command_in(
+        &mut self,
+        session: Option<&str>,
+        method: &str,
+        params: Value,
+        deadline: Instant,
+    ) -> Result<Value, CommandError> {
         let id = self
-            .send(method, params)
+            .send_to(session, method, params)
             .map_err(|_| CommandError::Disconnected)?;
 
         loop {
@@ -1081,6 +1412,16 @@ impl<'a> Connection<'a> {
 
             if message["id"].as_u64() != Some(id) {
                 self.observe(&message);
+            } else if self.is_devtools {
+                return match message.get("error") {
+                    Some(error) => Err(CommandError::Failed(
+                        error["message"]
+                            .as_str()
+                            .unwrap_or("unknown error")
+                            .to_string(),
+                    )),
+                    None => Ok(message["result"].clone()),
+                };
             } else if message["type"] == "success" {
                 return Ok(message["result"].clone());
             } else {
@@ -1096,11 +1437,23 @@ impl<'a> Connection<'a> {
     }
 
     fn send(&mut self, method: &str, params: Value) -> Result<u64, String> {
+        self.send_to(None, method, params)
+    }
+
+    fn send_to(
+        &mut self,
+        session: Option<&str>,
+        method: &str,
+        params: Value,
+    ) -> Result<u64, String> {
         self.last_command_id += 1;
         let id = self.last_command_id;
-        let command = json!({"id": id, "method": method, "params": params}).to_string();
+        let mut command = json!({"id": id, "method": method, "params": params});
+        if let Some(session) = session {
+            command["sessionId"] = json!(session);
+        }
         self.socket
-            .send(Message::text(command))
+            .send(Message::text(command.to_string()))
             .map_err(|error| error.to_string())?;
 
         Ok(id)
@@ -1132,6 +1485,11 @@ impl<'a> Connection<'a> {
     }
 
     fn observe(&mut self, message: &Value) {
+        if self.is_devtools {
+            self.observe_devtools(message);
+            return;
+        }
+
         let Some(request) = message["params"]["request"]["request"].as_str() else {
             return;
         };
@@ -1186,7 +1544,11 @@ impl<'a> Connection<'a> {
                     response.status = details["status"].as_u64().unwrap_or(0);
                     response.content_type = details["mimeType"].as_str().unwrap_or("").to_string();
                 }
-                self.log_response(request, details);
+                self.log_response(
+                    request,
+                    details["status"].as_u64().unwrap_or(0),
+                    details["statusText"].as_str().unwrap_or(""),
+                );
             }
             Some("network.fetchError") => {
                 self.requests_in_flight.remove(request);
@@ -1203,6 +1565,136 @@ impl<'a> Connection<'a> {
             _ => {}
         }
     }
+}
+
+impl Connection<'_> {
+    fn observe_devtools(&mut self, message: &Value) {
+        let params = &message["params"];
+        let session = message["sessionId"].as_str().unwrap_or("");
+        // Identifiers of requests are only unique within their sessions
+        let key = format!("{}|{}", session, params["requestId"].as_str().unwrap_or(""));
+
+        match message["method"].as_str() {
+            Some("Page.loadEventFired") if self.page_session.as_deref() == Some(session) => {
+                self.is_page_loaded = true;
+            }
+            Some("Target.attachedToTarget") => {
+                if params["targetInfo"]["type"] == "worker"
+                    && let Some(url) = params["targetInfo"]["url"].as_str()
+                {
+                    self.worker_urls.push(url.to_string());
+                }
+
+                let session = params["sessionId"].as_str().unwrap_or("").to_string();
+                let session = Some(session.as_str());
+                let _ = self.send_to(session, "Network.enable", network_buffers());
+                if self.is_filtering_requests() {
+                    let _ = self.send_to(session, "Fetch.enable", json!({}));
+                }
+                let _ = self.send_to(
+                    session,
+                    "Target.setAutoAttach",
+                    json!({"autoAttach": true, "flatten": true, "waitForDebuggerOnStart": true}),
+                );
+                let _ = self.send_to(session, "Runtime.runIfWaitingForDebugger", json!({}));
+            }
+            // The browser sits on these until told what to do with them
+            Some("Fetch.requestPaused") => {
+                let url = params["request"]["url"].as_str().unwrap_or("");
+                let destination = destination_of(
+                    params["resourceType"].as_str().unwrap_or(""),
+                    params["frameId"] == self.page_target.as_str(),
+                );
+                let is_allowed = is_request_allowed(url, destination, self.options);
+                let paused_request = json!({"requestId": params["requestId"]});
+
+                if is_allowed {
+                    let _ = self.send_to(Some(session), "Fetch.continueRequest", paused_request);
+                } else {
+                    let mut failure = paused_request;
+                    failure["errorReason"] = json!("BlockedByClient");
+                    let _ = self.send_to(Some(session), "Fetch.failRequest", failure);
+
+                    let network_id = params["networkId"].as_str().unwrap_or("");
+                    self.refused_requests
+                        .insert(format!("{}|{}", session, network_id));
+                    if Url::parse(url).is_ok_and(|url| !is_domain_allowed(&url, self.options)) {
+                        self.log_error(url, "domain not allowed");
+                    }
+                }
+            }
+            Some("Network.requestWillBeSent") => {
+                self.requests_in_flight.insert(key.clone());
+
+                // Redirects keep the request's identifier, which is how they end up being one asset
+                let details = &params["request"];
+                let url = details["url"].as_str().unwrap_or("");
+                let destination = destination_of(
+                    params["type"].as_str().unwrap_or(""),
+                    params["frameId"] == self.page_target.as_str(),
+                );
+                let sequence = self.captured_responses.len();
+                let response = self.captured_responses.entry(key).or_default();
+                response.destination = destination.to_string();
+                response.method = details["method"].as_str().unwrap_or("GET").to_string();
+                response.sequence = sequence;
+                if !response.urls.iter().any(|existing| existing == url) {
+                    response.urls.push(url.to_string());
+                }
+            }
+            Some("Network.responseReceived") => {
+                let details = &params["response"];
+                let status = details["status"].as_u64().unwrap_or(0);
+                if let Some(response) = self.captured_responses.get_mut(&key) {
+                    response.status = status;
+                    response.content_type = details["mimeType"].as_str().unwrap_or("").to_string();
+                }
+                self.log_response(&key, status, details["statusText"].as_str().unwrap_or(""));
+            }
+            Some("Network.loadingFinished") => {
+                self.requests_in_flight.remove(&key);
+            }
+            Some("Network.loadingFailed") => {
+                self.requests_in_flight.remove(&key);
+                let response = self.captured_responses.remove(&key);
+
+                // Requests that were refused have already been accounted for
+                if !self.refused_requests.remove(&key)
+                    && params["canceled"] != true
+                    && let Some(url) = response.as_ref().and_then(|r| r.urls.last())
+                {
+                    self.log_error(url, "request failed");
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+// Browsers forget what they've received pretty quickly otherwise
+fn network_buffers() -> Value {
+    json!({
+        "maxResourceBufferSize": MAX_CAPTURED_RESPONSE_SIZE,
+        "maxTotalBufferSize": MAX_CAPTURED_RESPONSE_SIZE,
+    })
+}
+
+/// Describes a cookie the way DevTools Protocol expects to receive it.
+#[doc(hidden)]
+pub fn devtools_cookie(cookie: &Cookie) -> Value {
+    let description = cookie_to_json(cookie);
+    let mut result = json!({
+        "domain": description["domain"],
+        "name": description["name"],
+        "path": description["path"],
+        "secure": description["secure"],
+        "value": cookie.value,
+    });
+    if cookie.expires > 0 {
+        result["expires"] = json!(cookie.expires);
+    }
+
+    result
 }
 
 #[doc(hidden)]

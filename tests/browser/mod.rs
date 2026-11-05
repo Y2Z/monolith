@@ -1,6 +1,8 @@
 mod captured_response;
 mod cookie_to_json;
 mod decode_bytes;
+mod destination_of;
+mod devtools_arguments;
 mod find_browser_in;
 mod is_request_allowed;
 mod is_snap;
@@ -12,3 +14,5 @@ mod parse_macos_color_scheme;
 mod parse_portal_color_scheme;
 mod parse_windows_color_scheme;
 mod profile_preferences;
+mod snap_name;
+mod uses_devtools;
