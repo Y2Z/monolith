@@ -23,6 +23,7 @@ mod passing {
         assert!(!options.insecure);
         assert!(!options.no_metadata);
         assert_eq!(options.output_format, MonolithOutputFormat::HTML);
+        assert!(!options.reader_mode);
         assert!(options.remove_elements.is_empty());
         assert!(options.wipe_elements.is_empty());
         assert!(!options.silent);

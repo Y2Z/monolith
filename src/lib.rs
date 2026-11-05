@@ -6,5 +6,6 @@ pub mod html;
 pub mod js;
 pub mod mhtml;
 pub mod net;
+pub mod reader_mode;
 pub mod session;
 pub mod url;

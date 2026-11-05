@@ -16,6 +16,7 @@ use crate::html::{
     strip_elements, targets_element_anywhere, walk,
 };
 use crate::mhtml::{create_mhtml_document, is_mhtml, parse_mhtml};
+use crate::reader_mode::simplify_document;
 use crate::session::Session;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
 
@@ -69,6 +70,7 @@ pub struct MonolithOptions {
     pub no_js: bool,
     pub no_metadata: bool,
     pub output_format: MonolithOutputFormat,
+    pub reader_mode: bool,
     pub remove_elements: Vec<String>,
     pub silent: bool,
     pub threads: usize,
@@ -98,6 +100,11 @@ pub fn create_monolithic_document_from_data(
     input_encoding: Option<String>,
     input_target: Option<String>,
 ) -> Result<(Vec<u8>, Option<String>), MonolithError> {
+    // Simplified documents have no use for JavaScript
+    if session.options.reader_mode {
+        session.options.no_js = true;
+    }
+
     // Validate options
     {
         // Check if custom encoding value is acceptable
@@ -233,6 +240,11 @@ pub fn create_monolithic_document_from_data(
     }
 
     let had_favicon: bool = has_favicon(&dom.document);
+    if session.options.reader_mode {
+        if !simplify_document(&dom, !session.options.no_styles) && !session.options.silent {
+            print_error_message("reader mode found no article, the page may rely on JavaScript");
+        }
+    }
     strip_elements(
         &dom.document,
         &session.options.remove_elements,

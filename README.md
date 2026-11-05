@@ -221,6 +221,7 @@ monolith page-saved-by-browser.mhtml -o page.html
  - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-q`: Be quiet
  - `-r`: Remove elements matching `selector` from the document (can be used multiple times)
+ - `-R`: Save a simplified version of the page, like the reader mode of a web browser: just the article, without any JavaScript, and with styling that follows the system's color scheme (add `-s` to leave it without any styles)
  - `-s`: Exclude styles
  - `-t`: Adjust `network request timeout`
  - `-u`: Use `custom User-Agent`
