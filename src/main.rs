@@ -101,6 +101,10 @@ struct Cli {
     #[arg(short, long)]
     quiet: bool,
 
+    /// Save a simplified version of the page, just the article and nothing around it
+    #[arg(short = 'R', long)]
+    reader_mode: bool,
+
     /// Remove elements from the document, e.g. "audio,video" or "main div iframe"
     #[arg(short = 'r', long = "remove", value_name = "selector")]
     remove_elements: Vec<String>,
@@ -216,6 +220,7 @@ fn main() {
             options.output_format = MonolithOutputFormat::MHTML;
         }
         options.no_metadata = cli.no_metadata;
+        options.reader_mode = cli.reader_mode;
         options.remove_elements = cli.remove_elements;
         options.wipe_elements = cli.wipe_elements;
         options.silent = cli.quiet;

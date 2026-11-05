@@ -7,8 +7,9 @@ use html5ever::tendril::{StrTendril, TendrilSink, format_tendril};
 use html5ever::tree_builder::{TreeSink, create_element};
 use html5ever::{LocalName, ns};
 use html5ever::{parse_document, parse_fragment};
-use markup5ever_rcdom::{Handle, NodeData, RcDom, SerializableHandle};
+use markup5ever_rcdom::{Handle, Node, NodeData, RcDom, SerializableHandle};
 use sha2::{Digest, Sha256, Sha384, Sha512};
+use std::cell::RefCell;
 use std::default::Default;
 use std::rc::Rc;
 
@@ -246,6 +247,20 @@ pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> 
     }
 
     result
+}
+
+pub fn create_html_element(dom: &RcDom, name: &str) -> Handle {
+    create_element(
+        dom,
+        QualName::new(None, ns!(html), LocalName::from(name)),
+        vec![],
+    )
+}
+
+pub fn create_text_node(text: &str) -> Handle {
+    Node::new(NodeData::Text {
+        contents: RefCell::new(StrTendril::from(text)),
+    })
 }
 
 pub fn find_nodes(node: &Handle, mut path: Vec<&str>) -> Vec<Handle> {
@@ -616,6 +631,15 @@ pub fn set_charset(dom: RcDom, charset: String) -> RcDom {
     drop(children);
 
     dom
+}
+
+/// Gets rid of all attributes except for the given ones
+pub fn retain_node_attrs(node: &Handle, attr_names: &[&str]) {
+    if let NodeData::Element { attrs, .. } = &node.data {
+        attrs
+            .borrow_mut()
+            .retain(|attr| attr_names.contains(&attr.name.local.as_ref()));
+    }
 }
 
 pub fn set_node_attr(node: &Handle, attr_name: &str, attr_value: Option<String>) {
