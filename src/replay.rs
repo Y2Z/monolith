@@ -36,7 +36,7 @@ pub struct CapturedPage {
     pub url: String,
 }
 
-const EMULATOR: &str = include_str!("replay.js");
+const EMULATOR: &str = include_str!("../assets/scripts/replay.js");
 const LOCATION_REPLACEMENT: &str = "__monolithLocation";
 
 fn escape_attribute(value: &str) -> String {

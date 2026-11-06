@@ -37,7 +37,7 @@ lint-check:
 .PHONY: lint_check
 
 test: build
-	@cargo test --locked
+	@cargo test --locked --no-fail-fast
 .PHONY: test
 
 uninstall:

@@ -369,12 +369,12 @@
     };
 
     const startWorker = async (event, installLocation, installNetwork, installClock, installImports) => {
-        const { capturedAt, entryUrl, isModule, modules, pageUrl, responses } = event.data;
+        const { capturedAt, entryUrl, isModule, modules, responses } = event.data;
         const heldMessages = [];
         const hold = (message) => heldMessages.push(message);
         self.addEventListener("message", hold);
-        installLocation(pageUrl);
-        installNetwork(responses, pageUrl);
+        installLocation(entryUrl);
+        installNetwork(responses, entryUrl);
         installClock(capturedAt);
 
         const toUrl = (code) => URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
@@ -418,7 +418,6 @@
                     entryUrl: found.url,
                     isModule: Boolean(options && options.type === "module"),
                     modules: collectModules(found.url),
-                    pageUrl: PAGE_URL,
                     responses: responses.filter((response) => !isScript(response)),
                 });
             }

@@ -66,8 +66,10 @@ const BROWSER_NAMES: [&str; 15] = [
 // Anything that has these in its name speaks DevTools Protocol, instead of WebDriver BiDi
 const DEVTOOLS_BROWSERS: [&str; 6] = ["brave", "chrome", "chromium", "edge", "opera", "vivaldi"];
 // Keeps the browser from contacting anything other than what the page asks for
-const DEVTOOLS_SWITCHES: [&str; 27] = [
+const DEVTOOLS_SWITCHES: [&str; 31] = [
     "--disable-background-networking",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
     "--disable-breakpad",
     "--disable-client-side-phishing-detection",
     "--disable-component-extensions-with-background-pages",
@@ -76,6 +78,7 @@ const DEVTOOLS_SWITCHES: [&str; 27] = [
     "--disable-domain-reliability",
     "--disable-extensions",
     "--disable-features=MediaRouter,NetworkTimeServiceQuerying,OptimizationHints,PreconnectToSearch,Translate",
+    "--disable-renderer-backgrounding",
     "--disable-search-engine-choice-screen",
     "--disable-sync",
     "--metrics-recording-only",
@@ -84,6 +87,9 @@ const DEVTOOLS_SWITCHES: [&str; 27] = [
     "--no-pings",
     "--no-service-autorun",
     "--password-store=basic",
+    // The keychain of macOS is what cookies get encrypted with, and it makes browsers wait for
+    // someone to answer its prompt, forever
+    "--use-mock-keychain",
     // These browsers keep talking to their makers regardless of being told not to, so what they
     // talk to gets replaced with a port that nothing ever answers on
     "--apps-gallery-update-url=http://127.0.0.1:9",
@@ -97,10 +103,13 @@ const DEVTOOLS_SWITCHES: [&str; 27] = [
     "--lso-url=http://127.0.0.1:9",
     "--sync-url=http://127.0.0.1:9",
 ];
+// Otherwise these browsers go and download dictionaries
+const DEVTOOLS_PREFERENCES: &str = r#"{"browser":{"enable_spellchecking":false},"spellcheck":{"dictionaries":[],"dictionary":""}}"#;
 // There's no way of telling these to listen for commands
 const UNSUPPORTED_BROWSERS: [&str; 1] = ["safari"];
 const MAX_LAUNCHER_SCRIPT_SIZE: u64 = 64 * 1024;
-const BROWSER_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
+// Takes a while on busy machines, when nothing of the browser is in memory yet
+const BROWSER_STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
 const BROWSER_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 // How long the network has to stay silent for the page to be considered done
 const NETWORK_QUIET_PERIOD: Duration = Duration::from_millis(1000);
@@ -131,7 +140,18 @@ user_pref("browser.shell.checkDefaultBrowser", false);
 user_pref("browser.startup.page", 0);
 user_pref("datareporting.healthreport.uploadEnabled", false);
 user_pref("datareporting.policy.dataSubmissionEnabled", false);
+user_pref("extensions.addonAbuseReport.url", "http://127.0.0.1:9/");
+user_pref("extensions.getAddons.browserMappings.url", "http://127.0.0.1:9/");
+user_pref("extensions.getAddons.cache.enabled", false);
+user_pref("extensions.getAddons.discovery.api_url", "http://127.0.0.1:9/");
+user_pref("extensions.getAddons.get.url", "http://127.0.0.1:9/");
+user_pref("extensions.getAddons.langpacks.url", "http://127.0.0.1:9/");
+user_pref("extensions.systemAddon.update.enabled", false);
+user_pref("extensions.systemAddon.update.url", "http://127.0.0.1:9/");
+user_pref("extensions.update.autoUpdateDefault", false);
+user_pref("extensions.update.background.url", "http://127.0.0.1:9/");
 user_pref("extensions.update.enabled", false);
+user_pref("extensions.update.url", "http://127.0.0.1:9/");
 user_pref("network.captive-portal-service.enabled", false);
 user_pref("network.connectivity-service.enabled", false);
 user_pref("network.dns.disablePrefetch", true);
@@ -583,7 +603,7 @@ fn find_browser() -> Result<PathBuf, String> {
         .unwrap_or_default();
 
     find_browser_in(&directories)
-        .or_else(find_installed_browser)
+        .or_else(|| find_installed_browsers().into_iter().next())
         .ok_or(format!(
             "could not find a browser, install Firefox or Chromium, or set {} to one",
             BROWSER_PATH_VARIABLE
@@ -682,7 +702,8 @@ pub fn executable_name(name: &str) -> OsString {
 
 // Browsers don't always make it into PATH on these two
 #[cfg(target_os = "macos")]
-fn find_installed_browser() -> Option<PathBuf> {
+#[doc(hidden)]
+pub fn find_installed_browsers() -> Vec<PathBuf> {
     [
         ("Firefox", "firefox"),
         ("LibreWolf", "librewolf"),
@@ -692,17 +713,19 @@ fn find_installed_browser() -> Option<PathBuf> {
         ("Microsoft Edge", "Microsoft Edge"),
     ]
     .iter()
-    .find_map(|(application, executable)| {
-        let path = PathBuf::from(format!(
+    .map(|(application, executable)| {
+        PathBuf::from(format!(
             "/Applications/{}.app/Contents/MacOS/{}",
             application, executable
-        ));
-        path.is_file().then_some(path)
+        ))
     })
+    .filter(|path| path.is_file())
+    .collect()
 }
 
 #[cfg(target_os = "windows")]
-fn find_installed_browser() -> Option<PathBuf> {
+#[doc(hidden)]
+pub fn find_installed_browsers() -> Vec<PathBuf> {
     [
         "Mozilla Firefox\\firefox.exe",
         "Google\\Chrome\\Application\\chrome.exe",
@@ -710,19 +733,21 @@ fn find_installed_browser() -> Option<PathBuf> {
         "Microsoft\\Edge\\Application\\msedge.exe",
     ]
     .iter()
-    .find_map(|executable| {
+    .flat_map(|executable| {
         ["ProgramFiles", "ProgramFiles(x86)"]
-            .iter()
-            .find_map(|variable| {
-                let path = PathBuf::from(env::var_os(variable)?).join(executable);
-                path.is_file().then_some(path)
+            .into_iter()
+            .filter_map(move |variable| {
+                Some(PathBuf::from(env::var_os(variable)?).join(executable))
             })
     })
+    .filter(|path| path.is_file())
+    .collect()
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn find_installed_browser() -> Option<PathBuf> {
-    None
+#[doc(hidden)]
+pub fn find_installed_browsers() -> Vec<PathBuf> {
+    vec![]
 }
 
 #[doc(hidden)]
@@ -863,6 +888,12 @@ impl<'a> Browser<'a> {
 
         let mut command = Command::new(executable);
         if is_devtools {
+            // Not something that switches are there for
+            let directory = profile.path().join("Default");
+            fs::create_dir(&directory)
+                .and_then(|_| fs::write(directory.join("Preferences"), DEVTOOLS_PREFERENCES))
+                .map_err(|error| format!("could not create browser profile: {}", error))?;
+
             command.args(devtools_arguments(profile.path(), options, is_visible));
         } else {
             let preferences = profile_preferences(options, color_scheme);
@@ -897,6 +928,8 @@ impl<'a> Browser<'a> {
                 .env_remove("XDG_DATA_HOME")
                 .env_remove("XDG_STATE_HOME");
         }
+        // Whatever browsers create for themselves has to go away along with the profile
+        command.env("TMPDIR", profile.path());
         // Keeps helper processes together, and away from what's typed into the terminal
         #[cfg(unix)]
         command.process_group(0);
@@ -1127,13 +1160,22 @@ impl<'a> Connection<'a> {
         cookies: Option<&[Cookie]>,
         deadline: Instant,
     ) -> Result<(), String> {
-        let targets = self.command("Target.getTargets", json!({}), deadline)?;
-        let target = targets["targetInfos"]
-            .as_array()
-            .and_then(|targets| targets.iter().find(|target| target["type"] == "page"))
-            .and_then(|target| target["targetId"].as_str())
-            .ok_or("browser has no window to work with")?
-            .to_string();
+        // Browsers can be ready to talk before they've got anything to show
+        let target = loop {
+            let targets = self.command("Target.getTargets", json!({}), deadline)?;
+            let page = targets["targetInfos"]
+                .as_array()
+                .and_then(|targets| targets.iter().find(|target| target["type"] == "page"))
+                .and_then(|target| target["targetId"].as_str());
+
+            match page {
+                Some(target) => break target.to_string(),
+                None if Instant::now() >= deadline => {
+                    return Err("browser has no window to work with".to_string());
+                }
+                None => thread::sleep(NETWORK_POLL_INTERVAL),
+            }
+        };
         let attached = self.command(
             "Target.attachToTarget",
             json!({"flatten": true, "targetId": target}),
@@ -1240,7 +1282,7 @@ impl<'a> Connection<'a> {
         ) {
             Ok(_) => Ok(context),
             // Something on the page never finished, what did finish can still be saved
-            Err(CommandError::TimedOut) => Ok(context),
+            Err(CommandError::TimedOut(_)) => Ok(context),
             Err(CommandError::Disconnected) => Err(CommandError::Disconnected.into()),
             Err(CommandError::Failed(reason)) => Err(format!(
                 "could not open page: {}",
@@ -1570,7 +1612,7 @@ impl<'a> Connection<'a> {
         loop {
             let message = match self.read(deadline) {
                 Ok(Some(message)) => message,
-                Ok(None) => return Err(CommandError::TimedOut),
+                Ok(None) => return Err(CommandError::TimedOut(method.to_string())),
                 Err(_) => return Err(CommandError::Disconnected),
             };
 
@@ -1899,7 +1941,7 @@ pub fn decode_bytes(bytes: &Value) -> Option<Vec<u8>> {
 enum CommandError {
     Disconnected,
     Failed(String),
-    TimedOut,
+    TimedOut(String),
 }
 
 impl From<CommandError> for String {
@@ -1907,7 +1949,9 @@ impl From<CommandError> for String {
         match error {
             CommandError::Disconnected => "lost connection to the browser".to_string(),
             CommandError::Failed(reason) => reason,
-            CommandError::TimedOut => "timed out waiting for the browser".to_string(),
+            CommandError::TimedOut(method) => {
+                format!("timed out waiting for the browser to do {}", method)
+            }
         }
     }
 }

@@ -328,6 +328,11 @@ Please open an issue if something is wrong, that helps make this project better.
 ---------------------------------------------------
 
 
+## Testing
+
+`cargo test` runs unit tests first, then real browsers: one of each kind found, or whatever's listed in `MONOLITH_TEST_BROWSERS`. Tests that need them have nothing to do if there are none, set `MONOLITH_TEST_REQUIRE_BROWSERS` to make that a failure.
+
+
 ## License
 
 To the extent possible under law, the author(s) have dedicated all copyright related and neighboring rights to this software to the public domain worldwide.

@@ -17,7 +17,6 @@ readme = "README.md"
 keywords = ["web", "http", "html", "download", "command-line"]
 categories = ["command-line-utilities", "web-programming"]
 include = [
-    "src/*.js",
     "src/*.rs",
     "Cargo.toml",
     "build.rs",
@@ -25,6 +24,7 @@ include = [
     "assets/icon/icon.ico",
     "assets/fonts/Jost-300-Light.ttf",
     "assets/fonts/Jost-OFL.txt",
+    "assets/scripts/replay.js",
 ]
 license = "CC0-1.0"
 
@@ -96,15 +96,18 @@ vendored-openssl = [] # Deprecated, being kept as a remnant (probably until 2.15
 [lib]
 name = "monolith"
 path = "src/lib.rs"
+test = false
 
 [[bin]]
 name = "monolith"
 path = "src/main.rs"
+test = false
 required-features = ["cli"]
 
 [[bin]]
 name = "monolith-gui"
 path = "src/gui.rs"
+test = false
 required-features = ["gui"]
 
 [profile.release]
