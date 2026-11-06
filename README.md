@@ -261,11 +261,15 @@ The browser runs without a window, from a clean temporary profile which gets del
 
 The browser follows your system's light or dark mode, so pages that adapt to it get saved the way you'd see them. Set `MONOLITH_BROWSER_COLOR_SCHEME` to `dark`, `light`, or `auto` to choose for yourself.
 
+The browser pretends to have a 1920x1080 viewport, set `MONOLITH_BROWSER_VIEWPORT` to change that, e.g. to `1280x720`. Pages only load what they think can be seen, and those that adapt to the size of the window get saved the way they look at that size.
+
+Pages get scrolled through before being saved, since a lot of them only load things as they come into view. Set `MONOLITH_BROWSER_SCROLL_LIMIT` to the number of screens to go through (30 by default, `0` turns it off), pages that never end stop there.
+
 If Monolith gets interrupted, it takes the browser and its temporary files down with it.
 
 Should the page turn out to be a challenge which doesn't solve itself, such as the ones used to tell people from bots, the browser reopens in a window and waits for you to solve it.
 
-The saved page keeps its JavaScript, along with the responses it has received, which get replayed to it without any network access: buttons, menus, and other things that only rely on the page's own code keep working, but anything that needs a server doesn't. A saved page only contains what it has loaded while being saved, so parts of web apps that were never opened won't be there. Scripts of the saved page get modified to make that work: they're told the page's original URL, and imports get pointed at what's stored inside of the document. They never reach out to the server, and `-b` doesn't apply to them. Add `-j` to save a frozen copy of what the browser had on screen instead; that's also what MHTML output and `-R` always do.
+The saved page keeps its JavaScript, along with the responses it has received, which get replayed to it without any network access: buttons, menus, and other things that only rely on the page's own code keep working, but anything that needs a server doesn't. A saved page only contains what it has loaded while being saved, so parts of web apps that were never opened won't be there. Scripts of the saved page get modified to make that work: they're told the page's original URL, and imports get pointed at what's stored inside of the document. Frames that get added by scripts show what they had without running anything, frames from other websites stay empty. They can't reach out to anything, their content security policy doesn't allow it, and `-b` doesn't apply to them. Add `-j` to save a frozen copy of what the browser had on screen instead; that's also what MHTML output and `-R` always do.
 
 The same is available to the GUI (“Render in browser”) and to programs using Monolith as a library, by setting `browser` in `MonolithOptions`. Apps that have a web view of their own, such as mobile ones, can use `create_monolithic_document_from_capture()` to save what it has loaded.
 

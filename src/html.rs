@@ -139,12 +139,12 @@ pub fn targets_element_anywhere(options: &MonolithOptions, names: &[&str]) -> bo
 pub fn compose_csp(options: &MonolithOptions) -> String {
     let mut string_list = vec![];
 
-    if options.isolate {
-        // Modules of documents that replay responses get put together on the spot
-        string_list.push(match options.replay {
-            true => "default-src 'unsafe-eval' 'unsafe-inline' data: blob:;",
-            false => "default-src 'unsafe-eval' 'unsafe-inline' data:;",
-        });
+    // Documents that replay responses have no business reaching out to anything, even if not all of
+    // their URLs could be taken care of, and their modules get put together on the spot
+    if options.replay {
+        string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data: blob:;");
+    } else if options.isolate {
+        string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data:;");
     }
 
     if options.no_styles {
@@ -424,10 +424,34 @@ pub fn html_to_dom(data: &Vec<u8>, document_encoding: String) -> RcDom {
         s = String::from_utf8_lossy(data).to_string();
     }
 
-    parse_document(RcDom::default(), Default::default())
+    let dom = parse_document(RcDom::default(), Default::default())
         .from_utf8()
         .read_from(&mut s.as_bytes())
-        .unwrap()
+        .unwrap();
+    move_template_contents(&dom.document);
+
+    dom
+}
+
+/// Parsers keep what's inside of TEMPLATE elements away from the tree, where nothing can find it
+/// and it doesn't get serialized, which would've left all of them empty.
+fn move_template_contents(node: &Handle) {
+    if let NodeData::Element {
+        ref template_contents,
+        ..
+    } = node.data
+        && let Some(contents) = template_contents.borrow().as_ref()
+    {
+        let children: Vec<Handle> = contents.children.borrow_mut().drain(..).collect();
+        for child in children.iter() {
+            child.parent.set(Some(Rc::downgrade(node)));
+        }
+        node.children.borrow_mut().extend(children);
+    }
+
+    for child in node.children.borrow().iter() {
+        move_template_contents(child);
+    }
 }
 
 pub fn is_favicon(attr_value: &str) -> bool {

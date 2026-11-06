@@ -1,7 +1,7 @@
 //! Makes saved documents work without a network, by storing responses their scripts have received,
 //! and a script that hands those responses back to them.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
@@ -617,4 +617,74 @@ pub fn rewrite_scripts(assets: &mut [CapturedAsset]) -> Vec<(String, String, Str
     }
 
     imports
+}
+
+/// Stylesheets that pages load on their own don't get to go through what Monolith does to the rest
+/// of them, and whatever they point at can't be found once they're inside of a document.
+#[doc(hidden)]
+pub fn rewrite_stylesheets(assets: &mut [CapturedAsset]) {
+    let mut data_urls: HashMap<String, String> = HashMap::new();
+    for asset in assets
+        .iter()
+        .filter(|asset| asset.is_reusable && matches!(asset.destination.as_str(), "font" | "image"))
+    {
+        let data_url = format!(
+            "data:{};base64,{}",
+            asset.content_type.split(';').next().unwrap_or(""),
+            BASE64_STANDARD.encode(&asset.data)
+        );
+        for url in &asset.urls {
+            data_urls.insert(url.clone(), data_url.clone());
+        }
+    }
+
+    for asset in assets
+        .iter_mut()
+        .filter(|asset| asset.content_type.starts_with("text/css"))
+    {
+        if let Some(url) = asset.urls.last().and_then(|url| Url::parse(url).ok()) {
+            let stylesheet = String::from_utf8_lossy(&asset.data);
+            asset.data = embed_stylesheet_urls(&stylesheet, &url, &data_urls).into_bytes();
+        }
+    }
+}
+
+/// Replaces what's inside of url() with what it has been found to point at.
+#[doc(hidden)]
+pub fn embed_stylesheet_urls(
+    stylesheet: &str,
+    stylesheet_url: &Url,
+    data_urls: &HashMap<String, String>,
+) -> String {
+    let mut result = String::with_capacity(stylesheet.len());
+    let mut remainder = stylesheet;
+
+    while let Some(start) = remainder.find("url(") {
+        let (before, after) = remainder.split_at(start + 4);
+        result.push_str(before);
+        remainder = after;
+
+        let Some(end) = remainder.find(')') else {
+            break;
+        };
+        let value = remainder[..end].trim().trim_matches(['"', '\'']);
+        let found = stylesheet_url
+            .join(value)
+            .ok()
+            .map(|mut url| {
+                url.set_fragment(None);
+                url
+            })
+            .and_then(|url| data_urls.get(url.as_str()));
+
+        if let Some(data_url) = found.filter(|_| !value.starts_with("data:")) {
+            result.push('"');
+            result.push_str(data_url);
+            result.push('"');
+            remainder = &remainder[end..];
+        }
+    }
+    result.push_str(remainder);
+
+    result
 }

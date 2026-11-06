@@ -20,7 +20,7 @@ use crate::mhtml::{create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::reader_mode::simplify_document;
 use crate::replay::{
     CapturedAsset, CapturedPage, create_replay_markup, insert_replay_markup, is_script,
-    rewrite_scripts,
+    rewrite_scripts, rewrite_stylesheets,
 };
 use crate::session::Session;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
@@ -66,7 +66,11 @@ pub struct MonolithOptions {
     pub browser: bool,
     /// Overrides MONOLITH_BROWSER_COLOR_SCHEME, the system decides if neither is set
     pub browser_color_scheme: Option<ColorScheme>,
+    /// Overrides MONOLITH_BROWSER_SCROLL_LIMIT: how many screens to go through, zero for none
+    pub browser_scroll_limit: Option<u32>,
     pub browser_user_agent: Option<String>,
+    /// Overrides MONOLITH_BROWSER_VIEWPORT: width and height of what the page gets to see
+    pub browser_viewport: Option<(u32, u32)>,
     pub domains: Option<Vec<String>>,
     pub whitelist_domains: bool,
     pub encoding: Option<String>,
@@ -538,6 +542,7 @@ pub fn create_monolithic_document_from_capture(
             }
         }
         let imports = rewrite_scripts(&mut page.assets);
+        rewrite_stylesheets(&mut page.assets);
         add_captured_assets(&mut session, &page.assets);
 
         let markup = create_replay_markup(

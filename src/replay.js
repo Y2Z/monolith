@@ -47,7 +47,8 @@
             if (text.startsWith("file:")) {
                 return new URL(new URL(text).pathname, PAGE_URL).href;
             }
-            return new URL(text, PAGE_URL).href;
+            const base = typeof document !== "undefined" && document.querySelector("base[href]");
+            return new URL(text, base ? new URL(base.getAttribute("href"), PAGE_URL) : PAGE_URL).href;
         } catch (error) {
             return text;
         }
@@ -102,7 +103,8 @@
         const status = replayStatus(found);
         const hasBody = ![101, 204, 205, 304].includes(status);
         const response = new Response(hasBody ? toBytes(found) : null, {
-            headers: { "content-type": found.type },
+            // Servers tell the time this way, and some pages rely on it
+            headers: { "content-type": found.type, date: new Date().toUTCString() },
             status,
         });
         Object.defineProperty(response, "url", { value: found.url });
@@ -145,10 +147,11 @@
         setRequestHeader() {}
         overrideMimeType() {}
         getResponseHeader(name) {
-            return this.found && name.toLowerCase() === "content-type" ? this.found.type : null;
+            const headers = { "content-type": this.found && this.found.type, date: this.found && new Date().toUTCString() };
+            return headers[name.toLowerCase()] || null;
         }
         getAllResponseHeaders() {
-            return this.found ? "content-type: " + this.found.type + "\r\n" : "";
+            return this.found ? "content-type: " + this.found.type + "\r\ndate: " + new Date().toUTCString() + "\r\n" : "";
         }
         abort() {
             this.aborted = true;
@@ -268,7 +271,25 @@
         return found ? "data:" + found.type + ";base64," + found.body : undefined;
     };
 
+    // Frames have scripts of their own, those would be left waiting for a network that isn't there,
+    // and some of them don't take it well. What's been saved can still be shown without them.
+    const frameUrlFor = (element, url) => {
+        if (!/^(https?:|file:|\/|\.|[^:]*$)/i.test(url)) {
+            return undefined;
+        }
+        const found = findAsset(url);
+        // Frames from elsewhere depend on being there, they're usually widgets that talk to servers
+        if (!found || new URL(found.url).origin !== new URL(PAGE_URL).origin) {
+            return "about:blank";
+        }
+        element.sandbox = "";
+        return "data:text/html;charset=utf-8," + encodeURIComponent(toText(found));
+    };
+    const replacementFor = (element, url) =>
+        element instanceof HTMLIFrameElement ? frameUrlFor(element, url) : dataUrlFor(url);
+
     const attributes = [
+        [HTMLIFrameElement, "src"],
         [HTMLImageElement, "src"],
         [HTMLLinkElement, "href"],
         [HTMLScriptElement, "src"],
@@ -279,26 +300,36 @@
         Object.defineProperty(element.prototype, attribute, {
             ...descriptor,
             set(value) {
-                descriptor.set.call(this, dataUrlFor(String(value)) || value);
+                descriptor.set.call(this, replacementFor(this, String(value)) || value);
             },
         });
     }
+    // Bundlers set integrity of what they load, but what's in here has already been through that,
+    // and scripts have been modified since
+    for (const element of [HTMLLinkElement, HTMLScriptElement]) {
+        const descriptor = Object.getOwnPropertyDescriptor(element.prototype, "integrity");
+        Object.defineProperty(element.prototype, "integrity", { ...descriptor, set() {} });
+    }
+
     const originalSetAttribute = Element.prototype.setAttribute;
     Element.prototype.setAttribute = function (name, value) {
+        if (String(name).toLowerCase() === "integrity") {
+            return undefined;
+        }
         const isTarget = attributes.some(
             ([element, attribute]) => this instanceof element && attribute === String(name).toLowerCase(),
         );
-        return originalSetAttribute.call(this, name, (isTarget && dataUrlFor(String(value))) || value);
+        return originalSetAttribute.call(this, name, (isTarget && replacementFor(this, String(value))) || value);
     };
     // Markup that comes from HTML strings doesn't go through any of that
     const fixElement = (element) => {
         if (element.nodeType !== 1) {
             return;
         }
-        for (const node of [element, ...element.querySelectorAll("img[src],link[href],source[src]")]) {
+        for (const node of [element, ...element.querySelectorAll("iframe[src],img[src],link[href],source[src]")]) {
             const name = node.matches("link") ? "href" : "src";
-            const value = node.matches("img,link,source") && node.getAttribute(name);
-            const url = value && dataUrlFor(value);
+            const value = node.matches("iframe,img,link,source") && node.getAttribute(name);
+            const url = value && replacementFor(node, value);
             if (url) {
                 originalSetAttribute.call(node, name, url);
             }
@@ -526,6 +557,35 @@
         };
     };
     installImports({});
+
+    // Browsers don't keep cookies for files, this keeps them for as long as the page stays open
+
+    const cookies = new Map();
+    Object.defineProperty(document, "cookie", {
+        configurable: true,
+        get: () => Array.from(cookies, ([name, value]) => name + "=" + value).join("; "),
+        set: (cookie) => {
+            const [pair, ...attributes] = String(cookie).split(";");
+            const separator = pair.indexOf("=");
+            const name = pair.slice(0, separator).trim();
+            const value = pair.slice(separator + 1).trim();
+            const attribute = (wanted) => {
+                const found = attributes.find((item) => item.trim().toLowerCase().startsWith(wanted + "="));
+                return found && found.slice(found.indexOf("=") + 1);
+            };
+            const maxAge = attribute("max-age");
+            const expires = attribute("expires");
+            const isExpired =
+                (maxAge !== undefined && Number(maxAge) <= 0) ||
+                (maxAge === undefined && expires !== undefined && new Date(expires) <= new Date());
+
+            if (separator < 0 || isExpired) {
+                cookies.delete(separator < 0 ? pair.trim() : name);
+            } else {
+                cookies.set(name, value);
+            }
+        },
+    });
 
     // Time resumes from the moment the page was saved, cached data shouldn't look expired
 

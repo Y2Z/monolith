@@ -36,6 +36,15 @@ use crate::session::Session;
 
 const BROWSER_COLOR_SCHEME_VARIABLE: &str = "MONOLITH_BROWSER_COLOR_SCHEME";
 const BROWSER_PATH_VARIABLE: &str = "MONOLITH_BROWSER";
+const BROWSER_SCROLL_LIMIT_VARIABLE: &str = "MONOLITH_BROWSER_SCROLL_LIMIT";
+const BROWSER_VIEWPORT_VARIABLE: &str = "MONOLITH_BROWSER_VIEWPORT";
+// What browsers start with on their own is tiny, pages only load what they think can be seen
+const DEFAULT_VIEWPORT: (u32, u32) = (1920, 1080);
+// How many screens to go through, some pages have no end
+const DEFAULT_SCROLL_LIMIT: u32 = 30;
+// Whatever comes into view gets requested quickly, this keeps long pages from taking forever
+const SCROLL_QUIET_PERIOD: Duration = Duration::from_millis(400);
+const SCROLL_STEP_TIMEOUT: Duration = Duration::from_secs(3);
 // Firefox and browsers made out of it, the ones that come with WebDriver BiDi
 const BROWSER_NAMES: [&str; 15] = [
     "firefox",
@@ -145,6 +154,33 @@ const CHALLENGE_SCRIPT: &str = r##"!!(
     )
 )"##;
 
+// Goes one screen down, using what actually scrolls: plenty of web apps keep the page itself still
+const SCROLL_SCRIPT: &str = r#"(() => {
+    const isScrollable = (element) =>
+        element.scrollHeight > element.clientHeight + 100 &&
+        ["auto", "scroll"].includes(getComputedStyle(element).overflowY);
+    const target = (() => {
+        const page = document.scrollingElement || document.documentElement;
+        if (page.scrollHeight > page.clientHeight + 100) {
+            return page;
+        }
+        const elements = Array.from(document.querySelectorAll("*")).filter(isScrollable);
+        elements.sort((a, b) => b.scrollHeight - a.scrollHeight);
+        return elements[0] || page;
+    })();
+    target.scrollTop += Math.floor(target.clientHeight * 0.9);
+    return target.scrollTop + target.clientHeight >= target.scrollHeight - 2;
+})()"#;
+
+// Pages have to be saved the way they first appear
+const SCROLL_TO_TOP_SCRIPT: &str = r#"(() => {
+    for (const element of [document.scrollingElement, ...document.querySelectorAll("*")]) {
+        if (element && element.scrollTop) {
+            element.scrollTop = 0;
+        }
+    }
+})()"#;
+
 // Makes the document's current state a part of its HTML, then serializes it.
 // Passwords stay out, that's the only thing here which could've been typed in by a script
 // and yet shouldn't end up in a file.
@@ -156,30 +192,43 @@ const SNAPSHOT_SCRIPT: &str = r#"(() => {
             return "";
         }
     };
-    // CSS-in-JS libraries insert their rules directly, those never appear in the markup
-    for (const style of document.querySelectorAll("style")) {
-        if (style.sheet && !style.textContent.trim()) {
-            style.textContent = rules(style.sheet);
+    const freeze = (root) => {
+        // CSS-in-JS libraries insert their rules directly, those never appear in the markup
+        for (const style of root.querySelectorAll("style")) {
+            if (style.sheet && !style.textContent.trim()) {
+                style.textContent = rules(style.sheet);
+            }
         }
-    }
-    for (const sheet of document.adoptedStyleSheets || []) {
-        const style = document.createElement("style");
-        style.textContent = rules(sheet);
-        document.head.appendChild(style);
-    }
-    for (const input of document.querySelectorAll("input")) {
-        if (input.type === "checkbox" || input.type === "radio") {
-            input.toggleAttribute("checked", input.checked);
-        } else if (input.type !== "password" && input.type !== "file") {
-            input.setAttribute("value", input.value);
+        for (const sheet of root.adoptedStyleSheets || []) {
+            const style = document.createElement("style");
+            style.textContent = rules(sheet);
+            (root === document ? document.head : root).appendChild(style);
         }
-    }
-    for (const textarea of document.querySelectorAll("textarea")) {
-        textarea.textContent = textarea.value;
-    }
-    for (const option of document.querySelectorAll("option")) {
-        option.toggleAttribute("selected", option.selected);
-    }
+        for (const input of root.querySelectorAll("input")) {
+            if (input.type === "checkbox" || input.type === "radio") {
+                input.toggleAttribute("checked", input.checked);
+            } else if (input.type !== "password" && input.type !== "file") {
+                input.setAttribute("value", input.value);
+            }
+        }
+        for (const textarea of root.querySelectorAll("textarea")) {
+            textarea.textContent = textarea.value;
+        }
+        for (const option of root.querySelectorAll("option")) {
+            option.toggleAttribute("selected", option.selected);
+        }
+        // Web components keep their contents out of the markup, this is what brings them back
+        for (const element of root.querySelectorAll("*")) {
+            if (element.shadowRoot) {
+                freeze(element.shadowRoot);
+                const template = document.createElement("template");
+                template.setAttribute("shadowrootmode", element.shadowRoot.mode);
+                template.innerHTML = element.shadowRoot.innerHTML;
+                element.prepend(template);
+            }
+        }
+    };
+    freeze(document);
     const doctype = document.doctype
         ? new XMLSerializer().serializeToString(document.doctype)
         : "";
@@ -254,6 +303,8 @@ fn visit_page(
         connection.wait_for_network_to_settle(deadline);
     }
 
+    connection.scroll_through_page(&context, choose_scroll_limit(options)?, deadline);
+
     let mut page = connection.take_snapshot(&context, deadline)?;
     page.assets = connection.collect_assets();
 
@@ -307,6 +358,53 @@ pub fn parse_color_scheme(value: &str) -> Result<Option<ColorScheme>, String> {
             "unknown color scheme \"{}\", it can be dark, light, or auto",
             value
         )),
+    }
+}
+
+/// Reads the size of the viewport, which goes as WIDTHxHEIGHT.
+#[doc(hidden)]
+pub fn parse_viewport(value: &str) -> Result<(u32, u32), String> {
+    value
+        .trim()
+        .split_once(['x', 'X'])
+        .and_then(|(width, height)| Some((width.parse().ok()?, height.parse().ok()?)))
+        .filter(|(width, height)| *width > 0 && *height > 0)
+        .ok_or(format!(
+            "\"{}\" is not a size, it goes like 1920x1080",
+            value
+        ))
+}
+
+fn choose_viewport(options: &MonolithOptions) -> Result<(u32, u32), String> {
+    if let Some(viewport) = options.browser_viewport {
+        return Ok(viewport);
+    }
+
+    match env::var_os(BROWSER_VIEWPORT_VARIABLE) {
+        Some(value) => parse_viewport(&value.to_string_lossy())
+            .map_err(|error| format!("{}: {}", BROWSER_VIEWPORT_VARIABLE, error)),
+        None => Ok(DEFAULT_VIEWPORT),
+    }
+}
+
+/// Reads how many screens to scroll through, zero means none at all.
+#[doc(hidden)]
+pub fn parse_scroll_limit(value: &str) -> Result<u32, String> {
+    value
+        .trim()
+        .parse()
+        .map_err(|_| format!("\"{}\" is not a number of screens", value))
+}
+
+fn choose_scroll_limit(options: &MonolithOptions) -> Result<u32, String> {
+    if let Some(limit) = options.browser_scroll_limit {
+        return Ok(limit);
+    }
+
+    match env::var_os(BROWSER_SCROLL_LIMIT_VARIABLE) {
+        Some(value) => parse_scroll_limit(&value.to_string_lossy())
+            .map_err(|error| format!("{}: {}", BROWSER_SCROLL_LIMIT_VARIABLE, error)),
+        None => Ok(DEFAULT_SCROLL_LIMIT),
     }
 }
 
@@ -759,6 +857,7 @@ impl<'a> Browser<'a> {
         let is_devtools = uses_devtools(executable);
         let is_snap = is_snap(executable);
         let color_scheme = choose_color_scheme(options)?;
+        let viewport = choose_viewport(options)?;
         let profile = create_profile_directory(executable, is_snap)
             .map_err(|error| format!("could not create browser profile: {}", error))?;
 
@@ -780,7 +879,10 @@ impl<'a> Browser<'a> {
                 .arg("about:blank")
                 .env("MOZ_CRASHREPORTER_DISABLE", "1")
                 // Without this one the browser pays no attention to services.settings.server
-                .env("MOZ_REMOTE_SETTINGS_DEVTOOLS", "1");
+                .env("MOZ_REMOTE_SETTINGS_DEVTOOLS", "1")
+                // Size of the screen, for pages that go by that instead
+                .env("MOZ_HEADLESS_WIDTH", viewport.0.to_string())
+                .env("MOZ_HEADLESS_HEIGHT", viewport.1.to_string());
         }
         // Being moved to another home directory shouldn't cut it off from the display
         if let Some(home) = env::var_os("HOME").filter(|_| env::var_os("XAUTHORITY").is_none()) {
@@ -856,6 +958,7 @@ impl<'a> Browser<'a> {
             options,
             is_devtools,
             color_scheme,
+            viewport,
         )?);
 
         Ok(browser)
@@ -910,6 +1013,7 @@ struct Connection<'a> {
     refused_requests: HashSet<String>,
     requests_in_flight: HashSet<String>,
     socket: WebSocket<TcpStream>,
+    viewport: (u32, u32),
     worker_urls: Vec<String>,
 }
 
@@ -919,6 +1023,7 @@ impl<'a> Connection<'a> {
         options: &'a MonolithOptions,
         is_devtools: bool,
         color_scheme: Option<ColorScheme>,
+        viewport: (u32, u32),
     ) -> Result<Connection<'a>, String> {
         let (address, path) = endpoint.split_once('/').unwrap_or((endpoint, "session"));
         let stream = TcpStream::connect(address)
@@ -946,6 +1051,7 @@ impl<'a> Connection<'a> {
             refused_requests: HashSet::new(),
             requests_in_flight: HashSet::new(),
             socket,
+            viewport,
             worker_urls: vec![],
         })
     }
@@ -1038,6 +1144,19 @@ impl<'a> Connection<'a> {
 
         self.command("Page.enable", json!({}), deadline)?;
         self.command("Network.enable", network_buffers(), deadline)?;
+        let (width, height) = self.viewport;
+        self.command(
+            "Emulation.setDeviceMetricsOverride",
+            json!({
+                "deviceScaleFactor": 0,
+                "height": height,
+                "mobile": false,
+                "screenHeight": height,
+                "screenWidth": width,
+                "width": width,
+            }),
+            deadline,
+        )?;
         // Has to work, the alternative is contacting what the user has asked not to be contacted
         if self.is_filtering_requests() {
             self.command("Fetch.enable", json!({}), deadline)?;
@@ -1106,6 +1225,13 @@ impl<'a> Connection<'a> {
             .as_str()
             .ok_or("browser has no window to work with")?
             .to_string();
+
+        let (width, height) = self.viewport;
+        self.command(
+            "browsingContext.setViewport",
+            json!({"context": context, "viewport": {"height": height, "width": width}}),
+            deadline,
+        )?;
 
         match self.command(
             "browsingContext.navigate",
@@ -1196,13 +1322,17 @@ impl<'a> Connection<'a> {
     }
 
     fn wait_for_network_to_settle(&mut self, deadline: Instant) {
-        let deadline = deadline.min(Instant::now() + NETWORK_QUIET_TIMEOUT);
+        self.wait_for_network(NETWORK_QUIET_PERIOD, NETWORK_QUIET_TIMEOUT, deadline);
+    }
+
+    fn wait_for_network(&mut self, quiet_period: Duration, timeout: Duration, deadline: Instant) {
+        let deadline = deadline.min(Instant::now() + timeout);
         let mut quiet_since = Instant::now();
 
         while Instant::now() < deadline {
             if !self.requests_in_flight.is_empty() {
                 quiet_since = Instant::now();
-            } else if quiet_since.elapsed() >= NETWORK_QUIET_PERIOD {
+            } else if quiet_since.elapsed() >= quiet_period {
                 return;
             }
 
@@ -1211,6 +1341,40 @@ impl<'a> Connection<'a> {
                 Ok(None) => {}
                 Err(_) => return,
             }
+        }
+    }
+
+    /// Lets the page see all of itself, a lot of what's on pages only loads once it's in view.
+    fn scroll_through_page(&mut self, context: &str, limit: u32, deadline: Instant) {
+        let mut was_at_end = false;
+
+        for screen in 0..limit {
+            if Instant::now() >= deadline {
+                break;
+            }
+            let Ok(is_at_end) = self.evaluate(SCROLL_SCRIPT, context, deadline) else {
+                break;
+            };
+            let is_at_end = is_at_end == true;
+            self.wait_for_network(SCROLL_QUIET_PERIOD, SCROLL_STEP_TIMEOUT, deadline);
+
+            // Reaching the end twice means that nothing new has shown up in the meantime
+            if is_at_end && was_at_end {
+                break;
+            }
+            was_at_end = is_at_end;
+
+            if screen + 1 == limit && !self.options.silent {
+                print_info_message(&format!(
+                    "Stopped scrolling after {} screens, {} changes that",
+                    limit, BROWSER_SCROLL_LIMIT_VARIABLE
+                ));
+            }
+        }
+
+        if limit > 0 {
+            let _ = self.evaluate(SCROLL_TO_TOP_SCRIPT, context, deadline);
+            self.wait_for_network(SCROLL_QUIET_PERIOD, SCROLL_STEP_TIMEOUT, deadline);
         }
     }
 

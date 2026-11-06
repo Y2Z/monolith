@@ -122,6 +122,25 @@ mod passing {
     }
 
     #[test]
+    fn documents_that_replay_responses_are_not_allowed_to_reach_out() {
+        let mut session = session();
+        session.options.replay = true;
+
+        let (data, _) = create_monolithic_document_from_data(
+            session,
+            b"<html><head></head><body></body></html>".to_vec(),
+            Some("utf-8".to_string()),
+            Some("https://example.com/page".to_string()),
+        )
+        .unwrap();
+
+        assert!(
+            String::from_utf8_lossy(&data)
+                .contains("content=\"default-src 'unsafe-eval' 'unsafe-inline' data: blob:;")
+        );
+    }
+
+    #[test]
     fn documents_that_replay_responses_do_not_reach_out() {
         let mut session = session();
         session.options.replay = true;
@@ -136,6 +155,60 @@ mod passing {
         .unwrap();
 
         assert!(!String::from_utf8_lossy(&data).contains("a.js"));
+    }
+
+    #[test]
+    fn embeds_assets_into_saved_shadow_roots() {
+        let mut session = session();
+        session.options.no_images = false;
+        session.add_asset(
+            &Url::parse("https://example.com/a.png").unwrap(),
+            &vec![0x89, 0x50, 0x4E, 0x47],
+            "image/png".to_string(),
+            "".to_string(),
+        );
+
+        let (data, _) = create_monolithic_document_from_data(
+            session,
+            b"<html><body><x-a><template shadowrootmode=\"open\"><img src=\"a.png\"></template></x-a></body></html>"
+                .to_vec(),
+            Some("utf-8".to_string()),
+            Some("https://example.com/page".to_string()),
+        )
+        .unwrap();
+        let html = String::from_utf8_lossy(&data);
+
+        assert!(html.contains("shadowrootmode=\"open\""));
+        assert!(html.contains("src=\"data:image/png"));
+    }
+
+    #[test]
+    fn keeps_contents_of_templates() {
+        let (data, _) = create_monolithic_document_from_data(
+            session(),
+            b"<html><body><template><p>Kept</p></template></body></html>".to_vec(),
+            Some("utf-8".to_string()),
+            Some("https://example.com/page".to_string()),
+        )
+        .unwrap();
+
+        assert!(String::from_utf8_lossy(&data).contains("<template><p>Kept</p></template>"));
+    }
+
+    #[test]
+    fn removes_scripts_from_templates() {
+        let mut session = session();
+        session.options.no_js = true;
+
+        let (data, _) = create_monolithic_document_from_data(
+            session,
+            b"<html><body><template><script>run();</script></template></body></html>".to_vec(),
+            Some("utf-8".to_string()),
+            Some("https://example.com/page".to_string()),
+        )
+        .unwrap();
+
+        assert!(!String::from_utf8_lossy(&data).contains("run();"));
     }
 
     #[test]

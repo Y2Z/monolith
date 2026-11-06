@@ -12,6 +12,8 @@ mod parse_endpoint;
 mod parse_gsettings_color_scheme;
 mod parse_macos_color_scheme;
 mod parse_portal_color_scheme;
+mod parse_scroll_limit;
+mod parse_viewport;
 mod parse_windows_color_scheme;
 mod profile_preferences;
 mod snap_name;
