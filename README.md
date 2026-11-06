@@ -203,9 +203,9 @@ monolith page-saved-by-browser.mhtml -o page.html
 ## Options
 
  - `-b`: Use `custom base URL`
- - `-B`: Forbid retrieving assets from specified domain(s)
+ - `-B`: Let a browser render the page first (requires Firefox, or anything based on it or Chromium)
  - `-C`: Read cookies from `file`
- - `-d`: Allow retrieving assets only from specified `domain(s)`
+ - `-d`: Forbid retrieving assets from specified `domain(s)` (can be used multiple times)
  - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
@@ -226,22 +226,23 @@ monolith page-saved-by-browser.mhtml -o page.html
  - `-t`: Adjust `network request timeout`
  - `-u`: Use `custom User-Agent`
  - `-w`: Wipe elements matching `selector`: links and such turn into their contents, images, frames, and other elements that load something lose their sources (can be used multiple times)
+ - `-W`: Only retrieve assets from domains specified with `-d`
  - `-V`: Print version number
 
 
 ---------------------------------------------------
 
 
-## Whitelisting and blacklisting domains
+## Blacklisting and whitelisting domains
 
-Options `-d` and `-B` provide control over what domains can be used to retrieve assets from, e.g.:
+Option `-d` forbids retrieving assets from the specified domains, and adding `-W` flips it to allow only those domains, e.g.:
 
 ```console
-monolith -I -d example.com -d www.example.com https://example.com -o example-only.html
+monolith -I -d .googleusercontent.com -d googleanalytics.com -d .google.com https://example.com -o example-no-ads.html
 ```
 
 ```console
-monolith -I -B -d .googleusercontent.com -d googleanalytics.com -d .google.com https://example.com -o example-no-ads.html
+monolith -I -W -d example.com -d www.example.com https://example.com -o example-only.html
 ```
 
 
@@ -250,9 +251,29 @@ monolith -I -B -d .googleusercontent.com -d googleanalytics.com -d .google.com h
 
 ## Dynamic content
 
-Monolith doesn't feature a JavaScript engine, hence websites that retrieve and display data after initial load may require usage of additional tools.
+Monolith doesn't feature a JavaScript engine, but it can make use of the one inside of a browser that's already installed: option `-B` opens the page in a browser, waits for it to finish rendering, and saves what the page has become, e.g.:
 
-For example, Chromium (Chrome) can be used to act as a pre-processor for such pages:
+```console
+monolith -B https://example.com -o example.html
+```
+
+The browser runs without a window, from a clean temporary profile which gets deleted afterwards. It never gets access to your own profile, cookies, or history, gets only those cookies that were passed in using `-C`, and sticks to the same rules as the rest of Monolith: domains forbidden with `-d` and whatever got excluded with `-i`, `-f`, or `-s` don't get requested by the browser either. It identifies itself as what it is, unless told otherwise with `-u`. Firefox gets used if it's installed. Set `MONOLITH_BROWSER` to the browser's path to choose another one: anything based on Firefox or Chromium works, such as LibreWolf, GNU IceCat, Chrome, Brave, or Edge.
+
+The browser follows your system's light or dark mode, so pages that adapt to it get saved the way you'd see them. Set `MONOLITH_BROWSER_COLOR_SCHEME` to `dark`, `light`, or `auto` to choose for yourself.
+
+The browser pretends to have a 1920x1080 viewport, set `MONOLITH_BROWSER_VIEWPORT` to change that, e.g. to `1280x720`. Pages only load what they think can be seen, and those that adapt to the size of the window get saved the way they look at that size.
+
+Pages get scrolled through before being saved, since a lot of them only load things as they come into view. Set `MONOLITH_BROWSER_SCROLL_LIMIT` to the number of screens to go through (30 by default, `0` turns it off), pages that never end stop there.
+
+If Monolith gets interrupted, it takes the browser and its temporary files down with it.
+
+Should the page turn out to be a challenge which doesn't solve itself, such as the ones used to tell people from bots, the browser reopens in a window and waits for you to solve it.
+
+The saved page keeps its JavaScript, along with the responses it has received, which get replayed to it without any network access: buttons, menus, and other things that only rely on the page's own code keep working, but anything that needs a server doesn't. A saved page only contains what it has loaded while being saved, so parts of web apps that were never opened won't be there. Scripts of the saved page get modified to make that work: they're told the page's original URL, and imports get pointed at what's stored inside of the document. Frames that get added by scripts show what they had without running anything, frames from other websites stay empty. They can't reach out to anything, their content security policy doesn't allow it, and `-b` doesn't apply to them. Add `-j` to save a frozen copy of what the browser had on screen instead; that's also what MHTML output and `-R` always do.
+
+The same is available to the GUI (“Render in browser”) and to programs using Monolith as a library, by setting `browser` in `MonolithOptions`. Apps that have a web view of their own, such as mobile ones, can use `create_monolithic_document_from_capture()` to save what it has loaded.
+
+Any other browser can be used as a pre-processor as well, e.g. Chromium (Chrome):
 
 ```console
 chromium --headless --window-size=1920,1080 --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --incognito --dump-dom https://github.com | monolith - -I -b https://github.com -o github.html
@@ -305,6 +326,11 @@ Please open an issue if something is wrong, that helps make this project better.
 
 
 ---------------------------------------------------
+
+
+## Testing
+
+`cargo test` runs unit tests first, then real browsers: one of each kind found, or whatever's listed in `MONOLITH_TEST_BROWSERS`. Tests that need them have nothing to do if there are none, set `MONOLITH_TEST_REQUIRE_BROWSERS` to make that a failure.
 
 
 ## License

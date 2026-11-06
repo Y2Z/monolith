@@ -1,3 +1,4 @@
+pub mod browser;
 pub mod cache;
 pub mod cookies;
 pub mod core;
@@ -7,5 +8,6 @@ pub mod js;
 pub mod mhtml;
 pub mod net;
 pub mod reader_mode;
+pub mod replay;
 pub mod session;
 pub mod url;

@@ -16,6 +16,7 @@ use std::rc::Rc;
 use crate::core::{MonolithOptions, MonolithOutputFormat, declared_encoding, parse_media_type};
 use crate::css::{embed_css, embed_stylesheet};
 use crate::js::{attr_is_event_handler, escape_script_end_tag};
+use crate::replay::rewrite_imports;
 use crate::session::Session;
 use crate::url::{
     EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, create_srcset_data_url,
@@ -138,7 +139,11 @@ pub fn targets_element_anywhere(options: &MonolithOptions, names: &[&str]) -> bo
 pub fn compose_csp(options: &MonolithOptions) -> String {
     let mut string_list = vec![];
 
-    if options.isolate {
+    // Documents that replay responses have no business reaching out to anything, even if not all of
+    // their URLs could be taken care of, and their modules get put together on the spot
+    if options.replay {
+        string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data: blob:;");
+    } else if options.isolate {
         string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data:;");
     }
 
@@ -419,10 +424,34 @@ pub fn html_to_dom(data: &Vec<u8>, document_encoding: String) -> RcDom {
         s = String::from_utf8_lossy(data).to_string();
     }
 
-    parse_document(RcDom::default(), Default::default())
+    let dom = parse_document(RcDom::default(), Default::default())
         .from_utf8()
         .read_from(&mut s.as_bytes())
-        .unwrap()
+        .unwrap();
+    move_template_contents(&dom.document);
+
+    dom
+}
+
+/// Parsers keep what's inside of TEMPLATE elements away from the tree, where nothing can find it
+/// and it doesn't get serialized, which would've left all of them empty.
+fn move_template_contents(node: &Handle) {
+    if let NodeData::Element {
+        ref template_contents,
+        ..
+    } = node.data
+        && let Some(contents) = template_contents.borrow().as_ref()
+    {
+        let children: Vec<Handle> = contents.children.borrow_mut().drain(..).collect();
+        for child in children.iter() {
+            child.parent.set(Some(Rc::downgrade(node)));
+        }
+        node.children.borrow_mut().extend(children);
+    }
+
+    for child in node.children.borrow().iter() {
+        move_template_contents(child);
+    }
 }
 
 pub fn is_favicon(attr_value: &str) -> bool {
@@ -1012,7 +1041,10 @@ pub fn retrieve_and_embed_asset(
                 // Check integrity
                 if let Some(node_integrity_attr_value) = get_node_attr(node, "integrity") {
                     if !node_integrity_attr_value.is_empty() {
-                        ok_to_include = check_integrity(&data, &node_integrity_attr_value);
+                        ok_to_include = check_integrity(
+                            session.original_data(&final_url).unwrap_or(&data),
+                            &node_integrity_attr_value,
+                        );
                     }
 
                     // Wipe the integrity attribute
@@ -1097,8 +1129,13 @@ pub fn retrieve_and_embed_asset(
                         }
                         // TODO: There is also `speculationrules` but this is not yet standard.
 
-                        if script_media_type == "text/javascript"
-                            || script_media_type == "application/javascript"
+                        // Browsers ignore both of these on scripts that have no source
+                        let is_timed = get_node_attr(node, "async").is_some()
+                            || get_node_attr(node, "defer").is_some();
+
+                        if !is_timed
+                            && (script_media_type == "text/javascript"
+                                || script_media_type == "application/javascript")
                         {
                             // Embed javascript code instead of using data URLs
                             let script_dom: RcDom =
@@ -1187,7 +1224,25 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     let link_node_types: Vec<LinkType> =
                         parse_link_type(&get_node_attr(node, "rel").unwrap_or(String::from("")));
 
-                    if link_node_types.contains(&LinkType::Favicon)
+                    // Hints are of no use without a network, and would've reached out to one
+                    let is_hint = get_node_attr(node, "rel")
+                        .unwrap_or_default()
+                        .split_whitespace()
+                        .any(|rel| {
+                            [
+                                "dns-prefetch",
+                                "modulepreload",
+                                "preconnect",
+                                "prefetch",
+                                "preload",
+                            ]
+                            .iter()
+                            .any(|hint| rel.eq_ignore_ascii_case(hint))
+                        });
+
+                    if session.options.replay && is_hint {
+                        set_node_attr(node, "href", None);
+                    } else if link_node_types.contains(&LinkType::Favicon)
                         || link_node_types.contains(&LinkType::AppleTouchIcon)
                     {
                         // Find and resolve LINK's href attribute
@@ -1561,7 +1616,31 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         // Read values of integrity and src attributes
                         let script_src: &str = &get_node_attr(node, "src").unwrap_or_default();
 
-                        if !script_src.is_empty() {
+                        let is_module = get_node_attr(node, "type")
+                            .is_some_and(|value| value.eq_ignore_ascii_case("module"));
+
+                        if !script_src.is_empty() && session.options.replay && is_module {
+                            // Everything that imports it has to end up with the same instance
+                            // of it, so it can't become a separate copy of itself in here
+                            let script_url = resolve_url(document_url, script_src);
+                            let integrity = get_node_attr(node, "integrity").unwrap_or_default();
+                            let is_intact = integrity.is_empty()
+                                || session
+                                    .original_data(&script_url)
+                                    .is_some_and(|data| check_integrity(data, &integrity));
+                            let import = script_url.as_str().replace('"', "%22");
+                            set_node_attr(
+                                node,
+                                "src",
+                                is_intact.then(|| {
+                                    format!(
+                                        "data:text/javascript;charset=utf-8,import%20%22{}%22",
+                                        import.replace('%', "%25").replace('#', "%23")
+                                    )
+                                }),
+                            );
+                            set_node_attr(node, "integrity", None);
+                        } else if !script_src.is_empty() {
                             if session.options.output_format == MonolithOutputFormat::HTML {
                                 retrieve_and_embed_asset(
                                     session,
@@ -1575,6 +1654,15 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     resolve_url(document_url, &script_src);
                                 set_node_attr(node, "src", Some(script_src_full_url.to_string()));
                                 session.log_asset_url(&script_src_full_url);
+                            }
+                        } else if session.options.replay {
+                            for child_node in node.children.borrow_mut().iter_mut() {
+                                if let NodeData::Text { ref contents } = child_node.data {
+                                    let mut tendril = contents.borrow_mut();
+                                    let script = rewrite_imports(tendril.as_ref(), document_url);
+                                    tendril.clear();
+                                    tendril.push_slice(&script.code);
+                                }
                             }
                         }
                     }

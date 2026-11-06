@@ -19,6 +19,7 @@ jobs:
   build_and_test:
     name: Build and test
     strategy:
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
@@ -34,8 +35,16 @@ jobs:
     - name: Build
       run: cargo build --all --locked --verbose
 
+    # Ubuntu restricts what Chromium's sandbox relies on, unless it's installed from a package
+    - name: Let browsers use their sandbox
+      if: runner.os == 'Linux'
+      run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
     - name: Run tests
-      run: cargo test --all --locked --verbose
+      run: cargo test --all --locked --verbose --no-fail-fast
+      env:
+        MONOLITH_TEST_REQUIRE_BROWSERS: 1
+        MONOLITH_TEST_BROWSERS: ${{ runner.os == 'Windows' && 'C:\Program Files\Mozilla Firefox\firefox.exe;C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' || '' }}
 
     - name: Check code formatting
       run: |

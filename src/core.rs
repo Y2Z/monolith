@@ -10,6 +10,7 @@ use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
 use url::Url;
 
+use crate::browser::{ColorScheme, render_page};
 use crate::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
     has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots,
@@ -17,6 +18,10 @@ use crate::html::{
 };
 use crate::mhtml::{create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::reader_mode::simplify_document;
+use crate::replay::{
+    CapturedAsset, CapturedPage, create_replay_markup, insert_replay_markup, is_script,
+    rewrite_scripts, rewrite_stylesheets,
+};
 use crate::session::Session;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
 
@@ -58,8 +63,16 @@ pub enum MonolithOutputFormat {
 #[derive(Default)]
 pub struct MonolithOptions {
     pub base_url: Option<String>,
-    pub blacklist_domains: bool,
+    pub browser: bool,
+    /// Overrides MONOLITH_BROWSER_COLOR_SCHEME, the system decides if neither is set
+    pub browser_color_scheme: Option<ColorScheme>,
+    /// Overrides MONOLITH_BROWSER_SCROLL_LIMIT: how many screens to go through, zero for none
+    pub browser_scroll_limit: Option<u32>,
+    pub browser_user_agent: Option<String>,
+    /// Overrides MONOLITH_BROWSER_VIEWPORT: width and height of what the page gets to see
+    pub browser_viewport: Option<(u32, u32)>,
     pub domains: Option<Vec<String>>,
+    pub whitelist_domains: bool,
     pub encoding: Option<String>,
     pub ignore_errors: bool,
     pub insecure: bool,
@@ -72,6 +85,8 @@ pub struct MonolithOptions {
     pub output_format: MonolithOutputFormat,
     pub reader_mode: bool,
     pub remove_elements: Vec<String>,
+    /// Set for documents that replay responses, instead of relying on a network
+    pub replay: bool,
     pub silent: bool,
     pub threads: usize,
     pub timeout: u64,
@@ -421,6 +436,18 @@ pub fn create_monolithic_document(
         },
     };
 
+    if session.options.browser {
+        let page = render_page(target_url.as_str(), &session)
+            .map_err(|error| MonolithError::new(&error))?;
+
+        if is_captured_document(&page) {
+            return create_monolithic_document_from_capture(session, page);
+        }
+
+        // Images, PDFs, and such have nothing to render, they get saved the usual way
+        add_captured_assets(&mut session, &page.assets);
+    }
+
     let data: Vec<u8>;
     let document_encoding: Option<String>;
 
@@ -461,6 +488,95 @@ pub fn create_monolithic_document(
         data,
         document_encoding,
         Some(target_url.to_string()),
+    )
+}
+
+fn is_captured_document(page: &CapturedPage) -> bool {
+    page.content_type == "text/html" || page.content_type == "application/xhtml+xml"
+}
+
+/// Saves requests, and works for what servers wouldn't give to anyone but who received it.
+fn add_captured_assets(session: &mut Session, assets: &[CapturedAsset]) {
+    for asset in assets.iter().filter(|asset| asset.is_reusable) {
+        let (media_type, charset, _) = parse_media_type(&asset.content_type);
+
+        for url in asset.urls.iter().filter_map(|url| Url::parse(url).ok()) {
+            session.add_asset(
+                &url,
+                &asset.data,
+                media_type.clone(),
+                charset.clone().unwrap_or_default(),
+            );
+        }
+    }
+}
+
+/// Creates a document out of a page that has already been loaded by something else.
+///
+/// If scripts are to be kept, and the capture has the original document (an asset with destination
+/// "document" and status 200), the result starts over from it and replays captured responses.
+/// Otherwise it's a frozen copy of what the page has turned into.
+pub fn create_monolithic_document_from_capture(
+    mut session: Session,
+    mut page: CapturedPage,
+) -> Result<(Vec<u8>, Option<String>), MonolithError> {
+    let source_document = page
+        .assets
+        .iter()
+        .rfind(|asset| asset.destination == "document" && asset.status == 200)
+        .cloned();
+
+    if let Some(source_document) = source_document.filter(|_| {
+        !session.options.no_js
+            && !session.options.reader_mode
+            && session.options.output_format == MonolithOutputFormat::HTML
+    }) {
+        session.options.replay = true;
+        // Scripts of the document have to find everything right where they found it in the
+        // browser, no other base URL can work for it
+        session.options.base_url = None;
+
+        for asset in page.assets.iter().filter(|asset| is_script(asset)) {
+            for url in asset.urls.iter().filter_map(|url| Url::parse(url).ok()) {
+                session.add_original_data(&url, asset.data.clone());
+            }
+        }
+        let imports = rewrite_scripts(&mut page.assets);
+        rewrite_stylesheets(&mut page.assets);
+        add_captured_assets(&mut session, &page.assets);
+
+        let markup = create_replay_markup(
+            &page.assets,
+            &imports,
+            &page.url,
+            Utc::now().timestamp_millis(),
+        );
+        let charset = parse_media_type(&source_document.content_type).1;
+        let source_url = source_document.urls.last().cloned();
+        let (document, _) = create_monolithic_document_from_data(
+            session,
+            source_document.data,
+            charset,
+            source_url,
+        )?;
+
+        return Ok((
+            insert_replay_markup(document, &markup),
+            Some(page.title).filter(|title| !title.is_empty()),
+        ));
+    }
+
+    add_captured_assets(&mut session, &page.assets);
+
+    // What a browser leaves behind has already been through JavaScript, running it again would
+    // only break it
+    session.options.no_js = true;
+
+    create_monolithic_document_from_data(
+        session,
+        page.html.into_bytes(),
+        Some("utf-8".to_string()),
+        Some(page.url),
     )
 }
 

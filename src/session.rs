@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
@@ -24,11 +25,13 @@ pub struct Session {
     pub asset_urls: Vec<String>,
     cache: Option<Cache>,
     client: Client,
-    cookies: Option<Vec<Cookie>>,
+    pub(crate) cookies: Option<Vec<Cookie>>,
     /// Encoding of the document (or stylesheet) currently being processed, if it declares one.
     /// Stylesheets that don't specify their own encoding get decoded using it.
     pub environment_encoding: Option<&'static Encoding>,
     pub options: MonolithOptions,
+    /// Contents of assets that got modified, integrity of which is yet to be checked
+    original_data: HashMap<String, Vec<u8>>,
     /// Receives the encoding the document ends up being saved in, if set
     pub output_encoding: Option<Arc<OnceLock<String>>>,
     /// Gets updated as assets are being prefetched, if set
@@ -61,19 +64,19 @@ impl Session {
             .redirect({
                 // Stop redirects into blocked domains before the request is even made
                 let domains = options.domains.clone();
-                let blacklist_domains = options.blacklist_domains;
+                let whitelist_domains = options.whitelist_domains;
                 reqwest::redirect::Policy::custom(move |attempt| {
                     let allowed = match (&domains, attempt.url().host_str()) {
                         (Some(domains), Some(host)) => {
                             domains
                                 .iter()
                                 .any(|d| domain_is_within_domain(host, d.trim()))
-                                != blacklist_domains
+                                == whitelist_domains
                         }
                         _ => true,
                     };
                     if !allowed {
-                        attempt.error("redirect target is blacklisted")
+                        attempt.error("redirect target is blocked")
                     } else if attempt.previous().len() >= 10 {
                         attempt.error("too many redirects")
                     } else {
@@ -93,8 +96,29 @@ impl Session {
             environment_encoding: None,
             options,
             output_encoding: None,
+            original_data: HashMap::new(),
             prefetch_progress: None,
         }
+    }
+
+    /// Makes the given asset available without requesting it: pages rendered by a browser come with
+    /// everything the browser has already downloaded, and that may be all it can be obtained from.
+    /// Keeps what an asset was before it got modified, for checking its integrity later on.
+    pub fn add_original_data(&mut self, url: &Url, data: Vec<u8>) {
+        self.original_data
+            .insert(clean_url(url.clone()).to_string(), data);
+    }
+
+    pub fn original_data(&self, url: &Url) -> Option<&Vec<u8>> {
+        self.original_data.get(clean_url(url.clone()).as_str())
+    }
+
+    pub fn add_asset(&mut self, url: &Url, data: &Vec<u8>, media_type: String, charset: String) {
+        let key: String = clean_url(url.clone()).as_str().to_string();
+
+        self.cache
+            .get_or_insert_with(|| Cache::new(0, None))
+            .set(&key, data, media_type, charset);
     }
 
     /// Makes the session retrieve assets from the given MHTML archive, instead of the network or filesystem.
@@ -250,9 +274,7 @@ impl Session {
                 let domain_matches = domains
                     .iter()
                     .any(|d| domain_is_within_domain(url.host_str().unwrap(), d.trim()));
-                if (self.options.blacklist_domains && domain_matches)
-                    || (!self.options.blacklist_domains && !domain_matches)
-                {
+                if domain_matches != self.options.whitelist_domains {
                     return Err(self.client.get("").send().unwrap_err());
                 }
             }
