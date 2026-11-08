@@ -1,4 +1,5 @@
 mod browser;
+mod cache;
 mod cli;
 mod cookies;
 mod core;

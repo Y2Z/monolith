@@ -125,15 +125,17 @@ type JobResult = Result<(String, Option<String>), String>;
 enum OutputFormat {
     Html,
     Mhtml,
+    Warc,
 }
 
 impl OutputFormat {
-    const ALL: [OutputFormat; 2] = [OutputFormat::Html, OutputFormat::Mhtml];
+    const ALL: [OutputFormat; 3] = [OutputFormat::Html, OutputFormat::Mhtml, OutputFormat::Warc];
 
     fn label(self) -> &'static str {
         match self {
             OutputFormat::Html => "HTML",
             OutputFormat::Mhtml => "MHTML",
+            OutputFormat::Warc => "WARC",
         }
     }
 
@@ -141,6 +143,7 @@ impl OutputFormat {
         match self {
             OutputFormat::Html => MonolithOutputFormat::HTML,
             OutputFormat::Mhtml => MonolithOutputFormat::MHTML,
+            OutputFormat::Warc => MonolithOutputFormat::WARC,
         }
     }
 }

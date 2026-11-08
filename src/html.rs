@@ -213,7 +213,7 @@ pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> 
             let image_full_url: Url = resolve_url(document_url, srcset_item.path);
             match session.retrieve_asset(document_url, &image_full_url) {
                 Ok((image_data, image_final_url, image_media_type, image_charset)) => {
-                    if session.options.output_format == MonolithOutputFormat::HTML {
+                    if session.options.output_format != MonolithOutputFormat::MHTML {
                         // Append retrieved asset as a data URL
                         result.push_str(&create_srcset_data_url(
                             &image_media_type,
@@ -1357,7 +1357,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             img_src.unwrap_or_default()
                         };
 
-                        if session.options.output_format == MonolithOutputFormat::HTML {
+                        if session.options.output_format != MonolithOutputFormat::MHTML {
                             retrieve_and_embed_asset(session, document_url, node, "src", &img_src);
                         } else {
                             let img_src_full_url: Url = resolve_url(document_url, &img_src);
@@ -1549,7 +1549,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     let parent_node_name: &str = get_node_name(&parent_node).unwrap_or_default();
 
                     if let Some(source_src) = get_node_attr(node, "src") {
-                        if session.options.output_format == MonolithOutputFormat::HTML {
+                        if session.options.output_format != MonolithOutputFormat::MHTML {
                             retrieve_and_embed_asset(
                                 session,
                                 document_url,
@@ -1641,7 +1641,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             );
                             set_node_attr(node, "integrity", None);
                         } else if !script_src.is_empty() {
-                            if session.options.output_format == MonolithOutputFormat::HTML {
+                            if session.options.output_format != MonolithOutputFormat::MHTML {
                                 retrieve_and_embed_asset(
                                     session,
                                     document_url,
@@ -1693,7 +1693,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 }
                 "frame" | "iframe" => {
                     if let Some(frame_attr_src_value) = get_node_attr(node, "src") {
-                        if session.options.output_format == MonolithOutputFormat::HTML {
+                        if session.options.output_format != MonolithOutputFormat::MHTML {
                             // Ignore (i)frames with empty source (they cause infinite loops)
                             if !frame_attr_src_value.trim().is_empty() {
                                 retrieve_and_embed_asset(
@@ -1720,7 +1720,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 "audio" => {
                     // Embed audio source
                     if let Some(audio_attr_src_value) = get_node_attr(node, "src") {
-                        if session.options.output_format == MonolithOutputFormat::HTML {
+                        if session.options.output_format != MonolithOutputFormat::MHTML {
                             retrieve_and_embed_asset(
                                 session,
                                 document_url,
@@ -1739,7 +1739,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 "video" => {
                     // Embed video source
                     if let Some(video_attr_src_value) = get_node_attr(node, "src") {
-                        if session.options.output_format == MonolithOutputFormat::HTML {
+                        if session.options.output_format != MonolithOutputFormat::MHTML {
                             retrieve_and_embed_asset(
                                 session,
                                 document_url,
@@ -1766,7 +1766,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     Some(EMPTY_IMAGE_DATA_URL.to_string()),
                                 );
                             } else {
-                                if session.options.output_format == MonolithOutputFormat::HTML {
+                                if session.options.output_format != MonolithOutputFormat::MHTML {
                                     retrieve_and_embed_asset(
                                         session,
                                         document_url,

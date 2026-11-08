@@ -19,6 +19,7 @@ mod passing {
             method: "GET".to_string(),
             status: 200,
             urls: vec![url.to_string()],
+            ..Default::default()
         }
     }
 
@@ -78,5 +79,32 @@ mod passing {
 
         assert!(rewrite_scripts(&mut assets).is_empty());
         assert_eq!(assets[0].data, b"import './b.css';".to_vec());
+    }
+
+    #[test]
+    fn scripts_in_legacy_encodings_become_utf8() {
+        let mut script = asset("https://a.b/c.js", "");
+        script.content_type = "text/javascript; charset=windows-1252".to_string();
+        script.data = b"document.title = '\xe9t\xe9';".to_vec();
+        script.http.response_headers = vec![(
+            "Content-Type".to_string(),
+            "text/javascript; charset=windows-1252".to_string(),
+        )];
+        let mut assets = vec![script];
+
+        rewrite_scripts(&mut assets);
+
+        assert_eq!(
+            String::from_utf8(assets[0].data.clone()).unwrap(),
+            "document.title = '\u{e9}t\u{e9}';"
+        );
+        assert_eq!(assets[0].content_type, "text/javascript; charset=utf-8");
+        assert_eq!(
+            assets[0].http.response_headers,
+            vec![(
+                "Content-Type".to_string(),
+                "text/javascript; charset=utf-8".to_string()
+            )]
+        );
     }
 }

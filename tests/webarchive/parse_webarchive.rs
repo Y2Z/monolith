@@ -65,4 +65,34 @@ mod failing {
             let _ = parse_webarchive(&broken);
         }
     }
+
+    #[test]
+    fn objects_referred_to_over_and_over_do_not_add_up() {
+        // Every array refers to the next one twice: reading it all would take 2^30 steps
+        let levels: usize = 30;
+        let mut data = b"bplist00".to_vec();
+        let mut offsets = vec![];
+        for level in 0..levels {
+            offsets.push(data.len());
+            match level + 1 < levels {
+                true => data.extend([0xa2, (level + 1) as u8, (level + 1) as u8]),
+                false => data.push(0xa0),
+            }
+        }
+        let offsets_start = data.len();
+        for offset in &offsets {
+            data.push(*offset as u8);
+        }
+        let mut trailer = vec![0; 6];
+        trailer.extend([1, 1]);
+        trailer.extend((levels as u64).to_be_bytes());
+        trailer.extend(0_u64.to_be_bytes());
+        trailer.extend((offsets_start as u64).to_be_bytes());
+        data.extend(trailer);
+
+        let started = std::time::Instant::now();
+        assert!(!is_webarchive(&data));
+        assert!(parse_webarchive(&data).is_none());
+        assert!(started.elapsed().as_secs() < 5);
+    }
 }

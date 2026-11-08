@@ -3,7 +3,10 @@
 use base64::prelude::*;
 use serde_json::Value;
 
-use crate::replay::{ArchivedResponse, CapturedPage, create_page_from_responses};
+use crate::replay::{
+    ArchivedResponse, CapturedPage, HttpDetails, create_page_from_responses, set_content_type,
+    with_utf8_charset,
+};
 
 fn parse(data: &[u8]) -> Option<Value> {
     let data = data.strip_prefix(b"\xef\xbb\xbf").unwrap_or(data);
@@ -44,20 +47,57 @@ fn parse_response(entry: &Value) -> Option<ArchivedResponse> {
         return None;
     }
     let is_text = content["text"].is_string() && content["encoding"] != "base64";
+    let headers_of = |message: &Value| -> Vec<(String, String)> {
+        message["headers"]
+            .as_array()
+            .map(|headers| {
+                headers
+                    .iter()
+                    .filter_map(|header| {
+                        Some((
+                            header["name"].as_str()?.to_string(),
+                            header["value"].as_str()?.to_string(),
+                        ))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let location = find_header(response, "Location")
+        .or(response["redirectURL"].as_str())
+        .filter(|location| !location.is_empty())
+        .map(str::to_string);
+    let content_type = match is_text {
+        true => with_utf8_charset(content_type),
+        false => content_type.to_string(),
+    };
+    let mut response_headers = headers_of(response);
+    if is_text && !content_type.is_empty() {
+        set_content_type(&mut response_headers, &content_type);
+    }
+    if let Some(location) = &location
+        && find_header(response, "Location").is_none()
+    {
+        response_headers.push(("Location".to_string(), location.clone()));
+    }
+    let http = HttpDetails {
+        http_version: response["httpVersion"].as_str().unwrap_or("").to_string(),
+        request_headers: headers_of(&entry["request"]),
+        response_headers,
+        status_text: response["statusText"].as_str().unwrap_or("").to_string(),
+        time: entry["startedDateTime"]
+            .as_str()
+            .and_then(|date| chrono::DateTime::parse_from_rfc3339(date).ok())
+            .map(|date| date.timestamp_millis())
+            .unwrap_or(0),
+        redirects: vec![],
+    };
 
     Some(ArchivedResponse {
-        content_type: match is_text {
-            true => format!(
-                "{}; charset=utf-8",
-                content_type.split(';').next().unwrap_or("").trim()
-            ),
-            false => content_type.to_string(),
-        },
+        content_type,
         data: data.unwrap_or_default(),
-        location: find_header(response, "Location")
-            .or(response["redirectURL"].as_str())
-            .filter(|location| !location.is_empty())
-            .map(str::to_string),
+        http,
+        location,
         method: entry["request"]["method"].as_str()?.to_string(),
         status,
         url: entry["request"]["url"].as_str()?.to_string(),

@@ -134,6 +134,48 @@ mod passing {
         assert_eq!(page.url, "https://a.test/");
         assert_eq!(page.assets[0].urls[0], "http://a.test/");
     }
+
+    #[test]
+    fn headers_say_what_text_has_become() {
+        let mut page = entry(
+            "https://a.test/",
+            200,
+            "text/html; charset=gb2312",
+            Some("x"),
+        );
+        page["response"]["headers"] =
+            json!([{"name": "Content-Type", "value": "text/html; charset=gb2312"}]);
+
+        let (page, _) = parse_har(&har(vec![page]), None).unwrap();
+
+        assert_eq!(
+            page.assets[0].http.response_headers,
+            vec![(
+                "Content-Type".to_string(),
+                "text/html; charset=utf-8".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn redirects_say_where_they_lead() {
+        let mut redirect = entry("http://a.test/", 301, "", None);
+        redirect["response"]["redirectURL"] = json!("https://a.test/");
+
+        let (page, _) = parse_har(
+            &har(vec![
+                redirect,
+                entry("https://a.test/", 200, "text/html", Some("<p>one")),
+            ]),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            page.assets[0].http.redirects[0].response_headers,
+            vec![("Location".to_string(), "https://a.test/".to_string())]
+        );
+    }
 }
 
 #[cfg(test)]

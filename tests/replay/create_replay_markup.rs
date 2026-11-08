@@ -19,6 +19,7 @@ mod passing {
             method: "GET".to_string(),
             status: 200,
             urls: vec![url.to_string()],
+            ..Default::default()
         }
     }
 

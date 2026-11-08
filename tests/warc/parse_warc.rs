@@ -188,6 +188,63 @@ mod passing {
         assert_eq!(page.html, "<p>one");
         assert!(!has_other_pages);
     }
+
+    #[test]
+    fn keeps_every_response_to_the_same_request() {
+        let mut warc = record("response", "https://a.test/", "", &html("<p>one"));
+        for body in [b"1", b"2"] {
+            warc.extend(record(
+                "response",
+                "https://a.test/poll",
+                "",
+                &http("200 OK", "Content-Type: application/json\r\n", body),
+            ));
+        }
+
+        let (page, _) = parse_warc(&warc, None).unwrap();
+
+        assert_eq!(page.assets.len(), 3);
+        assert_eq!(page.assets[1].data, b"1");
+        assert_eq!(page.assets[2].data, b"2");
+    }
+
+    #[test]
+    fn documents_get_decoded_the_way_they_say_they_are_encoded() {
+        let warc = record(
+            "response",
+            "https://a.test/",
+            "",
+            &http(
+                "200 OK",
+                "Content-Type: text/html; charset=windows-1252\r\n",
+                b"<p>caf\xe9",
+            ),
+        );
+
+        assert_eq!(parse_warc(&warc, None).unwrap().0.html, "<p>caf\u{e9}");
+    }
+
+    #[test]
+    fn undoes_encodings_applied_one_after_another() {
+        use flate2::write::ZlibEncoder;
+
+        let mut deflate = ZlibEncoder::new(vec![], Compression::default());
+        deflate.write_all(b"<p>one").unwrap();
+        let mut gzip = GzEncoder::new(vec![], Compression::default());
+        gzip.write_all(&deflate.finish().unwrap()).unwrap();
+        let warc = record(
+            "response",
+            "https://a.test/",
+            "",
+            &http(
+                "200 OK",
+                "Content-Type: text/html\r\nContent-Encoding: deflate, gzip\r\n",
+                &gzip.finish().unwrap(),
+            ),
+        );
+
+        assert_eq!(parse_warc(&warc, None).unwrap().0.html, "<p>one");
+    }
 }
 
 #[cfg(test)]

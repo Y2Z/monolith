@@ -20,13 +20,13 @@ use crate::html::{
 };
 use crate::mhtml::{ArchivedAsset, MhtmlArchive, create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::replay::{
-    CapturedAsset, CapturedPage, create_replay_markup, insert_replay_markup, is_html, is_script,
-    rewrite_scripts, rewrite_stylesheets,
+    CapturedAsset, CapturedPage, create_replay_markup, exchanges_of, insert_replay_markup, is_html,
+    is_script, rewrite_scripts, rewrite_stylesheets,
 };
 use crate::session::Session;
 use crate::simplify::simplify_document;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
-use crate::warc::{is_warc, parse_warc};
+use crate::warc::{create_warc_document, is_warc, parse_warc};
 use crate::webarchive::{is_webarchive, parse_webarchive};
 
 #[derive(Debug)]
@@ -59,7 +59,7 @@ pub enum MonolithOutputFormat {
     #[default]
     HTML,
     MHTML,
-    // WARC,
+    WARC,
     // ZIM,
     // HAR,
 }
@@ -71,7 +71,11 @@ impl FromStr for MonolithOutputFormat {
         match format.to_lowercase().as_str() {
             "html" | "htm" => Ok(MonolithOutputFormat::HTML),
             "mhtml" | "mht" => Ok(MonolithOutputFormat::MHTML),
-            _ => Err(format!("unknown format \"{}\", use HTML or MHTML", format)),
+            "warc" => Ok(MonolithOutputFormat::WARC),
+            _ => Err(format!(
+                "unknown format \"{}\", use HTML, MHTML, or WARC",
+                format
+            )),
         }
     }
 }
@@ -79,6 +83,8 @@ impl FromStr for MonolithOutputFormat {
 #[derive(Default)]
 pub struct MonolithOptions {
     pub base_url: Option<String>,
+    /// Compress output, for formats that can be compressed (WARC)
+    pub compress: bool,
     pub browser: bool,
     /// Overrides MONOLITH_BROWSER_COLOR_SCHEME, the system decides if neither is set
     pub browser_color_scheme: Option<ColorScheme>,
@@ -124,6 +130,14 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "application/vnd.mozilla.xul+xml", // .xul
     "image/svg+xml",                   // .svg
 ];
+
+fn record_captured_page(session: &mut Session, page: &CapturedPage) {
+    for asset in &page.assets {
+        for exchange in exchanges_of(asset) {
+            session.record_exchange(exchange);
+        }
+    }
+}
 
 /// Things that are worth looking into, no matter what they claim to be.
 fn is_archive(data: &[u8]) -> bool {
@@ -202,12 +216,19 @@ pub fn create_monolithic_document_from_data(
             false => parse_har(&input_data, wanted_url.as_deref()),
         }
         .map_err(|error| MonolithError::new(&error))?;
+        // Whatever isn't in the archive stays missing
+        session.go_offline();
 
         if has_other_pages && wanted_url.is_none() && !session.options.silent {
             print_info_message(&format!(
                 "saving {}, the archive may have other pages, -b picks which one to save",
                 page.url
             ));
+        }
+
+        if session.is_recording() {
+            record_captured_page(&mut session, &page);
+            return Ok((create_warc_document(&session), None));
         }
 
         if !is_html(&page.content_type) {
@@ -250,6 +271,20 @@ pub fn create_monolithic_document_from_data(
                 .media_type
                 .eq_ignore_ascii_case("application/xhtml+xml")
         {
+            if let Some(url) = &root.url
+                && session.is_recording()
+            {
+                let (data, media_type, charset) = (
+                    root.data.clone(),
+                    root.media_type.clone(),
+                    root.charset.clone(),
+                );
+                let url = url.clone();
+                session.load_archive(archive);
+                session.record_resource(&url, &data, &media_type, &charset);
+                return Ok((create_warc_document(&session), None));
+            }
+
             // Provide output as is (without processing it, the way browsers do)
             return Ok((root.data.clone(), None));
         }
@@ -267,6 +302,24 @@ pub fn create_monolithic_document_from_data(
     } else {
         (input_data, input_encoding, input_target)
     };
+
+    // Archives need to know where the document came from
+    if session.is_recording() {
+        let usable = |url: &String| Url::parse(url).ok().filter(|url| url.scheme() != "data");
+        let document_url = input_target
+            .as_ref()
+            .and_then(usable)
+            .or(session.options.base_url.as_ref().and_then(usable))
+            .ok_or(MonolithError::new(
+                "document has no URL to be archived under, -b can provide one",
+            ))?;
+        session.record_resource(
+            &document_url,
+            &input_data,
+            "text/html",
+            input_encoding.as_deref().unwrap_or(""),
+        );
+    }
 
     let mut base_url: Url = if input_target.is_some() {
         Url::parse(&input_target.clone().unwrap()).unwrap()
@@ -444,6 +497,11 @@ pub fn create_monolithic_document_from_data(
         html.splice(0..0, metadata_comment.as_bytes().to_vec());
     }
 
+    if session.is_recording() {
+        // What has been put together only served to find out what it's made of
+        return Ok((create_warc_document(&session), document_title));
+    }
+
     if session.options.output_format == MonolithOutputFormat::MHTML {
         // Outputting in MHTML format
         let mhtml: Vec<u8> = create_mhtml_document(
@@ -543,7 +601,7 @@ pub fn create_monolithic_document(
         let page = render_page(target_url.as_str(), &session)
             .map_err(|error| MonolithError::new(&error))?;
 
-        if is_captured_document(&page) {
+        if is_captured_document(&page) || session.is_recording() {
             return create_monolithic_document_from_capture(session, page);
         }
 
@@ -566,6 +624,18 @@ pub fn create_monolithic_document(
                     && !media_type.eq_ignore_ascii_case("application/xhtml+xml")
                     && !is_archive(&retrieved_data)
                 {
+                    if session.is_recording() {
+                        if target_url.scheme() != "data" {
+                            session.record_resource(
+                                &final_url,
+                                &retrieved_data,
+                                &media_type,
+                                &charset,
+                            );
+                        }
+                        return Ok((create_warc_document(&session), None));
+                    }
+
                     // Provide output as text (without processing it, the way browsers do)
                     return Ok((retrieved_data, None));
                 }
@@ -623,6 +693,12 @@ pub fn create_monolithic_document_from_capture(
     mut session: Session,
     mut page: CapturedPage,
 ) -> Result<(Vec<u8>, Option<String>), MonolithError> {
+    if session.is_recording() {
+        record_captured_page(&mut session, &page);
+        let title = Some(page.title).filter(|title| !title.is_empty());
+        return Ok((create_warc_document(&session), title));
+    }
+
     let source_document = page
         .assets
         .iter()
@@ -722,6 +798,8 @@ pub fn format_output_path(
                 "htm"
             } else if output_format == MonolithOutputFormat::MHTML {
                 "mht"
+            } else if output_format == MonolithOutputFormat::WARC {
+                "warc"
             } else {
                 ""
             },
@@ -732,6 +810,8 @@ pub fn format_output_path(
                 "html"
             } else if output_format == MonolithOutputFormat::MHTML {
                 "mhtml"
+            } else if output_format == MonolithOutputFormat::WARC {
+                "warc"
             } else {
                 ""
             },

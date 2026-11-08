@@ -1,5 +1,6 @@
 //! Safari's .webarchive files: property lists holding the document, and what it's made of.
 
+use std::cell::Cell;
 use std::collections::HashMap;
 
 use url::Url;
@@ -35,6 +36,8 @@ impl Plist {
 }
 
 struct Reader<'a> {
+    /// How many more objects can be read, objects referenced many times count every time
+    budget: Cell<usize>,
     data: &'a [u8],
     offsets: &'a [u8],
     offset_size: usize,
@@ -91,9 +94,10 @@ impl Reader<'_> {
     }
 
     fn read_object(&self, object: usize, depth: usize) -> Option<Plist> {
-        if depth > MAX_DEPTH {
+        if depth > MAX_DEPTH || self.budget.get() == 0 {
             return None;
         }
+        self.budget.set(self.budget.get() - 1);
 
         let position = self.object_offset(object)?;
         let marker = *self.data.get(position)?;
@@ -161,6 +165,8 @@ fn parse_plist(data: &[u8]) -> Option<Plist> {
     }
 
     let reader = Reader {
+        // Archives don't need to refer to things more than a couple of times
+        budget: Cell::new(objects.saturating_mul(4).saturating_add(64)),
         data,
         offsets: data
             .get(offsets_start..offsets_start.checked_add(objects.checked_mul(offset_size)?)?)?,

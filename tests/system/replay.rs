@@ -441,3 +441,65 @@ fn har_gets_its_javascript_back() {
         assert!(html.contains("imported|fetched|/page"), "{}", html);
     });
 }
+
+#[test]
+fn saves_what_it_takes_to_replay_as_warc() {
+    with_each_browser(|browser| {
+        let server = Server::new(&[
+            (
+                "/",
+                "text/html",
+                b"<title>t</title><body><script type=module src=/app.js></script>",
+            ),
+            (
+                "/app.js",
+                "text/javascript",
+                b"import {name} from './lib.js';\
+                  const data = await (await fetch('/data.json')).json();\
+                  document.body.textContent = name + '|' + data.value;",
+            ),
+            (
+                "/lib.js",
+                "text/javascript",
+                b"export const name = 'imported';",
+            ),
+            ("/data.json", "application/json", b"{\"value\":\"fetched\"}"),
+        ]);
+        let workspace = Workspace::new(browser);
+        let saved = workspace.save(&server.url("/"), &["--format", "warc"]);
+        let warc = std::fs::read(&saved).unwrap();
+        let requests = server.requests().len();
+
+        assert!(warc.starts_with(b"WARC/1.1\r\n"));
+        let unpacked = workspace.unpack("page.warc", &warc);
+        let html = workspace.open(&unpacked);
+
+        assert!(html.contains("imported|fetched"), "{}", html);
+        assert_eq!(server.requests().len(), requests, "archive has reached out");
+    });
+}
+
+#[test]
+fn text_in_legacy_encodings_stays_readable() {
+    with_each_browser(|browser| {
+        let server = Server::new(&[
+            (
+                "/",
+                "text/html; charset=windows-1252",
+                b"<title>t</title><body><p id=p>caf\xe9</p><script src=/app.js></script>",
+            ),
+            (
+                "/app.js",
+                "text/javascript; charset=windows-1252",
+                b"document.body.dataset.done = document.getElementById('p').textContent \
+                  === 'caf\xe9' ? 'same' : 'different';",
+            ),
+        ]);
+        let workspace = Workspace::new(browser);
+        let saved = workspace.save(&server.url("/"), &[]);
+        let html = workspace.open(&saved);
+
+        assert!(html.contains("caf\u{e9}"), "{}", html);
+        assert!(html.contains("data-done=\"same\""), "{}", html);
+    });
+}

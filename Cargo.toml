@@ -99,6 +99,7 @@ vendored-openssl = [] # Deprecated, being kept as a remnant (probably until 2.15
 name = "monolith"
 path = "src/lib.rs"
 test = false
+doctest = false
 
 [[bin]]
 name = "monolith"

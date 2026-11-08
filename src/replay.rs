@@ -5,8 +5,37 @@ use std::collections::{HashMap, HashSet};
 
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
+use chrono::{DateTime, TimeZone, Utc};
+use encoding_rs::Encoding;
 use serde_json::json;
 use url::Url;
+
+use crate::cache::Exchange;
+use crate::core::parse_media_type;
+
+/// What else there is to know about a response, for archives that keep track of it.
+#[derive(Clone, Debug, Default)]
+pub struct HttpDetails {
+    /// "HTTP/1.1", "HTTP/2"... (empty if unknown)
+    pub http_version: String,
+    pub request_headers: Vec<(String, String)>,
+    pub response_headers: Vec<(String, String)>,
+    pub status_text: String,
+    /// When it was received, in milliseconds since the epoch (zero if unknown)
+    pub time: i64,
+    /// Responses that have redirected to it
+    pub redirects: Vec<Redirect>,
+}
+
+/// A response that has sent the request somewhere else.
+#[derive(Clone, Debug, Default)]
+pub struct Redirect {
+    pub request_headers: Vec<(String, String)>,
+    pub response_headers: Vec<(String, String)>,
+    pub status: u64,
+    pub status_text: String,
+    pub url: String,
+}
 
 /// Something a page has received while it was being loaded.
 #[derive(Clone, Debug, Default)]
@@ -22,6 +51,7 @@ pub struct CapturedAsset {
     pub status: u64,
     /// Where it was requested from, followed by the ones it got redirected to
     pub urls: Vec<String>,
+    pub http: HttpDetails,
 }
 
 /// A page that was loaded by something other than Monolith, be that a browser, or a web view of an
@@ -37,9 +67,11 @@ pub struct CapturedPage {
 }
 
 /// A response stored in an archive, the way it left the server.
+#[derive(Clone, Default)]
 pub struct ArchivedResponse {
     pub content_type: String,
     pub data: Vec<u8>,
+    pub http: HttpDetails,
     /// Where it redirects to, as given by the server
     pub location: Option<String>,
     pub method: String,
@@ -601,8 +633,8 @@ pub fn rewrite_scripts(assets: &mut [CapturedAsset]) -> Vec<(String, String, Str
         };
 
         if is_script(asset) {
-            let script = rewrite_imports(&String::from_utf8_lossy(&asset.data), &url);
-            asset.data = script.code.into_bytes();
+            let script = rewrite_imports(&decode_text(&asset.data, &asset.content_type), &url);
+            store_as_utf8(asset, script.code);
             // Scripts are free to be modules without using any of what makes them look like ones
             modules[index] = true;
             imported.extend(script.imports);
@@ -654,8 +686,9 @@ pub fn rewrite_stylesheets(assets: &mut [CapturedAsset]) {
         .filter(|asset| asset.content_type.starts_with("text/css"))
     {
         if let Some(url) = asset.urls.last().and_then(|url| Url::parse(url).ok()) {
-            let stylesheet = String::from_utf8_lossy(&asset.data);
-            asset.data = embed_stylesheet_urls(&stylesheet, &url, &data_urls).into_bytes();
+            let stylesheet = decode_text(&asset.data, &asset.content_type);
+            let stylesheet = embed_stylesheet_urls(&stylesheet, &url, &data_urls);
+            store_as_utf8(asset, stylesheet);
         }
     }
 }
@@ -700,6 +733,44 @@ pub fn embed_stylesheet_urls(
     result
 }
 
+/// Content type that says what text has been turned into.
+pub(crate) fn with_utf8_charset(content_type: &str) -> String {
+    format!(
+        "{}; charset=utf-8",
+        content_type.split(';').next().unwrap_or("").trim()
+    )
+}
+
+/// Makes headers agree with the content type, there's one of them in there at most.
+pub(crate) fn set_content_type(headers: &mut Vec<(String, String)>, content_type: &str) {
+    headers.retain(|(name, _)| !name.eq_ignore_ascii_case("content-type"));
+    headers.push(("Content-Type".to_string(), content_type.to_string()));
+}
+
+/// Text, decoded the way its content type says it's encoded.
+pub(crate) fn decode_text(data: &[u8], content_type: &str) -> String {
+    let (_, charset, _) = parse_media_type(content_type);
+
+    match charset.and_then(|charset| Encoding::for_label(charset.as_bytes())) {
+        Some(encoding) => encoding.decode_with_bom_removal(data).0.into_owned(),
+        None => String::from_utf8_lossy(data).into_owned(),
+    }
+}
+
+/// Text that has been re-encoded as UTF-8 has to say so.
+fn store_as_utf8(asset: &mut CapturedAsset, text: String) {
+    asset.data = text.into_bytes();
+    asset.content_type = with_utf8_charset(&asset.content_type);
+    if asset
+        .http
+        .response_headers
+        .iter()
+        .any(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+    {
+        set_content_type(&mut asset.http.response_headers, &asset.content_type);
+    }
+}
+
 fn without_fragment(url: &str) -> String {
     url.split('#').next().unwrap_or(url).to_string()
 }
@@ -739,7 +810,7 @@ pub fn create_page_from_responses(
     wanted_url: Option<&str>,
 ) -> Result<CapturedPage, String> {
     let mut redirects: HashMap<String, String> = HashMap::new();
-    let mut seen: HashSet<(String, String)> = HashSet::new();
+    let mut redirect_responses: HashMap<String, Redirect> = HashMap::new();
     let mut kept: Vec<ArchivedResponse> = vec![];
 
     for response in responses {
@@ -751,14 +822,19 @@ pub fn create_page_from_responses(
                 .as_ref()
                 .and_then(|location| Url::parse(&response.url).ok()?.join(location.trim()).ok());
             if let Some(target) = target {
+                redirect_responses.entry(key.clone()).or_insert(Redirect {
+                    request_headers: response.http.request_headers.clone(),
+                    response_headers: response.http.response_headers.clone(),
+                    status: response.status,
+                    status_text: response.http.status_text.clone(),
+                    url: response.url.clone(),
+                });
                 redirects
                     .entry(key)
                     .or_insert(without_fragment(target.as_str()));
             }
-        } else if response.status >= 200
-            && response.status != 304
-            && seen.insert((response.method.clone(), key))
-        {
+        } else if response.status >= 200 && response.status != 304 {
+            // Pages may ask for the same thing many times, and get something else every time
             kept.push(response);
         }
     }
@@ -795,7 +871,7 @@ pub fn create_page_from_responses(
     };
 
     let url = kept[root].url.clone();
-    let html = String::from_utf8_lossy(&kept[root].data).into_owned();
+    let html = decode_text(&kept[root].data, &kept[root].content_type);
     let content_type = kept[root].content_type.clone();
     let assets = kept
         .into_iter()
@@ -808,6 +884,11 @@ pub fn create_page_from_responses(
                 .cloned()
                 .collect();
             urls.sort();
+            let mut http = response.http;
+            http.redirects = urls
+                .iter()
+                .filter_map(|url| redirect_responses.get(url).cloned())
+                .collect();
             urls.push(response.url.clone());
 
             CapturedAsset {
@@ -822,6 +903,7 @@ pub fn create_page_from_responses(
                 method: response.method,
                 status: response.status,
                 urls,
+                http,
             }
         })
         .collect();
@@ -833,4 +915,61 @@ pub fn create_page_from_responses(
         title: String::new(),
         url,
     })
+}
+
+fn exchange_time(time: i64) -> DateTime<Utc> {
+    match time > 0 {
+        true => Utc
+            .timestamp_millis_opt(time)
+            .single()
+            .unwrap_or_else(Utc::now),
+        false => Utc::now(),
+    }
+}
+
+/// What it took to receive an asset, redirects included.
+pub fn exchanges_of(asset: &CapturedAsset) -> Vec<Exchange> {
+    let Some(url) = asset.urls.last() else {
+        return vec![];
+    };
+    let date = exchange_time(asset.http.time);
+    let mut exchanges: Vec<Exchange> = asset
+        .http
+        .redirects
+        .iter()
+        .map(|redirect| Exchange {
+            date,
+            http_version: asset.http.http_version.clone(),
+            method: asset.method.clone(),
+            request_headers: redirect.request_headers.clone(),
+            response_headers: redirect.response_headers.clone(),
+            status: Some(redirect.status as u16),
+            status_text: redirect.status_text.clone(),
+            url: redirect.url.clone(),
+            ..Default::default()
+        })
+        .collect();
+
+    let mut response_headers = asset.http.response_headers.clone();
+    let has_content_type = response_headers
+        .iter()
+        .any(|(name, _)| name.eq_ignore_ascii_case("content-type"));
+    if !has_content_type && !asset.content_type.is_empty() {
+        response_headers.push(("Content-Type".to_string(), asset.content_type.clone()));
+    }
+
+    exchanges.push(Exchange {
+        body: asset.data.clone(),
+        content_type: asset.content_type.clone(),
+        date,
+        http_version: asset.http.http_version.clone(),
+        method: asset.method.clone(),
+        request_headers: asset.http.request_headers.clone(),
+        response_headers,
+        status: Some(asset.status as u16),
+        status_text: asset.http.status_text.clone(),
+        url: url.clone(),
+    });
+
+    exchanges
 }

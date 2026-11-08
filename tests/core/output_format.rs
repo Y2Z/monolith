@@ -24,12 +24,27 @@ mod passing {
 }
 
 #[cfg(test)]
+mod passing_warc {
+    use monolith::core::MonolithOutputFormat;
+
+    #[test]
+    fn warc_in_any_case() {
+        for format in ["WARC", "warc", "Warc"] {
+            assert_eq!(
+                format.parse::<MonolithOutputFormat>(),
+                Ok(MonolithOutputFormat::WARC)
+            );
+        }
+    }
+}
+
+#[cfg(test)]
 mod failing {
     use monolith::core::MonolithOutputFormat;
 
     #[test]
     fn unknown_format() {
-        assert!("warc".parse::<MonolithOutputFormat>().is_err());
+        assert!("zim".parse::<MonolithOutputFormat>().is_err());
     }
 
     #[test]

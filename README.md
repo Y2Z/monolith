@@ -213,7 +213,7 @@ monolith crawl.warc.gz -b https://some.site/page -o page.html
  - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
- - `-F`: Set output `format`: `HTML` (default) or `MHTML`, `HTM` and `MHT` work as well, in any case
+ - `-F`: Set output `format`: `HTML` (default), `MHTML`, or `WARC` (compressed if the output file ends with `.gz`), `HTM` and `MHT` work as well, in any case
  - `-f`: Exclude web fonts
  - `-h`: Print usage information
  - `-i`: Remove images

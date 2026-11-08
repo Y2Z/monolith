@@ -152,3 +152,141 @@ mod failing {
         assert!(errors.contains("archive has no page at https://b.test/"));
     }
 }
+
+#[cfg(test)]
+mod warc_output {
+    use std::env;
+
+    use assert_cmd::Command;
+    use monolith::warc::parse_warc;
+
+    use super::helpers::{har, monolith, warc};
+
+    fn bytes(args: &[&str], input: &[u8]) -> (Vec<u8>, String, bool) {
+        let output = Command::new(assert_cmd::cargo_bin!("monolith"))
+            .args(args)
+            .write_stdin(input)
+            .output()
+            .unwrap();
+
+        (
+            output.stdout,
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+            output.status.success(),
+        )
+    }
+
+    #[test]
+    fn local_files_become_resources() {
+        let path = env::current_dir()
+            .unwrap()
+            .join("tests/_data_/basic/local-file.html");
+        let (output, _, success) = bytes(&["-q", "-F", "WARC", path.to_str().unwrap()], b"");
+        let output = String::from_utf8_lossy(&output);
+
+        assert!(success);
+        assert!(output.contains("WARC-Type: resource"));
+        assert!(output.contains("local-file.html"));
+        assert!(output.contains("local-style.css"));
+    }
+
+    #[test]
+    fn documents_from_stdin_need_a_url() {
+        let (_, errors, success) = bytes(&["-F", "WARC", "-"], b"<p>hi");
+
+        assert!(!success);
+        assert!(errors.contains("-b can provide one"));
+
+        let (output, _, success) = bytes(
+            &["-q", "-F", "WARC", "-b", "https://a.test/", "-"],
+            b"<p>hi",
+        );
+        assert!(success);
+        assert_eq!(parse_warc(&output, None).unwrap().0.html, "<p>hi");
+    }
+
+    #[test]
+    fn archives_turn_into_warc() {
+        for archive in [warc(), har()] {
+            let (output, _, success) = bytes(&["-q", "-F", "WARC", "-"], &archive);
+            let (page, _) = parse_warc(&output, None).unwrap();
+
+            assert!(success);
+            assert_eq!(page.url, "https://a.test/");
+            assert!(
+                page.assets
+                    .iter()
+                    .any(|asset| asset.urls[0] == "https://a.test/a.js")
+            );
+        }
+    }
+
+    #[test]
+    fn webarchives_turn_into_warc() {
+        let (output, _, success) = monolith(
+            include_bytes!("../_data_/webarchive/page.webarchive"),
+            &["-q", "-F", "WARC"],
+        );
+
+        assert!(success);
+        assert!(output.contains("WARC-Target-URI: https://example.com/page.html"));
+        assert!(output.contains("WARC-Target-URI: https://example.com/style.css"));
+    }
+
+    #[test]
+    fn documents_given_as_data_urls_can_get_their_url_from_base_url() {
+        let (output, _, success) = bytes(
+            &[
+                "-q",
+                "-F",
+                "WARC",
+                "-b",
+                "https://a.test/",
+                "data:text/html,<p>hi",
+            ],
+            b"",
+        );
+
+        assert!(success);
+        assert_eq!(parse_warc(&output, None).unwrap().0.url, "https://a.test/");
+    }
+
+    #[test]
+    fn local_files_that_are_not_documents_get_archived_too() {
+        let path = env::current_dir()
+            .unwrap()
+            .join("tests/_data_/basic/local-style.css");
+        let (output, _, success) = bytes(&["-q", "-F", "WARC", path.to_str().unwrap()], b"");
+        let output = String::from_utf8_lossy(&output);
+
+        assert!(success);
+        assert!(output.contains("WARC-Type: resource"));
+        assert!(output.contains("local-style.css"));
+    }
+
+    #[test]
+    fn archives_can_not_reach_into_local_files() {
+        let directory = env::current_dir().unwrap().join("tests/_data_/basic");
+        let page = format!(
+            "<link rel=stylesheet href=\"{}\">",
+            monolith::url::Url::from_file_path(directory.join("local-style.css")).unwrap()
+        );
+        let page_url = monolith::url::Url::from_file_path(directory.join("page.html")).unwrap();
+        let warc = format!(
+            "WARC/1.1\r\nWARC-Type: resource\r\nWARC-Target-URI: {}\r\n\
+             Content-Type: text/html\r\nContent-Length: {}\r\n\r\n{}\r\n\r\n",
+            page_url,
+            page.len(),
+            page
+        );
+        let stylesheet = std::fs::read_to_string(directory.join("local-style.css")).unwrap();
+
+        for args in [&["-j"][..], &[][..]] {
+            let (output, errors, success) = monolith(warc.as_bytes(), args);
+
+            assert!(success);
+            assert!(!output.contains(stylesheet.trim()));
+            assert!(errors.contains("local-style.css (not found in archive)"));
+        }
+    }
+}
