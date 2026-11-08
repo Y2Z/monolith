@@ -35,7 +35,7 @@ const DEFAULT_USER_AGENT: &str =
 #[command(version)] // Read version from Cargo.toml
 #[command(about = ASCII.to_owned() + "\n" + env!("CARGO_PKG_NAME") + " " + env!("CARGO_PKG_VERSION") + "\n\n" + env!("CARGO_PKG_DESCRIPTION"), long_about = None)]
 struct Cli {
-    /// Set custom base URL
+    /// Set custom base URL, or pick the page to save out of a WARC or HAR archive
     #[arg(short, long, value_name = "http://localhost/")]
     base_url: Option<String>,
 
@@ -63,6 +63,10 @@ struct Cli {
     #[arg(short = 'E', long, value_name = "UTF-8")]
     encoding: Option<String>,
 
+    /// Set output format: HTML (default) or MHTML
+    #[arg(short = 'F', long, value_name = "HTML")]
+    format: Option<MonolithOutputFormat>,
+
     /// Remove fonts
     #[arg(short = 'f', long)]
     no_fonts: bool,
@@ -83,10 +87,6 @@ struct Cli {
     #[arg(short = 'k', long)]
     insecure: bool,
 
-    /// Use MHTML as output format
-    #[arg(short = 'm', long)]
-    mhtml: bool,
-
     /// Exclude timestamp and source information
     #[arg(short = 'M', long)]
     no_metadata: bool,
@@ -103,13 +103,13 @@ struct Cli {
     #[arg(short, long)]
     quiet: bool,
 
-    /// Save a simplified version of the page, just the article and nothing around it
-    #[arg(short = 'R', long)]
-    reader_mode: bool,
-
     /// Remove elements from the document, e.g. "audio,video" or "main div iframe"
     #[arg(short = 'r', long = "remove", value_name = "selector")]
     remove_elements: Vec<String>,
+
+    /// Save a simplified version of the page, just the article and nothing around it
+    #[arg(short = 'S', long)]
+    simplify: bool,
 
     /// Remove styles
     #[arg(short = 's', long)]
@@ -224,11 +224,9 @@ fn main() {
         options.no_fonts = cli.no_fonts;
         options.no_images = cli.no_images;
         options.no_js = cli.no_js;
-        if cli.mhtml {
-            options.output_format = MonolithOutputFormat::MHTML;
-        }
+        options.output_format = cli.format.unwrap_or_default();
         options.no_metadata = cli.no_metadata;
-        options.reader_mode = cli.reader_mode;
+        options.simplify = cli.simplify;
         options.remove_elements = cli.remove_elements;
         options.wipe_elements = cli.wipe_elements;
         options.silent = cli.quiet;

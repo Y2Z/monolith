@@ -4,6 +4,7 @@ use std::fmt;
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::Path;
+use std::str::FromStr;
 
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::Encoding;
@@ -11,19 +12,22 @@ use markup5ever_rcdom::RcDom;
 use url::Url;
 
 use crate::browser::{ColorScheme, render_page};
+use crate::har::{is_har, parse_har};
 use crate::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
     has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots,
     strip_elements, targets_element_anywhere, walk,
 };
-use crate::mhtml::{create_mhtml_document, is_mhtml, parse_mhtml};
-use crate::reader_mode::simplify_document;
+use crate::mhtml::{ArchivedAsset, MhtmlArchive, create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::replay::{
-    CapturedAsset, CapturedPage, create_replay_markup, insert_replay_markup, is_script,
+    CapturedAsset, CapturedPage, create_replay_markup, insert_replay_markup, is_html, is_script,
     rewrite_scripts, rewrite_stylesheets,
 };
 use crate::session::Session;
+use crate::simplify::simplify_document;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
+use crate::warc::{is_warc, parse_warc};
+use crate::webarchive::{is_webarchive, parse_webarchive};
 
 #[derive(Debug)]
 pub struct MonolithError {
@@ -60,6 +64,18 @@ pub enum MonolithOutputFormat {
     // HAR,
 }
 
+impl FromStr for MonolithOutputFormat {
+    type Err = String;
+
+    fn from_str(format: &str) -> Result<Self, Self::Err> {
+        match format.to_lowercase().as_str() {
+            "html" | "htm" => Ok(MonolithOutputFormat::HTML),
+            "mhtml" | "mht" => Ok(MonolithOutputFormat::MHTML),
+            _ => Err(format!("unknown format \"{}\", use HTML or MHTML", format)),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct MonolithOptions {
     pub base_url: Option<String>,
@@ -83,11 +99,11 @@ pub struct MonolithOptions {
     pub no_js: bool,
     pub no_metadata: bool,
     pub output_format: MonolithOutputFormat,
-    pub reader_mode: bool,
     pub remove_elements: Vec<String>,
     /// Set for documents that replay responses, instead of relying on a network
     pub replay: bool,
     pub silent: bool,
+    pub simplify: bool,
     pub threads: usize,
     pub timeout: u64,
     pub unwrap_noscript: bool,
@@ -109,6 +125,45 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "image/svg+xml",                   // .svg
 ];
 
+/// Things that are worth looking into, no matter what they claim to be.
+fn is_archive(data: &[u8]) -> bool {
+    is_mhtml(data) || is_warc(data) || is_har(data) || is_webarchive(data)
+}
+
+/// Pages that won't be replayed still have to get everything from where they came from.
+fn create_archive_from_page(page: &CapturedPage) -> MhtmlArchive {
+    let assets = page
+        .assets
+        .iter()
+        .filter(|asset| asset.is_reusable)
+        .map(|asset| {
+            let urls: Vec<Url> = asset
+                .urls
+                .iter()
+                .filter_map(|url| Url::parse(url).ok())
+                .collect();
+            let (media_type, charset, _) = parse_media_type(&asset.content_type);
+
+            (
+                asset.destination != "document",
+                (
+                    urls.clone(),
+                    ArchivedAsset {
+                        data: asset.data.clone(),
+                        url: urls.last().cloned(),
+                        media_type,
+                        charset: charset.unwrap_or_default(),
+                    },
+                ),
+            )
+        });
+    let mut assets: Vec<_> = assets.collect();
+    // The document comes first
+    assets.sort_by_key(|(is_asset, _)| *is_asset);
+
+    MhtmlArchive::from_assets(assets.into_iter().map(|(_, asset)| asset).collect())
+}
+
 pub fn create_monolithic_document_from_data(
     mut session: Session,
     input_data: Vec<u8>,
@@ -116,7 +171,7 @@ pub fn create_monolithic_document_from_data(
     input_target: Option<String>,
 ) -> Result<(Vec<u8>, Option<String>), MonolithError> {
     // Simplified documents have no use for JavaScript
-    if session.options.reader_mode {
+    if session.options.simplify {
         session.options.no_js = true;
     }
 
@@ -133,14 +188,62 @@ pub fn create_monolithic_document_from_data(
         }
     }
 
-    // MHTML archives get unpacked: the document inside gets processed, the rest of the archive serves as its assets
-    let (input_data, input_encoding, input_target) = if is_mhtml(&input_data) {
-        let archive_url: Option<Url> = input_target.as_deref().and_then(|t| Url::parse(t).ok());
-        let archive = match parse_mhtml(&input_data, archive_url.as_ref()) {
-            Some(archive) => archive,
-            None => return Err(MonolithError::new("could not unpack MHTML archive")),
-        };
+    // Archives that hold original responses get their pages replayed
+    let mut archive: Option<MhtmlArchive> = None;
+    let is_warc_archive = is_warc(&input_data);
+    if is_warc_archive || is_har(&input_data) {
+        let wanted_url = session
+            .options
+            .base_url
+            .take()
+            .filter(|url| !url.is_empty());
+        let (page, has_other_pages) = match is_warc_archive {
+            true => parse_warc(&input_data, wanted_url.as_deref()),
+            false => parse_har(&input_data, wanted_url.as_deref()),
+        }
+        .map_err(|error| MonolithError::new(&error))?;
 
+        if has_other_pages && wanted_url.is_none() && !session.options.silent {
+            print_info_message(&format!(
+                "saving {}, the archive may have other pages, -b picks which one to save",
+                page.url
+            ));
+        }
+
+        if !is_html(&page.content_type) {
+            // Provide output as is (without processing it, the way browsers do)
+            let root = page
+                .assets
+                .into_iter()
+                .find(|asset| asset.destination == "document");
+            return Ok((root.map(|root| root.data).unwrap_or_default(), None));
+        }
+        if !session.options.no_js
+            && !session.options.simplify
+            && session.options.output_format == MonolithOutputFormat::HTML
+        {
+            return create_monolithic_document_from_capture(session, page);
+        }
+
+        archive = Some(create_archive_from_page(&page));
+    }
+
+    // Other archives get unpacked: the document inside gets processed, the rest of the archive serves as
+    // the only source of its assets
+    if is_mhtml(&input_data) {
+        let archive_url: Option<Url> = input_target.as_deref().and_then(|t| Url::parse(t).ok());
+        archive = Some(
+            parse_mhtml(&input_data, archive_url.as_ref())
+                .ok_or(MonolithError::new("could not unpack MHTML archive"))?,
+        );
+    } else if is_webarchive(&input_data) {
+        archive = Some(
+            parse_webarchive(&input_data)
+                .ok_or(MonolithError::new("could not unpack WebArchive"))?,
+        );
+    }
+
+    let (input_data, input_encoding, input_target) = if let Some(archive) = archive {
         let root = archive.root();
         if !root.media_type.eq_ignore_ascii_case("text/html")
             && !root
@@ -255,9 +358,9 @@ pub fn create_monolithic_document_from_data(
     }
 
     let had_favicon: bool = has_favicon(&dom.document);
-    if session.options.reader_mode {
+    if session.options.simplify {
         if !simplify_document(&dom, !session.options.no_styles) && !session.options.silent {
-            print_error_message("reader mode found no article, the page may rely on JavaScript");
+            print_error_message("found no article to simplify, the page may rely on JavaScript");
         }
     }
     strip_elements(
@@ -461,7 +564,7 @@ pub fn create_monolithic_document(
             Ok((retrieved_data, final_url, media_type, charset)) => {
                 if !media_type.eq_ignore_ascii_case("text/html")
                     && !media_type.eq_ignore_ascii_case("application/xhtml+xml")
-                    && !is_mhtml(&retrieved_data)
+                    && !is_archive(&retrieved_data)
                 {
                     // Provide output as text (without processing it, the way browsers do)
                     return Ok((retrieved_data, None));
@@ -528,7 +631,7 @@ pub fn create_monolithic_document_from_capture(
 
     if let Some(source_document) = source_document.filter(|_| {
         !session.options.no_js
-            && !session.options.reader_mode
+            && !session.options.simplify
             && session.options.output_format == MonolithOutputFormat::HTML
     }) {
         session.options.replay = true;
@@ -553,7 +656,7 @@ pub fn create_monolithic_document_from_capture(
         );
         let charset = parse_media_type(&source_document.content_type).1;
         let source_url = source_document.urls.last().cloned();
-        let (document, _) = create_monolithic_document_from_data(
+        let (document, title) = create_monolithic_document_from_data(
             session,
             source_document.data,
             charset,
@@ -562,7 +665,7 @@ pub fn create_monolithic_document_from_capture(
 
         return Ok((
             insert_replay_markup(document, &markup),
-            Some(page.title).filter(|title| !title.is_empty()),
+            Some(page.title).filter(|title| !title.is_empty()).or(title),
         ));
     }
 

@@ -36,6 +36,17 @@ pub struct CapturedPage {
     pub url: String,
 }
 
+/// A response stored in an archive, the way it left the server.
+pub struct ArchivedResponse {
+    pub content_type: String,
+    pub data: Vec<u8>,
+    /// Where it redirects to, as given by the server
+    pub location: Option<String>,
+    pub method: String,
+    pub status: u64,
+    pub url: String,
+}
+
 const EMULATOR: &str = include_str!("../assets/scripts/replay.js");
 const LOCATION_REPLACEMENT: &str = "__monolithLocation";
 
@@ -687,4 +698,139 @@ pub fn embed_stylesheet_urls(
     result.push_str(remainder);
 
     result
+}
+
+fn without_fragment(url: &str) -> String {
+    url.split('#').next().unwrap_or(url).to_string()
+}
+
+pub(crate) fn is_html(content_type: &str) -> bool {
+    let media_type = content_type.split(';').next().unwrap_or("").trim();
+
+    media_type.eq_ignore_ascii_case("text/html")
+        || media_type.eq_ignore_ascii_case("application/xhtml+xml")
+}
+
+/// Archives don't tell what things were requested for, what they are is a good enough hint.
+fn destination_by_content_type(content_type: &str) -> &'static str {
+    let media_type = content_type.to_lowercase();
+
+    if is_html(&media_type) {
+        "iframe"
+    } else if media_type.contains("javascript") || media_type.contains("ecmascript") {
+        "script"
+    } else if media_type.starts_with("text/css") {
+        "style"
+    } else if media_type.starts_with("image/") {
+        "image"
+    } else if media_type.starts_with("font/") || media_type.contains("font-") {
+        "font"
+    } else if media_type.starts_with("video/") || media_type.starts_with("audio/") {
+        "video"
+    } else {
+        ""
+    }
+}
+
+/// Puts a page together out of what an archive has stored: the page is either the one that was
+/// asked for, or the first document in there.
+pub fn create_page_from_responses(
+    responses: Vec<ArchivedResponse>,
+    wanted_url: Option<&str>,
+) -> Result<CapturedPage, String> {
+    let mut redirects: HashMap<String, String> = HashMap::new();
+    let mut seen: HashSet<(String, String)> = HashSet::new();
+    let mut kept: Vec<ArchivedResponse> = vec![];
+
+    for response in responses {
+        let key = without_fragment(&response.url);
+
+        if (300..400).contains(&response.status) && response.status != 304 {
+            let target = response
+                .location
+                .as_ref()
+                .and_then(|location| Url::parse(&response.url).ok()?.join(location.trim()).ok());
+            if let Some(target) = target {
+                redirects
+                    .entry(key)
+                    .or_insert(without_fragment(target.as_str()));
+            }
+        } else if response.status >= 200
+            && response.status != 304
+            && seen.insert((response.method.clone(), key))
+        {
+            kept.push(response);
+        }
+    }
+
+    let final_url_of = |url: &str| {
+        let mut url = without_fragment(url);
+        let mut hops = 0;
+        while let Some(target) = redirects.get(&url).filter(|_| hops < 32) {
+            url = target.clone();
+            hops += 1;
+        }
+        url
+    };
+
+    let root = match wanted_url {
+        Some(wanted_url) => {
+            let final_url = final_url_of(wanted_url);
+            kept.iter()
+                .position(|response| {
+                    response.method == "GET"
+                        && response.status == 200
+                        && without_fragment(&response.url) == final_url
+                })
+                .ok_or(format!("archive has no page at {}", wanted_url))?
+        }
+        None => kept
+            .iter()
+            .position(|response| {
+                response.method == "GET"
+                    && response.status == 200
+                    && is_html(&response.content_type)
+            })
+            .ok_or("archive has no pages in it")?,
+    };
+
+    let url = kept[root].url.clone();
+    let html = String::from_utf8_lossy(&kept[root].data).into_owned();
+    let content_type = kept[root].content_type.clone();
+    let assets = kept
+        .into_iter()
+        .enumerate()
+        .map(|(index, response)| {
+            let key = without_fragment(&response.url);
+            let mut urls: Vec<String> = redirects
+                .keys()
+                .filter(|source| final_url_of(source) == key)
+                .cloned()
+                .collect();
+            urls.sort();
+            urls.push(response.url.clone());
+
+            CapturedAsset {
+                destination: match index == root {
+                    true => "document",
+                    false => destination_by_content_type(&response.content_type),
+                }
+                .to_string(),
+                is_reusable: response.method == "GET" && response.status == 200,
+                content_type: response.content_type,
+                data: response.data,
+                method: response.method,
+                status: response.status,
+                urls,
+            }
+        })
+        .collect();
+
+    Ok(CapturedPage {
+        assets,
+        content_type,
+        html,
+        title: String::new(),
+        url,
+    })
 }

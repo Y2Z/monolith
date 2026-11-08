@@ -1,3 +1,4 @@
+mod archives;
 mod base_url;
 mod basic;
 mod browser;

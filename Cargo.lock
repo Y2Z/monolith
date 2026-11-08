@@ -1998,6 +1998,7 @@ version = "2.12.0"
 dependencies = [
  "assert_cmd",
  "base64",
+ "brotli-decompressor",
  "chrono",
  "clap",
  "cssparser",
@@ -2006,6 +2007,7 @@ dependencies = [
  "directories",
  "eframe",
  "encoding_rs",
+ "flate2",
  "html5ever",
  "libc",
  "markup5ever_rcdom",

@@ -860,7 +860,19 @@ impl MonolithApp {
 
     fn browse_target(&mut self) {
         if let Some(path) = rfd::FileDialog::new()
-            .add_filter("HTML and MHTML files", &["html", "htm", "mht", "mhtml"])
+            .add_filter(
+                "Pages and archives",
+                &[
+                    "html",
+                    "htm",
+                    "mht",
+                    "mhtml",
+                    "warc",
+                    "gz",
+                    "har",
+                    "webarchive",
+                ],
+            )
             .pick_file()
         {
             self.target = path.display().to_string();

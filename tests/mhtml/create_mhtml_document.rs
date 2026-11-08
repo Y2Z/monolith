@@ -111,7 +111,7 @@ mod passing {
 
         let out = cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
             .arg("-M")
-            .arg("-m")
+            .args(["-F", "MHTML"])
             .arg(format!(
                 "tests{s}_data_{s}basic{s}local-file.html",
                 s = MAIN_SEPARATOR
