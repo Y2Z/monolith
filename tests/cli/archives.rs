@@ -138,6 +138,51 @@ mod passing {
         assert!(success);
         assert!(!output.contains("monolith-url"));
     }
+
+    #[test]
+    fn integrity_of_stylesheets_is_about_what_they_used_to_be() {
+        use base64::Engine;
+        use sha2::{Digest, Sha384};
+
+        let stylesheet: &[u8] = b"@charset \"windows-1252\"; p { color: red }";
+        let integrity = format!(
+            "sha384-{}",
+            base64::prelude::BASE64_STANDARD.encode(Sha384::digest(stylesheet))
+        );
+        let mut warc = vec![];
+        for (url, content_type, body) in [
+            (
+                "https://a.test/",
+                "text/html",
+                format!(
+                    "<link rel=stylesheet href=a.css integrity=\"{}\"><script>1</script>",
+                    integrity
+                )
+                .into_bytes(),
+            ),
+            ("https://a.test/a.css", "text/css", stylesheet.to_vec()),
+        ] {
+            let mut block =
+                format!("HTTP/1.1 200 OK\r\nContent-Type: {}\r\n\r\n", content_type).into_bytes();
+            block.extend(body);
+            warc.extend(
+                format!(
+                    "WARC/1.1\r\nWARC-Type: response\r\nWARC-Target-URI: {}\r\n\
+                     Content-Length: {}\r\n\r\n",
+                    url,
+                    block.len()
+                )
+                .into_bytes(),
+            );
+            warc.extend(block);
+            warc.extend(b"\r\n\r\n");
+        }
+
+        let (output, _, success) = monolith(&warc, &["-q"]);
+
+        assert!(success);
+        assert!(output.contains("color: red"), "{}", output);
+    }
 }
 
 #[cfg(test)]
@@ -288,5 +333,29 @@ mod warc_output {
             assert!(!output.contains(stylesheet.trim()));
             assert!(errors.contains("local-style.css (not found in archive)"));
         }
+    }
+
+    #[test]
+    fn data_urls_that_are_not_documents_get_archived_too() {
+        let (output, _, success) = bytes(
+            &[
+                "-q",
+                "-F",
+                "WARC",
+                "-b",
+                "https://a.test/style.css",
+                "data:text/css,a{}",
+            ],
+            b"",
+        );
+        let output = String::from_utf8_lossy(&output);
+
+        assert!(success);
+        assert!(output.contains("WARC-Target-URI: https://a.test/style.css"));
+        assert!(output.contains("a{}"));
+
+        let (_, errors, success) = bytes(&["-F", "WARC", "data:text/css,a{}"], b"");
+        assert!(!success);
+        assert!(errors.contains("-b can provide one"));
     }
 }

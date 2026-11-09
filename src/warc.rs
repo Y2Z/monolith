@@ -135,11 +135,22 @@ fn parse_http_response(block: &[u8]) -> Option<HttpResponse> {
     let headers = parse_headers(&head[end_of_status..]);
     let mut body = block[end_of_headers + 4..].to_vec();
 
-    if find_header(&headers, "Transfer-Encoding")
-        .is_some_and(|encoding| encoding.eq_ignore_ascii_case("chunked"))
-        && let Some(decoded) = decode_chunks(&body)
-    {
-        body = decoded;
+    // Transfer codings come first, last one applied gets undone first
+    if let Some(codings) = find_header(&headers, "Transfer-Encoding") {
+        let decoded = codings
+            .split(',')
+            .map(str::trim)
+            .filter(|coding| !coding.is_empty() && !coding.eq_ignore_ascii_case("identity"))
+            .rev()
+            .try_fold(body.clone(), |body, coding| {
+                match coding.eq_ignore_ascii_case("chunked") {
+                    true => decode_chunks(&body),
+                    false => decompress(&body, coding),
+                }
+            });
+        if let Some(decoded) = decoded {
+            body = decoded;
+        }
     }
     // Encodings get undone in the reverse order of how they were applied
     if let Some(encodings) = find_header(&headers, "Content-Encoding") {
@@ -191,6 +202,7 @@ fn details_of(record: &Record, response: &HttpResponse, request: Option<&Headers
         status_text: response.status_text.clone(),
         time: record_time(record),
         redirects: vec![],
+        is_resource: false,
     }
 }
 
@@ -276,6 +288,7 @@ fn parse_responses(data: &[u8]) -> Vec<ArchivedResponse> {
                 data: record.block.to_vec(),
                 http: HttpDetails {
                     time: record_time(record),
+                    is_resource: true,
                     ..Default::default()
                 },
                 location: None,
@@ -387,21 +400,46 @@ fn record_id(url: &str) -> String {
 
 /// Header lines, without anything that could break them, or that's not to be shared.
 fn header_lines(headers: &[(String, String)], left_out: &[&str]) -> String {
+    // Names are tokens, what isn't one can't be a header
+    let is_token = |name: &str| {
+        !name.is_empty()
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte))
+    };
+
     headers
         .iter()
-        .filter(|(name, _)| {
-            !name.starts_with(':')
-                && !name.is_empty()
-                && !left_out.contains(&name.to_lowercase().as_str())
-        })
-        .map(|(name, value)| {
-            format!(
-                "{}: {}\r\n",
-                name.replace(['\r', '\n', ':'], ""),
-                value.replace(['\r', '\n'], " ").trim()
-            )
-        })
+        .filter(|(name, _)| is_token(name) && !left_out.contains(&name.to_lowercase().as_str()))
+        .map(|(name, value)| format!("{}: {}\r\n", name, single_line(value)))
         .collect()
+}
+
+/// Text that goes on a line of its own: archives being read may have anything in them, nothing
+/// they have can be allowed to start another line, or a record of its own.
+fn single_line(text: &str) -> String {
+    text.chars()
+        .map(|character| match character.is_control() {
+            true => ' ',
+            false => character,
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// Methods are tokens, anything else in there isn't a method.
+fn method_of(exchange: &Exchange) -> &str {
+    let is_token = !exchange.method.is_empty()
+        && exchange
+            .method
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte));
+
+    match is_token {
+        true => &exchange.method,
+        false => "GET",
+    }
 }
 
 /// URLs with whoever has used them left out.
@@ -475,12 +513,13 @@ impl Writer {
                 true => "application/octet-stream",
                 false => exchange.content_type.as_str(),
             };
+            let content_type = single_line(content_type);
             self.write_record(
                 "resource",
                 &id,
                 &exchange.date,
                 &[target, ("WARC-Payload-Digest", digest(&exchange.body))],
-                content_type,
+                &content_type,
                 &exchange.body,
             );
             return;
@@ -492,10 +531,13 @@ impl Writer {
             true => "HTTP/1.0",
             false => "HTTP/1.1",
         };
-        let mut response = format!("{} {} {}", version, status, exchange.status_text)
-            .trim_end()
-            .to_string();
-        response.push_str("\r\n");
+        // The space after the status has to be there, even when there's no reason phrase
+        let mut response = format!(
+            "{} {} {}\r\n",
+            version,
+            status,
+            single_line(&exchange.status_text)
+        );
         response.push_str(&header_lines(&exchange.response_headers, &left_out));
         response.push_str(&format!("Content-Length: {}\r\n\r\n", exchange.body.len()));
         let mut response = response.into_bytes();
@@ -514,7 +556,7 @@ impl Writer {
 
         let path = &url[::url::Position::BeforePath..::url::Position::AfterQuery];
         // Requests get sent the same way, no matter what servers answer with
-        let mut request = format!("{} {} HTTP/1.1\r\n", exchange.method, path);
+        let mut request = format!("{} {} HTTP/1.1\r\n", method_of(exchange), path);
         let has_host = exchange
             .request_headers
             .iter()

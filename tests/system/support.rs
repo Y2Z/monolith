@@ -200,11 +200,20 @@ fn respond(mut stream: TcpStream, responder: &Responder, requests: &Mutex<Vec<Re
 
     requests.lock().unwrap().push(request.clone());
 
-    let (status, media_type, body) = responder(&request);
+    let (status, media_type, mut body) = responder(&request);
+    // Redirects have where they lead to as their body
+    let location = match (300..400).contains(&status) {
+        true => format!(
+            "Location: {}\r\n",
+            String::from_utf8_lossy(&std::mem::take(&mut body))
+        ),
+        false => String::new(),
+    };
     let head = format!(
-        "HTTP/1.1 {} Status\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} Status\r\nContent-Type: {}\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
         status,
         media_type,
+        location,
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());

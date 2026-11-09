@@ -1538,6 +1538,15 @@ impl<'a> Connection<'a> {
             if let Some((data, is_decoded)) = self.response_body(&request) {
                 let is_reusable = response.is_usable();
                 let mut response = response;
+                // What servers say beats what browsers make of it
+                if let Some((_, content_type)) = response
+                    .http
+                    .response_headers
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+                {
+                    response.content_type = content_type.clone();
+                }
                 // Text that's been decoded is UTF-8 now, no matter what it used to be
                 if is_decoded && !response.content_type.is_empty() {
                     response.content_type = with_utf8_charset(&response.content_type);
@@ -1966,6 +1975,7 @@ impl CapturedResponse {
     ) {
         if (300..400).contains(&status) && status != 304 {
             self.http.redirects.push(Redirect {
+                method: self.method.clone(),
                 request_headers: self.http.request_headers.clone(),
                 response_headers: headers,
                 status,

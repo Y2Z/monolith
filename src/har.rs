@@ -43,7 +43,13 @@ fn parse_response(entry: &Value) -> Option<ArchivedResponse> {
         (Some(text), _) => Some(text.as_bytes().to_vec()),
         (None, _) => None,
     };
-    if data.is_none() && !(300..400).contains(&status) {
+    // Some responses have nothing in them by definition
+    let is_head = entry["request"]["method"].as_str() == Some("HEAD");
+    if data.is_none()
+        && !is_head
+        && !(300..400).contains(&status)
+        && !matches!(status, 100..200 | 204 | 205)
+    {
         return None;
     }
     let is_text = content["text"].is_string() && content["encoding"] != "base64";
@@ -91,6 +97,7 @@ fn parse_response(entry: &Value) -> Option<ArchivedResponse> {
             .map(|date| date.timestamp_millis())
             .unwrap_or(0),
         redirects: vec![],
+        is_resource: false,
     };
 
     Some(ArchivedResponse {

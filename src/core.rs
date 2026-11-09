@@ -625,14 +625,24 @@ pub fn create_monolithic_document(
                     && !is_archive(&retrieved_data)
                 {
                     if session.is_recording() {
-                        if target_url.scheme() != "data" {
-                            session.record_resource(
-                                &final_url,
-                                &retrieved_data,
-                                &media_type,
-                                &charset,
-                            );
-                        }
+                        let resource_url = match target_url.scheme() == "data" {
+                            true => session
+                                .options
+                                .base_url
+                                .as_deref()
+                                .and_then(|url| Url::parse(url).ok())
+                                .filter(|url| url.scheme() != "data")
+                                .ok_or(MonolithError::new(
+                                    "document has no URL to be archived under, -b can provide one",
+                                ))?,
+                            false => final_url.clone(),
+                        };
+                        session.record_resource(
+                            &resource_url,
+                            &retrieved_data,
+                            &media_type,
+                            &charset,
+                        );
                         return Ok((create_warc_document(&session), None));
                     }
 
@@ -695,6 +705,20 @@ pub fn create_monolithic_document_from_capture(
 ) -> Result<(Vec<u8>, Option<String>), MonolithError> {
     if session.is_recording() {
         record_captured_page(&mut session, &page);
+        // Without the page itself there would be nothing to open, what the browser has ended up
+        // with is the closest thing to it
+        let has_page = page.assets.iter().any(|asset| {
+            asset.destination == "document" && asset.urls.iter().any(|url| url == &page.url)
+        });
+        if !has_page && let Ok(url) = Url::parse(&page.url) {
+            if !session.options.silent {
+                print_error_message(&format!(
+                    "{} (browser has not given its original, saving what it has made of it)",
+                    page.url
+                ));
+            }
+            session.record_resource(&url, page.html.as_bytes(), "text/html", "utf-8");
+        }
         let title = Some(page.title).filter(|title| !title.is_empty());
         return Ok((create_warc_document(&session), title));
     }
@@ -715,13 +739,27 @@ pub fn create_monolithic_document_from_capture(
         // browser, no other base URL can work for it
         session.options.base_url = None;
 
-        for asset in page.assets.iter().filter(|asset| is_script(asset)) {
+        // Integrity is about what things were like before getting rewritten
+        for asset in page
+            .assets
+            .iter()
+            .filter(|asset| is_script(asset) || asset.content_type.starts_with("text/css"))
+        {
             for url in asset.urls.iter().filter_map(|url| Url::parse(url).ok()) {
                 session.add_original_data(&url, asset.data.clone());
             }
         }
-        let imports = rewrite_scripts(&mut page.assets);
-        rewrite_stylesheets(&mut page.assets);
+        // What doesn't say how it's encoded goes by the document
+        let document_encoding = parse_media_type(&source_document.content_type)
+            .1
+            .and_then(|charset| declared_encoding(&charset))
+            .or_else(|| {
+                let dom = html_to_dom(&source_document.data, "utf-8".to_string());
+                get_charset(&dom.document)
+                    .and_then(|charset| Encoding::for_label_no_replacement(charset.as_bytes()))
+            });
+        let imports = rewrite_scripts(&mut page.assets, document_encoding);
+        rewrite_stylesheets(&mut page.assets, document_encoding);
         add_captured_assets(&mut session, &page.assets);
 
         let markup = create_replay_markup(

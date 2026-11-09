@@ -114,7 +114,8 @@ pub fn is_domain_allowed(url: &Url, options: &MonolithOptions) -> bool {
 
 const MAX_REDIRECTS: usize = 10;
 
-fn request_headers(cookies: Option<&[Cookie]>, parent_url: &Url, url: &Url) -> HeaderMap {
+#[doc(hidden)]
+pub fn request_headers(cookies: Option<&[Cookie]>, parent_url: &Url, url: &Url) -> HeaderMap {
     let mut headers = HeaderMap::new();
     if let Some(cookies) = cookies {
         let cookie_values: Vec<String> = cookies
@@ -129,8 +130,10 @@ fn request_headers(cookies: Option<&[Cookie]>, parent_url: &Url, url: &Url) -> H
             );
         }
     }
-    // Add referer header for page resource requests
-    if ["https", "http"].contains(&parent_url.scheme()) && parent_url != url {
+    // Add referer header for page resource requests, but never send where secure pages are over
+    // connections that aren't
+    let is_downgrade = parent_url.scheme() == "https" && url.scheme() != "https";
+    if ["https", "http"].contains(&parent_url.scheme()) && parent_url != url && !is_downgrade {
         headers.insert(
             REFERER,
             HeaderValue::from_str(get_referer_url(parent_url.clone()).as_str()).unwrap(),
@@ -311,18 +314,17 @@ pub fn fetch_remote_asset(
     let (media_type, charset, _is_base64) = parse_media_type(content_type);
     let charset: String = charset.unwrap_or_default();
 
-    // Convert response into a byte array
-    let mut data: Vec<u8> = vec![];
-    match response.bytes() {
-        Ok(b) => {
-            data = b.to_vec();
-        }
+    // Convert response into a byte array, what broke off partway is no use
+    let data: Vec<u8> = match response.bytes() {
+        Ok(b) => b.to_vec(),
         Err(error) => {
             if !options.silent {
-                print_error_message(&format!("{}", error));
+                print_error_message(&format!("{} ({})", &cache_key, error));
             }
+
+            return Err(error);
         }
-    }
+    };
 
     if let (Some(exchanges), Some(mut exchange)) = (exchanges, exchange) {
         exchange.body = data.clone();

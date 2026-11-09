@@ -1,7 +1,8 @@
 //! Safari's .webarchive files: property lists holding the document, and what it's made of.
 
-use std::cell::Cell;
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use url::Url;
 
@@ -11,12 +12,14 @@ const SIGNATURE: &[u8] = b"bplist00";
 const TRAILER_SIZE: usize = 32;
 const MAX_DEPTH: usize = 32;
 
+/// Objects can be referred to from many places, each of them gets read once, and shared.
+#[derive(Clone)]
 enum Plist {
-    Array(Vec<Plist>),
-    Data(Vec<u8>),
-    Dictionary(HashMap<String, Plist>),
+    Array(Rc<[Plist]>),
+    Data(Rc<[u8]>),
+    Dictionary(Rc<HashMap<String, Plist>>),
     Other,
-    String(String),
+    String(Rc<str>),
 }
 
 impl Plist {
@@ -29,15 +32,17 @@ impl Plist {
 
     fn as_string(&self) -> Option<String> {
         match self {
-            Plist::String(string) => Some(string.clone()),
+            Plist::String(string) => Some(string.to_string()),
             _ => None,
         }
     }
 }
 
 struct Reader<'a> {
-    /// How many more objects can be read, objects referenced many times count every time
-    budget: Cell<usize>,
+    /// Objects that have been read already
+    objects: RefCell<HashMap<usize, Plist>>,
+    /// Objects that are being read, coming across one of them again means going in circles
+    reading: RefCell<HashSet<usize>>,
     data: &'a [u8],
     offsets: &'a [u8],
     offset_size: usize,
@@ -94,23 +99,35 @@ impl Reader<'_> {
     }
 
     fn read_object(&self, object: usize, depth: usize) -> Option<Plist> {
-        if depth > MAX_DEPTH || self.budget.get() == 0 {
+        if let Some(plist) = self.objects.borrow().get(&object) {
+            return Some(plist.clone());
+        }
+        if depth > MAX_DEPTH || !self.reading.borrow_mut().insert(object) {
             return None;
         }
-        self.budget.set(self.budget.get() - 1);
 
+        let plist = self.parse_object(object, depth);
+        self.reading.borrow_mut().remove(&object);
+        if let Some(plist) = &plist {
+            self.objects.borrow_mut().insert(object, plist.clone());
+        }
+
+        plist
+    }
+
+    fn parse_object(&self, object: usize, depth: usize) -> Option<Plist> {
         let position = self.object_offset(object)?;
         let marker = *self.data.get(position)?;
 
         Some(match marker >> 4 {
             0x4 => {
                 let (length, start) = self.read_length(marker, position)?;
-                Plist::Data(self.data.get(start..start.checked_add(length)?)?.to_vec())
+                Plist::Data(self.data.get(start..start.checked_add(length)?)?.into())
             }
             0x5 => {
                 let (length, start) = self.read_length(marker, position)?;
                 let bytes = self.data.get(start..start.checked_add(length)?)?;
-                Plist::String(String::from_utf8_lossy(bytes).into_owned())
+                Plist::String(String::from_utf8_lossy(bytes).into())
             }
             0x6 => {
                 let (length, start) = self.read_length(marker, position)?;
@@ -121,7 +138,7 @@ impl Reader<'_> {
                     .chunks_exact(2)
                     .map(|unit| u16::from_be_bytes([unit[0], unit[1]]))
                     .collect();
-                Plist::String(String::from_utf16_lossy(&units))
+                Plist::String(String::from_utf16_lossy(&units).into())
             }
             0xa => {
                 let (length, start) = self.read_length(marker, position)?;
@@ -129,7 +146,8 @@ impl Reader<'_> {
                     self.read_references(start, length)?
                         .into_iter()
                         .map(|item| self.read_object(item, depth + 1))
-                        .collect::<Option<_>>()?,
+                        .collect::<Option<Vec<_>>>()?
+                        .into(),
                 )
             }
             0xd => {
@@ -139,10 +157,10 @@ impl Reader<'_> {
                 let mut dictionary = HashMap::new();
                 for (key, value) in keys.into_iter().zip(values) {
                     if let Plist::String(key) = self.read_object(key, depth + 1)? {
-                        dictionary.insert(key, self.read_object(value, depth + 1)?);
+                        dictionary.insert(key.to_string(), self.read_object(value, depth + 1)?);
                     }
                 }
-                Plist::Dictionary(dictionary)
+                Plist::Dictionary(Rc::new(dictionary))
             }
             _ => Plist::Other,
         })
@@ -165,8 +183,8 @@ fn parse_plist(data: &[u8]) -> Option<Plist> {
     }
 
     let reader = Reader {
-        // Archives don't need to refer to things more than a couple of times
-        budget: Cell::new(objects.saturating_mul(4).saturating_add(64)),
+        objects: RefCell::new(HashMap::new()),
+        reading: RefCell::new(HashSet::new()),
         data,
         offsets: data
             .get(offsets_start..offsets_start.checked_add(objects.checked_mul(offset_size)?)?)?,
@@ -186,7 +204,7 @@ fn parse_resource(resource: &Plist) -> Option<(Vec<Url>, ArchivedAsset)> {
     Some((
         vec![url.clone()],
         ArchivedAsset {
-            data: data.clone(),
+            data: data.to_vec(),
             url: Some(url),
             media_type: resource
                 .get("WebResourceMIMEType")
@@ -208,7 +226,7 @@ fn collect_resources(archive: &Plist, assets: &mut Vec<(Vec<Url>, ArchivedAsset)
         assets.extend(resources.iter().filter_map(parse_resource));
     }
     if let Some(Plist::Array(frames)) = archive.get("WebSubframeArchives") {
-        for frame in frames {
+        for frame in frames.iter() {
             collect_resources(frame, assets);
         }
     }

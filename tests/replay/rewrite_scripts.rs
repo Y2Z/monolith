@@ -36,7 +36,7 @@ mod passing {
             data,
             unused,
         ];
-        let imports = rewrite_scripts(&mut assets);
+        let imports = rewrite_scripts(&mut assets, None);
         let urls: Vec<&str> = imports.iter().map(|(url, _, _)| url.as_str()).collect();
 
         assert_eq!(
@@ -57,7 +57,7 @@ mod passing {
         worker_script.destination = "worker".to_string();
         let mut assets = [worker_script];
 
-        assert_eq!(rewrite_scripts(&mut assets).len(), 1);
+        assert_eq!(rewrite_scripts(&mut assets, None).len(), 1);
         assert_eq!(assets[0].data, br#"import "https://a.b/b.js";"#.to_vec());
     }
 
@@ -68,7 +68,7 @@ mod passing {
             asset("https://a.b/a.js", "export const a = 1;"),
         ];
 
-        assert_eq!(rewrite_scripts(&mut assets).len(), 1);
+        assert_eq!(rewrite_scripts(&mut assets, None).len(), 1);
     }
 
     #[test]
@@ -77,7 +77,7 @@ mod passing {
         stylesheet.destination = "style".to_string();
         let mut assets = [stylesheet];
 
-        assert!(rewrite_scripts(&mut assets).is_empty());
+        assert!(rewrite_scripts(&mut assets, None).is_empty());
         assert_eq!(assets[0].data, b"import './b.css';".to_vec());
     }
 
@@ -92,7 +92,7 @@ mod passing {
         )];
         let mut assets = vec![script];
 
-        rewrite_scripts(&mut assets);
+        rewrite_scripts(&mut assets, None);
 
         assert_eq!(
             String::from_utf8(assets[0].data.clone()).unwrap(),
@@ -105,6 +105,54 @@ mod passing {
                 "Content-Type".to_string(),
                 "text/javascript; charset=utf-8".to_string()
             )]
+        );
+    }
+
+    #[test]
+    fn byte_order_marks_beat_what_has_been_declared() {
+        let mut script = asset("https://a.b/c.js", "");
+        script.content_type = "text/javascript; charset=windows-1252".to_string();
+        script.data = vec![0xff, 0xfe, b'x', 0, b'=', 0, b'1', 0];
+        let mut assets = vec![script];
+
+        rewrite_scripts(&mut assets, None);
+
+        assert_eq!(assets[0].data, b"x=1");
+    }
+
+    #[test]
+    fn other_parameters_of_content_types_stay() {
+        let mut script = asset("https://a.b/c.js", "");
+        script.content_type = "text/javascript; foo=bar; charset=windows-1252".to_string();
+        let mut assets = vec![script];
+
+        rewrite_scripts(&mut assets, None);
+
+        assert_eq!(
+            assets[0].content_type,
+            "text/javascript; foo=bar; charset=utf-8"
+        );
+    }
+
+    #[test]
+    fn unlabeled_scripts_that_are_not_utf8_go_by_the_document() {
+        let mut legacy = asset("https://a.b/c.js", "");
+        legacy.content_type = "text/javascript".to_string();
+        legacy.data = b"x = '\xe9';".to_vec();
+        let mut utf8 = asset("https://a.b/d.js", "");
+        utf8.content_type = "text/javascript".to_string();
+        utf8.data = "y = '\u{e9}';".as_bytes().to_vec();
+        let mut assets = vec![legacy, utf8];
+
+        rewrite_scripts(&mut assets, Some(encoding_rs::WINDOWS_1252));
+
+        assert_eq!(
+            String::from_utf8(assets[0].data.clone()).unwrap(),
+            "x = '\u{e9}';"
+        );
+        assert_eq!(
+            String::from_utf8(assets[1].data.clone()).unwrap(),
+            "y = '\u{e9}';"
         );
     }
 }

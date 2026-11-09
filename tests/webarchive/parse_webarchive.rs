@@ -39,6 +39,17 @@ mod passing {
             assert!(archive.contains(&url));
         }
     }
+
+    #[test]
+    fn resources_may_share_what_they_hold() {
+        // Every one of these refers to the same piece of data
+        let archive = parse_webarchive(include_bytes!("../_data_/webarchive/shared.webarchive"));
+
+        assert!(is_webarchive(include_bytes!(
+            "../_data_/webarchive/shared.webarchive"
+        )));
+        assert_eq!(archive.unwrap().len(), 5);
+    }
 }
 
 #[cfg(test)]
@@ -94,5 +105,42 @@ mod failing {
         assert!(!is_webarchive(&data));
         assert!(parse_webarchive(&data).is_none());
         assert!(started.elapsed().as_secs() < 5);
+    }
+
+    #[test]
+    fn data_referred_to_over_and_over_does_not_fill_memory() {
+        // Plenty of objects that are never used, one big piece of data, and an array that refers
+        // to it ten thousand times: copying it each time would take a gigabyte
+        let fillers: usize = 20_000;
+        let references: usize = 10_000;
+        let mut data = b"bplist00".to_vec();
+        let mut offsets = vec![];
+        offsets.push(data.len());
+        data.extend([0xaf, 0x11]);
+        data.extend((references as u16).to_be_bytes());
+        for _ in 0..references {
+            data.extend(1_u16.to_be_bytes());
+        }
+        offsets.push(data.len());
+        data.extend([0x4f, 0x12]);
+        data.extend(100_000_u32.to_be_bytes());
+        data.extend(vec![0; 100_000]);
+        for _ in 0..fillers {
+            offsets.push(data.len());
+            data.push(0x08);
+        }
+        let offsets_start = data.len();
+        for offset in &offsets {
+            data.extend((*offset as u32).to_be_bytes());
+        }
+        let mut trailer = vec![0; 6];
+        trailer.extend([4, 2]);
+        trailer.extend((offsets.len() as u64).to_be_bytes());
+        trailer.extend(0_u64.to_be_bytes());
+        trailer.extend((offsets_start as u64).to_be_bytes());
+        data.extend(trailer);
+
+        assert!(!is_webarchive(&data));
+        assert!(parse_webarchive(&data).is_none());
     }
 }

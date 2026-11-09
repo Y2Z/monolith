@@ -245,6 +245,159 @@ mod passing {
 
         assert_eq!(parse_warc(&warc, None).unwrap().0.html, "<p>one");
     }
+
+    #[test]
+    fn redirects_get_paired_with_what_they_led_to() {
+        let mut warc = record("response", "https://a.test/", "", &html("<p>one"));
+        for (version, body) in [("v1", b"1"), ("v2", b"2")] {
+            warc.extend(record(
+                "response",
+                "https://a.test/api",
+                "",
+                &http("302 Found", &format!("Location: /{}\r\n", version), b""),
+            ));
+            warc.extend(record(
+                "response",
+                &format!("https://a.test/{}", version),
+                "",
+                &http("200 OK", "Content-Type: application/json\r\n", body),
+            ));
+        }
+
+        let (page, _) = parse_warc(&warc, None).unwrap();
+
+        assert_eq!(
+            page.assets[1].urls,
+            vec!["https://a.test/api", "https://a.test/v1"]
+        );
+        assert_eq!(
+            page.assets[2].urls,
+            vec!["https://a.test/api", "https://a.test/v2"]
+        );
+        assert_eq!(page.assets[1].http.redirects.len(), 1);
+        assert_eq!(page.assets[2].http.redirects.len(), 1);
+    }
+
+    #[test]
+    fn resources_stay_resources() {
+        let warc = record(
+            "resource",
+            "file:///page.html",
+            "Content-Type: text/html\r\n",
+            b"<p>x",
+        );
+        let (page, _) = parse_warc(&warc, None).unwrap();
+        let exchanges = monolith::replay::exchanges_of(&page.assets[0]);
+
+        assert!(page.assets[0].http.is_resource);
+        assert_eq!(exchanges[0].status, None);
+    }
+
+    #[test]
+    fn stylesheets_follow_rules_of_their_own() {
+        let mut warc = record(
+            "response",
+            "https://a.test/",
+            "",
+            &html("<link rel=stylesheet href=a.css><script></script>"),
+        );
+        warc.extend(record(
+            "response",
+            "https://a.test/a.css",
+            "",
+            &http(
+                "200 OK",
+                "Content-Type: text/css\r\n",
+                b"@charset \"windows-1252\"; a::after { content: '\xe9' }",
+            ),
+        ));
+        let (mut page, _) = parse_warc(&warc, None).unwrap();
+
+        monolith::replay::rewrite_stylesheets(&mut page.assets, None);
+
+        assert!(
+            String::from_utf8(page.assets[1].data.clone())
+                .unwrap()
+                .contains("'\u{e9}'")
+        );
+    }
+
+    #[test]
+    fn unlabeled_stylesheets_go_by_the_document() {
+        let mut warc = record("response", "https://a.test/", "", &html("<p>"));
+        warc.extend(record(
+            "response",
+            "https://a.test/a.css",
+            "",
+            &http(
+                "200 OK",
+                "Content-Type: text/css\r\n",
+                // "日本" in Shift_JIS
+                b"a::after { content: '\x93\xfa\x96\x7b' }",
+            ),
+        ));
+        let (mut page, _) = parse_warc(&warc, None).unwrap();
+
+        monolith::replay::rewrite_stylesheets(&mut page.assets, Some(encoding_rs::SHIFT_JIS));
+
+        assert!(
+            String::from_utf8(page.assets[1].data.clone())
+                .unwrap()
+                .contains("'\u{65e5}\u{672c}'")
+        );
+    }
+
+    #[test]
+    fn redirects_keep_the_method_they_were_asked_with() {
+        let id = "<urn:uuid:1>";
+        let mut warc = record("response", "https://a.test/", "", &html("<p>one"));
+        warc.extend(record(
+            "response",
+            "https://a.test/form",
+            &format!("WARC-Record-ID: {}\r\n", id),
+            &http("303 See Other", "Location: /done\r\n", b""),
+        ));
+        warc.extend(record(
+            "request",
+            "https://a.test/form",
+            &format!("WARC-Concurrent-To: {}\r\n", id),
+            b"POST /form HTTP/1.1\r\n\r\n",
+        ));
+        warc.extend(record(
+            "response",
+            "https://a.test/done",
+            "",
+            &html("<p>done"),
+        ));
+
+        let (page, _) = parse_warc(&warc, None).unwrap();
+        let exchanges = monolith::replay::exchanges_of(&page.assets[1]);
+
+        assert_eq!(exchanges[0].method, "POST");
+        assert_eq!(exchanges[1].method, "GET");
+    }
+
+    #[test]
+    fn undoes_every_transfer_coding() {
+        let mut gzip = GzEncoder::new(vec![], Compression::default());
+        gzip.write_all(b"<p>one").unwrap();
+        let gzip = gzip.finish().unwrap();
+        let mut chunked = format!("{:x}\r\n", gzip.len()).into_bytes();
+        chunked.extend_from_slice(&gzip);
+        chunked.extend_from_slice(b"\r\n0\r\n\r\n");
+        let warc = record(
+            "response",
+            "https://a.test/",
+            "",
+            &http(
+                "200 OK",
+                "Content-Type: text/html\r\nTransfer-Encoding: gzip, chunked\r\n",
+                &chunked,
+            ),
+        );
+
+        assert_eq!(parse_warc(&warc, None).unwrap().0.html, "<p>one");
+    }
 }
 
 #[cfg(test)]

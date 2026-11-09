@@ -503,3 +503,39 @@ fn text_in_legacy_encodings_stays_readable() {
         assert!(html.contains("data-done=\"same\""), "{}", html);
     });
 }
+
+#[test]
+fn what_got_redirected_can_be_found_where_it_was_asked_for() {
+    with_each_browser(|browser| {
+        let server = Server::with_responder(Box::new(|request| match request.path.as_str() {
+            "/" => (
+                200,
+                "text/html",
+                b"<title>t</title><body><script>\
+                  fetch('/old.json').then((r) => r.json()).then((d) => {\
+                  document.body.dataset.value = d.value; });</script>"
+                    .to_vec(),
+            ),
+            "/old.json" => (302, "text/plain", b"/new.json".to_vec()),
+            "/new.json" => (200, "application/json", b"{\"value\":\"moved\"}".to_vec()),
+            _ => (404, "text/plain", vec![]),
+        }));
+        let workspace = Workspace::new(browser);
+
+        for format in ["html", "warc"] {
+            let saved = workspace.save(&server.url("/"), &["--format", format]);
+            let saved = match format {
+                "warc" => workspace.unpack("page.warc", &std::fs::read(&saved).unwrap()),
+                _ => saved,
+            };
+            let html = workspace.open(&saved);
+
+            assert!(
+                html.contains("data-value=\"moved\""),
+                "{}: {}",
+                format,
+                html
+            );
+        }
+    });
+}

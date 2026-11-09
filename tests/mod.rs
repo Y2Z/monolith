@@ -8,6 +8,7 @@ mod har;
 mod html;
 mod js;
 mod mhtml;
+mod net;
 mod replay;
 mod session;
 mod simplify;

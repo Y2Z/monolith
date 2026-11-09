@@ -11,6 +11,8 @@
             status: Number(element.dataset.monolithStatus),
             type: element.dataset.monolithType,
             url: element.dataset.monolithUrl,
+            // Where it was asked for before getting redirected
+            aliases: (element.dataset.monolithAliases || "").split(" ").filter(Boolean),
             used: false,
         });
         element.remove();
@@ -55,6 +57,7 @@
     };
     const withoutFragment = (url) => url.split("#")[0];
     const withoutQuery = (url) => withoutFragment(url).split("?")[0];
+    const urlsOf = (response) => [response.url, ...(response.aliases || [])];
     const fileName = (url) => withoutQuery(url).split("/").pop();
 
     // The same URL can provide different responses over time, those get handed out in order
@@ -70,15 +73,15 @@
     const findResponse = (method, url) => {
         const wanted = withoutFragment(absoluteUrl(url));
         const sameMethod = responses.filter((response) => response.method === method);
-        const exact = sameMethod.filter(
-            (response) => withoutFragment(response.url) === wanted,
+        const exact = sameMethod.filter((response) =>
+            urlsOf(response).some((url) => withoutFragment(url) === wanted),
         );
         if (exact.length) {
             return pick(exact);
         }
         // Things like cache busters change every time
-        const sameResource = sameMethod.filter(
-            (response) => withoutQuery(response.url) === withoutQuery(wanted),
+        const sameResource = sameMethod.filter((response) =>
+            urlsOf(response).some((url) => withoutQuery(url) === withoutQuery(wanted)),
         );
         return sameResource.length ? pick(sameResource) : undefined;
     };
@@ -246,10 +249,10 @@
             Promise.reject(new DOMException("Not available in a saved document", "SecurityError"));
     }
 
-    return { absoluteUrl, fileName, toText, withoutFragment, withoutQuery };
+    return { absoluteUrl, fileName, toText, urlsOf, withoutFragment, withoutQuery };
     };
 
-    const { absoluteUrl, fileName, toText, withoutFragment, withoutQuery } = installNetwork(responses, PAGE_URL);
+    const { absoluteUrl, fileName, toText, urlsOf, withoutFragment, withoutQuery } = installNetwork(responses, PAGE_URL);
 
     // Things that get added to the page after it has loaded
 
@@ -259,8 +262,8 @@
         }
         const wanted = withoutFragment(absoluteUrl(url));
         return (
-            responses.find((response) => response.method === "GET" && withoutFragment(response.url) === wanted) ||
-            responses.find((response) => response.method === "GET" && withoutQuery(response.url) === withoutQuery(wanted)) ||
+            responses.find((response) => response.method === "GET" && urlsOf(response).some((u) => withoutFragment(u) === wanted)) ||
+            responses.find((response) => response.method === "GET" && urlsOf(response).some((u) => withoutQuery(u) === withoutQuery(wanted))) ||
             // Bundlers work out where they are from their own URL, which isn't the original one anymore
             responses.find((response) => response.method === "GET" && fileName(response.url) === fileName(url) && fileName(url))
         );

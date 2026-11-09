@@ -82,4 +82,32 @@ mod passing {
             !create_replay_markup(&assets, &[], "https://a.b/", 7).contains("data-monolith-url=\"")
         );
     }
+
+    #[test]
+    fn remembers_where_redirected_things_were_asked_for() {
+        let mut moved = asset("https://a.test/new", "fetch");
+        moved.urls = vec![
+            "https://a.test/old".to_string(),
+            "https://a.test/new".to_string(),
+        ];
+        let markup = create_replay_markup(&[moved], &[], "https://a.test/", 0);
+
+        assert!(markup.contains(
+            "data-monolith-url=\"https://a.test/new\" data-monolith-aliases=\"https://a.test/old\""
+        ));
+    }
+
+    #[test]
+    fn merges_where_identical_responses_were_asked_for() {
+        let mut first = asset("https://a.test/shared", "fetch");
+        first.urls.insert(0, "https://a.test/old-a".to_string());
+        let mut second = asset("https://a.test/shared", "fetch");
+        second.urls.insert(0, "https://a.test/old-b".to_string());
+        let markup = create_replay_markup(&[first, second], &[], "https://a.test/", 0);
+
+        assert_eq!(markup.matches("data-monolith-url=").count(), 1);
+        assert!(
+            markup.contains("data-monolith-aliases=\"https://a.test/old-a https://a.test/old-b\"")
+        );
+    }
 }

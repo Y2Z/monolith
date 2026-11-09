@@ -1,7 +1,7 @@
 //! Makes saved documents work without a network, by storing responses their scripts have received,
 //! and a script that hands those responses back to them.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
@@ -12,6 +12,7 @@ use url::Url;
 
 use crate::cache::Exchange;
 use crate::core::parse_media_type;
+use crate::css::decode_stylesheet;
 
 /// What else there is to know about a response, for archives that keep track of it.
 #[derive(Clone, Debug, Default)]
@@ -25,11 +26,16 @@ pub struct HttpDetails {
     pub time: i64,
     /// Responses that have redirected to it
     pub redirects: Vec<Redirect>,
+    /// Whether it wasn't received over HTTP at all, the way local files and records of archives
+    /// that say so weren't
+    pub is_resource: bool,
 }
 
 /// A response that has sent the request somewhere else.
 #[derive(Clone, Debug, Default)]
 pub struct Redirect {
+    /// Method of the request that got redirected, the next one may use another one
+    pub method: String,
     pub request_headers: Vec<(String, String)>,
     pub response_headers: Vec<(String, String)>,
     pub status: u64,
@@ -110,24 +116,54 @@ pub fn create_replay_markup(
     captured_at: i64,
 ) -> String {
     let mut markup = String::new();
-    let mut stored: HashSet<(&String, &String, &Vec<u8>)> = HashSet::new();
+    // Pages tend to ask for the same things many times, each of those gets stored once, along with
+    // everywhere it's been asked for from before getting redirected
+    let mut stored: Vec<(&CapturedAsset, Vec<&str>)> = vec![];
+    let mut positions: HashMap<(&String, &String, &Vec<u8>), usize> = HashMap::new();
 
     for asset in assets.iter().filter(|asset| is_worth_storing(asset)) {
         let Some(url) = asset.urls.last() else {
             continue;
         };
-        // Pages tend to ask for the same things many times, and the import map has its own copy
-        if !stored.insert((url, &asset.method, &asset.data))
-            || imports
-                .iter()
-                .any(|(imported_url, _, _)| imported_url == url)
+        // The import map has its own copy
+        if imports
+            .iter()
+            .any(|(imported_url, _, _)| imported_url == url)
         {
             continue;
         }
+        let aliases = asset.urls[..asset.urls.len() - 1]
+            .iter()
+            .map(String::as_str);
+        match positions.get(&(url, &asset.method, &asset.data)) {
+            Some(position) => {
+                let known = &mut stored[*position].1;
+                for alias in aliases {
+                    if !known.contains(&alias) {
+                        known.push(alias);
+                    }
+                }
+            }
+            None => {
+                positions.insert((url, &asset.method, &asset.data), stored.len());
+                stored.push((asset, aliases.collect()));
+            }
+        }
+    }
+
+    for (asset, aliases) in stored {
+        let url = asset.urls.last().unwrap();
         markup.push_str(&format!(
-            "<script type=\"text/plain\" data-monolith-url=\"{}\" data-monolith-method=\"{}\" \
+            "<script type=\"text/plain\" data-monolith-url=\"{}\"{} data-monolith-method=\"{}\" \
              data-monolith-status=\"{}\" data-monolith-type=\"{}\">{}</script>",
             escape_attribute(url),
+            match aliases.is_empty() {
+                true => String::new(),
+                false => format!(
+                    " data-monolith-aliases=\"{}\"",
+                    escape_attribute(&aliases.join(" "))
+                ),
+            },
             escape_attribute(&asset.method),
             asset.status,
             escape_attribute(asset.content_type.split(';').next().unwrap_or("")),
@@ -623,7 +659,13 @@ pub(crate) fn is_script(asset: &CapturedAsset) -> bool {
 /// Prepares scripts to work from inside of a document, and provides what modules can import:
 /// URL, media type, and contents encoded using base64.
 #[doc(hidden)]
-pub fn rewrite_scripts(assets: &mut [CapturedAsset]) -> Vec<(String, String, String)> {
+///
+/// Scripts that don't say how they're encoded get the document's encoding, the way classic scripts
+/// do, unless they're UTF-8: modules always are.
+pub fn rewrite_scripts(
+    assets: &mut [CapturedAsset],
+    document_encoding: Option<&'static Encoding>,
+) -> Vec<(String, String, String)> {
     let mut imported: HashSet<String> = HashSet::new();
     let mut modules = vec![false; assets.len()];
 
@@ -633,7 +675,9 @@ pub fn rewrite_scripts(assets: &mut [CapturedAsset]) -> Vec<(String, String, Str
         };
 
         if is_script(asset) {
-            let script = rewrite_imports(&decode_text(&asset.data, &asset.content_type), &url);
+            let text =
+                decode_text_with_fallback(&asset.data, &asset.content_type, document_encoding);
+            let script = rewrite_imports(&text, &url);
             store_as_utf8(asset, script.code);
             // Scripts are free to be modules without using any of what makes them look like ones
             modules[index] = true;
@@ -665,7 +709,10 @@ pub fn rewrite_scripts(assets: &mut [CapturedAsset]) -> Vec<(String, String, Str
 /// Stylesheets that pages load on their own don't get to go through what Monolith does to the rest
 /// of them, and whatever they point at can't be found once they're inside of a document.
 #[doc(hidden)]
-pub fn rewrite_stylesheets(assets: &mut [CapturedAsset]) {
+pub fn rewrite_stylesheets(
+    assets: &mut [CapturedAsset],
+    document_encoding: Option<&'static Encoding>,
+) {
     let mut data_urls: HashMap<String, String> = HashMap::new();
     for asset in assets
         .iter()
@@ -686,7 +733,9 @@ pub fn rewrite_stylesheets(assets: &mut [CapturedAsset]) {
         .filter(|asset| asset.content_type.starts_with("text/css"))
     {
         if let Some(url) = asset.urls.last().and_then(|url| Url::parse(url).ok()) {
-            let stylesheet = decode_text(&asset.data, &asset.content_type);
+            // Stylesheets have rules of their own: @charset is there, and comes before guessing
+            let charset = parse_media_type(&asset.content_type).1.unwrap_or_default();
+            let stylesheet = decode_stylesheet(&asset.data, &charset, document_encoding).0;
             let stylesheet = embed_stylesheet_urls(&stylesheet, &url, &data_urls);
             store_as_utf8(asset, stylesheet);
         }
@@ -735,10 +784,21 @@ pub fn embed_stylesheet_urls(
 
 /// Content type that says what text has been turned into.
 pub(crate) fn with_utf8_charset(content_type: &str) -> String {
-    format!(
-        "{}; charset=utf-8",
-        content_type.split(';').next().unwrap_or("").trim()
-    )
+    let mut parts = content_type.split(';');
+    let mut result = parts.next().unwrap_or("").trim().to_string();
+    for parameter in parts
+        .map(str::trim)
+        .filter(|parameter| !parameter.is_empty())
+    {
+        let name = parameter.split('=').next().unwrap_or("").trim();
+        if !name.eq_ignore_ascii_case("charset") {
+            result.push_str("; ");
+            result.push_str(parameter);
+        }
+    }
+    result.push_str("; charset=utf-8");
+
+    result
 }
 
 /// Makes headers agree with the content type, there's one of them in there at most.
@@ -749,11 +809,27 @@ pub(crate) fn set_content_type(headers: &mut Vec<(String, String)>, content_type
 
 /// Text, decoded the way its content type says it's encoded.
 pub(crate) fn decode_text(data: &[u8], content_type: &str) -> String {
-    let (_, charset, _) = parse_media_type(content_type);
+    decode_text_with_fallback(data, content_type, None)
+}
 
-    match charset.and_then(|charset| Encoding::for_label(charset.as_bytes())) {
-        Some(encoding) => encoding.decode_with_bom_removal(data).0.into_owned(),
-        None => String::from_utf8_lossy(data).into_owned(),
+/// Text that says nothing about how it's encoded is UTF-8 if it can be, and in the fallback
+/// encoding otherwise.
+pub(crate) fn decode_text_with_fallback(
+    data: &[u8],
+    content_type: &str,
+    fallback: Option<&'static Encoding>,
+) -> String {
+    let (_, charset, _) = parse_media_type(content_type);
+    // Byte order marks beat whatever's been declared
+    let encoding = Encoding::for_bom(data)
+        .map(|(encoding, _)| encoding)
+        .or_else(|| charset.and_then(|charset| Encoding::for_label(charset.as_bytes())));
+
+    match (encoding, std::str::from_utf8(data), fallback) {
+        (Some(encoding), _, _) => encoding.decode_with_bom_removal(data).0.into_owned(),
+        (None, Ok(text), _) => text.to_string(),
+        (None, Err(_), Some(fallback)) => fallback.decode_without_bom_handling(data).0.into_owned(),
+        (None, Err(_), None) => String::from_utf8_lossy(data).into_owned(),
     }
 }
 
@@ -809,9 +885,12 @@ pub fn create_page_from_responses(
     responses: Vec<ArchivedResponse>,
     wanted_url: Option<&str>,
 ) -> Result<CapturedPage, String> {
+    // Where each URL has first redirected to, that's what's used for finding the page
     let mut redirects: HashMap<String, String> = HashMap::new();
-    let mut redirect_responses: HashMap<String, Redirect> = HashMap::new();
-    let mut kept: Vec<ArchivedResponse> = vec![];
+    // Redirects that have led somewhere, waiting for the response that came from there: the same
+    // URL may redirect somewhere else every time, they get paired up in the order they came in
+    let mut pending: HashMap<String, VecDeque<Vec<Redirect>>> = HashMap::new();
+    let mut kept: Vec<(ArchivedResponse, Vec<Redirect>)> = vec![];
 
     for response in responses {
         let key = without_fragment(&response.url);
@@ -820,22 +899,41 @@ pub fn create_page_from_responses(
             let target = response
                 .location
                 .as_ref()
-                .and_then(|location| Url::parse(&response.url).ok()?.join(location.trim()).ok());
+                .and_then(|location| Url::parse(&response.url).ok()?.join(location.trim()).ok())
+                .map(|target| without_fragment(target.as_str()));
             if let Some(target) = target {
-                redirect_responses.entry(key.clone()).or_insert(Redirect {
+                let mut chain = pending
+                    .get_mut(&key)
+                    .and_then(VecDeque::pop_front)
+                    .unwrap_or_default();
+                chain.push(Redirect {
+                    method: response.method.clone(),
                     request_headers: response.http.request_headers.clone(),
                     response_headers: response.http.response_headers.clone(),
                     status: response.status,
                     status_text: response.http.status_text.clone(),
                     url: response.url.clone(),
                 });
-                redirects
-                    .entry(key)
-                    .or_insert(without_fragment(target.as_str()));
+                pending.entry(target.clone()).or_default().push_back(chain);
+                redirects.entry(key).or_insert(target);
             }
         } else if response.status >= 200 && response.status != 304 {
             // Pages may ask for the same thing many times, and get something else every time
-            kept.push(response);
+            let chain = pending
+                .get_mut(&key)
+                .and_then(VecDeque::pop_front)
+                .unwrap_or_default();
+            kept.push((response, chain));
+        }
+    }
+
+    // Archives may have stored responses ahead of what has redirected to them
+    for (target, chains) in pending {
+        if let Some((_, chain)) = kept
+            .iter_mut()
+            .find(|(response, _)| without_fragment(&response.url) == target)
+        {
+            chain.extend(chains.into_iter().flatten());
         }
     }
 
@@ -853,7 +951,7 @@ pub fn create_page_from_responses(
         Some(wanted_url) => {
             let final_url = final_url_of(wanted_url);
             kept.iter()
-                .position(|response| {
+                .position(|(response, _)| {
                     response.method == "GET"
                         && response.status == 200
                         && without_fragment(&response.url) == final_url
@@ -862,7 +960,7 @@ pub fn create_page_from_responses(
         }
         None => kept
             .iter()
-            .position(|response| {
+            .position(|(response, _)| {
                 response.method == "GET"
                     && response.status == 200
                     && is_html(&response.content_type)
@@ -870,26 +968,24 @@ pub fn create_page_from_responses(
             .ok_or("archive has no pages in it")?,
     };
 
-    let url = kept[root].url.clone();
-    let html = decode_text(&kept[root].data, &kept[root].content_type);
-    let content_type = kept[root].content_type.clone();
+    let root_response = &kept[root].0;
+    let url = root_response.url.clone();
+    let html = decode_text(&root_response.data, &root_response.content_type);
+    let content_type = root_response.content_type.clone();
     let assets = kept
         .into_iter()
         .enumerate()
-        .map(|(index, response)| {
-            let key = without_fragment(&response.url);
-            let mut urls: Vec<String> = redirects
-                .keys()
-                .filter(|source| final_url_of(source) == key)
-                .cloned()
-                .collect();
-            urls.sort();
-            let mut http = response.http;
-            http.redirects = urls
-                .iter()
-                .filter_map(|url| redirect_responses.get(url).cloned())
-                .collect();
+        .map(|(index, (response, chain))| {
+            let mut urls: Vec<String> = vec![];
+            for redirect in &chain {
+                if !urls.contains(&redirect.url) {
+                    urls.push(redirect.url.clone());
+                }
+            }
+            urls.retain(|url| *url != response.url);
             urls.push(response.url.clone());
+            let mut http = response.http;
+            http.redirects = chain;
 
             CapturedAsset {
                 destination: match index == root {
@@ -940,7 +1036,10 @@ pub fn exchanges_of(asset: &CapturedAsset) -> Vec<Exchange> {
         .map(|redirect| Exchange {
             date,
             http_version: asset.http.http_version.clone(),
-            method: asset.method.clone(),
+            method: match redirect.method.is_empty() {
+                true => asset.method.clone(),
+                false => redirect.method.clone(),
+            },
             request_headers: redirect.request_headers.clone(),
             response_headers: redirect.response_headers.clone(),
             status: Some(redirect.status as u16),
@@ -949,6 +1048,18 @@ pub fn exchanges_of(asset: &CapturedAsset) -> Vec<Exchange> {
             ..Default::default()
         })
         .collect();
+
+    if asset.http.is_resource {
+        exchanges.push(Exchange {
+            body: asset.data.clone(),
+            content_type: asset.content_type.clone(),
+            date,
+            method: asset.method.clone(),
+            url: url.clone(),
+            ..Default::default()
+        });
+        return exchanges;
+    }
 
     let mut response_headers = asset.http.response_headers.clone();
     let has_content_type = response_headers

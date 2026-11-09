@@ -176,6 +176,38 @@ mod passing {
             vec![("Location".to_string(), "https://a.test/".to_string())]
         );
     }
+
+    #[test]
+    fn keeps_responses_that_have_nothing_in_them() {
+        let (page, _) = parse_har(
+            &har(vec![
+                entry("https://a.test/", 200, "text/html", Some("<p>one")),
+                entry("https://a.test/ping", 204, "", None),
+            ]),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(page.assets.len(), 2);
+        assert_eq!(page.assets[1].status, 204);
+    }
+
+    #[test]
+    fn keeps_responses_to_head_requests() {
+        let mut head = entry("https://a.test/check", 200, "text/plain", None);
+        head["request"]["method"] = json!("HEAD");
+
+        let (page, _) = parse_har(
+            &har(vec![
+                entry("https://a.test/", 200, "text/html", Some("<p>one")),
+                head,
+            ]),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(page.assets[1].method, "HEAD");
+    }
 }
 
 #[cfg(test)]
