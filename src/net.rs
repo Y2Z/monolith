@@ -3,13 +3,17 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 
+use chrono::Utc;
 use cssparser::{ParseError, Parser, Token};
 use markup5ever_rcdom::{Handle, NodeData};
 use rayon::{Scope, ThreadPoolBuilder};
-use reqwest::blocking::Client;
-use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, REFERER};
+use reqwest::blocking::{Client, Response};
+use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, LOCATION, REFERER};
+use reqwest::{StatusCode, Version};
 
+use crate::cache::Exchange;
 use crate::cookies::Cookie;
+use crate::core::MonolithOutputFormat;
 use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_info_message};
 use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{
@@ -23,6 +27,8 @@ pub struct CacheEntry {
     pub data: Vec<u8>,
     pub media_type: String,
     pub charset: String,
+    /// What it took to get it, for archives that keep that
+    pub exchanges: Vec<Exchange>,
 }
 
 /// How far along prefetching is; meant to be shared with whoever displays the progress.
@@ -63,6 +69,7 @@ struct Fetched {
     media_type: String,
     charset: String,
     kind: AssetKind,
+    exchanges: Vec<Exchange>,
 }
 
 /// Shared, read-only state handed to every worker.
@@ -105,25 +112,10 @@ pub fn is_domain_allowed(url: &Url, options: &MonolithOptions) -> bool {
     }
 }
 
-/// Performs the HTTP(S) request for an asset.
-/// It doesn't touch the cache or the Session, so prefetch workers can call it concurrently.
-pub fn fetch_remote_asset(
-    client: &Client,
-    cookies: Option<&[Cookie]>,
-    options: &MonolithOptions,
-    parent_url: &Url,
-    url: &Url,
-) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
-    let cache_key: String = clean_url(url.clone()).as_str().to_string();
+const MAX_REDIRECTS: usize = 10;
 
-    if !is_domain_allowed(url, options) {
-        if !options.silent {
-            print_error_message(&format!("{} (domain not allowed)", &cache_key));
-        }
-
-        return Err(client.get("").send().unwrap_err());
-    }
-
+#[doc(hidden)]
+pub fn request_headers(cookies: Option<&[Cookie]>, parent_url: &Url, url: &Url) -> HeaderMap {
     let mut headers = HeaderMap::new();
     if let Some(cookies) = cookies {
         let cookie_values: Vec<String> = cookies
@@ -138,69 +130,208 @@ pub fn fetch_remote_asset(
             );
         }
     }
-    // Add referer header for page resource requests
-    if ["https", "http"].contains(&parent_url.scheme()) && parent_url != url {
+    // Add referer header for page resource requests, but never send where secure pages are over
+    // connections that aren't
+    let is_downgrade = parent_url.scheme() == "https" && url.scheme() != "https";
+    if ["https", "http"].contains(&parent_url.scheme()) && parent_url != url && !is_downgrade {
         headers.insert(
             REFERER,
             HeaderValue::from_str(get_referer_url(parent_url.clone()).as_str()).unwrap(),
         );
     }
 
-    match client.get(url.as_str()).headers(headers).send() {
-        Ok(response) => {
-            if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
+    headers
+}
+
+fn header_pairs(headers: &HeaderMap) -> Vec<(String, String)> {
+    headers
+        .iter()
+        .map(|(name, value)| {
+            (
+                name.to_string(),
+                String::from_utf8_lossy(value.as_bytes()).into_owned(),
+            )
+        })
+        .collect()
+}
+
+/// What was sent and received, the way archives keep it.
+fn create_exchange(
+    options: &MonolithOptions,
+    url: &Url,
+    sent_headers: &HeaderMap,
+    response: &Response,
+) -> Exchange {
+    let mut request_headers = vec![(
+        "Host".to_string(),
+        url[::url::Position::BeforeHost..::url::Position::AfterPort].to_string(),
+    )];
+    if let Some(user_agent) = &options.user_agent {
+        request_headers.push(("User-Agent".to_string(), user_agent.clone()));
+    }
+    request_headers.push(("Accept".to_string(), "*/*".to_string()));
+    request_headers.extend(header_pairs(sent_headers));
+
+    Exchange {
+        date: Utc::now(),
+        http_version: match response.version() {
+            Version::HTTP_09 => "HTTP/0.9",
+            Version::HTTP_10 => "HTTP/1.0",
+            Version::HTTP_2 => "HTTP/2",
+            Version::HTTP_3 => "HTTP/3",
+            _ => "HTTP/1.1",
+        }
+        .to_string(),
+        method: "GET".to_string(),
+        request_headers,
+        response_headers: header_pairs(response.headers()),
+        status: Some(response.status().as_u16()),
+        status_text: response
+            .status()
+            .canonical_reason()
+            .unwrap_or_default()
+            .to_string(),
+        url: url.to_string(),
+        ..Default::default()
+    }
+}
+
+/// Performs the HTTP(S) request for an asset.
+/// It doesn't touch the cache or the Session, so prefetch workers can call it concurrently.
+///
+/// Whatever gets exchanged ends up in exchanges, if given; the client has to be the one that
+/// doesn't follow redirects then, they get followed here, so that each one gets recorded.
+pub fn fetch_remote_asset(
+    client: &Client,
+    cookies: Option<&[Cookie]>,
+    options: &MonolithOptions,
+    parent_url: &Url,
+    url: &Url,
+    mut exchanges: Option<&mut Vec<Exchange>>,
+) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
+    let cache_key: String = clean_url(url.clone()).as_str().to_string();
+
+    if !is_domain_allowed(url, options) {
+        if !options.silent {
+            print_error_message(&format!("{} (domain not allowed)", &cache_key));
+        }
+
+        return Err(client.get("").send().unwrap_err());
+    }
+
+    let mut current_url: Url = url.clone();
+    let mut redirects: usize = 0;
+    let (response, sent_headers) = loop {
+        let sent_headers = request_headers(cookies, parent_url, &current_url);
+        let response = match client
+            .get(current_url.as_str())
+            .headers(sent_headers.clone())
+            .send()
+        {
+            Ok(response) => response,
+            Err(error) => {
                 if !options.silent {
-                    print_error_message(&format!("{} ({})", &cache_key, response.status()));
+                    print_error_message(&format!("{} ({})", &cache_key, error));
                 }
 
-                // Provoke error
                 return Err(client.get("").send().unwrap_err());
             }
+        };
 
-            let response_url: Url = response.url().clone();
+        let next_url: Option<Url> = response
+            .status()
+            .is_redirection()
+            .then(|| response.headers().get(LOCATION)?.to_str().ok())
+            .flatten()
+            .and_then(|location| current_url.join(location.trim()).ok());
+        let Some(exchanges) = exchanges.as_deref_mut() else {
+            break (response, sent_headers);
+        };
+        let Some(next_url) = next_url.filter(|_| response.status() != StatusCode::NOT_MODIFIED)
+        else {
+            break (response, sent_headers);
+        };
 
+        let mut exchange = create_exchange(options, &current_url, &sent_headers, &response);
+        exchange.body = response.bytes().map(|b| b.to_vec()).unwrap_or_default();
+        exchanges.push(exchange);
+
+        redirects += 1;
+        let reason = if !is_domain_allowed(&next_url, options) {
+            Some("redirect target is blocked")
+        } else if redirects > MAX_REDIRECTS {
+            Some("too many redirects")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
             if !options.silent {
-                if url.as_str() == response_url.as_str() {
-                    print_info_message(&cache_key.to_string());
-                } else {
-                    print_info_message(&format!("{} -> {}", &cache_key, &response_url));
-                }
+                print_error_message(&format!("{} ({})", &cache_key, reason));
             }
 
-            // Attempt to obtain media type and charset by reading Content-Type header
-            let content_type: &str = response
-                .headers()
-                .get(CONTENT_TYPE)
-                .and_then(|header| header.to_str().ok())
-                .unwrap_or("");
-
-            // Leave charset empty if not given, so that the document's META can be used
-            let (media_type, charset, _is_base64) = parse_media_type(content_type);
-            let charset: String = charset.unwrap_or_default();
-
-            // Convert response into a byte array
-            let mut data: Vec<u8> = vec![];
-            match response.bytes() {
-                Ok(b) => {
-                    data = b.to_vec();
-                }
-                Err(error) => {
-                    if !options.silent {
-                        print_error_message(&format!("{}", error));
-                    }
-                }
-            }
-
-            Ok((data, response_url, media_type, charset))
+            return Err(client.get("").send().unwrap_err());
         }
+        current_url = next_url;
+    };
+
+    let exchange: Option<Exchange> = exchanges
+        .is_some()
+        .then(|| create_exchange(options, &current_url, &sent_headers, &response));
+
+    if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
+        if !options.silent {
+            print_error_message(&format!("{} ({})", &cache_key, response.status()));
+        }
+
+        // Archives keep what went wrong too
+        if let (Some(exchanges), Some(mut exchange)) = (exchanges, exchange) {
+            exchange.body = response.bytes().map(|b| b.to_vec()).unwrap_or_default();
+            exchanges.push(exchange);
+        }
+
+        // Provoke error
+        return Err(client.get("").send().unwrap_err());
+    }
+
+    let response_url: Url = response.url().clone();
+
+    if !options.silent {
+        if url.as_str() == response_url.as_str() {
+            print_info_message(&cache_key.to_string());
+        } else {
+            print_info_message(&format!("{} -> {}", &cache_key, &response_url));
+        }
+    }
+
+    // Attempt to obtain media type and charset by reading Content-Type header
+    let content_type: &str = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|header| header.to_str().ok())
+        .unwrap_or("");
+
+    // Leave charset empty if not given, so that the document's META can be used
+    let (media_type, charset, _is_base64) = parse_media_type(content_type);
+    let charset: String = charset.unwrap_or_default();
+
+    // Convert response into a byte array, what broke off partway is no use
+    let data: Vec<u8> = match response.bytes() {
+        Ok(b) => b.to_vec(),
         Err(error) => {
             if !options.silent {
                 print_error_message(&format!("{} ({})", &cache_key, error));
             }
 
-            Err(client.get("").send().unwrap_err())
+            return Err(error);
         }
+    };
+
+    if let (Some(exchanges), Some(mut exchange)) = (exchanges, exchange) {
+        exchange.body = data.clone();
+        exchanges.push(exchange);
     }
+
+    Ok((data, response_url, media_type, charset))
 }
 
 pub fn prefetch_assets(
@@ -263,6 +394,7 @@ pub fn prefetch_assets(
                 data: fetched.data.clone(),
                 media_type: fetched.media_type.clone(),
                 charset: fetched.charset.clone(),
+                exchanges: vec![],
             });
         }
 
@@ -271,6 +403,7 @@ pub fn prefetch_assets(
             data: fetched.data,
             media_type: fetched.media_type,
             charset: fetched.charset,
+            exchanges: fetched.exchanges,
         });
     }
 
@@ -285,12 +418,15 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
     ctx.count_job_found();
 
     s.spawn(move |s| {
+        let mut exchanges: Vec<Exchange> = vec![];
+        let is_recording = ctx.options.output_format == MonolithOutputFormat::WARC;
         let (data, final_url, media_type, charset) = match fetch_remote_asset(
             ctx.client,
             ctx.cookies,
             ctx.options,
             &job.parent_url,
             &job.url,
+            is_recording.then_some(&mut exchanges),
         ) {
             Ok(result) => result,
             Err(_) => {
@@ -335,6 +471,7 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             media_type,
             charset,
             kind: job.kind,
+            exchanges,
         });
 
         // Nested jobs get counted first, so that the total can't be reached too early

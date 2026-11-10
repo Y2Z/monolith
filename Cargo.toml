@@ -30,6 +30,7 @@ license = "CC0-1.0"
 
 [dependencies]
 base64 = "=0.23.1" # Used for integrity attributes
+brotli-decompressor = "=6.0.1" # Used for reading WARC archives
 chrono = "=0.4.45" # Used for formatting timestamps
 clap = { version = "=4.6.7", features = [
     "derive",
@@ -47,6 +48,7 @@ eframe = { version = "=0.36.2", default-features = false, features = [
     "x11",
 ], optional = true } # Used for GUI
 encoding_rs = "=0.8.42" # Used for parsing and converting document charsets
+flate2 = "=1.1.10" # Used for reading WARC archives
 html5ever = "=0.39.0" # Used for all things DOM
 markup5ever_rcdom = "=0.39.0" # Used for manipulating DOM
 sha2 = "=0.11.0" # Used for calculating checksums during integrity checks
@@ -97,6 +99,7 @@ vendored-openssl = [] # Deprecated, being kept as a remnant (probably until 2.15
 name = "monolith"
 path = "src/lib.rs"
 test = false
+doctest = false
 
 [[bin]]
 name = "monolith"

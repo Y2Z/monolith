@@ -3,7 +3,28 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use chrono::{DateTime, Utc};
 use redb::{Database, Error, ReadableDatabase, TableDefinition};
+
+/// Everything there is to know about getting a resource, the way it happened: what got asked for,
+/// and what came back. Archives get made out of these.
+#[derive(Clone, Debug, Default)]
+pub struct Exchange {
+    /// What came back, with transfer and content encodings already undone
+    pub body: Vec<u8>,
+    /// For what wasn't received over HTTP (see status); responses have it among their headers
+    pub content_type: String,
+    pub date: DateTime<Utc>,
+    /// "HTTP/1.1", "HTTP/2"...
+    pub http_version: String,
+    pub method: String,
+    pub request_headers: Vec<(String, String)>,
+    pub response_headers: Vec<(String, String)>,
+    /// None for what wasn't received over HTTP, such as local files, and assets of archives
+    pub status: Option<u16>,
+    pub status_text: String,
+    pub url: String,
+}
 
 pub struct CacheMetadataItem {
     data: Option<Vec<u8>>, // Asset's blob; used for caching small files or if on-disk database isn't utilized
@@ -18,10 +39,12 @@ pub struct Cache {
     db: Option<Database>, // Pointer to database instance; None if not yet initialized or if failed to initialize
     db_ok: Option<bool>, // None by default, Some(true) if was able to initialize database, Some (false) if an error occurred
     db_file_path: Option<String>, // Filesystem path to file used for storing database
+    exchanges: Vec<(Exchange, bool)>, // Network exchanges, along with whether their bodies are in the database
 }
 
 const FILE_WRITE_BUF_LEN: usize = 1024 * 100; // On-disk cache file write buffer size (in bytes)
 const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("_");
+const EXCHANGES_TABLE: TableDefinition<u64, &[u8]> = TableDefinition::new("exchanges");
 
 impl Cache {
     pub fn new(min_file_size: usize, db_file_path: Option<String>) -> Cache {
@@ -31,6 +54,7 @@ impl Cache {
             db: None,
             db_ok: None,
             db_file_path: db_file_path.clone(),
+            exchanges: vec![],
         };
 
         if db_file_path.is_some() {
@@ -111,6 +135,57 @@ impl Cache {
         }
 
         Err(Error::TransactionInProgress) // XXX
+    }
+
+    /// Keeps a record of a network exchange, bodies that are large enough go into the database.
+    pub fn add_exchange(&mut self, mut exchange: Exchange) {
+        let index = self.exchanges.len() as u64;
+        let mut is_on_disk = false;
+
+        if self.db_ok == Some(true)
+            && exchange.body.len() > self.min_file_size
+            && let Ok(mut write_txn) = self.db.as_ref().unwrap().begin_write()
+        {
+            let _ = write_txn.set_durability(redb::Durability::None);
+            let stored = write_txn
+                .open_table(EXCHANGES_TABLE)
+                .and_then(|mut table| {
+                    table.insert(index, exchange.body.as_slice())?;
+                    Ok(())
+                })
+                .is_ok();
+            if stored && write_txn.commit().is_ok() {
+                exchange.body = vec![];
+                is_on_disk = true;
+            }
+        }
+
+        self.exchanges.push((exchange, is_on_disk));
+    }
+
+    pub fn exchange_count(&self) -> usize {
+        self.exchanges.len()
+    }
+
+    /// Provides a recorded exchange, with its body.
+    pub fn exchange(&self, index: usize) -> Option<Exchange> {
+        let (exchange, is_on_disk) = self.exchanges.get(index)?;
+        let mut exchange = exchange.clone();
+
+        if *is_on_disk {
+            let read_txn = self.db.as_ref()?.begin_read().ok()?;
+            let table = read_txn.open_table(EXCHANGES_TABLE).ok()?;
+            exchange.body = table.get(index as u64).ok()??.value().to_vec();
+        }
+
+        Some(exchange)
+    }
+
+    /// Whether anything has been recorded for given URL.
+    pub fn has_exchange(&self, url: &str) -> bool {
+        self.exchanges
+            .iter()
+            .any(|(exchange, _)| exchange.url == url)
     }
 
     pub fn contains_key(&self, key: &str) -> bool {

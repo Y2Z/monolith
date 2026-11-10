@@ -196,33 +196,37 @@ cat some-site-page.html | monolith -IifsM -r audio,video -w frame,iframe -b http
 monolith page-saved-by-browser.mhtml -o page.html
 ```
 
+```console
+monolith crawl.warc.gz -b https://some.site/page -o page.html
+```
+
 
 ---------------------------------------------------
 
 
 ## Options
 
- - `-b`: Use `custom base URL`
+ - `-b`: Use `custom base URL`, or pick the page to save out of a WARC or HAR archive
  - `-B`: Let a browser render the page first (requires Firefox, or anything based on it or Chromium)
  - `-C`: Read cookies from `file`
  - `-d`: Forbid retrieving assets from specified `domain(s)` (can be used multiple times)
  - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
+ - `-F`: Set output `format`: `HTML` (default), `MHTML`, or `WARC` (compressed if the output file ends with `.gz`), `HTM` and `MHT` work as well, in any case
  - `-f`: Exclude web fonts
  - `-h`: Print usage information
  - `-i`: Remove images
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
- - `-m`: Output in MHTML format instead of HTML
  - `-M`: Don't add timestamp and URL information
  - `-n`: Extract contents of NOSCRIPT elements
  - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-q`: Be quiet
  - `-r`: Remove elements matching `selector` from the document (can be used multiple times)
- - `-R`: Save a simplified version of the page, like the reader mode of a web browser: just the article, without any JavaScript, and with styling that follows the system's color scheme (add `-s` to leave it without any styles)
  - `-s`: Exclude styles
+ - `-S`: Save a simplified version of the page, like the reader mode of a web browser: just the article, without any JavaScript, and with styling that follows the system's color scheme (add `-s` to leave it without any styles)
  - `-t`: Adjust `network request timeout`
  - `-u`: Use `custom User-Agent`
  - `-w`: Wipe elements matching `selector`: links and such turn into their contents, images, frames, and other elements that load something lose their sources (can be used multiple times)
@@ -327,6 +331,13 @@ Please open an issue if something is wrong, that helps make this project better.
 
 ---------------------------------------------------
 
+
+## Archives
+
+Besides documents, Monolith takes archives as targets, and never goes online to complete them: whatever isn't in there stays missing.
+
+ - WARC (`.warc`, `.warc.gz`) and HAR (`.har`) hold the responses a page has received. It gets saved along with its JavaScript and those responses, which get replayed to it the same way `-B` does it, unless scripts get removed with `-j`. They may hold many pages: the first one is what gets saved, unless `-b` points at another one. HAR files have to be exported with contents.
+ - MHTML (`.mhtml`, `.mht`) and WebArchive (`.webarchive`) hold a document with what it's made of. Its assets get embedded into it.
 
 ## Testing
 

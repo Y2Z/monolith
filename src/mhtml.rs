@@ -51,6 +51,24 @@ pub struct MhtmlArchive {
 }
 
 impl MhtmlArchive {
+    /// Creates an archive out of assets and the URLs they're known by, the first one is the document.
+    pub fn from_assets(assets: Vec<(Vec<Url>, ArchivedAsset)>) -> MhtmlArchive {
+        let mut archive = MhtmlArchive {
+            assets: Vec::with_capacity(assets.len()),
+            index: HashMap::new(),
+            root: 0,
+        };
+
+        for (i, (urls, asset)) in assets.into_iter().enumerate() {
+            for url in urls {
+                archive.index.entry(archive_key(&url)).or_insert(i);
+            }
+            archive.assets.push(asset);
+        }
+
+        archive
+    }
+
     /// The document itself.
     pub fn root(&self) -> &ArchivedAsset {
         &self.assets[self.root]

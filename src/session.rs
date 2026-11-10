@@ -4,12 +4,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
+use chrono::Utc;
 use encoding_rs::Encoding;
 use markup5ever_rcdom::Handle;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 
-use crate::cache::Cache;
+use crate::cache::{Cache, Exchange};
 use crate::cookies::Cookie;
 use crate::core::{
     MonolithOptions, MonolithOutputFormat, detect_media_type, print_error_message,
@@ -22,6 +23,8 @@ use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
 pub struct Session {
     /// MHTML archive the document came from; when loaded, assets get retrieved from it (and only from it)
     archive: Option<MhtmlArchive>,
+    /// Whether the document came from an archive that only has original responses in it
+    is_offline: bool,
     pub asset_urls: Vec<String>,
     cache: Option<Cache>,
     client: Client,
@@ -65,6 +68,7 @@ impl Session {
                 // Stop redirects into blocked domains before the request is even made
                 let domains = options.domains.clone();
                 let whitelist_domains = options.whitelist_domains;
+                let is_recording = options.output_format == MonolithOutputFormat::WARC;
                 reqwest::redirect::Policy::custom(move |attempt| {
                     let allowed = match (&domains, attempt.url().host_str()) {
                         (Some(domains), Some(host)) => {
@@ -75,7 +79,10 @@ impl Session {
                         }
                         _ => true,
                     };
-                    if !allowed {
+                    // Archives keep every redirect, they get followed by hand to be recorded
+                    if is_recording {
+                        attempt.stop()
+                    } else if !allowed {
                         attempt.error("redirect target is blocked")
                     } else if attempt.previous().len() >= 10 {
                         attempt.error("too many redirects")
@@ -90,6 +97,7 @@ impl Session {
         Session {
             archive: None,
             asset_urls: Vec::new(),
+            is_offline: false,
             cache,
             cookies,
             client,
@@ -121,13 +129,61 @@ impl Session {
             .set(&key, data, media_type, charset);
     }
 
+    pub fn is_recording(&self) -> bool {
+        self.options.output_format == MonolithOutputFormat::WARC
+    }
+
+    /// Keeps a record of how something was obtained, for formats that keep that.
+    pub fn record_exchange(&mut self, exchange: Exchange) {
+        if self.is_recording() {
+            self.cache
+                .get_or_insert_with(|| Cache::new(0, None))
+                .add_exchange(exchange);
+        }
+    }
+
+    /// Records something that has been obtained without asking a server for it.
+    pub fn record_resource(&mut self, url: &Url, data: &[u8], media_type: &str, charset: &str) {
+        let url = clean_url(url.clone()).to_string();
+        if !self.is_recording() || self.has_exchange(&url) {
+            return;
+        }
+
+        self.record_exchange(Exchange {
+            body: data.to_vec(),
+            content_type: match charset.is_empty() {
+                true => media_type.to_string(),
+                false => format!("{}; charset={}", media_type, charset),
+            },
+            date: Utc::now(),
+            method: "GET".to_string(),
+            url,
+            ..Default::default()
+        });
+    }
+
+    pub fn has_exchange(&self, url: &str) -> bool {
+        self.cache
+            .as_ref()
+            .is_some_and(|cache| cache.has_exchange(url))
+    }
+
+    pub fn cache(&self) -> Option<&Cache> {
+        self.cache.as_ref()
+    }
+
     /// Makes the session retrieve assets from the given MHTML archive, instead of the network or filesystem.
     pub fn load_archive(&mut self, archive: MhtmlArchive) {
         self.archive = Some(archive);
     }
 
     pub fn has_archive(&self) -> bool {
-        self.archive.is_some()
+        self.archive.is_some() || self.is_offline
+    }
+
+    /// Keeps the session from going online: what it needs has to be in the cache already.
+    pub fn go_offline(&mut self) {
+        self.is_offline = true;
     }
 
     pub fn log_asset_url(&mut self, url: &Url) {
@@ -142,9 +198,10 @@ impl Session {
     /// (everything is already in there).
     pub fn prefetch_assets(&mut self, document_url: &Url, document: &Handle) {
         if self.options.threads < 2
-            || self.options.output_format != MonolithOutputFormat::HTML
+            || self.options.output_format == MonolithOutputFormat::MHTML
             || self.cache.is_none()
             || self.archive.is_some()
+            || self.is_offline
         {
             return;
         }
@@ -163,6 +220,9 @@ impl Session {
         let cache = self.cache.as_mut().unwrap();
         for entry in entries {
             cache.set(&entry.key, &entry.data, entry.media_type, entry.charset);
+            for exchange in entry.exchanges {
+                cache.add_exchange(exchange);
+            }
         }
     }
 
@@ -192,6 +252,7 @@ impl Session {
                     if !self.options.silent {
                         print_info_message(&cache_key);
                     }
+                    self.record_resource(&asset.1, &asset.0, &asset.2, &asset.3);
 
                     Ok(asset)
                 }
@@ -208,7 +269,7 @@ impl Session {
                     Err(self.client.get("").send().unwrap_err())
                 }
             }
-        } else if url.scheme() == "file" {
+        } else if url.scheme() == "file" && !self.is_offline {
             // Check if parent_url is also a file:// URL (if not, then we don't embed the asset)
             if parent_url.scheme() != "file" {
                 if !self.options.silent {
@@ -235,13 +296,13 @@ impl Session {
                     }
 
                     let file_blob: Vec<u8> = fs::read(path).expect("unable to read file");
+                    let media_type = detect_media_type(&file_blob, url);
+                    // Targets get recorded for what's in them, they may be archives
+                    if parent_url != url {
+                        self.record_resource(url, &file_blob, &media_type, "");
+                    }
 
-                    Ok((
-                        file_blob.clone(),
-                        url.clone(),
-                        detect_media_type(&file_blob, url),
-                        "".to_string(),
-                    ))
+                    Ok((file_blob, url.clone(), media_type, "".to_string()))
                 }
             } else {
                 if !self.options.silent {
@@ -269,6 +330,13 @@ impl Session {
                 self.cache.as_ref().unwrap().get(&cache_key).unwrap().1,
                 self.cache.as_ref().unwrap().get(&cache_key).unwrap().2,
             ))
+        } else if self.is_offline {
+            if !self.options.silent {
+                print_error_message(&format!("{} (not found in archive)", &cache_key));
+            }
+
+            // Provoke error
+            Err(self.client.get("").send().unwrap_err())
         } else {
             if let Some(domains) = &self.options.domains {
                 let domain_matches = domains
@@ -279,13 +347,20 @@ impl Session {
                 }
             }
 
-            let (data, response_url, media_type, charset) = net::fetch_remote_asset(
+            let mut exchanges: Vec<Exchange> = vec![];
+            let is_recording = self.is_recording();
+            let result = net::fetch_remote_asset(
                 &self.client,
                 self.cookies.as_deref(),
                 &self.options,
                 parent_url,
                 url,
-            )?;
+                is_recording.then_some(&mut exchanges),
+            );
+            for exchange in exchanges {
+                self.record_exchange(exchange);
+            }
+            let (data, response_url, media_type, charset) = result?;
 
             // Add retrieved resource to cache
             if let Some(cache) = self.cache.as_mut() {

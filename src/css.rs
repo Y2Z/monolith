@@ -308,7 +308,7 @@ pub fn process_css<'a>(
                     } else {
                         let resolved_url: Url = resolve_url(document_url, value);
 
-                        if session.options.output_format == MonolithOutputFormat::HTML {
+                        if session.options.output_format != MonolithOutputFormat::MHTML {
                             match session.retrieve_asset(document_url, &resolved_url) {
                                 Ok((data, final_url, media_type, charset)) => {
                                     // TODO: if it's @font-face, exclude definitions of non-woff/woff-2 fonts (if woff/woff-2 are present)
@@ -426,7 +426,7 @@ pub fn process_css<'a>(
                 } else {
                     let full_url: Url = resolve_url(document_url, value);
 
-                    if session.options.output_format == MonolithOutputFormat::HTML {
+                    if session.options.output_format != MonolithOutputFormat::MHTML {
                         match session.retrieve_asset(document_url, &full_url) {
                             Ok((data, final_url, media_type, charset)) => {
                                 let data_url = create_data_url(

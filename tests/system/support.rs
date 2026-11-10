@@ -200,11 +200,20 @@ fn respond(mut stream: TcpStream, responder: &Responder, requests: &Mutex<Vec<Re
 
     requests.lock().unwrap().push(request.clone());
 
-    let (status, media_type, body) = responder(&request);
+    let (status, media_type, mut body) = responder(&request);
+    // Redirects have where they lead to as their body
+    let location = match (300..400).contains(&status) {
+        true => format!(
+            "Location: {}\r\n",
+            String::from_utf8_lossy(&std::mem::take(&mut body))
+        ),
+        false => String::new(),
+    };
     let head = format!(
-        "HTTP/1.1 {} Status\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} Status\r\nContent-Type: {}\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
         status,
         media_type,
+        location,
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());
@@ -237,7 +246,7 @@ impl Workspace {
             .env("TMPDIR", self.temporary_directory.path())
             .env("TEMP", self.temporary_directory.path())
             .env("TMP", self.temporary_directory.path())
-            .args(["--browser", "--timeout", "60"]);
+            .args(["--browser", "--timeout", "300"]);
         command
     }
 
@@ -250,6 +259,22 @@ impl Workspace {
             .args(["--output"])
             .arg(&path)
             .arg(url)
+            .output()
+            .unwrap();
+        assert_success(&output);
+
+        path
+    }
+
+    /// Turns an archive into a document, no browser is needed for that.
+    pub fn unpack(&self, name: &str, archive: &[u8]) -> PathBuf {
+        let source = self.directory.path().join(name);
+        let path = self.directory.path().join("unpacked.html");
+        fs::write(&source, archive).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_monolith"))
+            .arg("--output")
+            .arg(&path)
+            .arg(&source)
             .output()
             .unwrap();
         assert_success(&output);

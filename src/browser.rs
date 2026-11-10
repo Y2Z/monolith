@@ -21,6 +21,7 @@ use std::time::{Duration, Instant};
 
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
+use chrono::Utc;
 use serde_json::{Value, json};
 use tempfile::{Builder, TempDir};
 use tungstenite::client::{IntoClientRequest, client_with_config};
@@ -31,7 +32,9 @@ use url::Url;
 use crate::cookies::Cookie;
 use crate::core::{MonolithOptions, print_error_message, print_info_message};
 use crate::net::is_domain_allowed;
-use crate::replay::{CapturedAsset, CapturedPage};
+use crate::replay::{
+    CapturedAsset, CapturedPage, HttpDetails, Redirect, set_content_type, with_utf8_charset,
+};
 use crate::session::Session;
 
 const BROWSER_COLOR_SCHEME_VARIABLE: &str = "MONOLITH_BROWSER_COLOR_SCHEME";
@@ -1440,7 +1443,8 @@ impl<'a> Connection<'a> {
         })
     }
 
-    fn response_body(&mut self, request: &str) -> Option<Vec<u8>> {
+    /// Body of a response, along with whether it's text that has already been decoded.
+    fn response_body(&mut self, request: &str) -> Option<(Vec<u8>, bool)> {
         let deadline = Instant::now() + NETWORK_QUIET_TIMEOUT;
 
         if self.is_devtools {
@@ -1456,15 +1460,17 @@ impl<'a> Connection<'a> {
             let body = result["body"].as_str()?;
 
             return match result["base64Encoded"] == true {
-                true => BASE64_STANDARD.decode(body).ok(),
-                false => Some(body.as_bytes().to_vec()),
+                true => Some((BASE64_STANDARD.decode(body).ok()?, false)),
+                false => Some((body.as_bytes().to_vec(), true)),
             };
         }
 
         let params = json!({"dataType": "response", "request": request});
         let result = self.command("network.getData", params, deadline).ok()?;
 
-        decode_bytes(&result["bytes"])
+        // Text comes as text, already decoded
+        let is_decoded = result["bytes"]["type"] == "string";
+        Some((decode_bytes(&result["bytes"])?, is_decoded))
     }
 
     /// Reports what the browser has received, the same way Monolith does for what it retrieves.
@@ -1529,8 +1535,23 @@ impl<'a> Connection<'a> {
             }
 
             // Whatever is gone from the browser's memory by now gets retrieved by Monolith instead
-            if let Some(data) = self.response_body(&request) {
+            if let Some((data, is_decoded)) = self.response_body(&request) {
                 let is_reusable = response.is_usable();
+                let mut response = response;
+                // What servers say beats what browsers make of it
+                if let Some((_, content_type)) = response
+                    .http
+                    .response_headers
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+                {
+                    response.content_type = content_type.clone();
+                }
+                // Text that's been decoded is UTF-8 now, no matter what it used to be
+                if is_decoded && !response.content_type.is_empty() {
+                    response.content_type = with_utf8_charset(&response.content_type);
+                    set_content_type(&mut response.http.response_headers, &response.content_type);
+                }
                 assets.push(CapturedAsset {
                     content_type: response.content_type,
                     data,
@@ -1539,6 +1560,7 @@ impl<'a> Connection<'a> {
                     method: response.method,
                     status: response.status,
                     urls: response.urls,
+                    http: response.http,
                 });
             }
         }
@@ -1555,6 +1577,7 @@ impl<'a> Connection<'a> {
                     method: "GET".to_string(),
                     status: 200,
                     urls: vec![url],
+                    ..Default::default()
                 });
             }
         }
@@ -1737,6 +1760,7 @@ impl<'a> Connection<'a> {
                 let details = &message["params"]["request"];
                 response.destination = details["destination"].as_str().unwrap_or("").to_string();
                 response.method = details["method"].as_str().unwrap_or("GET").to_string();
+                response.http.request_headers = bidi_headers(&details["headers"]);
                 response.sequence = sequence;
                 if !response.urls.iter().any(|existing| existing == url) {
                     response.urls.push(url.to_string());
@@ -1747,8 +1771,17 @@ impl<'a> Connection<'a> {
 
                 let details = &message["params"]["response"];
                 if let Some(response) = self.captured_responses.get_mut(request) {
-                    response.status = details["status"].as_u64().unwrap_or(0);
-                    response.content_type = details["mimeType"].as_str().unwrap_or("").to_string();
+                    let status = details["status"].as_u64().unwrap_or(0);
+                    if !(300..400).contains(&status) || status == 304 {
+                        response.content_type =
+                            details["mimeType"].as_str().unwrap_or("").to_string();
+                    }
+                    response.receive(
+                        status,
+                        details["statusText"].as_str().unwrap_or(""),
+                        details["protocol"].as_str().unwrap_or(""),
+                        bidi_headers(&details["headers"]),
+                    );
                 }
                 self.log_response(
                     request,
@@ -1841,8 +1874,19 @@ impl Connection<'_> {
                 );
                 let sequence = self.captured_responses.len();
                 let response = self.captured_responses.entry(key).or_default();
+                // Redirects get reported along with where they lead
+                let redirect = &params["redirectResponse"];
+                if redirect.is_object() {
+                    response.receive(
+                        redirect["status"].as_u64().unwrap_or(0),
+                        redirect["statusText"].as_str().unwrap_or(""),
+                        redirect["protocol"].as_str().unwrap_or(""),
+                        devtools_headers(&redirect["headers"]),
+                    );
+                }
                 response.destination = destination.to_string();
                 response.method = details["method"].as_str().unwrap_or("GET").to_string();
+                response.http.request_headers = devtools_headers(&details["headers"]);
                 response.sequence = sequence;
                 if !response.urls.iter().any(|existing| existing == url) {
                     response.urls.push(url.to_string());
@@ -1852,8 +1896,13 @@ impl Connection<'_> {
                 let details = &params["response"];
                 let status = details["status"].as_u64().unwrap_or(0);
                 if let Some(response) = self.captured_responses.get_mut(&key) {
-                    response.status = status;
                     response.content_type = details["mimeType"].as_str().unwrap_or("").to_string();
+                    response.receive(
+                        status,
+                        details["statusText"].as_str().unwrap_or(""),
+                        details["protocol"].as_str().unwrap_or(""),
+                        devtools_headers(&details["headers"]),
+                    );
                 }
                 self.log_response(&key, status, details["statusText"].as_str().unwrap_or(""));
             }
@@ -1912,9 +1961,37 @@ pub struct CapturedResponse {
     pub sequence: usize,
     pub status: u64,
     pub urls: Vec<String>,
+    pub http: HttpDetails,
 }
 
 impl CapturedResponse {
+    /// Takes note of what the browser got back, a redirect becomes one of the steps taken.
+    fn receive(
+        &mut self,
+        status: u64,
+        status_text: &str,
+        protocol: &str,
+        headers: Vec<(String, String)>,
+    ) {
+        if (300..400).contains(&status) && status != 304 {
+            self.http.redirects.push(Redirect {
+                method: self.method.clone(),
+                request_headers: self.http.request_headers.clone(),
+                response_headers: headers,
+                status,
+                status_text: status_text.to_string(),
+                url: self.urls.last().cloned().unwrap_or_default(),
+            });
+            return;
+        }
+
+        self.status = status;
+        self.http.status_text = status_text.to_string();
+        self.http.http_version = http_version_of(protocol);
+        self.http.response_headers = headers;
+        self.http.time = Utc::now().timestamp_millis();
+    }
+
     // Partial responses, error pages, and answers to POST requests aren't what their URLs point to
     pub fn is_usable(&self) -> bool {
         self.method == "GET" && matches!(self.status, 200 | 203 | 304)
@@ -1925,6 +2002,60 @@ impl CapturedResponse {
         self.status >= 200 && self.status != 206 && !(300..400).contains(&self.status)
             || self.status == 304
     }
+}
+
+/// Browsers name protocols the way ALPN does.
+#[doc(hidden)]
+pub fn http_version_of(protocol: &str) -> String {
+    match protocol.to_lowercase().as_str() {
+        "http/1.0" => "HTTP/1.0",
+        "h2" | "http/2" | "http/2.0" => "HTTP/2",
+        "h3" | "http/3" => "HTTP/3",
+        "" => "",
+        _ => "HTTP/1.1",
+    }
+    .to_string()
+}
+
+/// WebDriver BiDi gives headers as lists of names and values.
+#[doc(hidden)]
+pub fn bidi_headers(headers: &Value) -> Vec<(String, String)> {
+    headers
+        .as_array()
+        .map(|headers| {
+            headers
+                .iter()
+                .filter_map(|header| {
+                    let value = decode_bytes(&header["value"])?;
+                    Some((
+                        header["name"].as_str()?.to_string(),
+                        String::from_utf8_lossy(&value).into_owned(),
+                    ))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// DevTools Protocol gives headers as objects, with repeated ones joined by line breaks.
+#[doc(hidden)]
+pub fn devtools_headers(headers: &Value) -> Vec<(String, String)> {
+    headers
+        .as_object()
+        .map(|headers| {
+            headers
+                .iter()
+                .flat_map(|(name, value)| {
+                    value
+                        .as_str()
+                        .unwrap_or("")
+                        .split('\n')
+                        .map(|value| (name.clone(), value.to_string()))
+                        .collect::<Vec<_>>()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 #[doc(hidden)]

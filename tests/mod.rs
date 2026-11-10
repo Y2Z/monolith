@@ -1,11 +1,17 @@
 mod browser;
+mod cache;
 mod cli;
 mod cookies;
 mod core;
 mod css;
+mod har;
 mod html;
 mod js;
 mod mhtml;
+mod net;
 mod replay;
 mod session;
+mod simplify;
 mod url;
+mod warc;
+mod webarchive;

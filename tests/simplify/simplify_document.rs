@@ -9,7 +9,7 @@
 mod passing {
     use monolith::core::MonolithOptions;
     use monolith::html;
-    use monolith::reader_mode::simplify_document;
+    use monolith::simplify::simplify_document;
 
     fn simplify(html: &str, add_styles: bool) -> String {
         let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
