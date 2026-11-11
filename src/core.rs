@@ -198,13 +198,13 @@ pub fn create_monolithic_document_from_data(
     // Validate options
     {
         // Check if custom encoding value is acceptable
-        if let Some(custom_output_encoding) = session.options.encoding.clone() {
-            if Encoding::for_label_no_replacement(custom_output_encoding.as_bytes()).is_none() {
-                return Err(MonolithError::new(&format!(
-                    "unknown encoding \"{}\"",
-                    &custom_output_encoding
-                )));
-            }
+        if let Some(custom_output_encoding) = session.options.encoding.clone()
+            && Encoding::for_label_no_replacement(custom_output_encoding.as_bytes()).is_none()
+        {
+            return Err(MonolithError::new(&format!(
+                "unknown encoding \"{}\"",
+                custom_output_encoding
+            )));
         }
     }
 
@@ -350,16 +350,14 @@ pub fn create_monolithic_document_from_data(
     // Attempt to determine document's encoding
     if authoritative_encoding.is_none()
         && let Some(html_charset) = get_charset(&dom.document)
+        && !html_charset.is_empty()
     {
-        if !html_charset.is_empty() {
-            // Check if the charset specified inside HTML is valid
-            if let Some(document_charset) =
-                Encoding::for_label_no_replacement(html_charset.as_bytes())
-            {
-                document_encoding = html_charset;
-                environment_encoding = Some(document_charset);
-                dom = html_to_dom(&input_data, document_charset.name().to_string());
-            }
+        // Check if the charset specified inside HTML is valid
+        if let Some(document_charset) = Encoding::for_label_no_replacement(html_charset.as_bytes())
+        {
+            document_encoding = html_charset;
+            environment_encoding = Some(document_charset);
+            dom = html_to_dom(&input_data, document_charset.name().to_string());
         }
     }
 
@@ -417,10 +415,11 @@ pub fn create_monolithic_document_from_data(
     }
 
     let had_favicon: bool = has_favicon(&dom.document);
-    if session.options.simplify {
-        if !simplify_document(&dom, !session.options.no_styles) && !session.options.silent {
-            print_error_message("found no article to simplify, the page may rely on JavaScript");
-        }
+    if session.options.simplify
+        && !simplify_document(&dom, !session.options.no_styles)
+        && !session.options.silent
+    {
+        print_error_message("found no article to simplify, the page may rely on JavaScript");
     }
     strip_elements(
         &dom.document,
@@ -550,13 +549,13 @@ pub fn create_monolithic_document(
     // Validate options
     {
         // Check if custom encoding value is acceptable
-        if let Some(custom_encoding) = session.options.encoding.clone() {
-            if Encoding::for_label_no_replacement(custom_encoding.as_bytes()).is_none() {
-                return Err(MonolithError::new(&format!(
-                    "unknown encoding \"{}\"",
-                    &custom_encoding
-                )));
-            }
+        if let Some(custom_encoding) = session.options.encoding.clone()
+            && Encoding::for_label_no_replacement(custom_encoding.as_bytes()).is_none()
+        {
+            return Err(MonolithError::new(&format!(
+                "unknown encoding \"{}\"",
+                custom_encoding
+            )));
         }
     }
 
@@ -585,7 +584,7 @@ pub fn create_monolithic_document(
                                 Err(_) => {
                                     return Err(MonolithError::new(&format!(
                                         "could not generate file URL out of given path \"{}\"",
-                                        &target_str
+                                        target_str
                                     )));
                                 }
                             }
@@ -593,14 +592,14 @@ pub fn create_monolithic_document(
                         false => {
                             return Err(MonolithError::new(&format!(
                                 "local target \"{}\" is not a file",
-                                &target_str
+                                target_str
                             )));
                         }
                     },
                     false => {
                         // It is not a FS path, now we do what browsers do:
                         // prepend "http://" and hope it points to a website
-                        Url::parse(&format!("http://{}", &target_str)).unwrap()
+                        Url::parse(&format!("http://{}", target_str)).unwrap()
                     }
                 }
             }
@@ -985,10 +984,10 @@ pub fn print_error_message(text: &str) {
     const ENV_VAR_TERM: &str = "TERM";
 
     let mut no_color = env::var_os(ENV_VAR_NO_COLOR).is_some() || !std::io::stderr().is_terminal();
-    if let Some(term) = env::var_os(ENV_VAR_TERM) {
-        if term == "dumb" {
-            no_color = true;
-        }
+    if let Some(term) = env::var_os(ENV_VAR_TERM)
+        && term == "dumb"
+    {
+        no_color = true;
     }
 
     if handle
@@ -996,7 +995,7 @@ pub fn print_error_message(text: &str) {
             format!(
                 "{}{}{}\n",
                 if no_color { "" } else { ANSI_COLOR_RED },
-                &text,
+                text,
                 if no_color { "" } else { ANSI_COLOR_RESET },
             )
             .as_bytes(),
@@ -1009,5 +1008,5 @@ pub fn print_info_message(text: &str) {
     let stderr = io::stderr();
     let mut handle = stderr.lock();
 
-    if handle.write_all(format!("{}\n", &text).as_bytes()).is_ok() {}
+    if handle.write_all(format!("{}\n", text).as_bytes()).is_ok() {}
 }

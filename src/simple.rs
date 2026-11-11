@@ -194,15 +194,15 @@ pub fn simplify_document(dom: &RcDom, add_styles: bool) -> bool {
     let has_text: bool = text_length(body) >= MIN_ARTICLE_LENGTH;
 
     let mut has_new_title = false;
-    if let Some(title) = title {
-        if !has_descendant(body, &["h1"]) {
-            let heading = create_html_element(dom, "h1");
-            set_children(&heading, vec![create_text_node(&title)]);
-            let mut children = vec![heading];
-            children.extend(body.children.take());
-            set_children(body, children);
-            has_new_title = true;
-        }
+    if let Some(title) = title
+        && !has_descendant(body, &["h1"])
+    {
+        let heading = create_html_element(dom, "h1");
+        set_children(&heading, vec![create_text_node(&title)]);
+        let mut children = vec![heading];
+        children.extend(body.children.take());
+        set_children(body, children);
+        has_new_title = true;
     }
     add_below_title(dom, body, [subtitle, byline], has_new_title);
 

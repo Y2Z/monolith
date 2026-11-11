@@ -213,7 +213,7 @@ pub fn fetch_remote_asset(
 
     if !is_domain_allowed(url, options) {
         if !options.silent {
-            print_error_message(&format!("{} (domain not allowed)", &cache_key));
+            print_error_message(&format!("{} (domain not allowed)", cache_key));
         }
 
         return Err(client.get("").send().unwrap_err());
@@ -231,7 +231,7 @@ pub fn fetch_remote_asset(
             Ok(response) => response,
             Err(error) => {
                 if !options.silent {
-                    print_error_message(&format!("{} ({})", &cache_key, error));
+                    print_error_message(&format!("{} ({})", cache_key, error));
                 }
 
                 return Err(client.get("").send().unwrap_err());
@@ -266,7 +266,7 @@ pub fn fetch_remote_asset(
         };
         if let Some(reason) = reason {
             if !options.silent {
-                print_error_message(&format!("{} ({})", &cache_key, reason));
+                print_error_message(&format!("{} ({})", cache_key, reason));
             }
 
             return Err(client.get("").send().unwrap_err());
@@ -280,7 +280,7 @@ pub fn fetch_remote_asset(
 
     if !options.ignore_errors && response.status() != reqwest::StatusCode::OK {
         if !options.silent {
-            print_error_message(&format!("{} ({})", &cache_key, response.status()));
+            print_error_message(&format!("{} ({})", cache_key, response.status()));
         }
 
         // Archives keep what went wrong too
@@ -299,7 +299,7 @@ pub fn fetch_remote_asset(
         if url.as_str() == response_url.as_str() {
             print_info_message(&cache_key.to_string());
         } else {
-            print_info_message(&format!("{} -> {}", &cache_key, &response_url));
+            print_info_message(&format!("{} -> {}", cache_key, response_url));
         }
     }
 
@@ -319,7 +319,7 @@ pub fn fetch_remote_asset(
         Ok(b) => b.to_vec(),
         Err(error) => {
             if !options.silent {
-                print_error_message(&format!("{} ({})", &cache_key, error));
+                print_error_message(&format!("{} ({})", cache_key, error));
             }
 
             return Err(error);
@@ -555,10 +555,10 @@ fn collect_html(
                     }
                 }
                 "body" => {
-                    if !options.no_images {
-                        if let Some(background) = get_node_attr(node, "background") {
-                            push_job(jobs, base_url, &background, AssetKind::Other);
-                        }
+                    if !options.no_images
+                        && let Some(background) = get_node_attr(node, "background")
+                    {
+                        push_job(jobs, base_url, &background, AssetKind::Other);
                     }
                 }
                 "img" => {
@@ -576,10 +576,9 @@ fn collect_html(
                         && get_node_attr(node, "type")
                             .unwrap_or_default()
                             .eq_ignore_ascii_case("image")
+                        && let Some(src) = get_node_attr(node, "src")
                     {
-                        if let Some(src) = get_node_attr(node, "src") {
-                            push_job(jobs, base_url, &src, AssetKind::Other);
-                        }
+                        push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                 }
                 "image" | "use" => {
@@ -597,17 +596,18 @@ fn collect_html(
                     if let Some(src) = get_node_attr(node, "src") {
                         push_job(jobs, base_url, &src, AssetKind::Other);
                     }
-                    if parent_name == "picture" && !options.no_images {
-                        if let Some(srcset) = get_node_attr(node, "srcset") {
-                            push_srcset(jobs, base_url, &srcset);
-                        }
+                    if parent_name == "picture"
+                        && !options.no_images
+                        && let Some(srcset) = get_node_attr(node, "srcset")
+                    {
+                        push_srcset(jobs, base_url, &srcset);
                     }
                 }
                 "script" => {
-                    if !options.no_js {
-                        if let Some(src) = get_node_attr(node, "src") {
-                            push_job(jobs, base_url, &src, AssetKind::Other);
-                        }
+                    if !options.no_js
+                        && let Some(src) = get_node_attr(node, "src")
+                    {
+                        push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                 }
                 "style" => {
@@ -631,10 +631,10 @@ fn collect_html(
                     if let Some(src) = get_node_attr(node, "src") {
                         push_job(jobs, base_url, &src, AssetKind::Other);
                     }
-                    if !options.no_images {
-                        if let Some(poster) = get_node_attr(node, "poster") {
-                            push_job(jobs, base_url, &poster, AssetKind::Other);
-                        }
+                    if !options.no_images
+                        && let Some(poster) = get_node_attr(node, "poster")
+                    {
+                        push_job(jobs, base_url, &poster, AssetKind::Other);
                     }
                 }
                 "noscript" => {
@@ -646,10 +646,10 @@ fn collect_html(
                 _ => {}
             }
 
-            if !options.no_styles {
-                if let Some(style) = get_node_attr(node, "style") {
-                    collect_css_str(&style, base_url, options, jobs);
-                }
+            if !options.no_styles
+                && let Some(style) = get_node_attr(node, "style")
+            {
+                collect_css_str(&style, base_url, options, jobs);
             }
 
             for child in node.children.borrow().iter() {

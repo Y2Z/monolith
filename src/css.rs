@@ -126,12 +126,11 @@ fn charset_rule_encoding(data: &[u8]) -> Option<&'static Encoding> {
 }
 
 fn rewrite_charset_rule(css: &str) -> String {
-    if let Some(rest) = css.strip_prefix(CHARSET_RULE_PREFIX) {
-        if let Some(label_end) = rest.find(CHARSET_RULE_SUFFIX) {
-            if !rest[..label_end].eq_ignore_ascii_case("UTF-8") {
-                return format!("{}UTF-8{}", CHARSET_RULE_PREFIX, &rest[label_end..]);
-            }
-        }
+    if let Some(rest) = css.strip_prefix(CHARSET_RULE_PREFIX)
+        && let Some(label_end) = rest.find(CHARSET_RULE_SUFFIX)
+        && !rest[..label_end].eq_ignore_ascii_case("UTF-8")
+    {
+        return format!("{}UTF-8{}", CHARSET_RULE_PREFIX, &rest[label_end..]);
     }
 
     css.to_string()
@@ -193,17 +192,16 @@ pub fn process_css<'a>(
                     continue;
                 }
 
-                let closure: &str;
-                if token == &Token::ParenthesisBlock {
+                let closure: &str = if token == &Token::ParenthesisBlock {
                     result.push('(');
-                    closure = ")";
+                    ")"
                 } else if token == &Token::SquareBracketBlock {
                     result.push('[');
-                    closure = "]";
+                    "]"
                 } else {
                     result.push('{');
-                    closure = "}";
-                }
+                    "}"
+                };
 
                 let block_css: String = parser
                     .parse_nested_block(|parser| {
@@ -259,7 +257,7 @@ pub fn process_css<'a>(
                     curr_rule = "".to_string();
 
                     // Skip empty import values
-                    if value.len() == 0 {
+                    if value.is_empty() {
                         result.push_str("''");
                         continue;
                     }
@@ -299,7 +297,7 @@ pub fn process_css<'a>(
                     }
                 } else if func_name == "url" {
                     // Skip empty url()'s
-                    if value.len() == 0 {
+                    if value.is_empty() {
                         continue;
                     }
 
@@ -390,7 +388,7 @@ pub fn process_css<'a>(
                 }
 
                 // Skip empty url()'s
-                if value.len() < 1 {
+                if value.is_empty() {
                     result.push_str("url()");
                     continue;
                 } else if value.starts_with("#") {

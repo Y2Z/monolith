@@ -262,7 +262,7 @@ impl Session {
                 }
                 None => {
                     if !self.options.silent {
-                        print_error_message(&format!("{} (not found in archive)", &cache_key));
+                        print_error_message(&format!("{} (not found in archive)", cache_key));
                     }
 
                     // Provoke error
@@ -273,7 +273,7 @@ impl Session {
             // Check if parent_url is also a file:// URL (if not, then we don't embed the asset)
             if parent_url.scheme() != "file" {
                 if !self.options.silent {
-                    print_error_message(&format!("{} (security error)", &cache_key));
+                    print_error_message(&format!("{} (security error)", cache_key));
                 }
 
                 // Provoke error
@@ -285,7 +285,7 @@ impl Session {
             if path.exists() {
                 if path.is_dir() {
                     if !self.options.silent {
-                        print_error_message(&format!("{} (is a directory)", &cache_key));
+                        print_error_message(&format!("{} (is a directory)", cache_key));
                     }
 
                     // Provoke error
@@ -306,7 +306,7 @@ impl Session {
                 }
             } else {
                 if !self.options.silent {
-                    print_error_message(&format!("{} (file not found)", &url));
+                    print_error_message(&format!("{} (file not found)", url));
                 }
 
                 // Provoke error
@@ -332,7 +332,7 @@ impl Session {
             ))
         } else if self.is_offline {
             if !self.options.silent {
-                print_error_message(&format!("{} (not found in archive)", &cache_key));
+                print_error_message(&format!("{} (not found in archive)", cache_key));
             }
 
             // Provoke error

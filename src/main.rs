@@ -157,20 +157,21 @@ impl Output {
             // missing and the user opted in via --create-dirs (like curl).
             // Without the flag a clear error is reported instead of creating
             // directory trees the user did not ask for.
-            if let Some(parent) = Path::new(&final_destination).parent() {
-                if !parent.as_os_str().is_empty() && !parent.exists() {
-                    if create_dirs {
-                        fs::create_dir_all(parent)?;
-                    } else {
-                        return Err(IoError::new(
-                            io::ErrorKind::NotFound,
-                            format!(
-                                "cannot write to '{}': directory '{}' does not exist (use --create-dirs to create it)",
-                                final_destination,
-                                parent.display()
-                            ),
-                        ));
-                    }
+            if let Some(parent) = Path::new(&final_destination).parent()
+                && !parent.as_os_str().is_empty()
+                && !parent.exists()
+            {
+                if create_dirs {
+                    fs::create_dir_all(parent)?;
+                } else {
+                    return Err(IoError::new(
+                        io::ErrorKind::NotFound,
+                        format!(
+                            "cannot write to '{}': directory '{}' does not exist (use --create-dirs to create it)",
+                            final_destination,
+                            parent.display()
+                        ),
+                    ));
                 }
             }
 
@@ -252,11 +253,7 @@ fn main() {
     }
 
     // Set up cache (attempt to create temporary file)
-    let temp_cache_file: Option<NamedTempFile> = match Builder::new().prefix("monolith-").tempfile()
-    {
-        Ok(tempfile) => Some(tempfile),
-        Err(_) => None,
-    };
+    let temp_cache_file: Option<NamedTempFile> = Builder::new().prefix("monolith-").tempfile().ok();
     let cache = Some(Cache::new(
         CACHE_ASSET_FILE_SIZE_THRESHOLD,
         if temp_cache_file.is_some() {
