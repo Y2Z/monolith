@@ -1424,31 +1424,21 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "img" => {
-                    // Find src and data-src attribute(s)
+                    // Images that scripts load on their own are what browsers are there for (-B),
+                    // attributes that only scripts know the meaning of get left alone
                     let img_src: Option<String> = get_node_attr(node, "src");
-                    let img_data_src: Option<String> = get_node_attr(node, "data-src");
 
                     if session.options.no_images {
-                        // Put empty images into src and data-src attributes
+                        // Put empty image into src attribute
                         if img_src.is_some() {
                             set_node_attr(node, "src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         }
-                        if img_data_src.is_some() {
-                            set_node_attr(node, "data-src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
-                        }
-                    } else if img_src.clone().unwrap_or_default().is_empty()
-                        && img_data_src.clone().unwrap_or_default().is_empty()
-                    {
+                    } else if img_src.clone().unwrap_or_default().is_empty() {
                         // Add empty src attribute
                         set_node_attr(node, "src", Some("".to_string()));
                     } else {
                         // Add data URL src attribute
-                        let use_data_src = !img_data_src.clone().unwrap_or_default().is_empty();
-                        let img_src: String = if use_data_src {
-                            img_data_src.unwrap_or_default()
-                        } else {
-                            img_src.unwrap_or_default()
-                        };
+                        let img_src: String = img_src.unwrap_or_default();
 
                         if session.options.output_format != MonolithOutputFormat::MHTML {
                             retrieve_and_embed_asset(session, document_url, node, "src", &img_src);
@@ -1456,11 +1446,6 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             let img_src_full_url: Url = resolve_url(document_url, &img_src);
                             set_node_attr(node, "src", Some(img_src_full_url.to_string()));
                             session.log_asset_url(&img_src_full_url);
-                        }
-
-                        if use_data_src {
-                            // The image is already loaded; remove the lazy source without duplicating it.
-                            set_node_attr(node, "data-src", None);
                         }
                     }
 

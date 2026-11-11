@@ -135,20 +135,8 @@ const MAX_SUBTITLE_LENGTH: usize = 300;
 const MAX_SUBTITLE_DISTANCE: usize = 12;
 /// What usually separates the title of a page from the name of the website
 const TITLE_SEPARATORS: [&str; 5] = [" - ", " | ", " \u{b7} ", " \u{2013} ", " \u{2014} "];
-const KEPT_ATTRIBUTES: [&str; 14] = [
-    "alt",
-    "cite",
-    "colspan",
-    "data-src",
-    "data-srcset",
-    "datetime",
-    "dir",
-    "href",
-    "id",
-    "lang",
-    "rowspan",
-    "src",
-    "srcset",
+const KEPT_ATTRIBUTES: [&str; 12] = [
+    "alt", "cite", "colspan", "datetime", "dir", "href", "id", "lang", "rowspan", "src", "srcset",
     "title",
 ];
 
