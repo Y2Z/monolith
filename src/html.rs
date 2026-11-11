@@ -383,7 +383,10 @@ pub fn find_nodes(node: &Handle, mut path: Vec<&str>) -> Vec<Handle> {
 }
 
 pub fn get_base_url(handle: &Handle) -> Option<String> {
-    for base_node in find_nodes(handle, vec!["html", "head", "base"]).iter() {
+    if let Some(base_node) = find_nodes(handle, vec!["html", "head", "base"])
+        .iter()
+        .next()
+    {
         // Only the first base tag matters (we ignore the rest, if there's any)
         return get_node_attr(base_node, "href");
     }
@@ -488,11 +491,11 @@ pub fn has_favicon(handle: &Handle) -> bool {
     let mut found_favicon: bool = false;
 
     for link_node in find_nodes(handle, vec!["html", "head", "link"]).iter() {
-        if let Some(attr_value) = get_node_attr(link_node, "rel") {
-            if is_favicon(attr_value.trim()) {
-                found_favicon = true;
-                break;
-            }
+        if let Some(attr_value) = get_node_attr(link_node, "rel")
+            && is_favicon(attr_value.trim())
+        {
+            found_favicon = true;
+            break;
         }
     }
 
@@ -668,24 +671,24 @@ pub fn set_base_url(document: &Handle, base_href_value: String) -> RcDom {
     .expect("unable to serialize DOM into buffer");
     let dom = html_to_dom(&buf, "utf-8".to_string());
 
-    if let Some(html_node) = get_child_node_by_name(&dom.document, "html") {
-        if let Some(head_node) = get_child_node_by_name(&html_node, "head") {
-            // Check if BASE node already exists in the DOM tree
-            if let Some(base_node) = get_child_node_by_name(&head_node, "base") {
-                set_node_attr(&base_node, "href", Some(base_href_value));
-            } else {
-                let base_node = create_element(
-                    &dom,
-                    QualName::new(None, ns!(html), LocalName::from("base")),
-                    vec![Attribute {
-                        name: QualName::new(None, ns!(), LocalName::from("href")),
-                        value: format_tendril!("{}", base_href_value),
-                    }],
-                );
+    if let Some(html_node) = get_child_node_by_name(&dom.document, "html")
+        && let Some(head_node) = get_child_node_by_name(&html_node, "head")
+    {
+        // Check if BASE node already exists in the DOM tree
+        if let Some(base_node) = get_child_node_by_name(&head_node, "base") {
+            set_node_attr(&base_node, "href", Some(base_href_value));
+        } else {
+            let base_node = create_element(
+                &dom,
+                QualName::new(None, ns!(html), LocalName::from("base")),
+                vec![Attribute {
+                    name: QualName::new(None, ns!(), LocalName::from("href")),
+                    value: format_tendril!("{}", base_href_value),
+                }],
+            );
 
-                // Insert newly created BASE node into HEAD
-                head_node.children.borrow_mut().push(base_node.clone());
-            }
+            // Insert newly created BASE node into HEAD
+            head_node.children.borrow_mut().push(base_node.clone());
         }
     }
 
@@ -1046,10 +1049,9 @@ pub fn unwrap_noscripts(node: &Handle) {
         ref template_contents,
         ..
     } = node.data
+        && let Some(ref contents) = *template_contents.borrow()
     {
-        if let Some(ref contents) = *template_contents.borrow() {
-            unwrap_noscripts(contents);
-        }
+        unwrap_noscripts(contents);
     }
 }
 
@@ -1062,29 +1064,29 @@ pub fn serialize_document(
 
     if !compose_csp(options).is_empty() {
         // Take care of CSP
-        if let Some(html) = get_child_node_by_name(&dom.document, "html") {
-            if let Some(head) = get_child_node_by_name(&html, "head") {
-                let meta = create_element(
-                    &dom,
-                    QualName::new(None, ns!(html), LocalName::from("meta")),
-                    vec![
-                        Attribute {
-                            name: QualName::new(None, ns!(), LocalName::from("http-equiv")),
-                            value: format_tendril!("Content-Security-Policy"),
-                        },
-                        Attribute {
-                            name: QualName::new(None, ns!(), LocalName::from("content")),
-                            value: format_tendril!("{}", compose_csp(options)),
-                        },
-                    ],
-                );
-                // The CSP meta-tag has to be prepended, never appended,
-                //  since there already may be one defined in the original document,
-                //   and browsers don't allow re-defining them (for obvious reasons)
-                head.children.borrow_mut().reverse();
-                head.children.borrow_mut().push(meta.clone());
-                head.children.borrow_mut().reverse();
-            }
+        if let Some(html) = get_child_node_by_name(&dom.document, "html")
+            && let Some(head) = get_child_node_by_name(&html, "head")
+        {
+            let meta = create_element(
+                &dom,
+                QualName::new(None, ns!(html), LocalName::from("meta")),
+                vec![
+                    Attribute {
+                        name: QualName::new(None, ns!(), LocalName::from("http-equiv")),
+                        value: format_tendril!("Content-Security-Policy"),
+                    },
+                    Attribute {
+                        name: QualName::new(None, ns!(), LocalName::from("content")),
+                        value: format_tendril!("{}", compose_csp(options)),
+                    },
+                ],
+            );
+            // The CSP meta-tag has to be prepended, never appended,
+            //  since there already may be one defined in the original document,
+            //   and browsers don't allow re-defining them (for obvious reasons)
+            head.children.borrow_mut().reverse();
+            head.children.borrow_mut().push(meta.clone());
+            head.children.borrow_mut().reverse();
         }
     }
 
@@ -1096,12 +1098,12 @@ pub fn serialize_document(
     serialize(&mut buf, &serializable, SerializeOpts::default())
         .expect("Unable to serialize DOM into buffer");
 
-    if !document_encoding.is_empty() {
-        if let Some(encoding) = Encoding::for_label(document_encoding.as_bytes()) {
-            let s: &str = &String::from_utf8_lossy(&buf);
-            let (data, _, _) = encoding.encode(s);
-            buf = data.to_vec();
-        }
+    if !document_encoding.is_empty()
+        && let Some(encoding) = Encoding::for_label(document_encoding.as_bytes())
+    {
+        let s: &str = &String::from_utf8_lossy(&buf);
+        let (data, _, _) = encoding.encode(s);
+        buf = data.to_vec();
     }
 
     buf
@@ -1154,13 +1156,12 @@ pub fn retrieve_and_embed_asset(
                     let mut frame_encoding: Option<&'static Encoding> = declared_encoding(&charset);
 
                     // Without a charset from the protocol, look for one declared inside the document
-                    if frame_encoding.is_none() {
-                        if let Some(frame_charset) = get_charset(&frame_dom.document) {
-                            if let Some(encoding) = declared_encoding(&frame_charset) {
-                                frame_dom = html_to_dom(&data, encoding.name().to_string());
-                                frame_encoding = Some(encoding);
-                            }
-                        }
+                    if frame_encoding.is_none()
+                        && let Some(frame_charset) = get_charset(&frame_dom.document)
+                        && let Some(encoding) = declared_encoding(&frame_charset)
+                    {
+                        frame_dom = html_to_dom(&data, encoding.name().to_string());
+                        frame_encoding = Some(encoding);
                     }
 
                     // A byte order mark beats any declaration when it comes to decoding
@@ -1371,16 +1372,16 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         }
                     } else if link_node_types.contains(&LinkType::Manifest) {
                         // Resolve LINK's href attribute
-                        if let Some(link_attr_href_value) = get_node_attr(node, "href") {
-                            if !link_attr_href_value.is_empty() {
-                                retrieve_and_embed_asset(
-                                    session,
-                                    document_url,
-                                    node,
-                                    "href",
-                                    &link_attr_href_value,
-                                );
-                            }
+                        if let Some(link_attr_href_value) = get_node_attr(node, "href")
+                            && !link_attr_href_value.is_empty()
+                        {
+                            retrieve_and_embed_asset(
+                                session,
+                                document_url,
+                                node,
+                                "href",
+                                &link_attr_href_value,
+                            );
                         }
                     } else if link_node_types.contains(&LinkType::Preload)
                         || link_node_types.contains(&LinkType::DnsPrefetch)
@@ -1450,35 +1451,34 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
 
                     // Resolve srcset attribute
-                    if let Some(img_srcset) = get_node_attr(node, "srcset") {
-                        if !img_srcset.is_empty() {
-                            let resolved_srcset: String =
-                                embed_srcset(session, document_url, &img_srcset);
-                            set_node_attr(node, "srcset", Some(resolved_srcset));
-                        }
+                    if let Some(img_srcset) = get_node_attr(node, "srcset")
+                        && !img_srcset.is_empty()
+                    {
+                        let resolved_srcset: String =
+                            embed_srcset(session, document_url, &img_srcset);
+                        set_node_attr(node, "srcset", Some(resolved_srcset));
                     }
                 }
                 "input" => {
-                    if let Some(input_attr_type_value) = get_node_attr(node, "type") {
-                        if input_attr_type_value.eq_ignore_ascii_case("image") {
-                            if let Some(input_attr_src_value) = get_node_attr(node, "src") {
-                                if session.options.no_images || input_attr_src_value.is_empty() {
-                                    let value = if input_attr_src_value.is_empty() {
-                                        ""
-                                    } else {
-                                        EMPTY_IMAGE_DATA_URL
-                                    };
-                                    set_node_attr(node, "src", Some(value.to_string()));
-                                } else {
-                                    retrieve_and_embed_asset(
-                                        session,
-                                        document_url,
-                                        node,
-                                        "src",
-                                        &input_attr_src_value,
-                                    );
-                                }
-                            }
+                    if let Some(input_attr_type_value) = get_node_attr(node, "type")
+                        && input_attr_type_value.eq_ignore_ascii_case("image")
+                        && let Some(input_attr_src_value) = get_node_attr(node, "src")
+                    {
+                        if session.options.no_images || input_attr_src_value.is_empty() {
+                            let value = if input_attr_src_value.is_empty() {
+                                ""
+                            } else {
+                                EMPTY_IMAGE_DATA_URL
+                            };
+                            set_node_attr(node, "src", Some(value.to_string()));
+                        } else {
+                            retrieve_and_embed_asset(
+                                session,
+                                document_url,
+                                node,
+                                "src",
+                                &input_attr_src_value,
+                            );
                         }
                     }
                 }
@@ -1642,19 +1642,16 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         }
                     }
 
-                    if let Some(source_attr_srcset_value) = get_node_attr(node, "srcset") {
-                        if parent_node_name == "picture" && !source_attr_srcset_value.is_empty() {
-                            if session.options.no_images {
-                                set_node_attr(
-                                    node,
-                                    "srcset",
-                                    Some(EMPTY_IMAGE_DATA_URL.to_string()),
-                                );
-                            } else {
-                                let resolved_srcset: String =
-                                    embed_srcset(session, document_url, &source_attr_srcset_value);
-                                set_node_attr(node, "srcset", Some(resolved_srcset));
-                            }
+                    if let Some(source_attr_srcset_value) = get_node_attr(node, "srcset")
+                        && parent_node_name == "picture"
+                        && !source_attr_srcset_value.is_empty()
+                    {
+                        if session.options.no_images {
+                            set_node_attr(node, "srcset", Some(EMPTY_IMAGE_DATA_URL.to_string()));
+                        } else {
+                            let resolved_srcset: String =
+                                embed_srcset(session, document_url, &source_attr_srcset_value);
+                            set_node_attr(node, "srcset", Some(resolved_srcset));
                         }
                     }
                 }
@@ -1729,7 +1726,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 );
                             } else {
                                 let script_src_full_url: Url =
-                                    resolve_url(document_url, &script_src);
+                                    resolve_url(document_url, script_src);
                                 set_node_attr(node, "src", Some(script_src_full_url.to_string()));
                                 session.log_asset_url(&script_src_full_url);
                             }

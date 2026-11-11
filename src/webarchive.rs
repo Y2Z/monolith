@@ -135,7 +135,9 @@ impl Reader<'_> {
                     .data
                     .get(start..start.checked_add(length.checked_mul(2)?)?)?;
                 let units: Vec<u16> = bytes
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|unit| u16::from_be_bytes([unit[0], unit[1]]))
                     .collect();
                 Plist::String(String::from_utf16_lossy(&units).into())
