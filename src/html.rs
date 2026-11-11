@@ -24,16 +24,7 @@ use crate::url::{
 };
 
 /// Attributes that make elements load something, other than src (which is handled separately)
-const WIPED_ATTRIBUTES: [&str; 8] = [
-    "data",
-    "data-src",
-    "data-srcset",
-    "href",
-    "integrity",
-    "poster",
-    "srcdoc",
-    "srcset",
-];
+const WIPED_ATTRIBUTES: [&str; 6] = ["data", "href", "integrity", "poster", "srcdoc", "srcset"];
 /// Wiping these leaves them in place, there's nothing to unwrap
 const ELEMENTS_WIPED_IN_PLACE: [&str; 10] = [
     "audio", "embed", "frame", "iframe", "image", "img", "object", "source", "track", "video",

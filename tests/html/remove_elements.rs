@@ -111,13 +111,24 @@ mod passing {
     #[test]
     fn wiping_images_replaces_their_source() {
         let result = wipe(
-            "<html><head></head><body><img src=\"a.png\" srcset=\"b.png 2x\" data-src=\"c.png\"></body></html>",
+            "<html><head></head><body><img src=\"a.png\" srcset=\"b.png 2x\"></body></html>",
             &[],
             &["img"],
         );
 
         assert!(result.contains("src=\"data:image/png"));
         assert!(!result.contains(".png"));
+    }
+
+    #[test]
+    fn wiping_leaves_what_only_scripts_know_the_meaning_of() {
+        let result = wipe(
+            "<html><head></head><body><img src=\"a.png\" data-src=\"c.png\"></body></html>",
+            &[],
+            &["img"],
+        );
+
+        assert!(result.contains("data-src=\"c.png\""));
     }
 
     #[test]
