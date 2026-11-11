@@ -12,8 +12,10 @@ mod passing {
     use monolith::url::Url;
 
     fn session() -> Session {
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let mut options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         // Keeps favicons from being requested
         options.no_images = true;
         options.no_metadata = true;

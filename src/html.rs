@@ -93,18 +93,12 @@ pub fn add_favicon(document: &Handle, favicon_data_url: String) -> RcDom {
 }
 
 pub fn check_integrity(data: &[u8], integrity: &str) -> bool {
-    if integrity.starts_with("sha256-") {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        BASE64_STANDARD.encode(hasher.finalize()) == integrity[7..]
-    } else if integrity.starts_with("sha384-") {
-        let mut hasher = Sha384::new();
-        hasher.update(data);
-        BASE64_STANDARD.encode(hasher.finalize()) == integrity[7..]
-    } else if integrity.starts_with("sha512-") {
-        let mut hasher = Sha512::new();
-        hasher.update(data);
-        BASE64_STANDARD.encode(hasher.finalize()) == integrity[7..]
+    if let Some(expected) = integrity.strip_prefix("sha256-") {
+        BASE64_STANDARD.encode(Sha256::digest(data)) == expected
+    } else if let Some(expected) = integrity.strip_prefix("sha384-") {
+        BASE64_STANDARD.encode(Sha384::digest(data)) == expected
+    } else if let Some(expected) = integrity.strip_prefix("sha512-") {
+        BASE64_STANDARD.encode(Sha512::digest(data)) == expected
     } else {
         false
     }
@@ -383,10 +377,7 @@ pub fn find_nodes(node: &Handle, mut path: Vec<&str>) -> Vec<Handle> {
 }
 
 pub fn get_base_url(handle: &Handle) -> Option<String> {
-    if let Some(base_node) = find_nodes(handle, vec!["html", "head", "base"])
-        .iter()
-        .next()
-    {
+    if let Some(base_node) = find_nodes(handle, vec!["html", "head", "base"]).first() {
         // Only the first base tag matters (we ignore the rest, if there's any)
         return get_node_attr(base_node, "href");
     }
@@ -502,7 +493,7 @@ pub fn has_favicon(handle: &Handle) -> bool {
     found_favicon
 }
 
-pub fn html_to_dom(data: &Vec<u8>, document_encoding: String) -> RcDom {
+pub fn html_to_dom(data: &[u8], document_encoding: String) -> RcDom {
     let s: String;
 
     if let Some(encoding) = Encoding::for_label(document_encoding.as_bytes()) {
@@ -825,12 +816,11 @@ pub fn set_robots(dom: RcDom, content_value: &str) -> RcDom {
         );
 
         // Insert newly created META charset node into HEAD
-        for head_node in find_nodes(&dom.document, vec!["html", "head"]).iter() {
+        if let Some(head_node) = find_nodes(&dom.document, vec!["html", "head"]).first() {
             head_node
                 .children
                 .borrow_mut()
                 .push(meta_charset_node.clone());
-            break;
         }
     }
 
@@ -1587,14 +1577,13 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                                     .push(single_symbol_node.clone());
                                             } else {
                                                 // Replace this image|use with whole DOM of that SVG file
-                                                for svg_node in find_nodes(
+                                                if let Some(svg_node) = find_nodes(
                                                     &svg_dom.document,
                                                     vec!["html", "body", "svg"],
                                                 )
-                                                .iter()
+                                                .first()
                                                 {
                                                     svg_dom.reparent_children(svg_node, node);
-                                                    break;
                                                 }
                                                 // TODO: decide if we resort to using data URL here or stick with embedding the DOM
                                             }

@@ -12,7 +12,7 @@ mod passing {
     #[test]
     fn icon() {
         let html = r#"<link rel="icon" href="" /><div>text</div>"#;
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let res: bool = html::has_favicon(&dom.document);
 
         assert!(res);
@@ -21,7 +21,7 @@ mod passing {
     #[test]
     fn shortcut_icon() {
         let html = r#"<link rel="shortcut icon" href="" /><div>text</div>"#;
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let res: bool = html::has_favicon(&dom.document);
 
         assert!(res);
@@ -42,7 +42,7 @@ mod failing {
     #[test]
     fn absent() {
         let html = "<div>text</div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let res: bool = html::has_favicon(&dom.document);
 
         assert!(!res);

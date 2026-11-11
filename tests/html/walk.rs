@@ -140,9 +140,11 @@ mod passing {
         for no_images in [false, true] {
             let source = "<img src=\"data:,placeholder\" data-src=\"image.svg\">".to_string();
             let dom = html::html_to_dom(&source.into_bytes(), "".to_string());
-            let mut options = MonolithOptions::default();
-            options.no_images = no_images;
-            options.silent = true;
+            let options = MonolithOptions {
+                no_images,
+                silent: true,
+                ..Default::default()
+            };
             let mut session = Session::new(None, None, options);
 
             html::walk(&mut session, &url, &dom.document);
@@ -160,11 +162,13 @@ mod passing {
     #[test]
     fn basic() {
         let html: &str = "<div><P></P></div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -187,11 +191,13 @@ mod passing {
     #[test]
     fn ensure_no_recursive_iframe() {
         let html = "<div><P></P><iframe src=\"\"></iframe></div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -214,11 +220,13 @@ mod passing {
     #[test]
     fn ensure_no_recursive_frame() {
         let html = "<frameset><frame src=\"\"></frameset>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -246,12 +254,14 @@ mod passing {
             <style>html{background-color: #000;}</style>\
             <div style=\"display: none;\"></div>\
         ";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.no_styles = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_styles: true,
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -286,12 +296,14 @@ mod passing {
     fn no_images() {
         let html = "<link rel=\"icon\" href=\"favicon.ico\">\
                     <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.no_images = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_images: true,
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -327,12 +339,14 @@ mod passing {
     fn no_body_background_images() {
         let html =
             "<body background=\"no/such/image.png\" background=\"no/such/image2.png\"></body>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.no_images = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_images: true,
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -355,11 +369,13 @@ mod passing {
     #[test]
     fn no_frames() {
         let html = "<frameset><frame src=\"http://trackbook.com\"></frameset>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -391,11 +407,13 @@ mod passing {
     #[test]
     fn no_iframes() {
         let html = "<iframe src=\"http://trackbook.com\"></iframe>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -431,12 +449,14 @@ mod passing {
                 <script>alert(1)</script>\
             </div>\
         ";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.no_js = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_js: true,
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -470,11 +490,13 @@ mod passing {
     fn keeps_integrity_for_unfamiliar_links() {
         let html = "<title>Has integrity</title>\
                     <link integrity=\"sha384-12345\" rel=\"something\" href=\"https://some-site.com/some-file.ext\" />";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -509,13 +531,15 @@ mod passing {
             <link integrity=\"\" rel=\"stylesheet\" href=\"data:;\"/>\
             <script integrity=\"\" src=\"some.js\"></script>\
         ";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.no_styles = true;
-        options.no_js = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_styles: true,
+            no_js: true,
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -551,13 +575,15 @@ mod passing {
             <link integrity=\"sha384-123\" rel=\"something\" href=\"data:;\"/>\
             <script integrity=\"sha384-456\" src=\"some.js\"></script>\
         ";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.no_styles = true;
-        options.no_js = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_styles: true,
+            no_js: true,
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -599,14 +625,16 @@ mod passing {
                 </body>\
             </html>\
         ";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.no_styles = true;
-        options.no_js = true;
-        options.no_images = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_styles: true,
+            no_js: true,
+            no_images: true,
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -644,12 +672,14 @@ mod passing {
                 </noscript>\
             </body>\
         </html>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.no_images = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_images: true,
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -684,11 +714,13 @@ mod passing {
     #[test]
     fn preserves_script_type_json() {
         let html = "<script id=\"data\" type=\"application/json\">{\"mono\":\"lith\"}</script>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 

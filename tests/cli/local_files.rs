@@ -395,19 +395,11 @@ document.body.style.color = "red";
         let out = cmd
             .arg("-M")
             .arg("-i")
-            .arg(if cfg!(windows) {
-                format!(
-                    "{file}{cwd}/tests/_data_/integrity/index.html",
-                    file = file_url_protocol,
-                    cwd = cwd_normalized,
-                )
-            } else {
-                format!(
-                    "{file}{cwd}/tests/_data_/integrity/index.html",
-                    file = file_url_protocol,
-                    cwd = cwd_normalized,
-                )
-            })
+            .arg(format!(
+                "{file}{cwd}/tests/_data_/integrity/index.html",
+                file = file_url_protocol,
+                cwd = cwd_normalized,
+            ))
             .output()
             .unwrap();
 

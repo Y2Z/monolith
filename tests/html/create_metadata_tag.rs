@@ -22,7 +22,7 @@ mod passing {
             metadata_comment,
             format!(
                 "<!-- Saved from {} at {} using {} v{} -->",
-                &url,
+                url,
                 timestamp,
                 env!("CARGO_PKG_NAME"),
                 env!("CARGO_PKG_VERSION"),

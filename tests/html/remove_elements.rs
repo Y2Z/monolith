@@ -11,7 +11,7 @@ mod passing {
     use monolith::html;
 
     fn remove(html: &str, selectors: &[&str]) -> String {
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let selectors: Vec<String> = selectors.iter().map(|s| s.to_string()).collect();
         html::strip_elements(&dom.document, &selectors, &[]);
 
@@ -24,7 +24,7 @@ mod passing {
     }
 
     fn wipe(html: &str, remove: &[&str], wipe: &[&str]) -> String {
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let remove: Vec<String> = remove.iter().map(|s| s.to_string()).collect();
         let wipe: Vec<String> = wipe.iter().map(|s| s.to_string()).collect();
         html::strip_elements(&dom.document, &remove, &wipe);
@@ -218,7 +218,7 @@ mod failing {
     #[test]
     fn selectors_that_make_no_sense_get_ignored() {
         let page = "<html><head></head><body><p>a</p></body></html>";
-        let dom = html::html_to_dom(&page.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(page.as_bytes(), "".to_string());
 
         html::strip_elements(
             &dom.document,

@@ -16,8 +16,10 @@ mod passing {
 
     #[test]
     fn read_data_url() {
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -43,8 +45,10 @@ mod passing {
 
     #[test]
     fn read_local_file_with_file_url_parent() {
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
@@ -103,43 +107,41 @@ mod failing {
 
     #[test]
     fn read_local_file_with_data_url_parent() {
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
         // Inclusion of local assets from data URL sources should not be allowed
-        match session.retrieve_asset(
-            &Url::parse("data:text/html;base64,SoUrCe").unwrap(),
-            &Url::parse("file:///etc/passwd").unwrap(),
-        ) {
-            Ok((..)) => {
-                assert!(false);
-            }
-            Err(_) => {
-                assert!(true);
-            }
-        }
+        assert!(
+            session
+                .retrieve_asset(
+                    &Url::parse("data:text/html;base64,SoUrCe").unwrap(),
+                    &Url::parse("file:///etc/passwd").unwrap(),
+                )
+                .is_err()
+        );
     }
 
     #[test]
     fn read_local_file_with_https_parent() {
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
 
         let mut session: Session = Session::new(None, None, options);
 
         // Inclusion of local assets from remote sources should not be allowed
-        match session.retrieve_asset(
-            &Url::parse("https://kernel.org/").unwrap(),
-            &Url::parse("file:///etc/passwd").unwrap(),
-        ) {
-            Ok((..)) => {
-                assert!(false);
-            }
-            Err(_) => {
-                assert!(true);
-            }
-        }
+        assert!(
+            session
+                .retrieve_asset(
+                    &Url::parse("https://kernel.org/").unwrap(),
+                    &Url::parse("file:///etc/passwd").unwrap(),
+                )
+                .is_err()
+        );
     }
 }

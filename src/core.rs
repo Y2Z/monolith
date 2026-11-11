@@ -559,51 +559,50 @@ pub fn create_monolithic_document(
         }
     }
 
-    let mut target_url = match target.as_str() {
-        target_str => match Url::parse(target_str) {
-            Ok(target_url) if !is_windows_drive_path(target_str) => match target_url.scheme() {
-                "data" | "file" | "http" | "https" => target_url,
-                unsupported_scheme => {
-                    return Err(MonolithError::new(&format!(
-                        "unsupported target URL scheme \"{}\"",
-                        unsupported_scheme
-                    )));
-                }
-            },
-            _ => {
-                // Failed to parse given base URL (perhaps it's a filesystem path?)
-                let path: &Path = Path::new(&target_str);
-
-                match path.exists() {
-                    true => match path.is_file() {
-                        true => {
-                            let canonical_path = fs::canonicalize(path).unwrap();
-
-                            match Url::from_file_path(canonical_path) {
-                                Ok(url) => url,
-                                Err(_) => {
-                                    return Err(MonolithError::new(&format!(
-                                        "could not generate file URL out of given path \"{}\"",
-                                        target_str
-                                    )));
-                                }
-                            }
-                        }
-                        false => {
-                            return Err(MonolithError::new(&format!(
-                                "local target \"{}\" is not a file",
-                                target_str
-                            )));
-                        }
-                    },
-                    false => {
-                        // It is not a FS path, now we do what browsers do:
-                        // prepend "http://" and hope it points to a website
-                        Url::parse(&format!("http://{}", target_str)).unwrap()
-                    }
-                }
+    let target_str = target.as_str();
+    let mut target_url = match Url::parse(target_str) {
+        Ok(target_url) if !is_windows_drive_path(target_str) => match target_url.scheme() {
+            "data" | "file" | "http" | "https" => target_url,
+            unsupported_scheme => {
+                return Err(MonolithError::new(&format!(
+                    "unsupported target URL scheme \"{}\"",
+                    unsupported_scheme
+                )));
             }
         },
+        _ => {
+            // Failed to parse given base URL (perhaps it's a filesystem path?)
+            let path: &Path = Path::new(&target_str);
+
+            match path.exists() {
+                true => match path.is_file() {
+                    true => {
+                        let canonical_path = fs::canonicalize(path).unwrap();
+
+                        match Url::from_file_path(canonical_path) {
+                            Ok(url) => url,
+                            Err(_) => {
+                                return Err(MonolithError::new(&format!(
+                                    "could not generate file URL out of given path \"{}\"",
+                                    target_str
+                                )));
+                            }
+                        }
+                    }
+                    false => {
+                        return Err(MonolithError::new(&format!(
+                            "local target \"{}\" is not a file",
+                            target_str
+                        )));
+                    }
+                },
+                false => {
+                    // It is not a FS path, now we do what browsers do:
+                    // prepend "http://" and hope it points to a website
+                    Url::parse(&format!("http://{}", target_str)).unwrap()
+                }
+            }
+        }
     };
 
     #[cfg(feature = "browser")]

@@ -168,9 +168,11 @@ mod passing {
     #[test]
     fn style_exclude_unquoted_images() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = MonolithOptions::default();
-        options.no_images = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_images: true,
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const STYLE: &str = "/* border: none;*/\
@@ -199,9 +201,11 @@ mod passing {
     #[test]
     fn style_exclude_single_quoted_images() {
         let document_url: Url = Url::parse("data:,").unwrap();
-        let mut options = MonolithOptions::default();
-        options.no_images = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_images: true,
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const STYLE: &str = "/* border: none;*/\
@@ -230,8 +234,10 @@ mod passing {
     #[test]
     fn style_block() {
         let document_url: Url = Url::parse("file:///").unwrap();
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\
@@ -248,8 +254,10 @@ mod passing {
     #[test]
     fn attribute_selectors() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\
@@ -288,8 +296,10 @@ mod passing {
     #[test]
     fn import_string() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\
@@ -315,8 +325,10 @@ mod passing {
     #[test]
     fn hash_urls() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\
@@ -335,8 +347,10 @@ mod passing {
     #[test]
     fn transform_percentages_and_degrees() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\
@@ -353,8 +367,10 @@ mod passing {
     #[test]
     fn unusual_indents() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\
@@ -373,9 +389,11 @@ mod passing {
     #[test]
     fn exclude_fonts() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
-        let mut options = MonolithOptions::default();
-        options.no_fonts = true;
-        options.silent = true;
+        let options = MonolithOptions {
+            no_fonts: true,
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\
@@ -417,8 +435,10 @@ mod passing {
     #[test]
     fn content() {
         let document_url: Url = Url::parse("data:,").unwrap();
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\
@@ -438,8 +458,10 @@ mod passing {
     #[test]
     fn ie_css_hack() {
         let document_url: Url = Url::parse("data:,").unwrap();
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let mut session: Session = Session::new(None, None, options);
 
         const CSS: &str = "\

@@ -28,10 +28,12 @@ mod passing {
     }
 
     fn silent_session(output_format: MonolithOutputFormat) -> Session {
-        let mut options = MonolithOptions::default();
-        options.silent = true;
-        options.no_metadata = true;
-        options.output_format = output_format;
+        let options = MonolithOptions {
+            silent: true,
+            no_metadata: true,
+            output_format,
+            ..Default::default()
+        };
         Session::new(None, None, options)
     }
 
@@ -55,7 +57,7 @@ mod passing {
         // ...including the ones referenced by stylesheets
         let css = &result[result.find("<style>").unwrap()..result.find("</style>").unwrap()];
         let (media_type, _charset, data) =
-            parse_data_url(&Url::parse(attr_value(&css, r#"url(""#)).unwrap());
+            parse_data_url(&Url::parse(attr_value(css, r#"url(""#)).unwrap());
         assert_eq!(media_type, "image/gif");
         assert_eq!(data, b"GIF89a");
 

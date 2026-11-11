@@ -179,7 +179,7 @@ impl Output {
         }
     }
 
-    fn write(&mut self, bytes: &Vec<u8>) -> Result<(), IoError> {
+    fn write(&mut self, bytes: &[u8]) -> Result<(), IoError> {
         match self {
             Output::Stdout(stdout) => {
                 stdout.write_all(bytes)?;
@@ -256,18 +256,9 @@ fn main() {
     let temp_cache_file: Option<NamedTempFile> = Builder::new().prefix("monolith-").tempfile().ok();
     let cache = Some(Cache::new(
         CACHE_ASSET_FILE_SIZE_THRESHOLD,
-        if temp_cache_file.is_some() {
-            Some(
-                temp_cache_file
-                    .as_ref()
-                    .unwrap()
-                    .path()
-                    .display()
-                    .to_string(),
-            )
-        } else {
-            None
-        },
+        temp_cache_file
+            .as_ref()
+            .map(|temp_cache_file| temp_cache_file.path().display().to_string()),
     ));
 
     // Clean up if interrupted, none of what's been retrieved is supposed to stay behind
