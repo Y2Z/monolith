@@ -33,6 +33,12 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 cargo install monolith
 ```
 
+Rendering pages in browsers (`-B`) comes as a feature that's on by default, builds that don't need it can be made smaller without it:
+
+```console
+cargo install monolith --no-default-features --features cli
+```
+
 #### Via [Homebrew](https://formulae.brew.sh/formula/monolith) (macOS and GNU/Linux)
 
 ```console

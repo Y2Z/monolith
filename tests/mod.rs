@@ -1,3 +1,4 @@
+#[cfg(feature = "browser")]
 mod browser;
 mod cache;
 mod cli;

@@ -46,6 +46,10 @@ jobs:
         MONOLITH_TEST_REQUIRE_BROWSERS: 1
         MONOLITH_TEST_BROWSERS: ${{ runner.os == 'Windows' && 'C:\Program Files\Mozilla Firefox\firefox.exe;C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' || '' }}
 
+    # Browsers are a feature, builds without it have to keep working
+    - name: Run tests without browser support
+      run: cargo test --locked --verbose --no-default-features --features cli --test mod
+
     - name: Check code formatting
       run: |
         rustup component add rustfmt

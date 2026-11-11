@@ -59,7 +59,7 @@ serde_json = "=1.0.154" # Used for talking to browsers
 tempfile = "=3.27.0" # Used for on-disk caching of remote assets and browser profiles
 tungstenite = { version = "=0.30.0", default-features = false, features = [
     "handshake",
-] } # Used for talking to browsers
+], optional = true } # Used for talking to browsers
 url = "=2.5.8" # Used for parsing URLs
 
 # Used for making network requests
@@ -75,7 +75,7 @@ features = [
 ]
 
 [target.'cfg(unix)'.dependencies]
-libc = "=0.2.190" # Used for ending browsers along with their helper processes
+libc = { version = "=0.2.190", optional = true } # Used for ending browsers along with their helper processes
 
 [build-dependencies]
 winresource = { version = "=0.1.31", optional = true } # Used for embedding the icon into Windows executables
@@ -84,7 +84,8 @@ winresource = { version = "=0.1.31", optional = true } # Used for embedding the 
 assert_cmd = "=2.2.2"
 
 [features]
-default = ["cli"]
+default = ["browser", "cli"]
+browser = ["dep:libc", "dep:tungstenite"] # Make it possible to render pages in browsers before saving them
 cli = ["clap", "ctrlc"] # Build a CLI tool that includes main() function
 gui = [
     "ctrlc",

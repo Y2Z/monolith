@@ -37,7 +37,7 @@ jobs:
         echo "RUSTFLAGS=-C linker=aarch64-linux-gnu-gcc -L/usr/aarch64-linux-gnu/lib -L/cross-build/usr/lib/aarch64-linux-gnu" >> $GITHUB_ENV
 
     - name: Build the executable
-      run: cargo build --release --target=aarch64-unknown-linux-gnu --no-default-features --features cli
+      run: cargo build --release --target=aarch64-unknown-linux-gnu --no-default-features --features browser,cli
 
     - name: Attach artifact to the release
       shell: bash
@@ -65,7 +65,7 @@ jobs:
         echo "RUSTFLAGS=-C linker=arm-linux-gnueabihf-gcc -L/usr/arm-linux-gnueabihf/lib -L/cross-build/usr/lib/arm-linux-gnueabihf -L/cross-build/lib/arm-linux-gnueabihf" >> $GITHUB_ENV
 
     - name: Build the executable
-      run: cargo build --release --target=arm-unknown-linux-gnueabihf --no-default-features --features cli
+      run: cargo build --release --target=arm-unknown-linux-gnueabihf --no-default-features --features browser,cli
 
     - name: Attach artifact to the release
       shell: bash
