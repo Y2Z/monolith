@@ -19,8 +19,10 @@ mod passing {
 
     #[test]
     fn escapes_user_agent() {
-        let mut options = MonolithOptions::default();
-        options.browser_user_agent = Some("a\"b".to_string());
+        let options = MonolithOptions {
+            browser_user_agent: Some("a\"b".to_string()),
+            ..Default::default()
+        };
 
         assert!(
             profile_preferences(&options, None)

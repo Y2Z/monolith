@@ -12,7 +12,7 @@ mod helpers {
     }
 
     pub fn inline(html: &str) -> String {
-        let dom = html_to_dom(&html.as_bytes().to_vec(), "utf-8".to_string());
+        let dom = html_to_dom(html.as_bytes(), "utf-8".to_string());
         inline_stylesheets(&dom, &dom.document);
 
         String::from_utf8(serialize_document(

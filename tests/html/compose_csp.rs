@@ -12,8 +12,10 @@ mod passing {
 
     #[test]
     fn isolated() {
-        let mut options = MonolithOptions::default();
-        options.isolate = true;
+        let options = MonolithOptions {
+            isolate: true,
+            ..Default::default()
+        };
         let csp_content = html::compose_csp(&options);
 
         assert_eq!(
@@ -24,8 +26,10 @@ mod passing {
 
     #[test]
     fn no_styles() {
-        let mut options = MonolithOptions::default();
-        options.no_styles = true;
+        let options = MonolithOptions {
+            no_styles: true,
+            ..Default::default()
+        };
         let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "style-src 'none';");
@@ -33,8 +37,10 @@ mod passing {
 
     #[test]
     fn no_fonts() {
-        let mut options = MonolithOptions::default();
-        options.no_fonts = true;
+        let options = MonolithOptions {
+            no_fonts: true,
+            ..Default::default()
+        };
         let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "font-src 'none';");
@@ -42,8 +48,10 @@ mod passing {
 
     #[test]
     fn no_frames() {
-        let mut options = MonolithOptions::default();
-        options.wipe_elements = vec!["frame,iframe".to_string()];
+        let options = MonolithOptions {
+            wipe_elements: vec!["frame,iframe".to_string()],
+            ..Default::default()
+        };
         let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "frame-src 'none'; child-src 'none';");
@@ -51,8 +59,10 @@ mod passing {
 
     #[test]
     fn frames_targeted_by_selectors() {
-        let mut options = MonolithOptions::default();
-        options.wipe_elements = vec!["iframe".to_string()];
+        let options = MonolithOptions {
+            wipe_elements: vec!["iframe".to_string()],
+            ..Default::default()
+        };
 
         assert_eq!(
             html::compose_csp(&options),
@@ -62,24 +72,30 @@ mod passing {
 
     #[test]
     fn objects_targeted_by_selectors() {
-        let mut options = MonolithOptions::default();
-        options.remove_elements = vec!["object".to_string()];
+        let options = MonolithOptions {
+            remove_elements: vec!["object".to_string()],
+            ..Default::default()
+        };
 
         assert_eq!(html::compose_csp(&options), "object-src 'none';");
     }
 
     #[test]
     fn nested_selectors_do_not_affect_csp() {
-        let mut options = MonolithOptions::default();
-        options.remove_elements = vec!["main iframe".to_string()];
+        let options = MonolithOptions {
+            remove_elements: vec!["main iframe".to_string()],
+            ..Default::default()
+        };
 
         assert_eq!(html::compose_csp(&options), "");
     }
 
     #[test]
     fn no_js() {
-        let mut options = MonolithOptions::default();
-        options.no_js = true;
+        let options = MonolithOptions {
+            no_js: true,
+            ..Default::default()
+        };
         let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "script-src 'none'; object-src 'none';");
@@ -87,8 +103,10 @@ mod passing {
 
     #[test]
     fn no_images() {
-        let mut options = MonolithOptions::default();
-        options.no_images = true;
+        let options = MonolithOptions {
+            no_images: true,
+            ..Default::default()
+        };
         let csp_content = html::compose_csp(&options);
 
         assert_eq!(csp_content, "img-src data:;");
@@ -96,13 +114,15 @@ mod passing {
 
     #[test]
     fn all() {
-        let mut options = MonolithOptions::default();
-        options.isolate = true;
-        options.no_styles = true;
-        options.no_fonts = true;
-        options.wipe_elements = vec!["frame,iframe".to_string()];
-        options.no_js = true;
-        options.no_images = true;
+        let options = MonolithOptions {
+            isolate: true,
+            no_styles: true,
+            no_fonts: true,
+            wipe_elements: vec!["frame,iframe".to_string()],
+            no_js: true,
+            no_images: true,
+            ..Default::default()
+        };
         let csp_content = html::compose_csp(&options);
 
         assert_eq!(

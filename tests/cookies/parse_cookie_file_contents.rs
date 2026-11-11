@@ -71,14 +71,7 @@ mod failing {
     #[test]
     fn no_header() {
         let file_contents = "127.0.0.1	FALSE	/	FALSE	0	USER_TOKEN	in";
-        match cookies::parse_cookie_file_contents(file_contents) {
-            Ok(_result) => {
-                assert!(false);
-            }
-            Err(_e) => {
-                assert!(true);
-            }
-        }
+        assert!(cookies::parse_cookie_file_contents(file_contents).is_err());
     }
 
     #[test]

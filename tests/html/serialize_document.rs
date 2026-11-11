@@ -13,7 +13,7 @@ mod passing {
     #[test]
     fn div_as_root_element() {
         let html = "<div><script src=\"some.js\"></script></div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let options = MonolithOptions::default();
 
         assert_eq!(
@@ -28,9 +28,11 @@ mod passing {
                     <link rel=\"something\" href=\"some.css\" />\
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                     <div><script src=\"some.js\"></script></div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let mut options = MonolithOptions::default();
-        options.isolate = true;
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
+        let options = MonolithOptions {
+            isolate: true,
+            ..Default::default()
+        };
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
@@ -56,9 +58,11 @@ mod passing {
                     <title>Unstyled document</title>\
                     <link rel=\"stylesheet\" href=\"main.css\"/>\
                     <div style=\"display: none;\"></div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let mut options = MonolithOptions::default();
-        options.no_styles = true;
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
+        let options = MonolithOptions {
+            no_styles: true,
+            ..Default::default()
+        };
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
@@ -80,9 +84,11 @@ mod passing {
                     <title>Frameless document</title>\
                     <link rel=\"something\"/>\
                     <div><script src=\"some.js\"></script></div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let mut options = MonolithOptions::default();
-        options.wipe_elements = vec!["frame,iframe".to_string()];
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
+        let options = MonolithOptions {
+            wipe_elements: vec!["frame,iframe".to_string()],
+            ..Default::default()
+        };
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
@@ -109,14 +115,16 @@ mod passing {
                         <img style=\"width: 100%;\" src=\"some.png\" />\
                         <iframe src=\"some.html\"></iframe>\
                     </div>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
-        let mut options = MonolithOptions::default();
-        options.isolate = true;
-        options.no_styles = true;
-        options.no_fonts = true;
-        options.wipe_elements = vec!["frame,iframe".to_string()];
-        options.no_js = true;
-        options.no_images = true;
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
+        let options = MonolithOptions {
+            isolate: true,
+            no_styles: true,
+            no_fonts: true,
+            wipe_elements: vec!["frame,iframe".to_string()],
+            no_js: true,
+            no_images: true,
+            ..Default::default()
+        };
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),

@@ -20,8 +20,10 @@ mod passing {
             "<html><head><meta charset=\"Shift_JIS\"><link rel=\"stylesheet\" href=\"data:text/css;base64,{}\"></head><body></body></html>",
             BASE64_STANDARD.encode(css)
         );
-        let mut options = MonolithOptions::default();
-        options.silent = true;
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
         let session = Session::new(None, None, options);
 
         let (result, _title) =

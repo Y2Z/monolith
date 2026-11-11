@@ -11,7 +11,7 @@ mod passing {
     use monolith::html;
 
     fn set_charset_and_serialize(html: &str, charset: &str) -> String {
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let dom = html::set_charset(dom, charset.to_string());
         let options = MonolithOptions::default();
 
@@ -91,7 +91,7 @@ mod passing {
     #[test]
     fn get_charset_returns_what_was_set() {
         let html = "<html><head><title>x</title><meta http-equiv=\"content-type\" content=\"text/html\"><meta charset=\"Shift_JIS\"></head><body></body></html>";
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let dom = html::set_charset(dom, "UTF-8".to_string());
 
         assert_eq!(html::get_charset(&dom.document), Some("UTF-8".to_string()));

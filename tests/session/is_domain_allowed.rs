@@ -16,10 +16,11 @@ mod passing {
     }
 
     fn options(whitelist_domains: bool) -> MonolithOptions {
-        let mut options = MonolithOptions::default();
-        options.domains = Some(vec![".example.com".to_string()]);
-        options.whitelist_domains = whitelist_domains;
-        options
+        MonolithOptions {
+            domains: Some(vec![".example.com".to_string()]),
+            whitelist_domains,
+            ..Default::default()
+        }
     }
 
     #[test]

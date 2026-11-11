@@ -12,7 +12,7 @@ mod passing {
     use monolith::simple::simplify_document;
 
     fn simplify(html: &str, add_styles: bool) -> String {
-        let dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         simplify_document(&dom, add_styles);
 
         String::from_utf8_lossy(&html::serialize_document(
@@ -172,9 +172,7 @@ mod passing {
     #[test]
     fn reports_pages_with_barely_any_text() {
         let dom = html::html_to_dom(
-            &"<html><head></head><body><div id=\"root\"></div></body></html>"
-                .as_bytes()
-                .to_vec(),
+            "<html><head></head><body><div id=\"root\"></div></body></html>".as_bytes(),
             "".to_string(),
         );
 

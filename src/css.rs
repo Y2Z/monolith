@@ -155,7 +155,7 @@ pub fn is_image_url_prop(prop_name: &str) -> bool {
         .any(|p| prop_name.eq_ignore_ascii_case(p))
 }
 
-pub fn process_css<'a>(
+pub fn process_css(
     session: &mut Session,
     document_url: &Url,
     parser: &mut Parser,

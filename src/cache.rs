@@ -57,9 +57,9 @@ impl Cache {
             exchanges: vec![],
         };
 
-        if db_file_path.is_some() {
+        if let Some(db_file_path) = &db_file_path {
             // Attempt to initialize on-disk database
-            match Database::create(Path::new(&db_file_path.unwrap())) {
+            match Database::create(Path::new(db_file_path)) {
                 Ok(db) => {
                     cache.db = Some(db);
                     cache.db_ok = Some(true);
@@ -114,9 +114,9 @@ impl Cache {
         if self.metadata.contains_key(key) {
             let metadata_item = self.metadata.get(key).unwrap();
 
-            if metadata_item.data.is_some() {
+            if let Some(data) = &metadata_item.data {
                 return Ok((
-                    metadata_item.data.as_ref().unwrap().to_vec(),
+                    data.to_vec(),
                     metadata_item.media_type.as_ref().expect("").to_string(),
                     metadata_item.charset.as_ref().expect("").to_string(),
                 ));
@@ -220,10 +220,14 @@ impl Cache {
                         FILE_WRITE_BUF_LEN
                     };
                     let buffer = &mut buffer[..bytes_to_write];
-                    writer.write(buffer).unwrap();
+                    // All of it has to get overwritten, nothing of what's been saved is to remain
+                    if writer.write_all(buffer).is_err() {
+                        break;
+                    }
 
                     remaining_size -= bytes_to_write;
                 }
+                let _ = writer.flush();
             }
         }
     }

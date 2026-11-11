@@ -15,7 +15,7 @@ mod passing {
     #[test]
     fn basic() {
         let html = "<div>text</div>";
-        let mut dom = html::html_to_dom(&html.as_bytes().to_vec(), "".to_string());
+        let mut dom = html::html_to_dom(html.as_bytes(), "".to_string());
 
         dom = html::add_favicon(&dom.document, "I_AM_A_FAVICON_DATA_URL".to_string());
 

@@ -33,9 +33,11 @@ mod passing {
 
     #[test]
     fn follows_what_was_specified() {
-        let mut options = MonolithOptions::default();
-        options.insecure = true;
-        options.browser_user_agent = Some("Agent".to_string());
+        let options = MonolithOptions {
+            insecure: true,
+            browser_user_agent: Some("Agent".to_string()),
+            ..Default::default()
+        };
         let arguments = arguments(&options, false);
 
         assert!(arguments.contains(&OsString::from("--ignore-certificate-errors")));

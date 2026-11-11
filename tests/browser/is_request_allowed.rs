@@ -12,9 +12,11 @@ mod passing {
 
     #[test]
     fn what_was_not_excluded() {
-        let mut options = MonolithOptions::default();
-        options.domains = Some(vec!["ads.example.com".to_string()]);
-        options.no_images = true;
+        let options = MonolithOptions {
+            domains: Some(vec!["ads.example.com".to_string()]),
+            no_images: true,
+            ..Default::default()
+        };
 
         assert!(is_request_allowed("https://example.com/", "", &options));
         assert!(is_request_allowed(
@@ -39,8 +41,10 @@ mod failing {
 
     #[test]
     fn excluded_kind_of_asset() {
-        let mut options = MonolithOptions::default();
-        options.no_images = true;
+        let options = MonolithOptions {
+            no_images: true,
+            ..Default::default()
+        };
 
         assert!(!is_request_allowed(
             "https://example.com/a.png",
@@ -51,8 +55,10 @@ mod failing {
 
     #[test]
     fn domain_not_allowed() {
-        let mut options = MonolithOptions::default();
-        options.domains = Some(vec!["ads.example.com".to_string()]);
+        let options = MonolithOptions {
+            domains: Some(vec!["ads.example.com".to_string()]),
+            ..Default::default()
+        };
 
         assert!(!is_request_allowed(
             "https://ads.example.com/a.js",

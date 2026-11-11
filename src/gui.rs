@@ -427,7 +427,7 @@ fn elide_middle(ui: &egui::Ui, text: &str, font: &egui::FontId, max_width: f32) 
     // Look for the largest number of characters that still fits
     let (mut low, mut high) = (0, chars.len());
     while low < high {
-        let middle = (low + high + 1) / 2;
+        let middle = (low + high).div_ceil(2);
         if width(&elided(middle)) <= max_width {
             low = middle;
         } else {
@@ -778,11 +778,13 @@ fn path_row(
 
 impl MonolithApp {
     fn start(&mut self, ctx: &egui::Context) {
-        let mut options: MonolithOptions = MonolithOptions::default();
-        options.ignore_errors = self.ignore_errors;
-        options.insecure = self.insecure;
-        options.timeout = self.timeout;
-        options.silent = true;
+        let mut options: MonolithOptions = MonolithOptions {
+            ignore_errors: self.ignore_errors,
+            insecure: self.insecure,
+            timeout: self.timeout,
+            silent: true,
+            ..Default::default()
+        };
         if !self.keep_media {
             options.remove_elements = vec!["audio".to_string(), "video".to_string()];
         }

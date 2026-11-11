@@ -679,11 +679,8 @@ fn collect_css(
     let mut curr_rule: String = rule_name.to_string();
     let mut curr_prop: String = prop_name.to_string();
 
-    loop {
-        let token = match parser.next_including_whitespace_and_comments() {
-            Ok(token) => token.clone(),
-            Err(_) => break,
-        };
+    while let Ok(token) = parser.next_including_whitespace_and_comments() {
+        let token = token.clone();
 
         match token {
             Token::ParenthesisBlock | Token::SquareBracketBlock | Token::CurlyBracketBlock => {

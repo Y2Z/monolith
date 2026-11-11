@@ -315,21 +315,14 @@ impl Session {
         } else if !net::is_domain_allowed(url, &self.options) {
             // Provoke error
             Err(self.client.get("").send().unwrap_err())
-        } else if self.cache.is_some() && self.cache.as_ref().unwrap().contains_key(&cache_key) {
+        } else if let Some((data, media_type, charset)) = self
+            .cache
+            .as_ref()
+            .filter(|cache| cache.contains_key(&cache_key))
+            .and_then(|cache| cache.get(&cache_key).ok())
+        {
             // URL is in cache, we get and return it
-
-            Ok((
-                self.cache
-                    .as_ref()
-                    .unwrap()
-                    .get(&cache_key)
-                    .unwrap()
-                    .0
-                    .to_vec(),
-                url.clone(),
-                self.cache.as_ref().unwrap().get(&cache_key).unwrap().1,
-                self.cache.as_ref().unwrap().get(&cache_key).unwrap().2,
-            ))
+            Ok((data, url.clone(), media_type, charset))
         } else if self.is_offline {
             if !self.options.silent {
                 print_error_message(&format!("{} (not found in archive)", cache_key));
