@@ -30,7 +30,6 @@ mod passing {
     fn silent_session(output_format: MonolithOutputFormat) -> Session {
         let options = MonolithOptions {
             silent: true,
-            no_metadata: true,
             output_format,
             ..Default::default()
         };
@@ -108,7 +107,6 @@ mod passing {
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
 
         let out = cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
-            .arg("-M")
             .args(["-F", "MHTML"])
             .arg(format!(
                 "tests{s}_data_{s}basic{s}local-file.html",
@@ -119,7 +117,8 @@ mod passing {
         let mhtml = out.stdout;
 
         let text = String::from_utf8_lossy(&mhtml);
-        assert!(text.starts_with("Snapshot-Content-Location: "));
+        assert!(text.starts_with("From: <Saved by Monolith>\r\nSnapshot-Content-Location: "));
+        assert!(text.contains("\r\nDate: "));
         assert!(text.contains(&format!("boundary=\"{}\"", MHTML_BOUNDARY)));
         assert!(text.ends_with(&format!("--{}--\r\n", MHTML_BOUNDARY)));
 

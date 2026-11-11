@@ -17,7 +17,6 @@ mod passing {
         let options = MonolithOptions {
             silent: true,
             no_images: true,
-            no_metadata: true,
             ..Default::default()
         };
 

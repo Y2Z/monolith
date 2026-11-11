@@ -25,7 +25,6 @@ mod passing {
             .unwrap()
             .replace("\\", "/");
         let out = cmd
-            .arg("-M")
             .arg(format!(
                 "tests{s}_data_{s}basic{s}local-file.html",
                 s = MAIN_SEPARATOR
@@ -51,7 +50,7 @@ mod passing {
 
         // STDOUT should contain HTML from the local file
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<!DOCTYPE html><html lang="en"><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Local HTML file</title>
@@ -87,7 +86,6 @@ document.body.style.color = "red";
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
 
         let out = cmd
-            .arg("-M")
             .arg("-Ijsi")
             .arg(path_html.as_os_str())
             .output()
@@ -104,7 +102,7 @@ document.body.style.color = "red";
 
         // STDOUT should contain HTML from the local file
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             format!(
                 r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; script-src 'none'; object-src 'none'; img-src data:;">
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -143,7 +141,6 @@ document.body.style.color = "red";
             .join("local-file.html");
 
         let out = cmd
-            .arg("-M")
             .arg("-Ijsi")
             .arg(path_html.as_os_str())
             .output()
@@ -159,7 +156,9 @@ document.body.style.color = "red";
         );
 
         // STDOUT should contain HTML from the local file
-        assert!(String::from_utf8_lossy(&out.stdout).contains("<title>Local HTML file</title>"));
+        assert!(
+            crate::cli::without_metadata(&out.stdout).contains("<title>Local HTML file</title>")
+        );
 
         // Exit code should be 0
         out.assert().code(0);
@@ -175,7 +174,6 @@ document.body.style.color = "red";
             .replace("\\", "/");
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
         let out = cmd
-            .arg("-M")
             .arg("-sji")
             .arg(format!(
                 "{file}{cwd}/tests/_data_/basic/local-file.html",
@@ -197,7 +195,7 @@ document.body.style.color = "red";
 
         // STDOUT should contain HTML from the local file
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             format!(
                 r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="style-src 'none'; script-src 'none'; object-src 'none'; img-src data:;">
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -230,7 +228,7 @@ document.body.style.color = "red";
         let path_html: &Path = Path::new("tests/_data_/svg/index.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/image.svg");
 
-        let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
+        let out = cmd.arg(path_html.as_os_str()).output().unwrap();
 
         // STDERR should list files that got retrieved
         assert_eq!(
@@ -246,7 +244,7 @@ document.body.style.color = "red";
 
         // STDOUT should contain HTML with date URL for background-image in it
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<html><head><meta name="robots" content="none"></head><body><div style="background-image: url(&quot;data:image/svg+xml,%3Csvg version=%221.1%22 baseProfile=%22full%22 width=%22300%22 height=%22200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%0A    %3Crect width=%22100%25%22 height=%22100%25%22 fill=%22red%22 /%3E%0A    %3Ccircle cx=%22150%22 cy=%22100%22 r=%2280%22 fill=%22green%22 /%3E%0A    %3Ctext x=%22150%22 y=%22125%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22%3ESVG%3C/text%3E%0A%3C/svg%3E%0A&quot;)"></div>
 </body></html>
 "##
@@ -262,7 +260,7 @@ document.body.style.color = "red";
         let path_html: &Path = Path::new("tests/_data_/svg/svg.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/icons.svg");
 
-        let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
+        let out = cmd.arg(path_html.as_os_str()).output().unwrap();
 
         // STDERR should list files that got retrieved
         assert_eq!(
@@ -278,7 +276,7 @@ document.body.style.color = "red";
 
         // STDOUT should contain HTML with one symbol extracted from SVG file
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<html><head><meta name="robots" content="none"></head><body>
 <button class="tm-votes-lever__button" data-test-id="votes-lever-upvote-button" title="Like" type="button">
   <svg class="tm-svg-img tm-votes-lever__icon" height="24" width="24">
@@ -303,7 +301,7 @@ document.body.style.color = "red";
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let path_html: &Path = Path::new("tests/_data_/svg/svg_inline_symbol_use.html");
 
-        let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
+        let out = cmd.arg(path_html.as_os_str()).output().unwrap();
 
         // STDERR should list files that got retrieved (only 1; no self-embedding for the relative xlink)
         assert_eq!(
@@ -318,7 +316,7 @@ document.body.style.color = "red";
         // STDOUT should contain HTML with the use id kept the same because it
         // references an inlined SVG symbol in the same document
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<html><head><meta name="robots" content="none"></head><body>
   <svg xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -352,7 +350,7 @@ document.body.style.color = "red";
         let path_html: &Path = Path::new("tests/_data_/svg/image.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/image.svg");
 
-        let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
+        let out = cmd.arg(path_html.as_os_str()).output().unwrap();
 
         // STDERR should list files that got retrieved
         assert_eq!(
@@ -368,7 +366,7 @@ document.body.style.color = "red";
 
         // STDOUT should contain HTML with data URL of SVG file
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<html><head><meta name="robots" content="none"></head><body>
         <svg height="24" width="24">
             <image href="data:image/svg+xml,%3Csvg version=%221.1%22 baseProfile=%22full%22 width=%22300%22 height=%22200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%0A    %3Crect width=%22100%25%22 height=%22100%25%22 fill=%22red%22 /%3E%0A    %3Ccircle cx=%22150%22 cy=%22100%22 r=%2280%22 fill=%22green%22 /%3E%0A    %3Ctext x=%22150%22 y=%22125%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22%3ESVG%3C/text%3E%0A%3C/svg%3E%0A" width="24" height="24">
@@ -393,7 +391,6 @@ document.body.style.color = "red";
             .replace("\\", "/");
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
         let out = cmd
-            .arg("-M")
             .arg("-i")
             .arg(format!(
                 "{file}{cwd}/tests/_data_/integrity/index.html",
@@ -420,7 +417,7 @@ document.body.style.color = "red";
 
         // STDOUT should contain HTML from the local file; integrity attributes should be missing
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="img-src data:;">
         <title>Local HTML file</title>
         <style>body {
@@ -461,7 +458,6 @@ document.body.style.color = "red";
             .replace("\\", "/");
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
         let out = cmd
-            .arg("-M")
             .arg("tests/_data_/script-escape/index.html")
             .output()
             .unwrap();
@@ -480,7 +476,7 @@ document.body.style.color = "red";
 
         // STDOUT should contain every closing SCRIPT tag variant escaped
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<!DOCTYPE html><html><head>
     <title>Script end tag escaping</title>
     <script>var a = "<\/script>";

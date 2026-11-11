@@ -226,7 +226,6 @@ monolith crawl.warc.gz -b https://some.site/page -o page.html
  - `-I`: Isolate the document
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
- - `-M`: Don't add timestamp and URL information
  - `-n`: Extract contents of NOSCRIPT elements
  - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-q`: Be quiet

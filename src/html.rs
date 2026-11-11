@@ -161,28 +161,70 @@ pub fn compose_csp(options: &MonolithOptions) -> String {
     string_list.join(" ")
 }
 
-pub fn create_metadata_tag(url: &Url) -> String {
-    let datetime: &str = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let mut clean_url: Url = clean_url(url.clone());
+/// Names of META elements that say where documents have come from, when, and what has saved them.
+pub const METADATA_NAMES: [&str; 3] = ["generator", "dcterms.source", "dcterms.created"];
 
-    // Prevent credentials from getting into metadata
-    if clean_url.scheme() == "http" || clean_url.scheme() == "https" {
-        // Only HTTP(S) URLs can contain credentials
-        clean_url.set_username("").unwrap();
-        clean_url.set_password(None).unwrap();
+fn remove_named_meta_elements(node: &Handle, name: &str) {
+    node.children.borrow_mut().retain(|child| {
+        get_node_name(child) != Some("meta")
+            || !get_node_attr(child, "name").is_some_and(|value| value.eq_ignore_ascii_case(name))
+    });
+    for child in node.children.borrow().iter() {
+        remove_named_meta_elements(child, name);
     }
+}
 
-    format!(
-        "<!-- Saved from {} at {} using {} v{} -->",
-        if clean_url.scheme() == "http" || clean_url.scheme() == "https" {
-            clean_url.as_str()
-        } else {
-            "local source"
-        },
-        datetime,
-        env!("CARGO_PKG_NAME"),
-        env!("CARGO_PKG_VERSION"),
-    )
+/// Says what has saved the document, when, and where it came from, the way META elements do it:
+/// whatever the document had said about that before gets replaced. Only addresses of websites get
+/// given away, and never along with credentials.
+pub fn set_metadata(dom: &RcDom, source: Option<&Url>) {
+    let source: Option<Url> = source
+        .filter(|url| url.scheme() == "http" || url.scheme() == "https")
+        .map(|url| {
+            let mut url = clean_url(url.clone());
+            let _ = url.set_username("");
+            let _ = url.set_password(None);
+            url
+        });
+    let values = [
+        Some(format!(
+            "{} {}",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION")
+        )),
+        source.map(|url| url.to_string()),
+        Some(Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)),
+    ];
+    let Some(head) = find_nodes(&dom.document, vec!["html", "head"])
+        .into_iter()
+        .next()
+    else {
+        return;
+    };
+
+    // What there's nothing to replace with stays, saving a saved page keeps where it came from
+    for (name, value) in METADATA_NAMES.iter().zip(values) {
+        let Some(value) = value else {
+            continue;
+        };
+        remove_named_meta_elements(&dom.document, name);
+        let meta = create_element(
+            dom,
+            QualName::new(None, ns!(html), LocalName::from("meta")),
+            vec![
+                Attribute {
+                    name: QualName::new(None, ns!(), LocalName::from("name")),
+                    value: format_tendril!("{}", name),
+                },
+                Attribute {
+                    name: QualName::new(None, ns!(), LocalName::from("content")),
+                    value: format_tendril!("{}", value),
+                },
+            ],
+        );
+        meta.parent.set(Some(Rc::downgrade(&head)));
+        head.children.borrow_mut().push(meta);
+    }
 }
 
 pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> String {

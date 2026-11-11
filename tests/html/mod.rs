@@ -1,7 +1,6 @@
 mod add_favicon;
 mod check_integrity;
 mod compose_csp;
-mod create_metadata_tag;
 mod embed_srcset;
 mod get_base_url;
 mod get_charset;
@@ -15,5 +14,6 @@ mod parse_srcset;
 mod remove_elements;
 mod serialize_document;
 mod set_charset;
+mod set_metadata;
 mod set_node_attr;
 mod walk;

@@ -18,8 +18,7 @@ mod passing {
     #[test]
     fn malformed_srcset_descriptor_does_not_hang() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
-        cmd.arg("-M")
-            .arg("-")
+        cmd.arg("-")
             .write_stdin("<img srcset=\"data:,image invalid\">")
             .timeout(std::time::Duration::from_secs(5))
             .assert()
@@ -51,7 +50,7 @@ mod passing {
 
         // STDOUT should contain program name and version
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             format!("{} {}\n", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
         );
 
@@ -69,14 +68,14 @@ mod passing {
 
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         cmd.write_stdin(echo.stdout);
-        let out = cmd.arg("-M").arg("-").output().unwrap();
+        let out = cmd.arg("-").output().unwrap();
 
         // STDERR should be empty
         assert_eq!(String::from_utf8_lossy(&out.stderr), "");
 
         // STDOUT should contain HTML created out of STDIN
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><meta name="robots" content="none"></head><body>Hello from STDIN
 </body></html>
 "#
@@ -95,7 +94,7 @@ mod passing {
         assert!(path_html.is_file());
         assert!(path_css.is_file());
 
-        let out = cmd.arg("-M").arg(path_html.as_os_str()).output().unwrap();
+        let out = cmd.arg(path_html.as_os_str()).output().unwrap();
 
         // STDERR should list files that got retrieved
         assert_eq!(
@@ -114,7 +113,7 @@ mod passing {
 
         // STDOUT should contain embedded CSS url()'s
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<html><head><style>
 
     @charset "UTF-8";
@@ -143,7 +142,6 @@ mod passing {
         let path_output: PathBuf = dir_tmp.join("subdir").join("output.html");
 
         let out = cmd
-            .arg("-M")
             .arg("--create-dirs")
             .arg("-o")
             .arg(path_output.as_os_str())
@@ -155,7 +153,7 @@ mod passing {
         assert!(path_output.is_file());
 
         // STDOUT should be empty
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "");
+        assert_eq!(crate::cli::without_metadata(&out.stdout), "");
 
         // Exit code should be 0
         out.assert().code(0);
@@ -173,7 +171,6 @@ mod passing {
         let path_output: PathBuf = dir_tmp.join("subdir").join("output.html");
 
         let out = cmd
-            .arg("-M")
             .arg("-o")
             .arg(path_output.as_os_str())
             .arg(path_html.as_os_str())
@@ -218,7 +215,7 @@ mod failing {
         );
 
         // STDOUT should be empty
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "");
+        assert_eq!(crate::cli::without_metadata(&out.stdout), "");
 
         // Exit code should be 1
         out.assert().code(1);
@@ -236,7 +233,7 @@ mod failing {
         );
 
         // STDOUT should be empty
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "");
+        assert_eq!(crate::cli::without_metadata(&out.stdout), "");
 
         // Exit code should be 1
         out.assert().code(1);

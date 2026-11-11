@@ -17,7 +17,6 @@ mod passing {
     fn isolate_data_url() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-I")
             .arg("data:text/html,Hello%2C%20World!")
             .output()
@@ -28,7 +27,7 @@ mod passing {
 
         // STDOUT should contain isolated HTML
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><meta http-equiv="Content-Security-Policy" content="default-src 'unsafe-eval' 'unsafe-inline' data:;"><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );
@@ -41,7 +40,6 @@ mod passing {
     fn remove_css_from_data_url() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-s")
             .arg("data:text/html,<style>body{background-color:pink}</style>Hello")
             .output()
@@ -52,7 +50,7 @@ mod passing {
 
         // STDOUT should contain HTML with no CSS
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><meta http-equiv="Content-Security-Policy" content="style-src 'none';"><style></style><meta name="robots" content="none"></head><body>Hello</body></html>
 "#
         );
@@ -65,7 +63,6 @@ mod passing {
     fn remove_fonts_from_data_url() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-f")
             .arg("data:text/html,<style>@font-face { font-family: myFont; src: url(font.woff); }</style>Hi")
             .output()
@@ -76,7 +73,7 @@ mod passing {
 
         // STDOUT should contain HTML with no web fonts
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><meta http-equiv="Content-Security-Policy" content="font-src 'none';"><style></style><meta name="robots" content="none"></head><body>Hi</body></html>
 "#
         );
@@ -89,7 +86,6 @@ mod passing {
     fn remove_frames_from_data_url() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-w")
             .arg("frame,iframe")
             .arg(r#"data:text/html,<iframe src="https://duckduckgo.com"></iframe>Hi"#)
@@ -101,7 +97,7 @@ mod passing {
 
         // STDOUT should contain HTML with no iframes
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><meta http-equiv="Content-Security-Policy" content="frame-src 'none'; child-src 'none';"><meta name="robots" content="none"></head><body><iframe></iframe>Hi</body></html>
 "#
         );
@@ -114,7 +110,6 @@ mod passing {
     fn remove_images_from_data_url() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-i")
             .arg("data:text/html,<img src=\"https://google.com\"/>Hi")
             .output()
@@ -125,7 +120,7 @@ mod passing {
 
         // STDOUT should contain HTML with no images
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             format!(
                 r#"<html><head><meta http-equiv="Content-Security-Policy" content="img-src data:;"><meta name="robots" content="none"></head><body><img src="{empty_image}">Hi</body></html>
 "#,
@@ -141,7 +136,6 @@ mod passing {
     fn remove_js_from_data_url() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-j")
             .arg("data:text/html,<script>alert(2)</script>Hi")
             .output()
@@ -152,7 +146,7 @@ mod passing {
 
         // STDOUT should contain HTML with no JS
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none';"><script></script><meta name="robots" content="none"></head><body>Hi</body></html>
 "#
         );
@@ -184,7 +178,7 @@ mod failing {
         assert_eq!(String::from_utf8_lossy(&out.stderr), "");
 
         // STDOUT should contain text
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "Hello, World!");
+        assert_eq!(crate::cli::without_metadata(&out.stdout), "Hello, World!");
 
         // Exit code should be 0
         out.assert().code(0);
@@ -194,7 +188,6 @@ mod failing {
     fn security_disallow_local_assets_within_data_url_targets() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg(r#"data:text/html,%3Cscript%20src="src/tests/data/basic/local-script.js"%3E%3C/script%3E"#)
             .output()
             .unwrap();
@@ -204,7 +197,7 @@ mod failing {
 
         // STDOUT should contain HTML without contents of local JS file
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><script></script><meta name="robots" content="none"></head><body></body></html>
 "#
         );

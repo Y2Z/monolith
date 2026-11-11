@@ -16,7 +16,6 @@ mod passing {
     fn mhtml_file_target() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg(format!(
                 "tests{s}_data_{s}mhtml{s}chrome.mhtml",
                 s = MAIN_SEPARATOR
@@ -24,7 +23,7 @@ mod passing {
             .output()
             .unwrap();
 
-        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stdout = crate::cli::without_metadata(&out.stdout);
         assert!(stdout.starts_with("<!DOCTYPE html>"));
         assert!(stdout.contains(r#"<img src="data:image/png"#));
         assert!(stdout.contains(r#"<iframe src="data:text/html"#));

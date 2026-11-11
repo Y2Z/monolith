@@ -18,7 +18,6 @@ mod passing {
         };
         // Keeps favicons from being requested
         options.no_images = true;
-        options.no_metadata = true;
 
         Session::new(None, None, options)
     }
