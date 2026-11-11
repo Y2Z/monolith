@@ -8,7 +8,6 @@
 #[cfg(test)]
 mod passing {
     use base64::{Engine, prelude::BASE64_STANDARD};
-    use url::Url;
 
     use monolith::core::{MonolithOptions, create_monolithic_document_from_data};
     use monolith::session::Session;
@@ -28,18 +27,8 @@ mod passing {
         let (result, _title) =
             create_monolithic_document_from_data(session, html.into_bytes(), None, None).unwrap();
 
-        // The data URL itself is ASCII, no matter what the document gets saved as
-        let result = String::from_utf8_lossy(&result);
-        let start = result
-            .find("data:text/css")
-            .expect("no stylesheet data URL");
-        let end = start + result[start..].find('"').unwrap();
-        let (_, charset, data) =
-            monolith::url::parse_data_url(&Url::parse(&result[start..end]).unwrap());
-        assert_eq!(charset, "utf-8");
-        assert_eq!(
-            String::from_utf8(data).unwrap(),
-            "p{font-family:\"メイリオ\"}"
-        );
+        // The stylesheet becomes a part of the document, encoded the same way it is
+        let (result, _, _) = encoding_rs::SHIFT_JIS.decode(&result);
+        assert!(result.contains("<style>p{font-family:\"メイリオ\"}</style>"));
     }
 }

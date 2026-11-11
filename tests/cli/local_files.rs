@@ -55,7 +55,11 @@ mod passing {
             r##"<!DOCTYPE html><html lang="en"><head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Local HTML file</title>
-  <link href="data:text/css;charset=utf-8,body {%0A    background-color: %23000;%0A    color: %23fff;%0A}%0A" rel="stylesheet" type="text/css">
+  <style>body {
+    background-color: #000;
+    color: #fff;
+}
+</style>
   <link rel="stylesheet" type="text/css">
 <meta name="robots" content="none"></head>
 
@@ -427,7 +431,11 @@ document.body.style.color = "red";
             String::from_utf8_lossy(&out.stdout),
             r##"<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="img-src data:;">
         <title>Local HTML file</title>
-        <link href="data:text/css;charset=utf-8,body {%0A    background-color: %23000;%0A    color: %23FFF;%0A}%0A" rel="stylesheet" type="text/css" crossorigin="anonymous">
+        <style>body {
+    background-color: #000;
+    color: #FFF;
+}
+</style>
         <link href="style.css" rel="stylesheet" type="text/css" crossorigin="anonymous">
     <meta name="robots" content="none"></head>
 

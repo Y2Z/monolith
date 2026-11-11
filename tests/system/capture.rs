@@ -51,7 +51,7 @@ fn reuses_what_only_the_browser_was_given() {
 
         let html = Workspace::new(browser).render(&server.url("/"), &["--no-js"]);
 
-        assert!(html.contains("data:text/css"));
+        assert!(html.contains("<style>p{color:rgb(1,2,3)}</style>"), "{}", html);
     });
 }
 

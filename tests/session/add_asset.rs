@@ -230,6 +230,6 @@ mod passing {
         )
         .unwrap();
 
-        assert!(String::from_utf8_lossy(&data).contains("href=\"data:text/css"));
+        assert!(String::from_utf8_lossy(&data).contains("<style>"));
     }
 }
