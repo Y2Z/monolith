@@ -20,7 +20,7 @@ use crate::replay::rewrite_imports;
 use crate::session::Session;
 use crate::url::{
     EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, create_srcset_data_url,
-    is_url_and_has_protocol, resolve_url,
+    is_url_and_has_protocol, parse_data_url, resolve_url,
 };
 
 /// Attributes that make elements load something, other than src (which is handled separately)
@@ -252,6 +252,91 @@ pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> 
     }
 
     result
+}
+
+/// Attributes of stylesheet links that mean something for STYLE elements too, and ones that
+/// belong to any element.
+fn is_kept_on_style_element(name: &str) -> bool {
+    matches!(
+        name,
+        "media" | "title" | "nonce" | "blocking" | "id" | "class" | "lang" | "dir"
+    ) || name.starts_with("data-")
+}
+
+/// Turns stylesheets that ended up as data URLs into STYLE elements: there's no telling how long
+/// a stylesheet can be, and browsers limit how long URLs are.
+///
+/// Links that something can tell apart from STYLE elements stay the way they are: ones that wait
+/// for their load or error events, alternate and disabled ones, and ones holding something that
+/// would end STYLE elements early.
+pub fn inline_stylesheets(dom: &RcDom, node: &Handle) {
+    let children: Vec<Handle> = node.children.borrow().clone();
+
+    for (index, child) in children.iter().enumerate() {
+        if let Some(style) = stylesheet_as_style_element(dom, child) {
+            style.parent.set(Some(Rc::downgrade(node)));
+            node.children.borrow_mut()[index] = style;
+        } else {
+            inline_stylesheets(dom, child);
+        }
+    }
+}
+
+fn stylesheet_as_style_element(dom: &RcDom, node: &Handle) -> Option<Handle> {
+    let NodeData::Element { name, attrs, .. } = &node.data else {
+        return None;
+    };
+    if name.ns != ns!(html) || &*name.local != "link" {
+        return None;
+    }
+    let attrs = attrs.borrow();
+    let attribute = |wanted: &str| {
+        attrs
+            .iter()
+            .find(|attr| &*attr.name.local == wanted)
+            .map(|attr| attr.value.to_string())
+    };
+    let rel = attribute("rel")?.to_lowercase();
+    let rels: Vec<&str> = rel.split_whitespace().collect();
+    if rels != ["stylesheet"]
+        || attribute("disabled").is_some()
+        || attrs
+            .iter()
+            .any(|attr| attr_is_event_handler(&attr.name.local))
+    {
+        return None;
+    }
+    let href = Url::parse(&attribute("href")?).ok()?;
+    if href.scheme() != "data" {
+        return None;
+    }
+    let (media_type, charset, data) = parse_data_url(&href);
+    if !media_type.eq_ignore_ascii_case("text/css") {
+        return None;
+    }
+    let css = match Encoding::for_label(charset.as_bytes()) {
+        Some(encoding) => encoding.decode_with_bom_removal(&data).0.into_owned(),
+        None => String::from_utf8_lossy(&data).into_owned(),
+    };
+    if css.to_lowercase().contains("</style") {
+        return None;
+    }
+
+    let kept: Vec<Attribute> = attrs
+        .iter()
+        .filter(|attr| is_kept_on_style_element(&attr.name.local))
+        .cloned()
+        .collect();
+    let style = create_element(
+        dom,
+        QualName::new(None, ns!(html), LocalName::from("style")),
+        kept,
+    );
+    let text = create_text_node(&css);
+    text.parent.set(Some(Rc::downgrade(&style)));
+    style.children.borrow_mut().push(text);
+
+    Some(style)
 }
 
 pub fn create_html_element(dom: &RcDom, name: &str) -> Handle {
@@ -1132,8 +1217,12 @@ pub fn retrieve_and_embed_asset(
                         // Browsers ignore both of these on scripts that have no source
                         let is_timed = get_node_attr(node, "async").is_some()
                             || get_node_attr(node, "defer").is_some();
+                        // Scripts that have no source never get to load, or fail to
+                        let is_awaited = get_node_attr(node, "onload").is_some()
+                            || get_node_attr(node, "onerror").is_some();
 
                         if !is_timed
+                            && !is_awaited
                             && (script_media_type == "text/javascript"
                                 || script_media_type == "application/javascript")
                         {
@@ -1150,9 +1239,13 @@ pub fn retrieve_and_embed_asset(
                                 if let NodeData::Text { ref contents } = text_node.data {
                                     let mut tendril = contents.borrow_mut();
                                     tendril.clear();
-                                    tendril.push_slice(&escape_script_end_tag(
-                                        &String::from_utf8_lossy(&data),
-                                    ));
+                                    let code = match Encoding::for_label(charset.as_bytes()) {
+                                        Some(encoding) => {
+                                            encoding.decode_with_bom_removal(&data).0.into_owned()
+                                        }
+                                        None => String::from_utf8_lossy(&data).into_owned(),
+                                    };
+                                    tendril.push_slice(&escape_script_end_tag(&code));
                                 }
 
                                 node.children.borrow_mut().push(text_node.clone());

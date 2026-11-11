@@ -50,6 +50,39 @@ mod passing {
         )));
         assert_eq!(archive.unwrap().len(), 5);
     }
+
+    #[test]
+    fn scripts_get_inlined_unless_they_have_to_be_waited_for() {
+        use monolith::core::{MonolithOptions, create_monolithic_document_from_data};
+        use monolith::session::Session;
+
+        let options = MonolithOptions {
+            silent: true,
+            ..Default::default()
+        };
+        let archive = include_bytes!("../_data_/webarchive/scripts.webarchive").to_vec();
+        let (result, _) = create_monolithic_document_from_data(
+            Session::new(None, None, options),
+            archive,
+            None,
+            None,
+        )
+        .unwrap();
+        let result = String::from_utf8(result).unwrap();
+
+        // Decoded the way its archive says it's encoded
+        assert!(
+            result.contains("<script>var word = 'caf\u{e9}';</script>"),
+            "{}",
+            result
+        );
+        // Inline scripts never load, nothing would ever get to know they have
+        assert!(result.contains("<script src=\"data:text/javascript"));
+        assert!(result.contains("onload=\"window.loaded = true\""));
+        // Inline scripts can't wait
+        assert!(result.contains("defer=\"\""));
+        assert_eq!(result.matches("<script src=\"data:").count(), 2);
+    }
 }
 
 #[cfg(test)]

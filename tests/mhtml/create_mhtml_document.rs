@@ -53,11 +53,7 @@ mod passing {
         assert_eq!(data, b"\x89PNG\r\n\x1a\n");
 
         // ...including the ones referenced by stylesheets
-        let (media_type, _charset, css) = parse_data_url(
-            &Url::parse(attr_value(&result, r#"<link rel="stylesheet" href=""#)).unwrap(),
-        );
-        assert_eq!(media_type, "text/css");
-        let css = String::from_utf8(css).unwrap();
+        let css = &result[result.find("<style>").unwrap()..result.find("</style>").unwrap()];
         let (media_type, _charset, data) =
             parse_data_url(&Url::parse(attr_value(&css, r#"url(""#)).unwrap());
         assert_eq!(media_type, "image/gif");

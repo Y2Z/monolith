@@ -8,6 +8,7 @@ mod get_charset;
 mod get_node_attr;
 mod get_node_name;
 mod has_favicon;
+mod inline_stylesheets;
 mod is_favicon;
 mod parse_link_type;
 mod parse_srcset;

@@ -16,8 +16,8 @@ use crate::browser::{ColorScheme, render_page};
 use crate::har::{is_har, parse_har};
 use crate::html::{
     add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
-    has_favicon, html_to_dom, serialize_document, set_base_url, set_charset, set_robots,
-    strip_elements, targets_element_anywhere, walk,
+    has_favicon, html_to_dom, inline_stylesheets, serialize_document, set_base_url, set_charset,
+    set_robots, strip_elements, targets_element_anywhere, walk,
 };
 use crate::mhtml::{ArchivedAsset, MhtmlArchive, create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::replay::{
@@ -438,6 +438,10 @@ pub fn create_monolithic_document_from_data(
     // Traverse through the document and embed remote assets
     session.environment_encoding = environment_encoding;
     walk(&mut session, &base_url, &dom.document);
+    // Stylesheets go where they can be as long as they need to be
+    if session.options.output_format == MonolithOutputFormat::HTML {
+        inline_stylesheets(&dom, &dom.document);
+    }
 
     // Update or add new BASE element to reroute network requests and hash-links
     if let Some(new_base_url) = session.options.base_url.clone() {

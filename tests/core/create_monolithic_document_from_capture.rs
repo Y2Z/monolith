@@ -119,6 +119,6 @@ mod passing {
 
         let (data, _) = create_monolithic_document_from_capture(session(), page).unwrap();
 
-        assert!(String::from_utf8_lossy(&data).contains("data:text/css"));
+        assert!(String::from_utf8_lossy(&data).contains("<style>"));
     }
 }
