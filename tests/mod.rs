@@ -12,7 +12,7 @@ mod mhtml;
 mod net;
 mod replay;
 mod session;
-mod simplify;
+mod simple;
 mod url;
 mod warc;
 mod webarchive;
