@@ -15,7 +15,6 @@ mod passing {
     fn add_new_when_provided() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-b")
             .arg("http://localhost:30701/")
             .arg("data:text/html,Hello%2C%20World!")
@@ -27,7 +26,7 @@ mod passing {
 
         // STDOUT should contain newly added base URL
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><base href="http://localhost:30701/"><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );
@@ -40,7 +39,6 @@ mod passing {
     fn keep_existing_when_none_provided() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("data:text/html,<base href=\"http://localhost:30701/\" />Hello%2C%20World!")
             .output()
             .unwrap();
@@ -50,7 +48,7 @@ mod passing {
 
         // STDOUT should contain newly added base URL
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><base href="http://localhost:30701/"><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );
@@ -63,7 +61,6 @@ mod passing {
     fn override_existing_when_provided() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-b")
             .arg("http://localhost/")
             .arg("data:text/html,<base href=\"http://localhost:30701/\" />Hello%2C%20World!")
@@ -75,7 +72,7 @@ mod passing {
 
         // STDOUT should contain newly added base URL
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><base href="http://localhost/"><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );
@@ -88,7 +85,6 @@ mod passing {
     fn set_existing_to_empty_when_empty_provided() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-b")
             .arg("")
             .arg("data:text/html,<base href=\"http://localhost:30701/\" />Hello%2C%20World!")
@@ -100,7 +96,7 @@ mod passing {
 
         // STDOUT should contain newly added base URL
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r#"<html><head><base href=""><meta name="robots" content="none"></head><body>Hello, World!</body></html>
 "#
         );

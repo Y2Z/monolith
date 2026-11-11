@@ -88,10 +88,6 @@ struct Cli {
     #[arg(short = 'k', long)]
     insecure: bool,
 
-    /// Exclude timestamp and source information
-    #[arg(short = 'M', long)]
-    no_metadata: bool,
-
     /// Replace NOSCRIPT elements with their contents
     #[arg(short = 'n', long)]
     unwrap_noscript: bool,
@@ -230,7 +226,6 @@ fn main() {
         options.no_images = cli.no_images;
         options.no_js = cli.no_js;
         options.output_format = cli.format.unwrap_or_default();
-        options.no_metadata = cli.no_metadata;
         options.simplify = cli.simplify;
         options.remove_elements = cli.remove_elements;
         options.wipe_elements = cli.wipe_elements;

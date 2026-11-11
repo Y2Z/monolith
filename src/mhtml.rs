@@ -233,18 +233,14 @@ pub fn create_mhtml_document(
     let mut mhtml: Vec<u8> = Vec::with_capacity(html.len() * 2);
 
     // Message headers
-    if !session.options.no_metadata {
-        mhtml.extend_from_slice(b"From: <Saved by Monolith>\r\n");
-    }
+    mhtml.extend_from_slice(b"From: <Saved by Monolith>\r\n");
     if let Some(location) = document_location {
         push_header(&mut mhtml, "Snapshot-Content-Location", location.as_str());
     }
     if let Some(title) = document_title.filter(|title| !title.trim().is_empty()) {
         push_header(&mut mhtml, "Subject", &encode_header_value(title));
     }
-    if !session.options.no_metadata {
-        push_header(&mut mhtml, "Date", &Utc::now().to_rfc2822());
-    }
+    push_header(&mut mhtml, "Date", &Utc::now().to_rfc2822());
     mhtml.extend_from_slice(b"MIME-Version: 1.0\r\n");
     mhtml.extend_from_slice(
         format!(

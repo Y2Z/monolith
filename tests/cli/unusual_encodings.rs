@@ -20,7 +20,6 @@ mod passing {
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg(format!(
                 "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
                 s = MAIN_SEPARATOR
@@ -43,9 +42,9 @@ mod passing {
         let s: String;
         if let Some(encoding) = Encoding::for_label(b"gb2312") {
             let (string, _, _) = encoding.decode(&out.stdout);
-            s = string.to_string();
+            s = crate::cli::without_metadata(string.as_bytes());
         } else {
-            s = String::from_utf8_lossy(&out.stdout).to_string();
+            s = crate::cli::without_metadata(&out.stdout);
         }
         assert_eq!(
             s,
@@ -78,7 +77,7 @@ mod passing {
 
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         cmd.write_stdin(echo.stdout);
-        let out = cmd.arg("-M").arg("-").output().unwrap();
+        let out = cmd.arg("-").output().unwrap();
 
         // STDERR should be empty
         assert_eq!(String::from_utf8_lossy(&out.stderr), "");
@@ -87,9 +86,9 @@ mod passing {
         let s: String;
         if let Some(encoding) = Encoding::for_label(b"gb2312") {
             let (string, _, _) = encoding.decode(&out.stdout);
-            s = string.to_string();
+            s = crate::cli::without_metadata(string.as_bytes());
         } else {
-            s = String::from_utf8_lossy(&out.stdout).to_string();
+            s = crate::cli::without_metadata(&out.stdout);
         }
         assert_eq!(
             s,
@@ -115,7 +114,6 @@ mod passing {
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-E")
             .arg("utf8")
             .arg(format!(
@@ -138,7 +136,7 @@ mod passing {
 
         // STDOUT should contain original document without any modifications
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout).to_string(),
+            crate::cli::without_metadata(&out.stdout).to_string(),
             r#"<html><head>
     <meta http-equiv="content-type" content="text/html;charset=utf8">
     <title>近七成人减少线下需求　银行数字化转型提速--经济·科技--人民网 </title>
@@ -159,7 +157,6 @@ mod passing {
     fn properly_save_document_with_gb2312_custom_charset_bad() {
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg("-E")
             .arg("utf0")
             .arg(format!(
@@ -176,7 +173,7 @@ mod passing {
         );
 
         // STDOUT should be empty
-        assert_eq!(String::from_utf8_lossy(&out.stdout).to_string(), "");
+        assert_eq!(crate::cli::without_metadata(&out.stdout).to_string(), "");
 
         // Exit code should be 1
         out.assert().code(1);
@@ -203,7 +200,6 @@ mod failing {
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
         let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
         let out = cmd
-            .arg("-M")
             .arg(format!(
                 "tests{s}_data_{s}unusual_encodings{s}iso-8859-1.html",
                 s = MAIN_SEPARATOR
@@ -224,7 +220,7 @@ mod failing {
 
         // STDOUT should contain original document but with UTF-8 charset
         assert_eq!(
-            String::from_utf8_lossy(&out.stdout),
+            crate::cli::without_metadata(&out.stdout),
             r##"<html><head>
         <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
     <meta name="robots" content="none"></head>

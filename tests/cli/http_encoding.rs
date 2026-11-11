@@ -23,7 +23,7 @@ fn archive(content_type: &str, body: Vec<u8>) -> Vec<u8> {
         stream.write_all(&body).unwrap();
     });
     let output = cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
-        .args(["-M", "-i", "-q", "-t", "10", &url])
+        .args(["-i", "-q", "-t", "10", &url])
         .output()
         .unwrap();
     server.join().unwrap();
@@ -74,7 +74,6 @@ fn bom_overrides_http_charset() {
 fn data_url_default_charset_does_not_override_meta() {
     let output = cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
         .args([
-            "-M",
             "-q",
             "data:text/html,%3Cmeta%20charset%3Dutf-8%3E%3Ctitle%3E%E3%83%86%E3%82%B9%E3%83%88%3C%2Ftitle%3E",
         ])

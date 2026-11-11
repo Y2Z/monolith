@@ -12,7 +12,7 @@ mod helpers {
             .unwrap();
 
         (
-            String::from_utf8_lossy(&output.stdout).into_owned(),
+            crate::cli::without_metadata(&output.stdout),
             String::from_utf8_lossy(&output.stderr).into_owned(),
             output.status.success(),
         )

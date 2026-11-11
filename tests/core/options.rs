@@ -21,7 +21,6 @@ mod passing {
         assert!(!options.isolate);
         assert!(!options.no_js);
         assert!(!options.insecure);
-        assert!(!options.no_metadata);
         assert_eq!(options.output_format, MonolithOutputFormat::HTML);
         assert!(!options.simplify);
         assert!(options.remove_elements.is_empty());

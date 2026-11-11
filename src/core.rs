@@ -15,9 +15,9 @@ use url::Url;
 use crate::browser::{ColorScheme, render_page};
 use crate::har::{is_har, parse_har};
 use crate::html::{
-    add_favicon, create_metadata_tag, get_base_url, get_charset, get_robots, get_title,
-    has_favicon, html_to_dom, inline_stylesheets, serialize_document, set_base_url, set_charset,
-    set_robots, strip_elements, targets_element_anywhere, walk,
+    add_favicon, get_base_url, get_charset, get_robots, get_title, has_favicon, html_to_dom,
+    inline_stylesheets, serialize_document, set_base_url, set_charset, set_metadata, set_robots,
+    strip_elements, targets_element_anywhere, walk,
 };
 use crate::mhtml::{ArchivedAsset, MhtmlArchive, create_mhtml_document, is_mhtml, parse_mhtml};
 use crate::replay::{
@@ -109,7 +109,6 @@ pub struct MonolithOptions {
     pub no_fonts: bool,
     pub no_images: bool,
     pub no_js: bool,
-    pub no_metadata: bool,
     pub output_format: MonolithOutputFormat,
     pub remove_elements: Vec<String>,
     /// Set for documents that replay responses, instead of relying on a network
@@ -487,6 +486,17 @@ pub fn create_monolithic_document_from_data(
         let _ = output_encoding.set(document_encoding.clone());
     }
 
+    // Say what has saved it, when, and where from: documents without a location of their own
+    // (given through stdin) can get one from the base URL
+    set_metadata(
+        &dom,
+        input_target
+            .as_deref()
+            .or(session.options.base_url.as_deref())
+            .and_then(|target| Url::parse(target).ok())
+            .as_ref(),
+    );
+
     let document_title: Option<String> = get_title(&dom.document);
     // Serialize DOM tree
     let mut html: Vec<u8> = serialize_document(dom, document_encoding.clone(), &session.options);
@@ -496,15 +506,6 @@ pub fn create_monolithic_document_from_data(
         .as_deref()
         .and_then(|target| Url::parse(target).ok())
         .filter(|url| url.scheme() != "data");
-
-    // Prepend metadata comment tag
-    if !session.options.no_metadata && !input_target.clone().unwrap_or_default().is_empty() {
-        let mut metadata_comment: String =
-            create_metadata_tag(&Url::parse(&input_target.unwrap_or_default()).unwrap());
-        // let mut metadata_comment: String = create_metadata_tag(target);
-        metadata_comment += "\n";
-        html.splice(0..0, metadata_comment.as_bytes().to_vec());
-    }
 
     if session.is_recording() {
         // What has been put together only served to find out what it's made of
