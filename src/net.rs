@@ -563,12 +563,7 @@ fn collect_html(
                 }
                 "img" => {
                     if !options.no_images {
-                        let data_src = get_node_attr(node, "data-src").unwrap_or_default();
-                        let src = if !data_src.is_empty() {
-                            data_src
-                        } else {
-                            get_node_attr(node, "src").unwrap_or_default()
-                        };
+                        let src = get_node_attr(node, "src").unwrap_or_default();
                         push_job(jobs, base_url, &src, AssetKind::Other);
 
                         if let Some(srcset) = get_node_attr(node, "srcset") {
