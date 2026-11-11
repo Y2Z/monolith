@@ -27,130 +27,28 @@ If compared to saving websites with `wget -mpk`, this tool embeds all assets as 
 
 ## Installation
 
-#### Using [Cargo](https://crates.io/crates/monolith) (cross-platform)
-
-```console
-cargo install monolith
-```
-
-Rendering pages in browsers (`-B`) comes as a feature that's on by default, builds that don't need it can be made smaller without it:
-
-```console
-cargo install monolith --no-default-features --features cli
-```
-
-#### Via [Homebrew](https://formulae.brew.sh/formula/monolith) (macOS and GNU/Linux)
-
-```console
-brew install monolith
-```
-
-#### Via [Chocolatey](https://community.chocolatey.org/packages/monolith) (Windows)
-
-```console
-choco install monolith
-```
-
-#### Via [Scoop](https://scoop.sh/#/apps?q=monolith) (Windows)
-
-```console
-scoop install main/monolith
-```
-
-#### Via [Winget](https://winstall.app/apps/Y2Z.Monolith) (Windows)
-
-```console
-winget install --id=Y2Z.Monolith -e
-```
-
-#### Via [MacPorts](https://ports.macports.org/port/monolith/summary) (macOS)
-
-```console
-sudo port install monolith
-```
-
-#### Using [Snapcraft](https://snapcraft.io/monolith) (GNU/Linux)
-
-```console
-snap install monolith
-```
-
-#### Using [Guix](https://packages.guix.gnu.org/packages/monolith) (GNU/Linux)
-
-```console
-guix install monolith
-```
-
-#### Using [NixPkgs](https://search.nixos.org/packages?channel=unstable&show=monolith&query=monolith)
-
-```console
-nix-env -iA nixpkgs.monolith
-```
-
-#### Using [Flox](https://flox.dev)
-
-```console
-flox install monolith
-```
-
-#### Using [X-CMD](https://www.x-cmd.com/pkg/monolith)
-
-```console
-x install monolith
-```
-
-#### Using [Pacman](https://archlinux.org/packages/extra/x86_64/monolith) (Arch Linux)
-
-```console
-pacman -S monolith
-```
-
-#### Using [aports](https://pkgs.alpinelinux.org/packages?name=monolith) (Alpine Linux)
-
-```console
-apk add monolith
-```
-
-#### Using [pkg.haus APT archive](https://pkg.haus) (Debian)
-
-Set up the archive per the instructions on [pkg.haus](https://pkg.haus), then:
-
-```console
-sudo apt install monolith
-```
-
-#### Using [XBPS Package Manager](https://voidlinux.org/packages/?q=monolith) (Void Linux)
-
-```console
-xbps-install -S monolith
-```
-
-#### Using [FreeBSD packages](https://svnweb.freebsd.org/ports/head/www/monolith/) (FreeBSD)
-
-```console
-pkg install monolith
-```
-
-#### Using [FreeBSD ports](https://www.freshports.org/www/monolith/) (FreeBSD)
-
-```console
-cd /usr/ports/www/monolith/
-make install clean
-```
-
-#### Using [pkgsrc](https://pkgsrc.se/www/monolith) (NetBSD, OpenBSD, Haiku, etc)
-
-```console
-cd /usr/pkgsrc/www/monolith
-make install clean
-```
-
-#### Using [containers](https://www.docker.com/)
-
-```console
-docker build -t y2z/monolith .
-sudo install -b dist/run-in-container.sh /usr/local/bin/monolith
-```
+| OS | Method | Instructions |
+| :--- | :---: | :--- |
+| cross-platform | [Cargo](https://crates.io/crates/monolith) | `cargo install monolith` |
+| macOS, Linux | [Homebrew](https://formulae.brew.sh/formula/monolith) | `brew install monolith` |
+| Windows | [Chocolatey](https://community.chocolatey.org/packages/monolith) | `choco install monolith` |
+| Windows | [Scoop](https://scoop.sh/#/apps?q=monolith) | `scoop install main/monolith` |
+| Windows | [Winget](https://winstall.app/apps/Y2Z.Monolith) | `winget install --id=Y2Z.Monolith -e` |
+| macOS | [MacPorts](https://ports.macports.org/port/monolith/summary) | `sudo port install monolith` |
+| Linux | [Snapcraft](https://snapcraft.io/monolith) | `snap install monolith` |
+| Linux | [Guix](https://packages.guix.gnu.org/packages/monolith) | `guix install monolith` |
+| Linux | [NixPkgs](https://search.nixos.org/packages?channel=unstable&show=monolith&query=monolith) | `nix-env -iA nixpkgs.monolith` |
+| Linux | [Flox](https://flox.dev) | `flox install monolith` |
+| macOS | [X-CMD](https://www.x-cmd.com/pkg/monolith) | `x install monolith` |
+| Arch Linux | [Pacman](https://archlinux.org/packages/extra/x86_64/monolith) | `pacman -S monolith` |
+| Alpine Linux | [aports](https://pkgs.alpinelinux.org/packages?name=monolith) | `apk add monolith` |
+| Debian Linux | [pkg.haus APT archive](https://pkg.haus) | Set up the archive per the instructions on [pkg.haus](https://pkg.haus), then: `sudo apt install monolith` |
+| Void Linux | [XBPS Package Manager](https://voidlinux.org/packages/?q=monolith) | `xbps-install -S monolith` |
+| FreeBSD | [FreeBSD packages](https://svnweb.freebsd.org/ports/head/www/monolith/) | `pkg install monolith` |
+| FreeBSD | [FreeBSD ports](https://www.freshports.org/www/monolith/) | `cd /usr/ports/www/monolith/ && make install clean` |
+| NetBSD, OpenBSD, Haiku | [pkgsrc](https://pkgsrc.se/www/monolith) | `cd /usr/pkgsrc/www/monolith && make install clean` |
+| cross-platform | [Docker](https://www.docker.com/) | `docker build -t y2z/monolith . && sudo install -b dist/run-in-container.sh /usr/local/bin/monolith` |
+| cross-platform | [Release artifacts](https://github.com/Y2Z/monolith/releases) | Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standard CPU architecture. |
 
 #### From [source](https://github.com/Y2Z/monolith)
 
@@ -180,10 +78,11 @@ cd monolith
 make install
 ```
 
-#### Using [pre-built binaries](https://github.com/Y2Z/monolith/releases) (Windows, ARM-based devices, etc)
+Rendering pages in browsers (`-B`) comes as a feature that's on by default, builds that don't need it can be made smaller without it:
 
-Every release contains pre-built binaries for Windows, GNU/Linux, as well as platforms with non-standard CPU architecture.
-
+```console
+cargo install monolith --no-default-features --features cli
+```
 
 ---------------------------------------------------
 
