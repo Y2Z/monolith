@@ -25,7 +25,7 @@ use crate::replay::{
     is_script, rewrite_scripts, rewrite_stylesheets,
 };
 use crate::session::Session;
-use crate::simplify::simplify_document;
+use crate::simple::simplify_document;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
 use crate::warc::{create_warc_document, is_warc, parse_warc};
 use crate::webarchive::{is_webarchive, parse_webarchive};

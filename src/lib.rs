@@ -11,7 +11,7 @@ pub mod mhtml;
 pub mod net;
 pub mod replay;
 pub mod session;
-pub mod simplify;
+pub mod simple;
 pub mod url;
 pub mod warc;
 pub mod webarchive;
