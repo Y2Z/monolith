@@ -7,6 +7,8 @@
 //!
 //! Cargo runs test targets in alphabetical order, this name keeps these after the unit tests.
 
+#![cfg(feature = "browser")]
+
 #[path = "system/support.rs"]
 mod support;
 

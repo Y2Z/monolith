@@ -6,6 +6,7 @@ use std::process;
 use clap::Parser;
 use tempfile::{Builder, NamedTempFile};
 
+#[cfg(feature = "browser")]
 use monolith::browser;
 use monolith::cache::Cache;
 use monolith::cookies::{Cookie, parse_cookie_file_contents};
@@ -210,8 +211,11 @@ fn main() {
     // Process the command
     {
         options.base_url = cli.base_url;
-        options.browser = cli.browser;
-        options.browser_user_agent = cli.user_agent.clone();
+        #[cfg(feature = "browser")]
+        {
+            options.browser = cli.browser;
+            options.browser_user_agent = cli.user_agent.clone();
+        }
         options.encoding = cli.encoding;
         if !cli.domains.is_empty() {
             options.domains = Some(cli.domains);
@@ -274,6 +278,7 @@ fn main() {
         .as_ref()
         .map(|file| file.path().to_path_buf());
     let _ = ctrlc::set_handler(move || {
+        #[cfg(feature = "browser")]
         browser::shut_down();
         if let Some(path) = &cache_file_path {
             let _ = fs::remove_file(path);
@@ -317,6 +322,15 @@ fn main() {
     let output_format = options.output_format.clone();
     let silent = options.silent;
     let session: Session = Session::new(cache, cookies, options);
+
+    // The option is always there, builds that can't do what it asks for say so
+    if cli.browser && cfg!(not(feature = "browser")) {
+        if !silent {
+            print_error_message("Error: this build of monolith has no browser support");
+        }
+        drop(temp_cache_file);
+        process::exit(1);
+    }
 
     if cli.browser && cli.target == "-" {
         if !silent {

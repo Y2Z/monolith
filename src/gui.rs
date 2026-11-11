@@ -11,6 +11,7 @@ use eframe::egui;
 use encoding_rs::Encoding;
 use tempfile::{Builder, NamedTempFile};
 
+#[cfg(feature = "browser")]
 use monolith::browser;
 use monolith::cache::Cache;
 use monolith::core::{
@@ -166,6 +167,7 @@ struct MonolithApp {
     keep_images: bool,
     keep_scripts: bool,
     keep_styles: bool,
+    #[cfg(feature = "browser")]
     browser: bool,
     isolate: bool,
     unwrap_noscript: bool,
@@ -191,6 +193,7 @@ impl Default for MonolithApp {
             keep_images: true,
             keep_scripts: true,
             keep_styles: true,
+            #[cfg(feature = "browser")]
             browser: false,
             isolate: true,
             unwrap_noscript: false,
@@ -215,6 +218,7 @@ fn temp_cache_path() -> MutexGuard<'static, Option<PathBuf>> {
 }
 
 fn clean_up() {
+    #[cfg(feature = "browser")]
     browser::shut_down();
     if let Some(path) = temp_cache_path().take() {
         let _ = fs::remove_file(path);
@@ -789,7 +793,10 @@ impl MonolithApp {
         options.no_images = !self.keep_images;
         options.no_styles = !self.keep_styles;
         options.no_js = !self.keep_scripts;
-        options.browser = self.browser;
+        #[cfg(feature = "browser")]
+        {
+            options.browser = self.browser;
+        }
         options.isolate = self.isolate;
         options.threads = 30;
         options.unwrap_noscript = self.unwrap_noscript;
@@ -915,6 +922,7 @@ impl MonolithApp {
 
                 checkbox(behavior, &mut self.isolate, "Isolate document");
                 checkbox(behavior, &mut self.unwrap_noscript, "Unwrap NOSCRIPT");
+                #[cfg(feature = "browser")]
                 checkbox(behavior, &mut self.browser, "Render in browser");
 
                 checkbox(network, &mut self.ignore_errors, "Ignore network errors");

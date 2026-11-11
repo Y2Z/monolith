@@ -11,6 +11,7 @@ use encoding_rs::Encoding;
 use markup5ever_rcdom::RcDom;
 use url::Url;
 
+#[cfg(feature = "browser")]
 use crate::browser::{ColorScheme, render_page};
 use crate::har::{is_har, parse_har};
 use crate::html::{
@@ -85,13 +86,18 @@ pub struct MonolithOptions {
     pub base_url: Option<String>,
     /// Compress output, for formats that can be compressed (WARC)
     pub compress: bool,
+    #[cfg(feature = "browser")]
     pub browser: bool,
     /// Overrides MONOLITH_BROWSER_COLOR_SCHEME, the system decides if neither is set
+    #[cfg(feature = "browser")]
     pub browser_color_scheme: Option<ColorScheme>,
     /// Overrides MONOLITH_BROWSER_SCROLL_LIMIT: how many screens to go through, zero for none
+    #[cfg(feature = "browser")]
     pub browser_scroll_limit: Option<u32>,
+    #[cfg(feature = "browser")]
     pub browser_user_agent: Option<String>,
     /// Overrides MONOLITH_BROWSER_VIEWPORT: width and height of what the page gets to see
+    #[cfg(feature = "browser")]
     pub browser_viewport: Option<(u32, u32)>,
     pub domains: Option<Vec<String>>,
     pub whitelist_domains: bool,
@@ -597,6 +603,7 @@ pub fn create_monolithic_document(
         },
     };
 
+    #[cfg(feature = "browser")]
     if session.options.browser {
         let page = render_page(target_url.as_str(), &session)
             .map_err(|error| MonolithError::new(&error))?;
@@ -674,6 +681,7 @@ pub fn create_monolithic_document(
     )
 }
 
+#[cfg(feature = "browser")]
 fn is_captured_document(page: &CapturedPage) -> bool {
     page.content_type == "text/html" || page.content_type == "application/xhtml+xml"
 }
