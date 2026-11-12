@@ -68,7 +68,7 @@ impl Session {
                 // Stop redirects into blocked domains before the request is even made
                 let domains = options.domains.clone();
                 let whitelist_domains = options.whitelist_domains;
-                let is_recording = options.output_format == MonolithOutputFormat::WARC;
+                let is_recording = options.output_format.is_warc();
                 reqwest::redirect::Policy::custom(move |attempt| {
                     let allowed = match (&domains, attempt.url().host_str()) {
                         (Some(domains), Some(host)) => {
@@ -130,7 +130,7 @@ impl Session {
     }
 
     pub fn is_recording(&self) -> bool {
-        self.options.output_format == MonolithOutputFormat::WARC
+        self.options.output_format.is_warc()
     }
 
     /// Keeps a record of how something was obtained, for formats that keep that.
