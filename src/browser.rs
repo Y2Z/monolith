@@ -119,6 +119,8 @@ const NETWORK_QUIET_PERIOD: Duration = Duration::from_millis(1000);
 // Pages that never stop talking to their servers get this much time after they've loaded
 const NETWORK_QUIET_TIMEOUT: Duration = Duration::from_secs(15);
 const NETWORK_POLL_INTERVAL: Duration = Duration::from_millis(100);
+// How long to wait for the window browsers open on their own, before opening one
+const WINDOW_WAIT_TIMEOUT: Duration = Duration::from_secs(5);
 // Plenty of challenges solve themselves, these don't need anyone's attention
 const CHALLENGE_SELF_SOLVE_TIMEOUT: Duration = Duration::from_secs(8);
 // How long a person gets to deal with a challenge
@@ -1259,17 +1261,40 @@ impl<'a> Connection<'a> {
         Ok(self.page_target.clone())
     }
 
+    /// Browsers can be ready to talk before they've got anything to show (slow machines),
+    /// the window they open on their own gets waited for, and if it doesn't show up, opened.
+    fn find_or_open_window(&mut self, deadline: Instant) -> Result<String, String> {
+        let waiting_until = (Instant::now() + WINDOW_WAIT_TIMEOUT).min(deadline);
+
+        loop {
+            let tree = self.command("browsingContext.getTree", json!({}), deadline)?;
+            if let Some(context) = tree["contexts"][0]["context"].as_str() {
+                return Ok(context.to_string());
+            }
+            if Instant::now() >= waiting_until {
+                break;
+            }
+            thread::sleep(NETWORK_POLL_INTERVAL);
+        }
+
+        let created = self.command(
+            "browsingContext.create",
+            json!({"type": "window"}),
+            deadline,
+        )?;
+        created["context"]
+            .as_str()
+            .map(str::to_string)
+            .ok_or("browser has no window to work with".to_string())
+    }
+
     /// Returns the browsing context the page ended up in.
     fn open_page(&mut self, url: &str, deadline: Instant) -> Result<String, String> {
         if self.is_devtools {
             return self.open_devtools_page(url, deadline);
         }
 
-        let tree = self.command("browsingContext.getTree", json!({}), deadline)?;
-        let context = tree["contexts"][0]["context"]
-            .as_str()
-            .ok_or("browser has no window to work with")?
-            .to_string();
+        let context = self.find_or_open_window(deadline)?;
 
         let (width, height) = self.viewport;
         self.command(
