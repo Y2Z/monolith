@@ -33,8 +33,9 @@ lint:
 .PHONY: lint
 
 lint-check:
-	@cargo clippy --
-.PHONY: lint_check
+	@cargo clippy --all-targets -- -D warnings
+	@cargo clippy --all-targets --no-default-features --features cli -- -D warnings
+.PHONY: lint-check
 
 test: build
 	@cargo test --locked --no-fail-fast
