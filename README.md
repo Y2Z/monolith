@@ -117,6 +117,22 @@ monolith page-saved-by-browser.mhtml -o page.html
 monolith crawl.warc.gz -b https://some.site/page -o page.html
 ```
 
+```console
+monolith https://username:password@example.com -o example-basic-auth.html
+```
+
+```console
+chromium \
+ --headless \
+ --window-size=1920,1080 \
+ --run-all-compositor-stages-before-draw \
+ --virtual-time-budget=9000 \
+ --incognito \
+ --dump-dom \
+ https://github.com | monolith - -I -b https://github.com -o github.html
+```
+
+
 Results get saved into files named after the pages' titles. Several targets can be given at once: each one gets a file of its own, and links between them lead to those files, so that they can be browsed without going online. With `-F WARC` (or `WARCGZ`), all of them go into a single archive.
 
 
@@ -128,27 +144,27 @@ Results get saved into files named after the pages' titles. Several targets can 
  - `-b`: Use `custom base URL`, or pick the page to save out of a WARC or HAR archive
  - `-B`: Let a browser render the page first (requires Firefox, or anything based on it or Chromium)
  - `-C`: Read cookies from `file`
- - `-d`: Forbid retrieving assets from specified `domain(s)` (can be used multiple times)
+ - `-d`: Forbid retrieving assets from specified `domain`
  - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
- - `-F`: Set output `format`: `HTML` (default), `MHTML`, `WARC`, or `WARCGZ` (WARC compressed record by record), `HTM` and `MHT` work as well, in any case
  - `-f`: Exclude web fonts
+ - `-F`: Specify output `format`: `HTML` (default), `MHTML`, `WARC`, or `WARCGZ`
  - `-h`: Print usage information
- - `-i`: Remove images
+ - `-i`: Remove all images
  - `-I`: Isolate the document
- - `-j`: Exclude JavaScript
+ - `-j`: Remove all scripts
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-n`: Extract contents of NOSCRIPT elements
- - `-o`: Write output to `file` (use “-” for STDOUT), `%title%.%extension%` by default; files that are there already never get replaced: " (2)", " (3)"… get added to new files' names
+ - `-o`: Write output to `file` (use “-” for STDOUT), `%title%.%extension%` by default
  - `-q`: Be quiet
- - `-r`: Remove elements matching `selector` from the document (can be used multiple times)
+ - `-r`: Completely remove `element(s)` from the document
  - `-s`: Exclude styles
- - `-S`: Save a simplified version of the page, like the reader mode of a web browser: just the article, without any JavaScript, and with styling that follows the system's color scheme (add `-s` to leave it without any styles)
+ - `-S`: Save a simplified version of the page, like the reader mode of a web browser
  - `-t`: Adjust `network request timeout`
  - `-u`: Use `custom User-Agent`
- - `-w`: Wipe elements matching `selector`: links and such turn into their contents, images, frames, and other elements that load something lose their sources (can be used multiple times)
- - `-W`: Only retrieve assets from domains specified with `-d`
+ - `-w`: Wipe `element(s)` from the document, emptying their contents or sources, but preserving the node
+ - `-W`: Only retrieve assets from domains specified with `-d` (whitelist)
  - `-V`: Print version number
 
 
@@ -194,22 +210,6 @@ Should the page turn out to be a challenge which doesn't solve itself, such as t
 The saved page keeps its JavaScript, along with the responses it has received, which get replayed to it without any network access: buttons, menus, and other things that only rely on the page's own code keep working, but anything that needs a server doesn't. A saved page only contains what it has loaded while being saved, so parts of web apps that were never opened won't be there. Scripts of the saved page get modified to make that work: they're told the page's original URL, and imports get pointed at what's stored inside of the document. Frames that get added by scripts show what they had without running anything, frames from other websites stay empty. They can't reach out to anything, their content security policy doesn't allow it, and `-b` doesn't apply to them. Add `-j` to save a frozen copy of what the browser had on screen instead; that's also what MHTML output and `-R` always do.
 
 The same is available to the GUI (“Render in browser”) and to programs using Monolith as a library, by setting `browser` in `MonolithOptions`. Apps that have a web view of their own, such as mobile ones, can use `create_monolithic_document_from_capture()` to save what it has loaded.
-
-Any other browser can be used as a pre-processor as well, e.g. Chromium (Chrome):
-
-```console
-chromium --headless --window-size=1920,1080 --run-all-compositor-stages-before-draw --virtual-time-budget=9000 --incognito --dump-dom https://github.com | monolith - -I -b https://github.com -o github.html
-```
-
-
----------------------------------------------------
-
-
-## Authentication
-
-```console
-monolith https://username:password@example.com -o example-basic-auth.html
-```
 
 
 ---------------------------------------------------
