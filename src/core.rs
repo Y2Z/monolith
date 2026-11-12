@@ -7,7 +7,7 @@ use std::path::{MAIN_SEPARATOR, Path};
 use std::str::FromStr;
 
 use chrono::{SecondsFormat, Utc};
-use encoding_rs::Encoding;
+use encoding_rs::{Encoding, UTF_8};
 use markup5ever_rcdom::RcDom;
 use url::Url;
 
@@ -19,7 +19,9 @@ use crate::html::{
     inline_stylesheets, serialize_document, serialize_document_into, set_base_url, set_charset,
     set_metadata, set_robots, strip_elements, targets_element_anywhere, walk,
 };
-use crate::mhtml::{ArchivedAsset, MhtmlArchive, is_mhtml, parse_mhtml, write_mhtml_document};
+use crate::mhtml::{
+    ArchivedAsset, MhtmlArchive, is_mhtml, parse_mhtml, percent_decode, write_mhtml_document,
+};
 use crate::replay::{
     CapturedAsset, CapturedPage, create_replay_markup, exchanges_of, is_html, is_script,
     rewrite_scripts, rewrite_stylesheets,
@@ -100,7 +102,7 @@ impl FromStr for MonolithOutputFormat {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct MonolithOptions {
     pub base_url: Option<String>,
     #[cfg(feature = "browser")]
@@ -455,6 +457,12 @@ pub fn create_monolithic_document_from_data(
         &session.options.wipe_elements,
     );
 
+    // Relative links would lead elsewhere for documents with a base URL, and MHTML archives
+    // have their documents' original URLs as base URLs
+    session.links_are_absolute = get_base_url(&dom.document).is_some()
+        || session.options.base_url.is_some()
+        || session.options.output_format == MonolithOutputFormat::MHTML;
+
     // The result can start being written as soon as it's known what to call it: what's done
     // with the document doesn't change its title
     let document_title: Option<String> = session.title.take().or_else(|| get_title(&dom.document));
@@ -597,51 +605,7 @@ pub fn create_monolithic_document(mut session: Session, target: String) -> Monol
         }
     }
 
-    let target_str = target.as_str();
-    let mut target_url = match Url::parse(target_str) {
-        Ok(target_url) if !is_windows_drive_path(target_str) => match target_url.scheme() {
-            "data" | "file" | "http" | "https" => target_url,
-            unsupported_scheme => {
-                return Err(MonolithError::new(&format!(
-                    "unsupported target URL scheme \"{}\"",
-                    unsupported_scheme
-                )));
-            }
-        },
-        _ => {
-            // Failed to parse given base URL (perhaps it's a filesystem path?)
-            let path: &Path = Path::new(&target_str);
-
-            match path.exists() {
-                true => match path.is_file() {
-                    true => {
-                        let canonical_path = fs::canonicalize(path).unwrap();
-
-                        match Url::from_file_path(canonical_path) {
-                            Ok(url) => url,
-                            Err(_) => {
-                                return Err(MonolithError::new(&format!(
-                                    "could not generate file URL out of given path \"{}\"",
-                                    target_str
-                                )));
-                            }
-                        }
-                    }
-                    false => {
-                        return Err(MonolithError::new(&format!(
-                            "local target \"{}\" is not a file",
-                            target_str
-                        )));
-                    }
-                },
-                false => {
-                    // It is not a FS path, now we do what browsers do:
-                    // prepend "http://" and hope it points to a website
-                    Url::parse(&format!("http://{}", target_str)).unwrap()
-                }
-            }
-        }
-    };
+    let mut target_url = parse_target(&target)?;
 
     #[cfg(feature = "browser")]
     if session.options.browser {
@@ -718,6 +682,180 @@ pub fn create_monolithic_document(mut session: Session, target: String) -> Monol
         document_encoding,
         Some(target_url.to_string()),
     )
+}
+
+/// Turns what's been given as a target into the URL of it: file paths become file URLs,
+/// and what's neither a URL nor a path is assumed to be a website.
+pub fn parse_target(target: &str) -> Result<Url, MonolithError> {
+    if target.is_empty() {
+        return Err(MonolithError::new("no target specified"));
+    }
+
+    let target_str = target;
+    let target_url = match Url::parse(target_str) {
+        Ok(target_url) if !is_windows_drive_path(target_str) => match target_url.scheme() {
+            "data" | "file" | "http" | "https" => target_url,
+            unsupported_scheme => {
+                return Err(MonolithError::new(&format!(
+                    "unsupported target URL scheme \"{}\"",
+                    unsupported_scheme
+                )));
+            }
+        },
+        _ => {
+            // Failed to parse given base URL (perhaps it's a filesystem path?)
+            let path: &Path = Path::new(&target_str);
+
+            match path.exists() {
+                true => match path.is_file() {
+                    true => {
+                        let canonical_path = fs::canonicalize(path).unwrap();
+
+                        match Url::from_file_path(canonical_path) {
+                            Ok(url) => url,
+                            Err(_) => {
+                                return Err(MonolithError::new(&format!(
+                                    "could not generate file URL out of given path \"{}\"",
+                                    target_str
+                                )));
+                            }
+                        }
+                    }
+                    false => {
+                        return Err(MonolithError::new(&format!(
+                            "local target \"{}\" is not a file",
+                            target_str
+                        )));
+                    }
+                },
+                false => {
+                    // It is not a FS path, now we do what browsers do:
+                    // prepend "http://" and hope it points to a website
+                    Url::parse(&format!("http://{}", target_str)).map_err(|_| {
+                        MonolithError::new(&format!(
+                            "could not make sense of target \"{}\"",
+                            target_str
+                        ))
+                    })?
+                }
+            }
+        }
+    };
+
+    Ok(target_url)
+}
+
+/// What a target has turned out to be, before getting saved.
+pub struct ProbedTarget {
+    /// Title of the page, if it has one
+    pub title: Option<String>,
+    /// Where it has ended up being, after redirects
+    pub url: Url,
+}
+
+/// Finds out what a target is called and where it really is, without saving anything: the
+/// way it gets done depends on the session, browsers get used only if it says so. What gets
+/// retrieved stays in the session's cache, saving it afterwards doesn't have to retrieve it again.
+pub fn probe_target(mut session: Session, target: &str) -> Result<ProbedTarget, MonolithError> {
+    let target_url = parse_target(target)?;
+
+    #[cfg(feature = "browser")]
+    if session.options.browser {
+        let page = render_page(target_url.as_str(), &session)
+            .map_err(|error| MonolithError::new(&error))?;
+
+        return Ok(ProbedTarget {
+            title: Some(page.title).filter(|title| !title.trim().is_empty()),
+            url: Url::parse(&page.url).unwrap_or(target_url),
+        });
+    }
+
+    let (data, url, media_type, charset) = session
+        .retrieve_asset(&target_url, &target_url)
+        .map_err(|_| MonolithError::new("could not retrieve target document"))?;
+    let is_document = media_type.eq_ignore_ascii_case("text/html")
+        || media_type.eq_ignore_ascii_case("application/xhtml+xml");
+    let title = match is_document || is_archive(&data) {
+        true => probe_data(&session.options, &data, Some(&charset), Some(&url)),
+        false => None,
+    };
+
+    Ok(ProbedTarget { title, url })
+}
+
+/// Finds out what a document is called, for documents that have already been obtained:
+/// archives are called whatever the page they have in them is called.
+pub fn probe_data(
+    options: &MonolithOptions,
+    data: &[u8],
+    charset: Option<&str>,
+    url: Option<&Url>,
+) -> Option<String> {
+    if is_warc(data) || is_har(data) {
+        let wanted_url = options.base_url.as_deref().filter(|url| !url.is_empty());
+        let (page, _) = match is_warc(data) {
+            true => parse_warc(data, wanted_url),
+            false => parse_har(data, wanted_url),
+        }
+        .ok()?;
+        let document = page
+            .assets
+            .iter()
+            .find(|asset| asset.destination == "document")?;
+        let charset = parse_media_type(&document.content_type).1;
+
+        is_html(&page.content_type).then(|| title_of(&document.data, charset.as_deref()))?
+    } else if is_mhtml(data) || is_webarchive(data) {
+        let archive = match is_mhtml(data) {
+            true => parse_mhtml(data, url),
+            false => parse_webarchive(data),
+        }?;
+        let root = archive.root();
+
+        is_html(&root.media_type).then(|| title_of(&root.data, Some(&root.charset)))?
+    } else {
+        title_of(data, charset)
+    }
+}
+
+/// Title of an HTML document, decoded the way the document would be.
+fn title_of(data: &[u8], charset: Option<&str>) -> Option<String> {
+    let encoding = Encoding::for_bom(data)
+        .map(|(encoding, _)| encoding)
+        .or_else(|| charset.and_then(declared_encoding));
+    let dom = html_to_dom(data, encoding.unwrap_or(UTF_8).name().to_string());
+    let dom = match encoding {
+        None => match get_charset(&dom.document)
+            .and_then(|charset| Encoding::for_label_no_replacement(charset.as_bytes()))
+        {
+            Some(encoding) if encoding != UTF_8 => html_to_dom(data, encoding.name().to_string()),
+            _ => dom,
+        },
+        Some(_) => dom,
+    };
+
+    get_title(&dom.document).filter(|title| !title.trim().is_empty())
+}
+
+/// Something to name a file by, for pages that have no title: the last part of the URL's path,
+/// or the host, the way browsers name downloads.
+pub fn untitled_name(url: &Url) -> String {
+    let segment = url
+        .path_segments()
+        .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
+        .map(percent_decode)
+        .map(|segment| match segment.rfind('.') {
+            Some(dot) if dot > 0 => segment[..dot].to_string(),
+            _ => segment,
+        })
+        .filter(|segment| !segment.trim().is_empty());
+
+    match url.scheme() {
+        "http" | "https" | "file" => segment
+            .or(url.host_str().map(str::to_string))
+            .unwrap_or("Untitled".to_string()),
+        _ => "Untitled".to_string(),
+    }
 }
 
 #[cfg(feature = "browser")]
@@ -921,6 +1059,8 @@ pub fn format_output_path(
         .collect::<Vec<&str>>()
         .join(" ");
     let title: &str = title.trim_matches(|c: char| c == '.' || c == ' ');
+    // Files named after nothing would end up hidden, or nameless
+    let title: &str = if title.is_empty() { "Untitled" } else { title };
 
     path.replace("%timestamp%", &datetime.replace(':', "_"))
         .replace("%title%", title)

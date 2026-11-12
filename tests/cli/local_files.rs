@@ -7,7 +7,6 @@
 
 #[cfg(test)]
 mod passing {
-    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
     use std::fs;
@@ -18,7 +17,7 @@ mod passing {
 
     #[test]
     fn local_file_target_input_relative_target_path() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let cwd_normalized: String = env::current_dir()
             .unwrap()
             .to_str()
@@ -82,7 +81,7 @@ document.body.style.color = "red";
 
     #[test]
     fn local_file_target_input_absolute_target_path() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
 
         let out = cmd
@@ -131,7 +130,7 @@ document.body.style.color = "red";
 
     #[test]
     fn local_file_target_input_full_target_path() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         // On Windows this is a path that starts with a drive letter, e.g. "C:\...\local-file.html"
         let path_html = env::current_dir()
             .unwrap()
@@ -166,7 +165,7 @@ document.body.style.color = "red";
 
     #[test]
     fn local_file_url_target_input() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let cwd_normalized: String = env::current_dir()
             .unwrap()
             .to_str()
@@ -224,7 +223,7 @@ document.body.style.color = "red";
 
     #[test]
     fn embed_file_url_local_asset_within_style_attribute() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/svg/index.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/image.svg");
 
@@ -256,7 +255,7 @@ document.body.style.color = "red";
 
     #[test]
     fn embed_svg_local_asset_via_use() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/svg/svg.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/icons.svg");
 
@@ -298,7 +297,7 @@ document.body.style.color = "red";
 
     #[test]
     fn embed_svg_symbol_asset_via_use() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/svg/svg_inline_symbol_use.html");
 
         let out = cmd.arg(path_html.as_os_str()).output().unwrap();
@@ -346,7 +345,7 @@ document.body.style.color = "red";
 
     #[test]
     fn embed_svg_local_asset_via_image() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/svg/image.html");
         let path_svg: &Path = Path::new("tests/_data_/svg/image.svg");
 
@@ -383,7 +382,7 @@ document.body.style.color = "red";
 
     #[test]
     fn discard_integrity_for_local_files() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let cwd_normalized: String = env::current_dir()
             .unwrap()
             .to_str()
@@ -450,7 +449,7 @@ document.body.style.color = "red";
 
     #[test]
     fn escape_script_end_tag_variants_in_local_asset() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let cwd_normalized: String = env::current_dir()
             .unwrap()
             .to_str()

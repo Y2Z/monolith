@@ -1,9 +1,7 @@
-use std::cell::RefCell;
 use std::fs;
 use std::io::{self, BufWriter, Write};
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::process::{self, Command};
-use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread;
@@ -457,9 +455,9 @@ fn save_document(
     format: OutputFormat,
 ) -> Result<String, String> {
     // Where it's ended up, once the file has been created
-    let saved_path: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+    let saved_path: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     let output_path = output_path.to_string();
-    let path_holder = Rc::clone(&saved_path);
+    let path_holder = Arc::clone(&saved_path);
     session.set_destination(Box::new(move |title| {
         let path = format_output_path(
             &output_path,
@@ -479,12 +477,12 @@ fn save_document(
 
         let (file, path) = create_output_file(&path)
             .map_err(|e| io::Error::new(e.kind(), format!("could not write {path}: {e}")))?;
-        *path_holder.borrow_mut() = Some(path);
-        Ok(Box::new(BufWriter::new(file)) as Box<dyn Write>)
+        *path_holder.lock().unwrap() = Some(path);
+        Ok(Box::new(BufWriter::new(file)) as Box<dyn Write + Send>)
     }));
 
     let result = create_monolithic_document(session, target);
-    let path = saved_path.borrow_mut().take();
+    let path = saved_path.lock().unwrap().take();
     match (result, path) {
         (Ok(_), Some(path)) => Ok(path),
         (Ok(_), None) => Err("nothing has been saved".to_string()),

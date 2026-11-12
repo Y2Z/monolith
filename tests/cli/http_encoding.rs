@@ -1,4 +1,3 @@
-use assert_cmd::cargo_bin_cmd;
 use encoding_rs::SHIFT_JIS;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -22,7 +21,7 @@ fn archive(content_type: &str, body: Vec<u8>) -> Vec<u8> {
         write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len()).unwrap();
         stream.write_all(&body).unwrap();
     });
-    let output = cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
+    let output = crate::cli::monolith()
         .args(["-i", "-q", "-t", "10", &url])
         .output()
         .unwrap();
@@ -72,7 +71,7 @@ fn bom_overrides_http_charset() {
 
 #[test]
 fn data_url_default_charset_does_not_override_meta() {
-    let output = cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
+    let output = crate::cli::monolith()
         .args([
             "-q",
             "data:text/html,%3Cmeta%20charset%3Dutf-8%3E%3Ctitle%3E%E3%83%86%E3%82%B9%E3%83%88%3C%2Ftitle%3E",

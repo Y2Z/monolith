@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use chrono::{DateTime, Utc};
 use redb::{Database, Error, ReadableDatabase, TableDefinition};
@@ -32,8 +33,8 @@ pub struct CacheMetadataItem {
     charset: Option<String>, // "UTF-8", "UTF-16"...
 }
 
-// #[derive(Debug)]
-pub struct Cache {
+/// What gets cached, along with where it's cached (see Cache).
+struct CacheData {
     min_file_size: usize, // Only use database for assets larger than this size (in bytes), otherwise keep them in RAM
     metadata: HashMap<String, CacheMetadataItem>, // Dictionary of metadata (and occasionally data [mostly for very small files])
     db: Option<Database>, // Pointer to database instance; None if not yet initialized or if failed to initialize
@@ -46,9 +47,9 @@ const FILE_WRITE_BUF_LEN: usize = 1024 * 100; // On-disk cache file write buffer
 const TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("_");
 const EXCHANGES_TABLE: TableDefinition<u64, &[u8]> = TableDefinition::new("exchanges");
 
-impl Cache {
-    pub fn new(min_file_size: usize, db_file_path: Option<String>) -> Cache {
-        let mut cache = Cache {
+impl CacheData {
+    fn new(min_file_size: usize, db_file_path: Option<String>) -> CacheData {
+        let mut cache = CacheData {
             min_file_size,
             metadata: HashMap::new(),
             db: None,
@@ -76,7 +77,7 @@ impl Cache {
         }
     }
 
-    pub fn set(&mut self, key: &str, data: &Vec<u8>, media_type: String, charset: String) {
+    fn set(&mut self, key: &str, data: &Vec<u8>, media_type: String, charset: String) {
         let mut cache_metadata_item: CacheMetadataItem = CacheMetadataItem {
             data: if self.db_ok.is_some() && self.db_ok.unwrap() {
                 None
@@ -110,7 +111,7 @@ impl Cache {
             .insert((*key).to_string(), cache_metadata_item);
     }
 
-    pub fn get(&self, key: &str) -> Result<(Vec<u8>, String, String), Error> {
+    fn get(&self, key: &str) -> Result<(Vec<u8>, String, String), Error> {
         if self.metadata.contains_key(key) {
             let metadata_item = self.metadata.get(key).unwrap();
 
@@ -138,7 +139,7 @@ impl Cache {
     }
 
     /// Keeps a record of a network exchange, bodies that are large enough go into the database.
-    pub fn add_exchange(&mut self, mut exchange: Exchange) {
+    fn add_exchange(&mut self, mut exchange: Exchange) {
         let index = self.exchanges.len() as u64;
         let mut is_on_disk = false;
 
@@ -163,12 +164,12 @@ impl Cache {
         self.exchanges.push((exchange, is_on_disk));
     }
 
-    pub fn exchange_count(&self) -> usize {
+    fn exchange_count(&self) -> usize {
         self.exchanges.len()
     }
 
     /// Provides a recorded exchange, with its body.
-    pub fn exchange(&self, index: usize) -> Option<Exchange> {
+    fn exchange(&self, index: usize) -> Option<Exchange> {
         let (exchange, is_on_disk) = self.exchanges.get(index)?;
         let mut exchange = exchange.clone();
 
@@ -182,22 +183,22 @@ impl Cache {
     }
 
     /// Forgets recorded exchanges, those that come after start over from the first index.
-    pub fn clear_exchanges(&mut self) {
+    fn clear_exchanges(&mut self) {
         self.exchanges.clear();
     }
 
     /// Whether anything has been recorded for given URL.
-    pub fn has_exchange(&self, url: &str) -> bool {
+    fn has_exchange(&self, url: &str) -> bool {
         self.exchanges
             .iter()
             .any(|(exchange, _)| exchange.url == url)
     }
 
-    pub fn contains_key(&self, key: &str) -> bool {
+    fn contains_key(&self, key: &str) -> bool {
         self.metadata.contains_key(key)
     }
 
-    pub fn destroy_database_file(&mut self) {
+    fn destroy_database_file(&mut self) {
         if self.db_ok.is_none() || !self.db_ok.unwrap() {
             return;
         }
@@ -235,5 +236,65 @@ impl Cache {
                 let _ = writer.flush();
             }
         }
+    }
+}
+
+/// Assets and exchanges, kept in memory or in a database on disk (for the large ones).
+/// Clones share what's in it: what one session has obtained, others don't have to obtain again.
+#[derive(Clone)]
+pub struct Cache {
+    data: Arc<Mutex<CacheData>>,
+}
+
+impl Cache {
+    pub fn new(min_file_size: usize, db_file_path: Option<String>) -> Cache {
+        Cache {
+            data: Arc::new(Mutex::new(CacheData::new(min_file_size, db_file_path))),
+        }
+    }
+
+    fn data(&self) -> MutexGuard<'_, CacheData> {
+        // Nothing in there is left half-done by a panic, it's fine to keep using it
+        self.data.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    pub fn set(&mut self, key: &str, data: &Vec<u8>, media_type: String, charset: String) {
+        self.data().set(key, data, media_type, charset)
+    }
+
+    pub fn get(&self, key: &str) -> Result<(Vec<u8>, String, String), Error> {
+        self.data().get(key)
+    }
+
+    /// Keeps a record of a network exchange, bodies that are large enough go into the database.
+    pub fn add_exchange(&mut self, exchange: Exchange) {
+        self.data().add_exchange(exchange)
+    }
+
+    pub fn exchange_count(&self) -> usize {
+        self.data().exchange_count()
+    }
+
+    /// Provides a recorded exchange, with its body.
+    pub fn exchange(&self, index: usize) -> Option<Exchange> {
+        self.data().exchange(index)
+    }
+
+    /// Forgets recorded exchanges, those that come after start over from the first index.
+    pub fn clear_exchanges(&mut self) {
+        self.data().clear_exchanges()
+    }
+
+    /// Whether anything has been recorded for given URL.
+    pub fn has_exchange(&self, url: &str) -> bool {
+        self.data().has_exchange(url)
+    }
+
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.data().contains_key(key)
+    }
+
+    pub fn destroy_database_file(&mut self) {
+        self.data().destroy_database_file()
     }
 }

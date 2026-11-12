@@ -744,7 +744,7 @@ fn encode_header_value(text: &str) -> String {
     words.join("\r\n ")
 }
 
-fn percent_decode(text: &str) -> String {
+pub(crate) fn percent_decode(text: &str) -> String {
     let bytes: &[u8] = text.as_bytes();
     let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i: usize = 0;

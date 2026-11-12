@@ -7,13 +7,11 @@
 
 #[cfg(test)]
 mod passing {
-    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
-    use std::env;
 
     #[test]
     fn add_new_when_provided() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg("-b")
             .arg("http://localhost:30701/")
@@ -37,7 +35,7 @@ mod passing {
 
     #[test]
     fn keep_existing_when_none_provided() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg("data:text/html,<base href=\"http://localhost:30701/\" />Hello%2C%20World!")
             .output()
@@ -59,7 +57,7 @@ mod passing {
 
     #[test]
     fn override_existing_when_provided() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg("-b")
             .arg("http://localhost/")
@@ -83,7 +81,7 @@ mod passing {
 
     #[test]
     fn set_existing_to_empty_when_empty_provided() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg("-b")
             .arg("")

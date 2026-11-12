@@ -23,12 +23,12 @@ use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
 use crate::warc::WarcStream;
 
 /// Provides what the result gets written into, given the title of the document (if it has one).
-pub type OutputOpener = Box<dyn FnOnce(Option<&str>) -> io::Result<Box<dyn Write>>>;
+pub type OutputOpener = Box<dyn FnOnce(Option<&str>) -> io::Result<Box<dyn Write + Send>> + Send>;
 
 /// Where the result goes.
 pub(crate) enum Output {
     Memory(Vec<u8>),
-    Stream(Box<dyn Write>),
+    Stream(Box<dyn Write + Send>),
 }
 
 impl Write for Output {
@@ -65,6 +65,13 @@ pub struct Session {
     pub(crate) cookies: Option<Vec<Cookie>>,
     /// Where the result gets written, the result is provided as is if there's nowhere to write it
     destination: Option<OutputOpener>,
+    /// Files that other documents get saved in, by their URLs (without fragments)
+    linked_files: HashMap<String, Url>,
+    /// File this document gets saved in, for linking to other documents relative to it
+    own_file: Option<Url>,
+    /// Whether links to other documents have to be absolute: relative ones wouldn't work for
+    /// documents that have a base URL of their own
+    pub(crate) links_are_absolute: bool,
     /// Encoding of the document (or stylesheet) currently being processed, if it declares one.
     /// Stylesheets that don't specify their own encoding get decoded using it.
     pub environment_encoding: Option<&'static Encoding>,
@@ -151,6 +158,9 @@ impl Session {
             client,
             destination: None,
             environment_encoding: None,
+            linked_files: HashMap::new(),
+            links_are_absolute: false,
+            own_file: None,
             options,
             output: None,
             output_encoding: None,
@@ -186,6 +196,34 @@ impl Session {
 
     pub fn is_recording(&self) -> bool {
         self.options.output_format.is_warc()
+    }
+
+    /// Makes links to other documents lead to files they get saved in: given the file this
+    /// document gets saved in, and files of other documents by their URLs.
+    pub fn link_files(&mut self, own_file: &Path, files: &[(Url, PathBuf)]) {
+        let file_url = |path: &Path| {
+            fs::canonicalize(path)
+                .ok()
+                .and_then(|path| Url::from_file_path(path).ok())
+        };
+
+        self.own_file = file_url(own_file);
+        self.linked_files = files
+            .iter()
+            .filter_map(|(url, path)| Some((clean_url(url.clone()).to_string(), file_url(path)?)))
+            .collect();
+    }
+
+    /// Where a link has to lead, if it's a link to some other document that gets saved.
+    pub(crate) fn link_to(&self, url: &Url) -> Option<String> {
+        let file = self.linked_files.get(clean_url(url.clone()).as_str())?;
+        let mut file = file.clone();
+        file.set_fragment(url.fragment());
+
+        match (&self.own_file, self.links_are_absolute) {
+            (Some(own_file), false) => own_file.make_relative(&file),
+            _ => Some(file.to_string()),
+        }
     }
 
     /// Makes the result get written as it's being made, into whatever given function provides

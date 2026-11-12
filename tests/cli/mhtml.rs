@@ -7,14 +7,12 @@
 
 #[cfg(test)]
 mod passing {
-    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
-    use std::env;
     use std::path::MAIN_SEPARATOR;
 
     #[test]
     fn mhtml_file_target() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg(format!(
                 "tests{s}_data_{s}mhtml{s}chrome.mhtml",
