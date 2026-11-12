@@ -7,7 +7,15 @@ mod http_encoding;
 mod local_files;
 mod mhtml;
 mod noscript;
+mod targets;
 mod unusual_encodings;
+
+/// Monolith, writing to STDOUT unless told otherwise.
+pub fn monolith() -> assert_cmd::Command {
+    let mut command = assert_cmd::cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+    command.args(["--output", "-"]);
+    command
+}
 
 /// What monolith has output, without what changes every time it saves something (when it's done
 /// that, what version it is): the rest can be compared as is.

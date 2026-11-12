@@ -7,7 +7,6 @@
 
 #[cfg(test)]
 mod passing {
-    use assert_cmd::cargo_bin_cmd;
     use std::env;
     use std::fs;
     use std::path::MAIN_SEPARATOR;
@@ -106,7 +105,7 @@ mod passing {
             .replace("\\", "/");
         let file_url_protocol: &str = if cfg!(windows) { "file:///" } else { "file://" };
 
-        let out = cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
+        let out = crate::cli::monolith()
             .args(["-F", "MHTML"])
             .arg(format!(
                 "tests{s}_data_{s}basic{s}local-file.html",

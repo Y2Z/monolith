@@ -2,6 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::url::Url;
 
+#[derive(Clone)]
 pub struct Cookie {
     pub domain: String,
     pub include_subdomains: bool,

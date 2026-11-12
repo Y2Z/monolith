@@ -147,4 +147,14 @@ mod passing {
             );
         }
     }
+
+    #[test]
+    fn nothing_left_of_title() {
+        for title in ["", "  ", "...", " . "] {
+            assert_eq!(
+                format_output_path("%title%.%extension%", title, MonolithOutputFormat::HTML),
+                "Untitled.html"
+            );
+        }
+    }
 }

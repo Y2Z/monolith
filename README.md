@@ -90,11 +90,23 @@ cargo install monolith --no-default-features --features cli
 ## Usage
 
 ```console
+monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/
+```
+
+```console
 monolith https://lyrics.github.io/db/P/Portishead/Dummy/Roads/ -o %title%.%timestamp%.html
 ```
 
 ```console
-cat some-site-page.html | monolith -IifsM -r audio,video -w frame,iframe -b https://some.site/ - > some-site-page-with-assets.html
+monolith https://some.site/ https://some.site/about https://some.site/contact
+```
+
+```console
+monolith -F WARC https://some.site/ https://some.site/about -o some-site.warc
+```
+
+```console
+cat some-site-page.html | monolith -Iifs -r audio,video -w frame,iframe -b https://some.site/ - -o - > some-site-page-with-assets.html
 ```
 
 ```console
@@ -104,6 +116,8 @@ monolith page-saved-by-browser.mhtml -o page.html
 ```console
 monolith crawl.warc.gz -b https://some.site/page -o page.html
 ```
+
+Results get saved into files named after the pages' titles. Several targets can be given at once: each one gets a file of its own, and links between them lead to those files, so that they can be browsed without going online. With `-F WARC` (or `WARCGZ`), all of them go into a single archive.
 
 
 ---------------------------------------------------
@@ -126,7 +140,7 @@ monolith crawl.warc.gz -b https://some.site/page -o page.html
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-n`: Extract contents of NOSCRIPT elements
- - `-o`: Write output to `file` (use “-” for STDOUT), files that are there already never get replaced: " (2)", " (3)"… get added to new files' names
+ - `-o`: Write output to `file` (use “-” for STDOUT), `%title%.%extension%` by default; files that are there already never get replaced: " (2)", " (3)"… get added to new files' names
  - `-q`: Be quiet
  - `-r`: Remove elements matching `selector` from the document (can be used multiple times)
  - `-s`: Exclude styles

@@ -72,7 +72,7 @@ mod destination {
         let (writer, opened) = (written.clone(), Arc::clone(&titles));
         session.set_destination(Box::new(move |title| {
             opened.lock().unwrap().push(title.map(str::to_string));
-            Ok(Box::new(writer) as Box<dyn Write>)
+            Ok(Box::new(writer) as Box<dyn Write + Send>)
         }));
 
         (session, written, titles)

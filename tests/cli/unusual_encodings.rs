@@ -7,7 +7,6 @@
 
 #[cfg(test)]
 mod passing {
-    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use encoding_rs::Encoding;
     use std::env;
@@ -18,7 +17,7 @@ mod passing {
     fn properly_save_document_with_gb2312() {
         let cwd = env::current_dir().unwrap();
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg(format!(
                 "tests{s}_data_{s}unusual_encodings{s}gb2312.html",
@@ -75,7 +74,7 @@ mod passing {
             .output()
             .unwrap();
 
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         cmd.write_stdin(echo.stdout);
         let out = cmd.arg("-").output().unwrap();
 
@@ -112,7 +111,7 @@ mod passing {
     fn properly_save_document_with_gb2312_custom_charset() {
         let cwd = env::current_dir().unwrap();
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg("-E")
             .arg("utf8")
@@ -155,7 +154,7 @@ mod passing {
 
     #[test]
     fn properly_save_document_with_gb2312_custom_charset_bad() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg("-E")
             .arg("utf0")
@@ -189,7 +188,6 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
     use std::path::MAIN_SEPARATOR;
@@ -198,7 +196,7 @@ mod failing {
     fn change_iso88591_to_utf8_to_properly_display_html_entities() {
         let cwd = env::current_dir().unwrap();
         let cwd_normalized: String = cwd.to_str().unwrap().replace("\\", "/");
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg(format!(
                 "tests{s}_data_{s}unusual_encodings{s}iso-8859-1.html",

@@ -246,7 +246,7 @@ impl Workspace {
             .env("TMPDIR", self.temporary_directory.path())
             .env("TEMP", self.temporary_directory.path())
             .env("TMP", self.temporary_directory.path())
-            .args(["--browser", "--timeout", "300"]);
+            .args(["--browser", "--timeout", "300", "--output", "-"]);
         command
     }
 

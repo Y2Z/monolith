@@ -1,7 +1,8 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::io::{self, BufWriter, Error as IoError, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::{Arc, Mutex};
 
 use clap::Parser;
 use tempfile::{Builder, NamedTempFile};
@@ -12,10 +13,11 @@ use monolith::cache::Cache;
 use monolith::cookies::{Cookie, parse_cookie_file_contents};
 use monolith::core::{
     MonolithOptions, MonolithOutputFormat, create_monolithic_document,
-    create_monolithic_document_from_data, create_output_file, format_output_path,
-    print_error_message,
+    create_monolithic_document_from_data, create_output_file, format_output_path, parse_target,
+    print_error_message, probe_target, untitled_name,
 };
 use monolith::session::Session;
+use url::Url;
 
 const ASCII: &str = " \
  _____    _____________   __________     ___________________    ___
@@ -93,8 +95,8 @@ struct Cli {
     #[arg(short = 'n', long)]
     unwrap_noscript: bool,
 
-    /// File to write to, use - for STDOUT
-    #[arg(short, long, value_name = "result.html")]
+    /// File to write to, use - for STDOUT [default: %title%.%extension%]
+    #[arg(short, long, value_name = "result.html", overrides_with = "output")]
     output: Option<String>,
 
     /// Suppress verbosity
@@ -129,48 +131,104 @@ struct Cli {
     #[arg(short = 'W', long, requires = "domains")]
     whitelist: bool,
 
-    /// URL or file path, use - for STDIN
-    target: String,
+    /// URLs or file paths, use - for STDIN; links between them lead to files they get saved in
+    #[arg(required = true, value_name = "TARGETS")]
+    targets: Vec<String>,
 }
 
-/// Opens what the result gets written into: STDOUT, or a file named after the document.
-fn open_output(
+const DEFAULT_OUTPUT: &str = "%title%.%extension%";
+
+/// Whether results are meant to go to STDOUT, rather than into files.
+fn is_stdout(destination: &str) -> bool {
+    destination.is_empty() || destination == "-"
+}
+
+/// Creates the file for a document to be saved in, named after it (never replacing anything).
+/// Provides the file, and where it is.
+fn create_file(
     destination: &str,
-    document_title: &str,
+    name: &str,
     format: MonolithOutputFormat,
     create_dirs: bool,
-) -> Result<Box<dyn Write>, IoError> {
-    if destination.is_empty() || destination.eq("-") {
-        Ok(Box::new(BufWriter::new(io::stdout())))
-    } else {
-        let final_destination = format_output_path(destination, document_title, format);
+) -> Result<(fs::File, String), IoError> {
+    let final_destination = format_output_path(destination, name, format);
 
-        // Create directories in the path to output file if they are
-        // missing and the user opted in via --create-dirs (like curl).
-        // Without the flag a clear error is reported instead of creating
-        // directory trees the user did not ask for.
-        if let Some(parent) = Path::new(&final_destination).parent()
-            && !parent.as_os_str().is_empty()
-            && !parent.exists()
-        {
-            if create_dirs {
-                fs::create_dir_all(parent)?;
-            } else {
-                return Err(IoError::new(
-                    io::ErrorKind::NotFound,
-                    format!(
-                        "cannot write to '{}': directory '{}' does not exist (use --create-dirs to create it)",
-                        final_destination,
-                        parent.display()
-                    ),
-                ));
-            }
+    // Create directories in the path to output file if they are
+    // missing and the user opted in via --create-dirs (like curl).
+    // Without the flag a clear error is reported instead of creating
+    // directory trees the user did not ask for.
+    if let Some(parent) = Path::new(&final_destination).parent()
+        && !parent.as_os_str().is_empty()
+        && !parent.exists()
+    {
+        if create_dirs {
+            fs::create_dir_all(parent)?;
+        } else {
+            return Err(IoError::new(
+                io::ErrorKind::NotFound,
+                format!(
+                    "cannot write to '{}': directory '{}' does not exist (use --create-dirs to create it)",
+                    final_destination,
+                    parent.display()
+                ),
+            ));
         }
-
-        // Nothing gets replaced, files that would be get saved under names of their own
-        let (file, _) = create_output_file(&final_destination)?;
-        Ok(Box::new(BufWriter::new(file)))
     }
+
+    // Nothing gets replaced, files that would be get saved under names of their own
+    create_output_file(&final_destination)
+}
+
+/// What a file gets named after: the document's title, or its URL if it has none.
+fn name_of(title: Option<&str>, url: Option<&Url>) -> String {
+    match title.filter(|title| !title.trim().is_empty()) {
+        Some(title) => title.to_string(),
+        None => url.map_or("Untitled".to_string(), untitled_name),
+    }
+}
+
+/// Output that several sessions write into, one after another.
+#[derive(Clone, Default)]
+struct SharedOutput(Arc<Mutex<Option<Box<dyn Write + Send>>>>);
+
+impl SharedOutput {
+    fn is_open(&self) -> bool {
+        self.0.lock().unwrap().is_some()
+    }
+}
+
+impl Write for SharedOutput {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self.0.lock().unwrap().as_mut() {
+            Some(output) => output.write(buf),
+            None => Ok(buf.len()),
+        }
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        match self.0.lock().unwrap().as_mut() {
+            Some(output) => output.write_all(buf),
+            None => Ok(()),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self.0.lock().unwrap().as_mut() {
+            Some(output) => output.flush(),
+            None => Ok(()),
+        }
+    }
+}
+
+/// A document to be saved, and the file it's going into.
+struct Claim {
+    /// What was given
+    target: String,
+    /// Where it has turned out to be (none for STDIN)
+    url: Option<Url>,
+    /// Where it was said to be, if that's different from where it's turned out to be
+    original_url: Option<Url>,
+    path: String,
 }
 
 pub fn read_stdin() -> Vec<u8> {
@@ -281,53 +339,168 @@ fn main() {
         }
     }
 
-    // Initiate session
-    let output_format = options.output_format.clone();
     let silent = options.silent;
-    let mut session: Session = Session::new(cache, cookies, options);
-    // The result gets written as it's being made, once it's known what to call it
-    let destination = destination.unwrap_or_default();
-    let create_dirs = cli.create_dirs;
-    session.set_destination(Box::new(move |title| {
-        open_output(
-            &destination,
-            title.unwrap_or_default(),
-            output_format,
-            create_dirs,
-        )
-    }));
+    let report = |target: &str, error: &dyn std::fmt::Display| {
+        if !silent {
+            match cli.targets.len() {
+                1 => print_error_message(&format!("Error: {}", error)),
+                _ => print_error_message(&format!("Error: {}: {}", target, error)),
+            }
+        }
+    };
+    let exit = |message: &str, temp_cache_file: Option<NamedTempFile>| -> ! {
+        if !silent {
+            print_error_message(&format!("Error: {}", message));
+        }
+        drop(temp_cache_file);
+        process::exit(1);
+    };
 
     // The option is always there, builds that can't do what it asks for say so
     if cli.browser && cfg!(not(feature = "browser")) {
-        if !silent {
-            print_error_message("Error: this build of monolith has no browser support");
-        }
-        drop(temp_cache_file);
-        process::exit(1);
+        exit(
+            "this build of monolith has no browser support",
+            temp_cache_file,
+        );
+    }
+    let stdin_count = cli.targets.iter().filter(|target| *target == "-").count();
+    if cli.browser && stdin_count > 0 {
+        exit("browser can't be used with STDIN", temp_cache_file);
+    }
+    if stdin_count > 1 {
+        exit("STDIN can only be read once", temp_cache_file);
     }
 
-    if cli.browser && cli.target == "-" {
-        if !silent {
-            print_error_message("Error: browser can't be used with STDIN");
+    // Saving the same thing twice wouldn't do anything
+    let mut targets: Vec<String> = vec![];
+    for target in &cli.targets {
+        let url = parse_target(target).ok();
+        let is_known = |known: &String| match &url {
+            Some(url) => parse_target(known).ok().as_ref() == Some(url),
+            None => known == target,
+        };
+        if target == "-" || !targets.iter().any(is_known) {
+            targets.push(target.clone());
         }
-        drop(temp_cache_file);
-        process::exit(1);
     }
 
-    // Retrieve target from source
-    let result = if cli.target == "-" {
-        // Read input from pipe (STDIN)
-        create_monolithic_document_from_data(session, read_stdin(), None, None)
-    } else {
-        create_monolithic_document(session, cli.target)
+    let output_format = options.output_format.clone();
+    let destination = destination.unwrap_or(DEFAULT_OUTPUT.to_string());
+    let create_dirs = cli.create_dirs;
+    let new_session = || Session::new(cache.clone(), cookies.clone(), options.clone());
+    let save = |session: Session, target: &str| match target {
+        "-" => create_monolithic_document_from_data(session, read_stdin(), None, None),
+        _ => create_monolithic_document(session, target.to_string()),
     };
 
-    if let Err(error) = result {
-        if !silent {
-            print_error_message(&format!("Error: {}", error));
+    if output_format.is_warc() || targets.len() == 1 {
+        // One file for everything: it gets named after the first document that makes it in,
+        // documents after it get added to it
+        let output = SharedOutput::default();
+        for target in &targets {
+            let mut session = new_session();
+            let shared = output.clone();
+            let destination = destination.clone();
+            let output_format = output_format.clone();
+            let url = (target != "-").then(|| parse_target(target).ok()).flatten();
+            session.set_destination(Box::new(move |title| {
+                if !shared.is_open() {
+                    let opened: Box<dyn Write + Send> = match is_stdout(&destination) {
+                        true => Box::new(BufWriter::new(io::stdout())),
+                        false => {
+                            let name = name_of(title, url.as_ref());
+                            let (file, _) =
+                                create_file(&destination, &name, output_format, create_dirs)?;
+                            Box::new(BufWriter::new(file))
+                        }
+                    };
+                    *shared.0.lock().unwrap() = Some(opened);
+                }
+                Ok(Box::new(shared) as Box<dyn Write + Send>)
+            }));
+
+            if let Err(error) = save(session, target) {
+                report(target, &error);
+                exit_code = 1;
+            }
+        }
+    } else if is_stdout(&destination) {
+        exit(
+            "several documents can't all go to STDOUT, they can as WARC",
+            temp_cache_file,
+        );
+    } else {
+        // Files get claimed before anything gets saved, documents have to know what files
+        // they link to are called
+        let mut claims: Vec<Claim> = vec![];
+        for target in &targets {
+            let (title, url, original_url) = match target.as_str() {
+                "-" => (None, None, None),
+                _ => match probe_target(new_session(), target) {
+                    Ok(probed) => {
+                        let original_url =
+                            parse_target(target).ok().filter(|url| *url != probed.url);
+                        (probed.title, Some(probed.url), original_url)
+                    }
+                    Err(error) => {
+                        report(target, &error);
+                        exit_code = 1;
+                        continue;
+                    }
+                },
+            };
+            // Same document given twice (or redirected to) gets saved once
+            if url.is_some() && claims.iter().any(|claim| claim.url == url) {
+                continue;
+            }
+
+            match create_file(
+                &destination,
+                &name_of(title.as_deref(), url.as_ref()),
+                output_format.clone(),
+                create_dirs,
+            ) {
+                Ok((_, path)) => claims.push(Claim {
+                    target: target.clone(),
+                    url,
+                    original_url,
+                    path,
+                }),
+                Err(error) => {
+                    report(target, &error);
+                    exit_code = 1;
+                }
+            }
         }
 
-        exit_code = 1;
+        let files: Vec<(Url, PathBuf)> = claims
+            .iter()
+            .flat_map(|claim| {
+                [&claim.url, &claim.original_url]
+                    .into_iter()
+                    .flatten()
+                    .map(|url| (url.clone(), PathBuf::from(&claim.path)))
+            })
+            .collect();
+        for claim in &claims {
+            let mut session = new_session();
+            session.link_files(Path::new(&claim.path), &files);
+            let path = claim.path.clone();
+            session.set_destination(Box::new(move |_| {
+                let file = OpenOptions::new().write(true).truncate(true).open(&path)?;
+                Ok(Box::new(BufWriter::new(file)) as Box<dyn Write + Send>)
+            }));
+
+            // Where it has turned out to be is where it gets saved from
+            let target = claim
+                .url
+                .as_ref()
+                .map_or(claim.target.clone(), |url| url.to_string());
+            if let Err(error) = save(session, &target) {
+                report(&claim.target, &error);
+                exit_code = 1;
+            }
+        }
     }
 
     // TODO: bring this back

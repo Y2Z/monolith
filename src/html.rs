@@ -1861,13 +1861,14 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 // Replace with empty JS call to preserve original behavior
                                 set_node_attr(node, "href", Some("javascript:;".to_string()));
                             }
-                        } else {
-                            // Don't touch mailto: links or hrefs which begin with a hash sign
-                            if !anchor_attr_href_value.clone().starts_with('#')
-                                && !is_url_and_has_protocol(&anchor_attr_href_value.clone())
-                            {
-                                let href_full_url: Url =
-                                    resolve_url(document_url, &anchor_attr_href_value);
+                        } else if !anchor_attr_href_value.starts_with('#') {
+                            let href_full_url: Url =
+                                resolve_url(document_url, &anchor_attr_href_value);
+                            if let Some(link) = session.link_to(&href_full_url) {
+                                // Leads to some other document that gets saved
+                                set_node_attr(node, "href", Some(link));
+                            } else if !is_url_and_has_protocol(&anchor_attr_href_value) {
+                                // Don't touch mailto: links or hrefs which begin with a hash sign
                                 set_node_attr(node, "href", Some(href_full_url.to_string()));
                             }
                         }

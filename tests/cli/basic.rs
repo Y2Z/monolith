@@ -7,7 +7,6 @@
 
 #[cfg(test)]
 mod passing {
-    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
     use std::env;
     use std::fs;
@@ -17,7 +16,7 @@ mod passing {
 
     #[test]
     fn malformed_srcset_descriptor_does_not_hang() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         cmd.arg("-")
             .write_stdin("<img srcset=\"data:,image invalid\">")
             .timeout(std::time::Duration::from_secs(5))
@@ -27,7 +26,7 @@ mod passing {
 
     #[test]
     fn print_help_information() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd.arg("-h").output().unwrap();
 
         // STDERR should be empty
@@ -42,7 +41,7 @@ mod passing {
 
     #[test]
     fn print_version() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd.arg("-V").output().unwrap();
 
         // STDERR should be empty
@@ -66,7 +65,7 @@ mod passing {
             .output()
             .unwrap();
 
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         cmd.write_stdin(echo.stdout);
         let out = cmd.arg("-").output().unwrap();
 
@@ -87,7 +86,7 @@ mod passing {
 
     #[test]
     fn css_import_string() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/css/index.html");
         let path_css: &Path = Path::new("tests/_data_/css/style.css");
 
@@ -135,7 +134,7 @@ mod passing {
 
     #[test]
     fn output_file_into_missing_directories() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
         let dir_tmp: PathBuf =
             env::temp_dir().join(format!("monolith-test-{}", std::process::id()));
@@ -164,7 +163,7 @@ mod passing {
 
     #[test]
     fn output_file_into_missing_directories_without_create_dirs_flag() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
         let dir_tmp: PathBuf =
             env::temp_dir().join(format!("monolith-test-noflag-{}", std::process::id()));
@@ -199,13 +198,11 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
-    use std::env;
 
     #[test]
     fn bad_input_empty_target() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd.arg("").output().unwrap();
 
         // STDERR should contain error description
@@ -223,7 +220,7 @@ mod failing {
 
     #[test]
     fn unsupported_scheme() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd.arg("mailto:snshn@tutanota.com").output().unwrap();
 
         // STDERR should contain error description
@@ -244,15 +241,13 @@ mod failing {
 mod passing_saving {
     use std::fs;
 
-    use assert_cmd::cargo_bin_cmd;
-
     #[test]
     fn saving_again_keeps_what_has_been_saved_before() {
         let directory = tempfile::tempdir().unwrap();
         let output = directory.path().join("page.html");
         fs::write(&output, "keep me").unwrap();
 
-        cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
+        crate::cli::monolith()
             .args(["-q", "-o"])
             .arg(&output)
             .arg("data:text/html,<p>new")

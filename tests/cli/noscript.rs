@@ -7,16 +7,14 @@
 
 #[cfg(test)]
 mod passing {
-    use assert_cmd::cargo_bin_cmd;
     use assert_cmd::prelude::*;
-    use std::env;
     use std::fs;
     use std::path::Path;
     use url::Url;
 
     #[test]
     fn parse_noscript_contents() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/noscript/index.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -47,7 +45,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/noscript/index.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -78,7 +76,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_nested() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/noscript/nested.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -109,7 +107,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_with_script() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/noscript/script.html");
         let path_svg: &Path = Path::new("tests/_data_/noscript/image.svg");
 
@@ -142,7 +140,7 @@ mod passing {
 
     #[test]
     fn unwrap_noscript_contents_attr_data_url() {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let out = cmd
             .arg("-n")
             .arg("data:text/html,<noscript class=\"\">test</noscript>")
@@ -166,12 +164,10 @@ mod passing {
 
 #[cfg(test)]
 mod noscript_cleanup {
-    use assert_cmd::cargo_bin_cmd;
-    use std::env;
     use std::path::Path;
 
     fn save(args: &[&str]) -> String {
-        let mut cmd = cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
+        let mut cmd = crate::cli::monolith();
         let path_html: &Path = Path::new("tests/_data_/noscript/index.html");
         let out = cmd.args(args).arg(path_html.as_os_str()).output().unwrap();
 
