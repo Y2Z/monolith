@@ -16,6 +16,7 @@ use monolith::core::{
     create_monolithic_document_from_data, create_output_file, format_output_path, parse_target,
     print_error_message, probe_target, untitled_name,
 };
+use monolith::net::Credentials;
 use monolith::session::Session;
 use url::Url;
 
@@ -96,7 +97,7 @@ struct Cli {
     unwrap_noscript: bool,
 
     /// File to write to, use - for STDOUT [default: %title%.%extension%]
-    #[arg(short, long, value_name = "result.html", overrides_with = "output")]
+    #[arg(short, long, value_name = "result.html")]
     output: Option<String>,
 
     /// Suppress verbosity
@@ -228,6 +229,8 @@ struct Claim {
     url: Option<Url>,
     /// Where it was said to be, if that's different from where it's turned out to be
     original_url: Option<Url>,
+    /// What it is, as who: the same page can be something else for someone who's logged in
+    identity: Option<String>,
     path: String,
 }
 
@@ -449,8 +452,13 @@ fn main() {
                     }
                 },
             };
+            let mut credentials = Credentials::default();
+            if let Ok(original_url) = parse_target(target) {
+                credentials.take_from(&original_url);
+            }
+            let identity = url.as_ref().map(|url| credentials.cache_key(url));
             // Same document given twice (or redirected to) gets saved once
-            if url.is_some() && claims.iter().any(|claim| claim.url == url) {
+            if identity.is_some() && claims.iter().any(|claim| claim.identity == identity) {
                 continue;
             }
 
@@ -464,6 +472,7 @@ fn main() {
                     target: target.clone(),
                     url,
                     original_url,
+                    identity,
                     path,
                 }),
                 Err(error) => {
@@ -484,6 +493,10 @@ fn main() {
             .collect();
         for claim in &claims {
             let mut session = new_session();
+            // It gets saved from where it has turned out to be, as whoever it was asked for as
+            if let Ok(original_url) = parse_target(&claim.target) {
+                session.take_credentials(&original_url);
+            }
             session.link_files(Path::new(&claim.path), &files);
             let path = claim.path.clone();
             session.set_destination(Box::new(move |_| {

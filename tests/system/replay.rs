@@ -96,7 +96,7 @@ fn keeps_title_the_page_ended_up_with() {
         )]);
         let workspace = Workspace::new(browser);
         let output = workspace
-            .monolith()
+            .monolith_writing_files()
             .args(["--output", "%title%.html", &server.url("/")])
             .current_dir(workspace.directory.path())
             .output()
@@ -343,7 +343,7 @@ fn lazy_content_loads_again_when_needed() {
         ]);
         let workspace = Workspace::new(browser);
         let output = workspace
-            .monolith()
+            .monolith_writing_files()
             .env("MONOLITH_BROWSER_SCROLL_LIMIT", "10")
             .args(["--output"])
             .arg(workspace.directory.path().join("saved.html"))

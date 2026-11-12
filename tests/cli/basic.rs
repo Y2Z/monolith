@@ -134,7 +134,7 @@ mod passing {
 
     #[test]
     fn output_file_into_missing_directories() {
-        let mut cmd = crate::cli::monolith();
+        let mut cmd = crate::cli::monolith_writing_files();
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
         let dir_tmp: PathBuf =
             env::temp_dir().join(format!("monolith-test-{}", std::process::id()));
@@ -163,7 +163,7 @@ mod passing {
 
     #[test]
     fn output_file_into_missing_directories_without_create_dirs_flag() {
-        let mut cmd = crate::cli::monolith();
+        let mut cmd = crate::cli::monolith_writing_files();
         let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
         let dir_tmp: PathBuf =
             env::temp_dir().join(format!("monolith-test-noflag-{}", std::process::id()));
@@ -247,7 +247,7 @@ mod passing_saving {
         let output = directory.path().join("page.html");
         fs::write(&output, "keep me").unwrap();
 
-        crate::cli::monolith()
+        crate::cli::monolith_writing_files()
             .args(["-q", "-o"])
             .arg(&output)
             .arg("data:text/html,<p>new")

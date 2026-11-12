@@ -4,8 +4,13 @@ mod helpers {
     use serde_json::json;
 
     pub fn monolith(archive: &[u8], args: &[&str]) -> (String, String, bool) {
+        let writes_to_file = args.iter().any(|arg| *arg == "-o" || *arg == "--output");
         let output = Command::new(assert_cmd::cargo_bin!("monolith"))
-            .args(["-o", "-"])
+            .args(if writes_to_file {
+                vec![]
+            } else {
+                vec!["-o", "-"]
+            })
             .args(args)
             .arg("-")
             .write_stdin(archive)
@@ -209,8 +214,13 @@ mod warc_output {
     use super::helpers::{har, monolith, warc};
 
     fn bytes(args: &[&str], input: &[u8]) -> (Vec<u8>, String, bool) {
+        let writes_to_file = args.iter().any(|arg| *arg == "-o" || *arg == "--output");
         let output = Command::new(assert_cmd::cargo_bin!("monolith"))
-            .args(["-o", "-"])
+            .args(if writes_to_file {
+                vec![]
+            } else {
+                vec!["-o", "-"]
+            })
             .args(args)
             .write_stdin(input)
             .output()

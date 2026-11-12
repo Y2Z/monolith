@@ -18,7 +18,7 @@ use crate::core::{
     print_info_message,
 };
 use crate::mhtml::MhtmlArchive;
-use crate::net::{self, PrefetchProgress};
+use crate::net::{self, Credentials, PrefetchProgress, without_credentials};
 use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
 use crate::warc::WarcStream;
 
@@ -63,6 +63,8 @@ pub struct Session {
     cache: Option<Cache>,
     client: Client,
     pub(crate) cookies: Option<Vec<Cookie>>,
+    /// Credentials for HTTP authentication, given along with URLs
+    pub(crate) credentials: Credentials,
     /// Where the result gets written, the result is provided as is if there's nowhere to write it
     destination: Option<OutputOpener>,
     /// Files that other documents get saved in, by their URLs (without fragments)
@@ -156,6 +158,7 @@ impl Session {
             cache,
             cookies,
             client,
+            credentials: Credentials::default(),
             destination: None,
             environment_encoding: None,
             linked_files: HashMap::new(),
@@ -187,7 +190,7 @@ impl Session {
     }
 
     pub fn add_asset(&mut self, url: &Url, data: &Vec<u8>, media_type: String, charset: String) {
-        let key: String = clean_url(url.clone()).as_str().to_string();
+        let key: String = self.credentials.cache_key(url);
 
         self.cache
             .get_or_insert_with(|| Cache::new(0, None))
@@ -196,6 +199,12 @@ impl Session {
 
     pub fn is_recording(&self) -> bool {
         self.options.output_format.is_warc()
+    }
+
+    /// Takes user name and password out of given URL, they go along with everything that gets
+    /// retrieved from its origin from now on.
+    pub fn take_credentials(&mut self, url: &Url) -> Url {
+        self.credentials.take_from(url)
     }
 
     /// Makes links to other documents lead to files they get saved in: given the file this
@@ -210,13 +219,20 @@ impl Session {
         self.own_file = file_url(own_file);
         self.linked_files = files
             .iter()
-            .filter_map(|(url, path)| Some((clean_url(url.clone()).to_string(), file_url(path)?)))
+            .filter_map(|(url, path)| {
+                Some((
+                    clean_url(without_credentials(url)).to_string(),
+                    file_url(path)?,
+                ))
+            })
             .collect();
     }
 
     /// Where a link has to lead, if it's a link to some other document that gets saved.
     pub(crate) fn link_to(&self, url: &Url) -> Option<String> {
-        let file = self.linked_files.get(clean_url(url.clone()).as_str())?;
+        let file = self
+            .linked_files
+            .get(clean_url(without_credentials(url)).as_str())?;
         let mut file = file.clone();
         file.set_fragment(url.fragment());
 
@@ -402,8 +418,11 @@ impl Session {
 
         let cache = self.cache.as_ref().unwrap();
         let entries = net::prefetch_assets(
-            &self.client,
-            self.cookies.as_deref(),
+            net::Requester {
+                client: &self.client,
+                cookies: self.cookies.as_deref(),
+                credentials: &self.credentials,
+            },
             &self.options,
             document_url,
             document,
@@ -426,7 +445,11 @@ impl Session {
         parent_url: &Url,
         url: &Url,
     ) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
+        // Credentials only ever go along with requests, never with URLs
+        let url: &Url = &self.credentials.take_from(url);
+        let parent_url: &Url = &without_credentials(parent_url);
         let cache_key: String = clean_url(url.clone()).as_str().to_string();
+        let identity_key: String = self.credentials.cache_key(url);
 
         if url.scheme() == "data" {
             let (media_type, charset, data) = parse_data_url(url);
@@ -513,8 +536,8 @@ impl Session {
         } else if let Some((data, media_type, charset)) = self
             .cache
             .as_ref()
-            .filter(|cache| cache.contains_key(&cache_key))
-            .and_then(|cache| cache.get(&cache_key).ok())
+            .filter(|cache| cache.contains_key(&identity_key))
+            .and_then(|cache| cache.get(&identity_key).ok())
         {
             // URL is in cache, we get and return it
             Ok((data, url.clone(), media_type, charset))
@@ -540,6 +563,7 @@ impl Session {
             let result = net::fetch_remote_asset(
                 &self.client,
                 self.cookies.as_deref(),
+                &self.credentials,
                 &self.options,
                 parent_url,
                 url,
@@ -552,7 +576,7 @@ impl Session {
 
             // Add retrieved resource to cache
             if let Some(cache) = self.cache.as_mut() {
-                let new_cache_key: String = clean_url(response_url.clone()).to_string();
+                let new_cache_key: String = self.credentials.cache_key(&response_url);
                 cache.set(&new_cache_key, &data, media_type.clone(), charset.clone());
             }
 
