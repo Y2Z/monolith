@@ -17,6 +17,7 @@ readme = "README.md"
 keywords = ["web", "http", "html", "download", "command-line"]
 categories = ["command-line-utilities", "web-programming"]
 include = [
+    "LICENSE",
     "src/*.rs",
     "Cargo.toml",
     "build.rs",
@@ -26,7 +27,7 @@ include = [
     "assets/fonts/Jost-OFL.txt",
     "assets/scripts/replay.js",
 ]
-license = "CC0-1.0"
+license = "0BSD AND OFL-1.1"
 
 [dependencies]
 base64 = "=0.23.1" # Used for integrity attributes
