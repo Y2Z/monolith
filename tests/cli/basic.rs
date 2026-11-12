@@ -239,3 +239,31 @@ mod failing {
         out.assert().code(1);
     }
 }
+
+#[cfg(test)]
+mod passing_saving {
+    use std::fs;
+
+    use assert_cmd::cargo_bin_cmd;
+
+    #[test]
+    fn saving_again_keeps_what_has_been_saved_before() {
+        let directory = tempfile::tempdir().unwrap();
+        let output = directory.path().join("page.html");
+        fs::write(&output, "keep me").unwrap();
+
+        cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
+            .args(["-q", "-o"])
+            .arg(&output)
+            .arg("data:text/html,<p>new")
+            .assert()
+            .success();
+
+        assert_eq!(fs::read_to_string(&output).unwrap(), "keep me");
+        assert!(
+            fs::read_to_string(directory.path().join("page (2).html"))
+                .unwrap()
+                .contains("<p>new")
+        );
+    }
+}

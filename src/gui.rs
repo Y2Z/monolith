@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Write;
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::process::{self, Command};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
@@ -15,7 +16,8 @@ use tempfile::{Builder, NamedTempFile};
 use monolith::browser;
 use monolith::cache::Cache;
 use monolith::core::{
-    MonolithOptions, MonolithOutputFormat, create_monolithic_document, format_output_path,
+    MonolithOptions, MonolithOutputFormat, create_monolithic_document, create_output_file,
+    format_output_path,
 };
 use monolith::net::PrefetchProgress;
 use monolith::session::Session;
@@ -459,7 +461,10 @@ fn save_document(
         fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     }
 
-    fs::write(&path, data).map_err(|e| format!("could not write {path}: {e}"))?;
+    let (mut file, path) =
+        create_output_file(&path).map_err(|e| format!("could not write {path}: {e}"))?;
+    file.write_all(&data)
+        .map_err(|e| format!("could not write {path}: {e}"))?;
     Ok(path)
 }
 

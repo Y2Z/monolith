@@ -1,9 +1,9 @@
 use std::env;
 use std::error::Error;
 use std::fmt;
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, IsTerminal, Write};
-use std::path::Path;
+use std::path::{MAIN_SEPARATOR, Path};
 use std::str::FromStr;
 
 use chrono::{SecondsFormat, Utc};
@@ -814,6 +814,54 @@ pub fn detect_media_type(data: &[u8], url: &Url) -> String {
     dataurl::detect_media_type(data, file_name)
         .unwrap_or_default()
         .to_string()
+}
+
+// Extensions made of more than one part, the number goes in front of the whole thing
+const COMPOUND_EXTENSIONS: [&str; 1] = [".warc.gz"];
+// There's a limit to how many files with the same name are worth trying
+const MAX_NUMBERED_PATHS: usize = 10_000;
+
+/// Path with a number added to the file's name, the way browsers name downloads that would
+/// otherwise replace something: "page.html" becomes "page (2).html".
+pub fn numbered_path(path: &str, number: usize) -> String {
+    let name_start = path.rfind(['/', MAIN_SEPARATOR]).map_or(0, |i| i + 1);
+    let (directory, name) = path.split_at(name_start);
+    let lowercase = name.to_lowercase();
+    let extension_start = COMPOUND_EXTENSIONS
+        .iter()
+        .find(|extension| lowercase.ends_with(*extension) && name.len() > extension.len())
+        .map(|extension| name.len() - extension.len())
+        // Names that start with a dot don't have an extension because of it
+        .or_else(|| name.rfind('.').filter(|i| *i > 0))
+        .unwrap_or(name.len());
+    let (stem, extension) = name.split_at(extension_start);
+
+    format!("{}{} ({}){}", directory, stem, number, extension)
+}
+
+/// Creates the file to save to, without ever replacing anything: if there's something there
+/// already, a number gets added to the new file's name. Provides the file, and where it is.
+pub fn create_output_file(path: &str) -> io::Result<(File, String)> {
+    for number in 1..=MAX_NUMBERED_PATHS {
+        let candidate = match number {
+            1 => path.to_string(),
+            _ => numbered_path(path, number),
+        };
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(file) => return Ok((file, candidate)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        format!("there are too many files named like {} already", path),
+    ))
 }
 
 pub fn format_output_path(
