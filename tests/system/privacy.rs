@@ -1,5 +1,8 @@
+#[cfg(unix)]
 use std::process::{Command, Stdio};
+#[cfg(unix)]
 use std::thread::sleep;
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
 use crate::support::{Server, Workspace, assert_success, with_each_browser};

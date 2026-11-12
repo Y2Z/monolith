@@ -2,7 +2,9 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, BufWriter, Error as IoError, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 use clap::Parser;
 use tempfile::{Builder, NamedTempFile};
@@ -138,6 +140,20 @@ struct Cli {
 }
 
 const DEFAULT_OUTPUT: &str = "%title%.%extension%";
+
+/// Whether Ctrl+C has been pressed: what fails after that fails because of it, and it's up to
+/// what handles it to clean up and exit.
+static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+
+/// Exits with given code, unless interrupted (the interruption gets to exit the way it does).
+fn exit_with(code: i32) -> ! {
+    if INTERRUPTED.load(Ordering::SeqCst) {
+        loop {
+            thread::park();
+        }
+    }
+    process::exit(code);
+}
 
 /// Whether results are meant to go to STDOUT, rather than into files.
 fn is_stdout(destination: &str) -> bool {
@@ -302,6 +318,8 @@ fn main() {
         .as_ref()
         .map(|file| file.path().to_path_buf());
     let _ = ctrlc::set_handler(move || {
+        // Shutting the browser down makes whatever it's doing fail, that's not what to report
+        INTERRUPTED.store(true, Ordering::SeqCst);
         #[cfg(feature = "browser")]
         browser::shut_down();
         if let Some(path) = &cache_file_path {
@@ -326,7 +344,7 @@ fn main() {
                         ));
                     }
                     drop(temp_cache_file);
-                    process::exit(1);
+                    exit_with(1);
                 }
             },
             Err(_) => {
@@ -337,14 +355,14 @@ fn main() {
                     ));
                 }
                 drop(temp_cache_file);
-                process::exit(1);
+                exit_with(1);
             }
         }
     }
 
     let silent = options.silent;
     let report = |target: &str, error: &dyn std::fmt::Display| {
-        if !silent {
+        if !silent && !INTERRUPTED.load(Ordering::SeqCst) {
             match cli.targets.len() {
                 1 => print_error_message(&format!("Error: {}", error)),
                 _ => print_error_message(&format!("Error: {}: {}", target, error)),
@@ -356,7 +374,7 @@ fn main() {
             print_error_message(&format!("Error: {}", message));
         }
         drop(temp_cache_file);
-        process::exit(1);
+        exit_with(1);
     };
 
     // The option is always there, builds that can't do what it asks for say so
@@ -523,7 +541,5 @@ fn main() {
     // Exiting doesn't run destructors
     drop(temp_cache_file);
 
-    if exit_code > 0 {
-        process::exit(exit_code);
-    }
+    exit_with(exit_code);
 }

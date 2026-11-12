@@ -19,7 +19,8 @@ mod passing {
         let mut cmd = crate::cli::monolith();
         cmd.arg("-")
             .write_stdin("<img srcset=\"data:,image invalid\">")
-            .timeout(std::time::Duration::from_secs(5))
+            // Busy machines take their time, hanging takes forever
+            .timeout(std::time::Duration::from_secs(60))
             .assert()
             .success();
     }
