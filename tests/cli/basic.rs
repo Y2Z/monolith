@@ -142,7 +142,6 @@ mod passing {
         let path_output: PathBuf = dir_tmp.join("subdir").join("output.html");
 
         let out = cmd
-            .arg("--create-dirs")
             .arg("-o")
             .arg(path_output.as_os_str())
             .arg(path_html.as_os_str())
@@ -163,30 +162,21 @@ mod passing {
     }
 
     #[test]
-    fn output_file_into_missing_directories_without_create_dirs_flag() {
+    fn create_dirs_option_is_gone() {
         let mut cmd = crate::cli::monolith_writing_files();
-        let path_html: &Path = Path::new("tests/_data_/basic/local-file.html");
-        let dir_tmp: PathBuf =
-            env::temp_dir().join(format!("monolith-test-noflag-{}", std::process::id()));
-        let path_output: PathBuf = dir_tmp.join("subdir").join("output.html");
 
         let out = cmd
-            .arg("-o")
-            .arg(path_output.as_os_str())
-            .arg(path_html.as_os_str())
+            .args(["--create-dirs", "tests/_data_/basic/local-file.html"])
             .output()
             .unwrap();
 
-        // Without --create-dirs nothing gets created
-        assert!(!path_output.is_file());
-        assert!(!dir_tmp.exists());
-
-        // The error points the user at the flag instead of panicking
+        // Directories get created anyway, the option isn't needed anymore
         let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(stderr.contains("--create-dirs"), "stderr: {stderr}");
-
-        // Exit code is 1, not a panic
-        out.assert().code(1);
+        assert!(
+            stderr.contains("unexpected argument '--create-dirs'"),
+            "{stderr}"
+        );
+        out.assert().code(2);
     }
 }
 

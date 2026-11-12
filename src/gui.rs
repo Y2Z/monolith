@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, BufWriter, Write};
+use std::io::{BufWriter, Write};
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::process::{self, Command};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
@@ -17,7 +17,7 @@ use monolith::browser;
 use monolith::cache::Cache;
 use monolith::core::{
     MonolithOptions, MonolithOutputFormat, create_monolithic_document, create_output_file,
-    format_output_path, parse_target,
+    format_output_path, output_file_pattern, parse_target,
 };
 use monolith::net::PrefetchProgress;
 use monolith::session::Session;
@@ -442,7 +442,8 @@ fn save_document(
 ) -> Result<String, String> {
     // Where it's ended up, once the file has been created
     let saved_path: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-    let output_path = output_path.to_string();
+    // Directories get files named the default way
+    let output_path = output_file_pattern(output_path, DEFAULT_OUTPUT_FILE_NAME);
     let path_holder = Arc::clone(&saved_path);
     let url = parse_target(&target).ok();
     session.set_destination(Box::new(move |title| {
@@ -453,18 +454,8 @@ fn save_document(
             format.to_monolith(),
         );
 
-        // Always create missing directories, GUI users shouldn't have to know they need to exist
-        if let Some(dir) = Path::new(&path)
-            .parent()
-            .filter(|dir| !dir.as_os_str().is_empty())
-        {
-            fs::create_dir_all(dir).map_err(|e| {
-                io::Error::new(e.kind(), format!("could not create {}: {e}", dir.display()))
-            })?;
-        }
-
-        let (file, path) = create_output_file(&path)
-            .map_err(|e| io::Error::new(e.kind(), format!("could not write {path}: {e}")))?;
+        // Directories that aren't there get created too
+        let (file, path) = create_output_file(&path)?;
         *path_holder.lock().unwrap() = Some(path);
         Ok(Box::new(BufWriter::new(file)) as Box<dyn Write + Send>)
     }));

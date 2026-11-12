@@ -29,6 +29,17 @@ mod passing {
             "2"
         );
     }
+
+    #[test]
+    fn directories_get_created() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("a/b/page.html").display().to_string();
+
+        let (_, created) = create_output_file(&path).unwrap();
+
+        assert_eq!(created, path);
+        assert!(std::path::Path::new(&path).is_file());
+    }
 }
 
 #[cfg(test)]
@@ -36,14 +47,20 @@ mod failing {
     use monolith::core::create_output_file;
 
     #[test]
-    fn directories_that_are_not_there() {
+    fn directories_that_cannot_be_created() {
         let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("file"), "").unwrap();
         let path = directory
             .path()
-            .join("missing/page.html")
+            .join("file/page.html")
             .display()
             .to_string();
 
-        assert!(create_output_file(&path).is_err());
+        let error = create_output_file(&path).err().unwrap();
+        assert!(
+            error.to_string().starts_with("could not create directory"),
+            "{}",
+            error
+        );
     }
 }

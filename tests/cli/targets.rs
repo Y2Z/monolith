@@ -220,6 +220,48 @@ mod passing {
     }
 
     #[test]
+    fn directories_get_files_named_the_default_way() {
+        for (pattern, expected) in [
+            ("saved/", "saved/Page A.html"),
+            ("saved", "saved/Page A.html"),
+            ("by-type/%extension%/", "by-type/html/Page A.html"),
+            ("named.HTML", "named.HTML"),
+        ] {
+            let (site, saved) = (site(), tempfile::tempdir().unwrap());
+
+            let output = run(
+                saved.path(),
+                &["-q", "-o", pattern, &target(&site, "a.html")],
+            );
+
+            assert!(output.status.success(), "{}", pattern);
+            assert!(
+                saved.path().join(expected).is_file(),
+                "{} -> {}",
+                pattern,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn files_named_after_urls_in_directories() {
+        let (site, saved) = (site(), tempfile::tempdir().unwrap());
+
+        let output = run(
+            saved.path(),
+            &["-q", "-o", "deep/er/%url%.%ext%", &target(&site, "a.html")],
+        );
+
+        // Where temporary directories really are differs from what they're called (symlinks on
+        // macOS, short names on Windows), only how the name ends is certain
+        assert!(output.status.success());
+        let names = names(&saved.path().join("deep/er"));
+        assert_eq!(names.len(), 1, "{:?}", names);
+        assert!(names[0].ends_with("--a.html.htm"), "{:?}", names);
+    }
+
+    #[test]
     fn output_option_can_only_be_given_once() {
         let (site, saved) = (site(), tempfile::tempdir().unwrap());
 
