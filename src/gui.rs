@@ -17,7 +17,7 @@ use monolith::browser;
 use monolith::cache::Cache;
 use monolith::core::{
     MonolithOptions, MonolithOutputFormat, create_monolithic_document, create_output_file,
-    format_output_path,
+    format_output_path, parse_target,
 };
 use monolith::net::PrefetchProgress;
 use monolith::session::Session;
@@ -444,10 +444,12 @@ fn save_document(
     let saved_path: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     let output_path = output_path.to_string();
     let path_holder = Arc::clone(&saved_path);
+    let url = parse_target(&target).ok();
     session.set_destination(Box::new(move |title| {
         let path = format_output_path(
             &output_path,
             title.unwrap_or_default(),
+            url.as_ref(),
             format.to_monolith(),
         );
 

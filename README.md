@@ -156,7 +156,7 @@ Results get saved into files named after the pages' titles. Several targets can 
  - `-j`: Remove all scripts
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-n`: Extract contents of NOSCRIPT elements
- - `-o`: Write output to `file` (use “-” for STDOUT), `%title%.%extension%` by default
+ - `-o`: Write output to `file` (use “-” for STDOUT)
  - `-q`: Be quiet
  - `-r`: Completely remove `element(s)` from the document
  - `-s`: Exclude styles
