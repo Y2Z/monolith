@@ -15,8 +15,8 @@ use monolith::cache::Cache;
 use monolith::cookies::{Cookie, parse_cookie_file_contents};
 use monolith::core::{
     MonolithOptions, MonolithOutputFormat, create_monolithic_document,
-    create_monolithic_document_from_data, create_output_file, format_output_path, parse_target,
-    print_error_message, probe_target, untitled_name,
+    create_monolithic_document_from_data, create_output_file, format_output_path,
+    output_file_pattern, parse_target, print_error_message, probe_target, untitled_name,
 };
 use monolith::net::Credentials;
 use monolith::session::Session;
@@ -58,10 +58,6 @@ struct Cli {
     #[arg(short = 'd', long = "domain", value_name = "example.com")]
     domains: Vec<String>,
 
-    /// Create missing directories in the output file path
-    #[arg(short = 'D', long)]
-    create_dirs: bool,
-
     /// Ignore network errors
     #[arg(short = 'e', long)]
     ignore_errors: bool,
@@ -99,7 +95,8 @@ struct Cli {
     unwrap_noscript: bool,
 
     /// File to write to, use - for STDOUT; %title%, %url%, %timestamp% and %extension% get
-    /// replaced [default: %title%.%extension%]
+    /// replaced; directories (ending with a slash, or with no file extension) get files named
+    /// %title%.%extension% [default: %title%.%extension%]
     #[arg(short, long, value_name = "result.html")]
     output: Option<String>,
 
@@ -168,34 +165,10 @@ fn create_file(
     name: &str,
     url: Option<&Url>,
     format: MonolithOutputFormat,
-    create_dirs: bool,
 ) -> Result<(fs::File, String), IoError> {
-    let final_destination = format_output_path(destination, name, url, format);
-
-    // Create directories in the path to output file if they are
-    // missing and the user opted in via --create-dirs (like curl).
-    // Without the flag a clear error is reported instead of creating
-    // directory trees the user did not ask for.
-    if let Some(parent) = Path::new(&final_destination).parent()
-        && !parent.as_os_str().is_empty()
-        && !parent.exists()
-    {
-        if create_dirs {
-            fs::create_dir_all(parent)?;
-        } else {
-            return Err(IoError::new(
-                io::ErrorKind::NotFound,
-                format!(
-                    "cannot write to '{}': directory '{}' does not exist (use --create-dirs to create it)",
-                    final_destination,
-                    parent.display()
-                ),
-            ));
-        }
-    }
-
-    // Nothing gets replaced, files that would be get saved under names of their own
-    create_output_file(&final_destination)
+    // Nothing gets replaced, files that would be get saved under names of their own, and
+    // directories that aren't there get created
+    create_output_file(&format_output_path(destination, name, url, format))
 }
 
 /// What a file gets named after: the document's title, or its URL if it has none.
@@ -408,8 +381,14 @@ fn main() {
     }
 
     let output_format = options.output_format.clone();
-    let destination = destination.unwrap_or(DEFAULT_OUTPUT.to_string());
-    let create_dirs = cli.create_dirs;
+    // Directories get files named the default way
+    let destination = match destination {
+        Some(destination) if !is_stdout(&destination) => {
+            output_file_pattern(&destination, DEFAULT_OUTPUT)
+        }
+        Some(destination) => destination,
+        None => DEFAULT_OUTPUT.to_string(),
+    };
     let new_session = || Session::new(cache.clone(), cookies.clone(), options.clone());
     let save = |session: Session, target: &str| match target {
         "-" => create_monolithic_document_from_data(session, read_stdin(), None, None),
@@ -432,13 +411,8 @@ fn main() {
                         true => Box::new(BufWriter::new(io::stdout())),
                         false => {
                             let name = name_of(title, url.as_ref());
-                            let (file, _) = create_file(
-                                &destination,
-                                &name,
-                                url.as_ref(),
-                                output_format,
-                                create_dirs,
-                            )?;
+                            let (file, _) =
+                                create_file(&destination, &name, url.as_ref(), output_format)?;
                             Box::new(BufWriter::new(file))
                         }
                     };
@@ -494,7 +468,6 @@ fn main() {
                 &name_of(title.as_deref(), url.as_ref()),
                 given_url.as_ref(),
                 output_format.clone(),
-                create_dirs,
             ) {
                 Ok((_, path)) => claims.push(Claim {
                     target: target.clone(),

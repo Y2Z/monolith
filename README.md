@@ -145,7 +145,6 @@ Results get saved into files named after the pages' titles. Several targets can 
  - `-B`: Let a browser render the page first (requires Firefox, or anything based on it or Chromium)
  - `-C`: Read cookies from `file`
  - `-d`: Forbid retrieving assets from specified `domain`
- - `-D`: Create missing directories in the output file path
  - `-e`: Ignore network errors
  - `-E`: Save document using `custom encoding`
  - `-f`: Exclude web fonts

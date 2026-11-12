@@ -6,5 +6,6 @@ mod detect_media_type;
 mod format_output_path;
 mod numbered_path;
 mod options;
+mod output_file_pattern;
 mod output_format;
 mod probe_target;

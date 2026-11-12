@@ -1030,8 +1030,25 @@ pub fn numbered_path(path: &str, number: usize) -> String {
 }
 
 /// Creates the file to save to, without ever replacing anything: if there's something there
-/// already, a number gets added to the new file's name. Provides the file, and where it is.
+/// already, a number gets added to the new file's name. Directories it's supposed to be in get
+/// created too. Provides the file, and where it is.
 pub fn create_output_file(path: &str) -> io::Result<(File, String)> {
+    if let Some(directory) = Path::new(path)
+        .parent()
+        .filter(|directory| !directory.as_os_str().is_empty())
+    {
+        fs::create_dir_all(directory).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!(
+                    "could not create directory {}: {}",
+                    directory.display(),
+                    error
+                ),
+            )
+        })?;
+    }
+
     for number in 1..=MAX_NUMBERED_PATHS {
         let candidate = match number {
             1 => path.to_string(),
@@ -1044,7 +1061,12 @@ pub fn create_output_file(path: &str) -> io::Result<(File, String)> {
         {
             Ok(file) => return Ok((file, candidate)),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error),
+            Err(error) => {
+                return Err(io::Error::new(
+                    error.kind(),
+                    format!("could not create file {}: {}", candidate, error),
+                ));
+            }
         }
     }
 
@@ -1052,6 +1074,42 @@ pub fn create_output_file(path: &str) -> io::Result<(File, String)> {
         io::ErrorKind::AlreadyExists,
         format!("there are too many files named like {} already", path),
     ))
+}
+
+/// Endings that make output paths name files, rather than directories to save files in.
+const FILE_EXTENSIONS: [&str; 8] = [
+    ".%ext%",
+    ".%extension%",
+    ".htm",
+    ".html",
+    ".mht",
+    ".mhtml",
+    ".warc",
+    ".warc.gz",
+];
+
+/// Makes sure output paths name files: paths that end with a slash (or a backslash, on
+/// Windows), or with no file extension (.html, .%extension%…), are directories to save files in,
+/// those get named with given pattern. Doesn't touch paths that name files already.
+pub fn output_file_pattern(path: &str, file_name: &str) -> String {
+    let is_separator = |c: char| c == '/' || (cfg!(windows) && c == '\\');
+    if path.ends_with(is_separator) {
+        return format!("{}{}", path, file_name);
+    }
+
+    let last_part = path
+        .rsplit(is_separator)
+        .next()
+        .unwrap_or(path)
+        .to_lowercase();
+    if FILE_EXTENSIONS
+        .iter()
+        .any(|extension| last_part.ends_with(extension))
+    {
+        path.to_string()
+    } else {
+        format!("{}{}{}", path, MAIN_SEPARATOR, file_name)
+    }
 }
 
 /// Makes a path out of a pattern: %title% and %url% get replaced with what the document is
