@@ -1054,62 +1054,129 @@ pub fn create_output_file(path: &str) -> io::Result<(File, String)> {
     ))
 }
 
+/// Makes a path out of a pattern: %title% and %url% get replaced with what the document is
+/// called and where it's from (made fit for file names), %timestamp% with the current time,
+/// %extension% and %ext% with what files of given format are named with.
 pub fn format_output_path(
     path: &str,
     document_title: &str,
+    document_url: Option<&Url>,
     output_format: MonolithOutputFormat,
 ) -> String {
-    let datetime: &str = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let title: String = document_title
-        .replace(['/', '\\'], "_")
-        .replace('<', "[")
-        .replace('>', "]")
-        .replace(':', " - ")
-        .replace('\"', "")
-        .replace('|', "-")
-        .replace('?', "");
-    // Like browsers do when saving a page, turn newlines, tabs and other whitespace
-    // or control characters into single spaces, then trim leading/trailing spaces and dots
-    let title: String = title
+    let datetime: String = Utc::now()
+        .to_rfc3339_opts(SecondsFormat::Secs, true)
+        .replace(':', "_");
+    let title: String = file_name_part(
+        &document_title
+            .replace(['/', '\\'], "_")
+            .replace('<', "[")
+            .replace('>', "]")
+            .replace(':', " - ")
+            .replace('\"', "")
+            .replace('|', "-")
+            .replace('?', ""),
+    );
+    let url: String = document_url.map_or(String::new(), |url| file_name_part(&url_as_name(url)));
+    let (extension, ext) = match output_format {
+        MonolithOutputFormat::HTML => ("html", "htm"),
+        MonolithOutputFormat::MHTML => ("mhtml", "mht"),
+        MonolithOutputFormat::WARC => ("warc", "warc"),
+        MonolithOutputFormat::WARCGZ => ("warc.gz", "warc.gz"),
+    };
+    // Files named after nothing would end up hidden, or nameless
+    let or_untitled = |name: String| match name.is_empty() {
+        true => "Untitled".to_string(),
+        false => name,
+    };
+    let placeholders: [(&str, String); 5] = [
+        ("%timestamp%", datetime),
+        ("%title%", or_untitled(title)),
+        ("%url%", or_untitled(url)),
+        ("%extension%", extension.to_string()),
+        ("%ext%", ext.to_string()),
+    ];
+
+    // All at once, what titles and URLs have in them doesn't get replaced
+    let mut result = String::new();
+    let mut rest: &str = path;
+    while let Some(start) = rest.find('%') {
+        result.push_str(&rest[..start]);
+        rest = &rest[start..];
+        match placeholders
+            .iter()
+            .find(|(placeholder, _)| rest.starts_with(placeholder))
+        {
+            Some((placeholder, value)) => {
+                result.push_str(value);
+                rest = &rest[placeholder.len()..];
+            }
+            None => {
+                result.push('%');
+                rest = &rest[1..];
+            }
+        }
+    }
+    result.push_str(rest);
+
+    result
+}
+
+/// How long names that come from documents can get (in bytes): file systems allow 255,
+/// some of it has to stay for numbers that keep names unique, and for extensions.
+const MAX_FILE_NAME_PART_LENGTH: usize = 200;
+
+/// Makes something fit for file names, the way browsers do when saving pages: newlines, tabs,
+/// other whitespace and control characters become single spaces, with no spaces or dots at either
+/// end (those would make for hidden files), and names that are too long get cut short.
+fn file_name_part(text: &str) -> String {
+    let text: String = text
         .split(|c: char| c.is_whitespace() || c.is_control())
         .filter(|word| !word.is_empty())
         .collect::<Vec<&str>>()
         .join(" ");
-    let title: &str = title.trim_matches(|c: char| c == '.' || c == ' ');
-    // Files named after nothing would end up hidden, or nameless
-    let title: &str = if title.is_empty() { "Untitled" } else { title };
+    let mut text: &str = text.trim_matches(['.', ' ']);
 
-    path.replace("%timestamp%", &datetime.replace(':', "_"))
-        .replace("%title%", title)
-        .replace(
-            "%ext%",
-            if output_format == MonolithOutputFormat::HTML {
-                "htm"
-            } else if output_format == MonolithOutputFormat::MHTML {
-                "mht"
-            } else if output_format == MonolithOutputFormat::WARC {
-                "warc"
-            } else if output_format == MonolithOutputFormat::WARCGZ {
-                "warc.gz"
-            } else {
-                ""
-            },
-        )
-        .replace(
-            "%extension%",
-            if output_format == MonolithOutputFormat::HTML {
-                "html"
-            } else if output_format == MonolithOutputFormat::MHTML {
-                "mhtml"
-            } else if output_format == MonolithOutputFormat::WARC {
-                "warc"
-            } else if output_format == MonolithOutputFormat::WARCGZ {
-                "warc.gz"
-            } else {
-                ""
-            },
-        )
-        .to_string()
+    if text.len() > MAX_FILE_NAME_PART_LENGTH {
+        let mut end = MAX_FILE_NAME_PART_LENGTH;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text = text[..end].trim_end_matches(['.', ' ']);
+    }
+
+    text.to_string()
+}
+
+/// What a URL is, as a name: its host and path (and query, if it has one), with "--" where
+/// slashes were, and without what file names can't have (github.com--Y2Z--monolith--issues--169).
+/// User names and passwords never make it in.
+pub fn url_as_name(url: &Url) -> String {
+    let mut parts: Vec<String> = vec![];
+
+    if let Some(host) = url.host_str() {
+        parts.push(match url.port() {
+            Some(port) => format!("{}_{}", host, port),
+            None => host.to_string(),
+        });
+    }
+    match url.path_segments() {
+        Some(segments) => parts.extend(
+            segments
+                .filter(|segment| !segment.is_empty())
+                .map(percent_decode),
+        ),
+        // Data URLs and such are too much to name files after
+        None => parts.push(url.scheme().to_string()),
+    }
+    if let Some(query) = url.query().filter(|query| !query.is_empty()) {
+        parts.push(percent_decode(query));
+    }
+
+    parts
+        .iter()
+        .map(|part| part.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_"))
+        .collect::<Vec<String>>()
+        .join("--")
 }
 
 /// Maps a charset label (Content-Type header, data URL, META element) onto an encoding.

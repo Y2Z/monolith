@@ -98,7 +98,8 @@ struct Cli {
     #[arg(short = 'n', long)]
     unwrap_noscript: bool,
 
-    /// File to write to, use - for STDOUT [default: %title%.%extension%]
+    /// File to write to, use - for STDOUT; %title%, %url%, %timestamp% and %extension% get
+    /// replaced [default: %title%.%extension%]
     #[arg(short, long, value_name = "result.html")]
     output: Option<String>,
 
@@ -165,10 +166,11 @@ fn is_stdout(destination: &str) -> bool {
 fn create_file(
     destination: &str,
     name: &str,
+    url: Option<&Url>,
     format: MonolithOutputFormat,
     create_dirs: bool,
 ) -> Result<(fs::File, String), IoError> {
-    let final_destination = format_output_path(destination, name, format);
+    let final_destination = format_output_path(destination, name, url, format);
 
     // Create directories in the path to output file if they are
     // missing and the user opted in via --create-dirs (like curl).
@@ -430,8 +432,13 @@ fn main() {
                         true => Box::new(BufWriter::new(io::stdout())),
                         false => {
                             let name = name_of(title, url.as_ref());
-                            let (file, _) =
-                                create_file(&destination, &name, output_format, create_dirs)?;
+                            let (file, _) = create_file(
+                                &destination,
+                                &name,
+                                url.as_ref(),
+                                output_format,
+                                create_dirs,
+                            )?;
                             Box::new(BufWriter::new(file))
                         }
                     };
@@ -480,9 +487,12 @@ fn main() {
                 continue;
             }
 
+            // Named after where it was said to be, the way it was given
+            let given_url = parse_target(target).ok();
             match create_file(
                 &destination,
                 &name_of(title.as_deref(), url.as_ref()),
+                given_url.as_ref(),
                 output_format.clone(),
                 create_dirs,
             ) {

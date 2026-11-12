@@ -195,6 +195,31 @@ mod passing {
     }
 
     #[test]
+    fn files_named_after_urls() {
+        let (site, saved) = (site(), tempfile::tempdir().unwrap());
+
+        let output = run(
+            saved.path(),
+            &[
+                "-q",
+                "-o",
+                "%url%.%extension%",
+                &target(&site, "a.html"),
+                &target(&site, "b.html"),
+            ],
+        );
+
+        assert!(output.status.success());
+        let names = names(saved.path());
+        assert_eq!(names.len(), 2);
+        assert!(names[0].ends_with("--a.html.html"), "{:?}", names);
+        assert!(names[1].ends_with("--b.html.html"), "{:?}", names);
+        // Links lead to whatever files got called
+        let link = format!("<a href=\"{}\">B</a>", names[1].replace(' ', "%20"));
+        assert!(read(saved.path(), &names[0]).contains(&link));
+    }
+
+    #[test]
     fn output_option_can_only_be_given_once() {
         let (site, saved) = (site(), tempfile::tempdir().unwrap());
 
