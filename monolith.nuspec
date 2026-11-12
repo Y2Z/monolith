@@ -17,7 +17,7 @@ Unlike the conventional “Save page as”, monolith not only saves the target d
 
 If compared to saving websites using wget, this tool embeds all assets as data URLs and therefore lets browsers render the saved page exactly the way it was on the Internet, even when no network connection is available.
     </description>
-    <copyright>Public Domain</copyright>
+    <copyright>Copyright (C) 2017-2026 Monolith contributors</copyright>
     <language>en-US</language>
     <tags>scraping archiving</tags>
     <docsUrl>https://github.com/Y2Z/monolith/blob/master/README.md</docsUrl>
