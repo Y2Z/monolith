@@ -605,11 +605,14 @@ pub fn create_monolithic_document(mut session: Session, target: String) -> Monol
         }
     }
 
-    let mut target_url = parse_target(&target)?;
+    let target_with_credentials = parse_target(&target)?;
+    // Credentials go along with requests from now on, and never into what gets saved
+    let mut target_url = session.take_credentials(&target_with_credentials);
 
     #[cfg(feature = "browser")]
     if session.options.browser {
-        let page = render_page(target_url.as_str(), &session)
+        // Browsers deal with credentials on their own
+        let page = render_page(target_with_credentials.as_str(), &session)
             .map_err(|error| MonolithError::new(&error))?;
 
         if is_captured_document(&page) || session.is_recording() {
@@ -757,11 +760,12 @@ pub struct ProbedTarget {
 /// way it gets done depends on the session, browsers get used only if it says so. What gets
 /// retrieved stays in the session's cache, saving it afterwards doesn't have to retrieve it again.
 pub fn probe_target(mut session: Session, target: &str) -> Result<ProbedTarget, MonolithError> {
-    let target_url = parse_target(target)?;
+    let target_with_credentials = parse_target(target)?;
+    let target_url = session.take_credentials(&target_with_credentials);
 
     #[cfg(feature = "browser")]
     if session.options.browser {
-        let page = render_page(target_url.as_str(), &session)
+        let page = render_page(target_with_credentials.as_str(), &session)
             .map_err(|error| MonolithError::new(&error))?;
 
         return Ok(ProbedTarget {
@@ -888,6 +892,19 @@ pub fn create_monolithic_document_from_capture(
     mut session: Session,
     mut page: CapturedPage,
 ) -> MonolithResult {
+    // What browsers report may have credentials in it, those don't get saved
+    let mut strip = |url: &mut String| {
+        if let Ok(parsed) = Url::parse(url)
+            && (!parsed.username().is_empty() || parsed.password().is_some())
+        {
+            *url = session.take_credentials(&parsed).to_string();
+        }
+    };
+    strip(&mut page.url);
+    for asset in page.assets.iter_mut() {
+        asset.urls.iter_mut().for_each(&mut strip);
+    }
+
     if session.is_recording() {
         record_captured_page(&mut session, &page);
         // Without the page itself there would be nothing to open, what the browser has ended up

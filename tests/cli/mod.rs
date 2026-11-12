@@ -2,6 +2,7 @@ mod archives;
 mod base_url;
 mod basic;
 mod browser;
+mod credentials;
 mod data_url;
 mod http_encoding;
 mod local_files;
@@ -15,6 +16,11 @@ pub fn monolith() -> assert_cmd::Command {
     let mut command = assert_cmd::cargo_bin_cmd!(env!("CARGO_PKG_NAME"));
     command.args(["--output", "-"]);
     command
+}
+
+/// Monolith, writing wherever it's told to.
+pub fn monolith_writing_files() -> assert_cmd::Command {
+    assert_cmd::cargo_bin_cmd!(env!("CARGO_PKG_NAME"))
 }
 
 /// What monolith has output, without what changes every time it saves something (when it's done

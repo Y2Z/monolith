@@ -91,6 +91,7 @@ pub fn with_each_browser(test: impl Fn(&Path)) {
 
 #[derive(Clone, Debug)]
 pub struct Request {
+    pub authorization: String,
     pub cookie: String,
     pub host: String,
     pub path: String,
@@ -173,6 +174,7 @@ fn respond(mut stream: TcpStream, responder: &Responder, requests: &Mutex<Vec<Re
     let mut lines = head.lines();
     let mut request_line = lines.next().unwrap_or("").split(' ').skip(1);
     let mut request = Request {
+        authorization: String::new(),
         cookie: String::new(),
         host: String::new(),
         path: request_line.next().unwrap_or("").to_string(),
@@ -184,6 +186,7 @@ fn respond(mut stream: TcpStream, responder: &Responder, requests: &Mutex<Vec<Re
             let value = value.trim();
             match name.to_ascii_lowercase().as_str() {
                 "content-length" => content_length = value.parse().unwrap_or(0),
+                "authorization" => request.authorization = value.to_string(),
                 "cookie" => request.cookie = value.to_string(),
                 "host" => request.host = value.to_string(),
                 "user-agent" => request.user_agent = value.to_string(),
@@ -237,7 +240,15 @@ impl Workspace {
         }
     }
 
+    /// Monolith, writing to STDOUT.
     pub fn monolith(&self) -> Command {
+        let mut command = self.monolith_writing_files();
+        command.args(["--output", "-"]);
+        command
+    }
+
+    /// Monolith, writing wherever it's told to.
+    pub fn monolith_writing_files(&self) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_monolith"));
         command
             .env("MONOLITH_BROWSER", &self.browser)
@@ -246,7 +257,7 @@ impl Workspace {
             .env("TMPDIR", self.temporary_directory.path())
             .env("TEMP", self.temporary_directory.path())
             .env("TMP", self.temporary_directory.path())
-            .args(["--browser", "--timeout", "300", "--output", "-"]);
+            .args(["--browser", "--timeout", "300"]);
         command
     }
 
@@ -254,7 +265,7 @@ impl Workspace {
     pub fn save(&self, url: &str, arguments: &[&str]) -> PathBuf {
         let path = self.directory.path().join("saved.html");
         let output = self
-            .monolith()
+            .monolith_writing_files()
             .args(arguments)
             .args(["--output"])
             .arg(&path)

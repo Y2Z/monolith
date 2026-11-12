@@ -195,23 +195,20 @@ mod passing {
     }
 
     #[test]
-    fn last_output_option_wins() {
+    fn output_option_can_only_be_given_once() {
         let (site, saved) = (site(), tempfile::tempdir().unwrap());
 
         let output = run(
             saved.path(),
-            &[
-                "-q",
-                "-o",
-                "first.html",
-                "-o",
-                "-",
-                &target(&site, "a.html"),
-            ],
+            &["-o", "first.html", "-o", "-", &target(&site, "a.html")],
         );
 
-        assert!(output.status.success());
-        assert!(String::from_utf8_lossy(&output.stdout).contains("<title>Page A</title>"));
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("the argument '--output <result.html>' cannot be used multiple times")
+        );
         assert!(names(saved.path()).is_empty());
     }
 }

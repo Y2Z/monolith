@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
@@ -18,6 +18,7 @@ use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{
     LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset, strip_elements,
 };
+use crate::mhtml::percent_decode;
 use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, resolve_url};
 
 /// What Session should put into its cache.
@@ -75,6 +76,7 @@ struct Fetched {
 struct Ctx<'a> {
     client: &'a Client,
     cookies: Option<&'a [Cookie]>,
+    credentials: &'a Credentials,
     options: &'a MonolithOptions,
     progress: Option<&'a PrefetchProgress>,
     seen: Mutex<HashSet<String>>,
@@ -95,8 +97,64 @@ impl Ctx<'_> {
     }
 }
 
-fn cache_key(url: &Url) -> String {
-    clean_url(url.clone()).as_str().to_string()
+/// Credentials for HTTP authentication, by origin: once given for a site, they go along with
+/// everything that gets retrieved from it, the way browsers do it. URLs never keep them,
+/// they'd end up in saved documents otherwise.
+#[derive(Clone, Default)]
+pub struct Credentials {
+    by_origin: HashMap<String, (String, Option<String>)>,
+}
+
+impl Credentials {
+    fn origin_of(url: &Url) -> Option<String> {
+        matches!(url.scheme(), "http" | "https").then(|| url.origin().ascii_serialization())
+    }
+
+    /// Takes credentials out of given URL, keeping them for its origin.
+    pub fn take_from(&mut self, url: &Url) -> Url {
+        if url.username().is_empty() && url.password().is_none() {
+            return url.clone();
+        }
+        if let Some(origin) = Credentials::origin_of(url) {
+            self.by_origin.insert(
+                origin,
+                (
+                    percent_decode(url.username()),
+                    url.password().map(percent_decode),
+                ),
+            );
+        }
+
+        without_credentials(url)
+    }
+
+    /// User name and password to authenticate with, for given URL.
+    pub fn of(&self, url: &Url) -> Option<&(String, Option<String>)> {
+        self.by_origin.get(&Credentials::origin_of(url)?)
+    }
+
+    /// What given URL gets cached under: what's retrieved as someone isn't what's retrieved
+    /// as someone else (or as nobody), user names keep them apart; passwords stay out of it.
+    pub fn cache_key(&self, url: &Url) -> String {
+        let mut url = clean_url(without_credentials(url));
+        match self.of(&url) {
+            // Password alone is still someone, URLs can't show that
+            Some((user, _)) if user.is_empty() => format!("(password) {}", url),
+            Some((user, _)) => {
+                let _ = url.set_username(user);
+                url.to_string()
+            }
+            None => url.to_string(),
+        }
+    }
+}
+
+/// URL without user name and password.
+pub fn without_credentials(url: &Url) -> Url {
+    let mut url = url.clone();
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+    url
 }
 
 pub fn is_domain_allowed(url: &Url, options: &MonolithOptions) -> bool {
@@ -203,11 +261,16 @@ fn create_exchange(
 pub fn fetch_remote_asset(
     client: &Client,
     cookies: Option<&[Cookie]>,
+    credentials: &Credentials,
     options: &MonolithOptions,
     parent_url: &Url,
     url: &Url,
     mut exchanges: Option<&mut Vec<Exchange>>,
 ) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
+    // Credentials that come with the URL itself are for that URL's origin
+    let mut credentials = credentials.clone();
+    let url: &Url = &credentials.take_from(url);
+    let parent_url: &Url = &without_credentials(parent_url);
     let cache_key: String = clean_url(url.clone()).as_str().to_string();
 
     if !is_domain_allowed(url, options) {
@@ -222,11 +285,13 @@ pub fn fetch_remote_asset(
     let mut redirects: usize = 0;
     let (response, sent_headers) = loop {
         let sent_headers = request_headers(cookies, parent_url, &current_url);
-        let response = match client
+        let mut request = client
             .get(current_url.as_str())
-            .headers(sent_headers.clone())
-            .send()
-        {
+            .headers(sent_headers.clone());
+        if let Some((user, password)) = credentials.of(&current_url) {
+            request = request.basic_auth(user, password.as_ref());
+        }
+        let response = match request.send() {
             Ok(response) => response,
             Err(error) => {
                 if !options.silent {
@@ -333,9 +398,15 @@ pub fn fetch_remote_asset(
     Ok((data, response_url, media_type, charset))
 }
 
+/// What requests get made with.
+pub struct Requester<'a> {
+    pub client: &'a Client,
+    pub cookies: Option<&'a [Cookie]>,
+    pub credentials: &'a Credentials,
+}
+
 pub fn prefetch_assets(
-    client: &Client,
-    cookies: Option<&[Cookie]>,
+    requester: Requester,
     options: &MonolithOptions,
     document_url: &Url,
     document: &Handle,
@@ -344,7 +415,12 @@ pub fn prefetch_assets(
 ) -> Vec<CacheEntry> {
     let mut jobs: Vec<Job> = vec![];
     collect_html(document, "", document_url, options, &mut jobs);
-    jobs.retain(|job| !is_cached(&cache_key(&job.url)));
+    let Requester {
+        client,
+        cookies,
+        credentials,
+    } = requester;
+    jobs.retain(|job| !is_cached(&credentials.cache_key(&job.url)));
     if jobs.is_empty() {
         return vec![];
     }
@@ -359,10 +435,11 @@ pub fn prefetch_assets(
 
     let (tx, rx) = mpsc::channel();
     let mut seen: HashSet<String> = HashSet::new();
-    seen.insert(cache_key(document_url));
+    seen.insert(credentials.cache_key(document_url));
     let ctx = Ctx {
         client,
         cookies,
+        credentials,
         options,
         progress,
         seen: Mutex::new(seen),
@@ -380,7 +457,7 @@ pub fn prefetch_assets(
 
     let mut entries: Vec<CacheEntry> = vec![];
     for fetched in rx {
-        let final_key = cache_key(&fetched.final_url);
+        let final_key = credentials.cache_key(&fetched.final_url);
 
         // Session::retrieve_asset() looks assets up by their *request* URL and, on a
         // cache hit, reports that same URL as the final one. That's harmless for leaf
@@ -410,7 +487,7 @@ pub fn prefetch_assets(
 }
 
 fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
-    let request_key = cache_key(&job.url);
+    let request_key = ctx.credentials.cache_key(&job.url);
     if !ctx.seen.lock().unwrap().insert(request_key.clone()) {
         return; // Already fetched or in flight
     }
@@ -422,6 +499,7 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
         let (data, final_url, media_type, charset) = match fetch_remote_asset(
             ctx.client,
             ctx.cookies,
+            ctx.credentials,
             ctx.options,
             &job.parent_url,
             &job.url,

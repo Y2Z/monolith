@@ -5,7 +5,7 @@ mod failing {
     use std::thread;
 
     use monolith::core::MonolithOptions;
-    use monolith::net::fetch_remote_asset;
+    use monolith::net::{Credentials, fetch_remote_asset};
     use monolith::url::Url;
     use reqwest::blocking::Client;
 
@@ -24,7 +24,15 @@ mod failing {
             ..Default::default()
         };
 
-        let result = fetch_remote_asset(&Client::new(), None, &options, &url, &url, None);
+        let result = fetch_remote_asset(
+            &Client::new(),
+            None,
+            &Credentials::default(),
+            &options,
+            &url,
+            &url,
+            None,
+        );
 
         assert!(result.is_err());
     }
