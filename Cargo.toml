@@ -23,11 +23,9 @@ include = [
     "build.rs",
     "assets/icon/icon-128.png",
     "assets/icon/icon.ico",
-    "assets/fonts/Jost-300-Light.ttf",
-    "assets/fonts/Jost-OFL.txt",
     "assets/scripts/replay.js",
 ]
-license = "0BSD AND OFL-1.1"
+license = "0BSD"
 
 [dependencies]
 base64 = "=0.23.1" # Used for integrity attributes

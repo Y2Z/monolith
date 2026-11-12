@@ -68,8 +68,6 @@ const OUTPUT_ENCODINGS: &[&str] = &[
     "windows-874",
 ];
 const ENCODING_LIST_HEIGHT: f32 = 150.0; // Scrolls instead of leaving the fixed-size window
-const FONT: &[u8] = include_bytes!("../assets/fonts/Jost-300-Light.ttf");
-const FONT_NAME: &str = "Jost";
 const FONT_SIZE: f32 = 14.0;
 const FOCUS_GRAY: u8 = 0xCC; // Border of the text field that's being typed into
 const FORMAT_BUTTON_WIDTH: f32 = 72.0;
@@ -263,7 +261,7 @@ fn main() -> eframe::Result {
         options,
         Box::new(|cc| {
             // Stick to the dark theme, otherwise a light system theme would discard these colors
-            load_fonts(&cc.egui_ctx);
+            set_font_sizes(&cc.egui_ctx);
             cc.egui_ctx.set_theme(egui::Theme::Dark);
             cc.egui_ctx
                 .options_mut(|options| options.zoom_with_keyboard = false); // The window has a fixed size
@@ -274,20 +272,8 @@ fn main() -> eframe::Result {
     )
 }
 
-/// Make the embedded font the default one; stock fonts stay around as fallback
-fn load_fonts(ctx: &egui::Context) {
-    let mut fonts = egui::FontDefinitions::default();
-    fonts.font_data.insert(
-        FONT_NAME.to_string(),
-        Arc::new(egui::FontData::from_static(FONT)),
-    );
-    fonts
-        .families
-        .entry(egui::FontFamily::Proportional)
-        .or_default()
-        .insert(0, FONT_NAME.to_string());
-    ctx.set_fonts(fonts);
-
+/// Stock fonts it is, in sizes of our own
+fn set_font_sizes(ctx: &egui::Context) {
     ctx.all_styles_mut(|style| {
         for (text_style, size) in [
             (egui::TextStyle::Body, FONT_SIZE),

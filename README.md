@@ -266,5 +266,3 @@ Besides documents, Monolith takes archives as targets, and never goes online to 
 
 Monolith is free to use, copy, modify, and distribute, for any purpose, without even having to give credit: it comes under the [Zero-Clause BSD](LICENSE) license (0BSD).
 This software is distributed without any warranty.
-
-The Jost font it comes with has a license of its own, the [SIL Open Font License](assets/fonts/Jost-OFL.txt).
