@@ -50,7 +50,21 @@ jobs:
     - name: Run tests without browser support
       run: cargo test --locked --verbose --no-default-features --features cli --test mod
 
+    # Checks below run even if tests fail, for everything that's wrong to show up at once
     - name: Check code formatting
+      if: ${{ !cancelled() }}
       run: |
         rustup component add rustfmt
         cargo fmt --all -- --check
+
+    - name: Lint
+      if: ${{ !cancelled() }}
+      run: |
+        rustup component add clippy
+        cargo clippy --all-targets --locked -- -D warnings
+        cargo clippy --all-targets --locked --no-default-features --features cli -- -D warnings
+
+    # GUI builds need packages that Linux runners don't have
+    - name: Lint GUI
+      if: ${{ !cancelled() && runner.os != 'Linux' }}
+      run: cargo clippy --all-targets --locked --features gui -- -D warnings
