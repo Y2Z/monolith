@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -19,6 +20,39 @@ use crate::core::{
 use crate::mhtml::MhtmlArchive;
 use crate::net::{self, PrefetchProgress};
 use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
+use crate::warc::WarcStream;
+
+/// Provides what the result gets written into, given the title of the document (if it has one).
+pub type OutputOpener = Box<dyn FnOnce(Option<&str>) -> io::Result<Box<dyn Write>>>;
+
+/// Where the result goes.
+pub(crate) enum Output {
+    Memory(Vec<u8>),
+    Stream(Box<dyn Write>),
+}
+
+impl Write for Output {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Output::Memory(data) => data.write(buf),
+            Output::Stream(stream) => stream.write(buf),
+        }
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        match self {
+            Output::Memory(data) => data.write_all(buf),
+            Output::Stream(stream) => stream.write_all(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Output::Memory(_) => Ok(()),
+            Output::Stream(stream) => stream.flush(),
+        }
+    }
+}
 
 pub struct Session {
     /// MHTML archive the document came from; when loaded, assets get retrieved from it (and only from it)
@@ -29,16 +63,30 @@ pub struct Session {
     cache: Option<Cache>,
     client: Client,
     pub(crate) cookies: Option<Vec<Cookie>>,
+    /// Where the result gets written, the result is provided as is if there's nowhere to write it
+    destination: Option<OutputOpener>,
     /// Encoding of the document (or stylesheet) currently being processed, if it declares one.
     /// Stylesheets that don't specify their own encoding get decoded using it.
     pub environment_encoding: Option<&'static Encoding>,
     pub options: MonolithOptions,
+    /// What the result has been written into so far, None until it's known what to call it
+    output: Option<Output>,
+    /// What went wrong while writing the result, if anything did
+    output_error: Option<io::Error>,
     /// Contents of assets that got modified, integrity of which is yet to be checked
     original_data: HashMap<String, Vec<u8>>,
     /// Receives the encoding the document ends up being saved in, if set
     pub output_encoding: Option<Arc<OnceLock<String>>>,
     /// Gets updated as assets are being prefetched, if set
     pub prefetch_progress: Option<Arc<PrefetchProgress>>,
+    /// URLs of everything that has been recorded
+    recorded_urls: HashSet<String>,
+    /// Markup to put right after the opening tag of HEAD
+    pub(crate) replay_markup: Option<String>,
+    /// Title to name the result by, instead of what the document says
+    pub(crate) title: Option<String>,
+    /// Records exchanges as they come, once the result has somewhere to go
+    warc: Option<WarcStream>,
 }
 
 impl Session {
@@ -101,11 +149,18 @@ impl Session {
             cache,
             cookies,
             client,
+            destination: None,
             environment_encoding: None,
             options,
+            output: None,
             output_encoding: None,
+            output_error: None,
             original_data: HashMap::new(),
             prefetch_progress: None,
+            recorded_urls: HashSet::new(),
+            replay_markup: None,
+            title: None,
+            warc: None,
         }
     }
 
@@ -133,9 +188,112 @@ impl Session {
         self.options.output_format.is_warc()
     }
 
+    /// Makes the result get written as it's being made, into whatever given function provides
+    /// once it's known what the document is called. Without it, the result is provided as is.
+    pub fn set_destination(&mut self, open: OutputOpener) {
+        self.destination = Some(open);
+    }
+
+    /// Gets the result somewhere to go, under given title. Whatever has been recorded so far
+    /// goes there first.
+    pub(crate) fn open_output(&mut self, title: Option<&str>) -> io::Result<()> {
+        if self.output.is_some() {
+            return Ok(());
+        }
+        self.output = Some(match self.destination.take() {
+            Some(open) => Output::Stream(open(title)?),
+            None => Output::Memory(vec![]),
+        });
+
+        if self.is_recording() {
+            let mut warc =
+                WarcStream::new(self.options.output_format == MonolithOutputFormat::WARCGZ);
+            let count = self
+                .cache
+                .as_ref()
+                .map_or(0, |cache| cache.exchange_count());
+            for index in 0..count {
+                if let Some(exchange) = self.cache.as_ref().and_then(|cache| cache.exchange(index))
+                {
+                    warc.add(&exchange);
+                }
+                let data = warc.take();
+                self.write_output(&data);
+            }
+            let data = warc.take();
+            self.write_output(&data);
+            if let Some(cache) = self.cache.as_mut() {
+                cache.clear_exchanges();
+            }
+            self.flush_output();
+            self.warc = Some(warc);
+        }
+
+        Ok(())
+    }
+
+    /// Adds to the result, the first thing that fails to get written is what finish_output() reports.
+    pub(crate) fn write_output(&mut self, data: &[u8]) {
+        if self.output_error.is_some() || data.is_empty() {
+            return;
+        }
+        if let Some(Err(error)) = self.output.as_mut().map(|output| output.write_all(data)) {
+            self.output_error = Some(error);
+        }
+    }
+
+    /// Makes what has been written so far show up wherever it's going.
+    fn flush_output(&mut self) {
+        if self.output_error.is_some() {
+            return;
+        }
+        if let Some(Err(error)) = self.output.as_mut().map(|output| output.flush()) {
+            self.output_error = Some(error);
+        }
+    }
+
+    /// For writing into the result directly, put_output() has to give it back.
+    pub(crate) fn take_output(&mut self, title: Option<&str>) -> io::Result<Output> {
+        self.open_output(title)?;
+        Ok(self.output.take().unwrap())
+    }
+
+    pub(crate) fn put_output(&mut self, output: Output) {
+        self.output = Some(output);
+    }
+
+    /// Makes sure all of the result has been written, provides it if it had nowhere to go.
+    pub(crate) fn finish_output(&mut self, title: Option<&str>) -> io::Result<Vec<u8>> {
+        self.open_output(title)?;
+        if let Some(error) = self.output_error.take() {
+            return Err(error);
+        }
+
+        match self.output.take() {
+            Some(Output::Memory(data)) => Ok(data),
+            Some(Output::Stream(mut stream)) => {
+                stream.flush()?;
+                Ok(vec![])
+            }
+            None => Ok(vec![]),
+        }
+    }
+
     /// Keeps a record of how something was obtained, for formats that keep that.
     pub fn record_exchange(&mut self, exchange: Exchange) {
-        if self.is_recording() {
+        if !self.is_recording() {
+            return;
+        }
+        self.recorded_urls.insert(exchange.url.clone());
+
+        if let Some(warc) = self.warc.as_mut() {
+            // The result has somewhere to go already, there's no need to keep it around
+            warc.add(&exchange);
+            let data = warc.take();
+            self.write_output(&data);
+            // Records are whole, and big enough to not be written any other way
+            self.flush_output();
+        } else {
             self.cache
                 .get_or_insert_with(|| Cache::new(0, None))
                 .add_exchange(exchange);
@@ -163,9 +321,7 @@ impl Session {
     }
 
     pub fn has_exchange(&self, url: &str) -> bool {
-        self.cache
-            .as_ref()
-            .is_some_and(|cache| cache.has_exchange(url))
+        self.recorded_urls.contains(url)
     }
 
     pub fn cache(&self) -> Option<&Cache> {
@@ -217,11 +373,12 @@ impl Session {
             |key| cache.contains_key(key),
         );
 
-        let cache = self.cache.as_mut().unwrap();
         for entry in entries {
-            cache.set(&entry.key, &entry.data, entry.media_type, entry.charset);
+            if let Some(cache) = self.cache.as_mut() {
+                cache.set(&entry.key, &entry.data, entry.media_type, entry.charset);
+            }
             for exchange in entry.exchanges {
-                cache.add_exchange(exchange);
+                self.record_exchange(exchange);
             }
         }
     }
