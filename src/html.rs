@@ -1,6 +1,6 @@
 use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::{SecondsFormat, Utc};
-use encoding_rs::Encoding;
+use encoding_rs::{CoderResult, Encoder, Encoding, UTF_8};
 use html5ever::interface::{Attribute, QualName};
 use html5ever::serialize::{SerializeOpts, serialize};
 use html5ever::tendril::{StrTendril, TendrilSink, format_tendril};
@@ -11,6 +11,7 @@ use markup5ever_rcdom::{Handle, Node, NodeData, RcDom, SerializableHandle};
 use sha2::{Digest, Sha256, Sha384, Sha512};
 use std::cell::RefCell;
 use std::default::Default;
+use std::io::{self, Write};
 use std::rc::Rc;
 
 use crate::core::{MonolithOptions, MonolithOutputFormat, declared_encoding, parse_media_type};
@@ -1085,6 +1086,21 @@ pub fn serialize_document(
 ) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
 
+    serialize_document_into(dom, document_encoding, options, None, &mut buf)
+        .expect("Unable to serialize DOM into buffer");
+
+    buf
+}
+
+/// Writes the document out as it gets serialized, in the given encoding, with given markup
+/// (if any) right after the opening tag of HEAD. Provides the last byte that has been written.
+pub fn serialize_document_into(
+    dom: RcDom,
+    document_encoding: String,
+    options: &MonolithOptions,
+    after_head: Option<&[u8]>,
+    out: &mut dyn Write,
+) -> io::Result<Option<u8>> {
     if !compose_csp(options).is_empty() {
         // Take care of CSP
         if let Some(html) = get_child_node_by_name(&dom.document, "html")
@@ -1117,19 +1133,176 @@ pub fn serialize_document(
         unwrap_noscripts(&dom.document);
     }
 
-    let serializable: SerializableHandle = dom.document.into();
-    serialize(&mut buf, &serializable, SerializeOpts::default())
-        .expect("Unable to serialize DOM into buffer");
+    // UTF-8 is what the serializer makes, it only needs to be changed into something else
+    let encoder = Some(document_encoding)
+        .filter(|label| !label.is_empty())
+        .and_then(|label| Encoding::for_label(label.as_bytes()))
+        .map(|encoding| encoding.output_encoding())
+        .filter(|encoding| *encoding != UTF_8)
+        .map(|encoding| encoding.new_encoder());
+    let mut injector = HeadInjector {
+        markup: after_head,
+        out,
+        last_byte: None,
+        tail: vec![],
+        is_in_head_tag: false,
+    };
+    let mut encoder = EncodingWriter {
+        encoder,
+        out: &mut injector,
+        pending: vec![],
+    };
 
-    if !document_encoding.is_empty()
-        && let Some(encoding) = Encoding::for_label(document_encoding.as_bytes())
-    {
-        let s: &str = &String::from_utf8_lossy(&buf);
-        let (data, _, _) = encoding.encode(s);
-        buf = data.to_vec();
+    let serializable: SerializableHandle = dom.document.into();
+    serialize(&mut encoder, &serializable, SerializeOpts::default())?;
+    encoder.finish()?;
+    injector.finish()
+}
+
+/// Changes UTF-8 into another encoding as it gets written, what the encoding can't have
+/// becomes numeric character references.
+struct EncodingWriter<'a> {
+    /// None for keeping it UTF-8
+    encoder: Option<Encoder>,
+    out: &'a mut dyn Write,
+    /// Beginning of a character that is yet to be written in full
+    pending: Vec<u8>,
+}
+
+impl EncodingWriter<'_> {
+    fn encode(&mut self, last: bool) -> io::Result<()> {
+        let Some(encoder) = self.encoder.as_mut() else {
+            return Ok(());
+        };
+        let complete = match std::str::from_utf8(&self.pending) {
+            Ok(text) => text.len(),
+            Err(error) if last => {
+                // Can't happen to what the serializer makes, but nothing should get lost
+                return Err(io::Error::new(io::ErrorKind::InvalidData, error));
+            }
+            Err(error) => error.valid_up_to(),
+        };
+        let mut text = std::str::from_utf8(&self.pending[..complete]).unwrap();
+        let mut buffer = [0u8; 8192];
+
+        loop {
+            let (result, read, written, _) = encoder.encode_from_utf8(text, &mut buffer, last);
+            self.out.write_all(&buffer[..written])?;
+            text = &text[read..];
+            if result == CoderResult::InputEmpty {
+                break;
+            }
+        }
+        self.pending.drain(..complete);
+
+        Ok(())
     }
 
-    buf
+    fn finish(mut self) -> io::Result<()> {
+        self.encode(true)
+    }
+}
+
+impl Write for EncodingWriter<'_> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.write_all(buf)?;
+        Ok(buf.len())
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        if self.encoder.is_none() {
+            return self.out.write_all(buf);
+        }
+        self.pending.extend_from_slice(buf);
+        self.encode(false)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
+    }
+}
+
+/// Puts markup right after the opening tag of HEAD, as the document goes through it.
+struct HeadInjector<'a> {
+    /// None once it's in, or if there's nothing to put in
+    markup: Option<&'a [u8]>,
+    out: &'a mut dyn Write,
+    last_byte: Option<u8>,
+    /// What could turn out to be the beginning of "<head"
+    tail: Vec<u8>,
+    /// Whether the opening tag of HEAD has begun, but not yet ended
+    is_in_head_tag: bool,
+}
+
+const HEAD_TAG_START: &[u8] = b"<head";
+
+impl HeadInjector<'_> {
+    fn pass(&mut self, data: &[u8]) -> io::Result<()> {
+        if let Some(byte) = data.last() {
+            self.last_byte = Some(*byte);
+            self.out.write_all(data)?;
+        }
+        Ok(())
+    }
+
+    fn finish(mut self) -> io::Result<Option<u8>> {
+        let tail = std::mem::take(&mut self.tail);
+        self.pass(&tail)?;
+        self.out.flush()?;
+        Ok(self.last_byte)
+    }
+}
+
+impl Write for HeadInjector<'_> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.write_all(buf)?;
+        Ok(buf.len())
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        let Some(markup) = self.markup else {
+            return self.pass(buf);
+        };
+        let mut data: Vec<u8> = std::mem::take(&mut self.tail);
+        data.extend_from_slice(buf);
+        let mut data: &[u8] = &data;
+
+        if !self.is_in_head_tag {
+            match data
+                .windows(HEAD_TAG_START.len())
+                .position(|part| part.eq_ignore_ascii_case(HEAD_TAG_START))
+            {
+                Some(start) => {
+                    let end = start + HEAD_TAG_START.len();
+                    self.pass(&data[..end])?;
+                    data = &data[end..];
+                    self.is_in_head_tag = true;
+                }
+                None => {
+                    // What's at the end could be where it begins
+                    let kept = data.len().min(HEAD_TAG_START.len() - 1);
+                    let (passed, kept) = data.split_at(data.len() - kept);
+                    self.pass(passed)?;
+                    self.tail = kept.to_vec();
+                    return Ok(());
+                }
+            }
+        }
+
+        match data.iter().position(|byte| *byte == b'>') {
+            Some(end) => {
+                self.pass(&data[..=end])?;
+                self.pass(markup)?;
+                self.markup = None;
+                self.pass(&data[end + 1..])
+            }
+            None => self.pass(data),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
+    }
 }
 
 pub fn retrieve_and_embed_asset(

@@ -6,6 +6,7 @@
 //! all look like that, they just differ in which headers and transfer encodings they use.
 
 use std::collections::HashMap;
+use std::io::{self, Write};
 
 use base64::alphabet;
 use base64::engine::general_purpose::{GeneralPurpose, PAD_INDIFFERENT};
@@ -232,6 +233,32 @@ pub fn create_mhtml_document(
 ) -> Vec<u8> {
     let mut mhtml: Vec<u8> = Vec::with_capacity(html.len() * 2);
 
+    write_mhtml_document(
+        session,
+        &mut mhtml,
+        html,
+        document_url,
+        document_location,
+        document_charset,
+        document_title,
+    )
+    .expect("Unable to write MHTML into buffer");
+
+    mhtml
+}
+
+/// Writes the archive out part by part, assets get retrieved as they're needed.
+pub(crate) fn write_mhtml_document(
+    session: &mut Session,
+    out: &mut dyn Write,
+    html: Vec<u8>,
+    document_url: &Url,
+    document_location: Option<&Url>,
+    document_charset: &str,
+    document_title: Option<&str>,
+) -> io::Result<()> {
+    let mut mhtml: Vec<u8> = vec![];
+
     // Message headers
     mhtml.extend_from_slice(b"From: <Saved by Monolith>\r\n");
     if let Some(location) = document_location {
@@ -258,6 +285,9 @@ pub fn create_mhtml_document(
         document_location,
         &html,
     );
+    drop(html);
+    out.write_all(&mhtml)?;
+    drop(mhtml);
 
     // Assets
     let document_key: String = clean_url(document_url.clone()).to_string();
@@ -285,15 +315,15 @@ pub fn create_mhtml_document(
         if let Ok((data, _final_url, media_type, charset)) =
             session.retrieve_asset(document_url, &asset_url)
         {
-            push_part(&mut mhtml, &media_type, &charset, Some(&asset_url), &data);
+            let mut part: Vec<u8> = vec![];
+            push_part(&mut part, &media_type, &charset, Some(&asset_url), &data);
+            out.write_all(&part)?;
             packed.push(asset_url.to_string());
         }
     }
 
     // End of MIME message
-    mhtml.extend_from_slice(format!("--{}--\r\n", MHTML_BOUNDARY).as_bytes());
-
-    mhtml
+    out.write_all(format!("--{}--\r\n", MHTML_BOUNDARY).as_bytes())
 }
 
 fn push_header(mhtml: &mut Vec<u8>, name: &str, value: &str) {

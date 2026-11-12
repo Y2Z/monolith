@@ -1,7 +1,9 @@
+use std::cell::RefCell;
 use std::fs;
-use std::io::Write;
+use std::io::{self, BufWriter, Write};
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::process::{self, Command};
+use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread;
@@ -447,33 +449,49 @@ fn elide_middle(ui: &egui::Ui, text: &str, font: &egui::FontId, max_width: f32) 
     elided(low)
 }
 
-/// Runs on the worker thread: build the document and write it to disk
+/// Runs on the worker thread: build the document, writing it to disk as it's being made
 fn save_document(
-    session: Session,
+    mut session: Session,
     target: String,
     output_path: &str,
     format: OutputFormat,
 ) -> Result<String, String> {
-    let (data, title) = create_monolithic_document(session, target).map_err(|e| e.to_string())?;
-    let path = format_output_path(
-        output_path,
-        &title.unwrap_or_default(),
-        format.to_monolith(),
-    );
+    // Where it's ended up, once the file has been created
+    let saved_path: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+    let output_path = output_path.to_string();
+    let path_holder = Rc::clone(&saved_path);
+    session.set_destination(Box::new(move |title| {
+        let path = format_output_path(
+            &output_path,
+            title.unwrap_or_default(),
+            format.to_monolith(),
+        );
 
-    // Always create missing directories, GUI users shouldn't have to know they need to exist
-    if let Some(dir) = Path::new(&path)
-        .parent()
-        .filter(|dir| !dir.as_os_str().is_empty())
-    {
-        fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
+        // Always create missing directories, GUI users shouldn't have to know they need to exist
+        if let Some(dir) = Path::new(&path)
+            .parent()
+            .filter(|dir| !dir.as_os_str().is_empty())
+        {
+            fs::create_dir_all(dir).map_err(|e| {
+                io::Error::new(e.kind(), format!("could not create {}: {e}", dir.display()))
+            })?;
+        }
+
+        let (file, path) = create_output_file(&path)
+            .map_err(|e| io::Error::new(e.kind(), format!("could not write {path}: {e}")))?;
+        *path_holder.borrow_mut() = Some(path);
+        Ok(Box::new(BufWriter::new(file)) as Box<dyn Write>)
+    }));
+
+    let result = create_monolithic_document(session, target);
+    let path = saved_path.borrow_mut().take();
+    match (result, path) {
+        (Ok(_), Some(path)) => Ok(path),
+        (Ok(_), None) => Err("nothing has been saved".to_string()),
+        // The file stays, whatever made it into it may still be of use
+        (Err(error), Some(path)) => Err(format!("{error} ({path} is incomplete)")),
+        (Err(error), None) => Err(error.to_string()),
     }
-
-    let (mut file, path) =
-        create_output_file(&path).map_err(|e| format!("could not write {path}: {e}"))?;
-    file.write_all(&data)
-        .map_err(|e| format!("could not write {path}: {e}"))?;
-    Ok(path)
 }
 
 /// Widths of the label and button columns, shared by the rows that hold a path text field

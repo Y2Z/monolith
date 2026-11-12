@@ -147,3 +147,93 @@ mod passing {
         );
     }
 }
+
+#[cfg(test)]
+mod streaming {
+    use monolith::core::MonolithOptions;
+    use monolith::html;
+    use monolith::replay::insert_replay_markup;
+
+    /// Accepts a byte at a time, to make sure nothing depends on how things are written.
+    struct Trickle(Vec<u8>);
+
+    impl std::io::Write for Trickle {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            match buf.first() {
+                Some(byte) => {
+                    self.0.push(*byte);
+                    Ok(1)
+                }
+                None => Ok(0),
+            }
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn serialize_both_ways(html: &str, encoding: &str, markup: &str) -> (Vec<u8>, Vec<u8>) {
+        let options = MonolithOptions::default();
+        let dom = html::html_to_dom(html.as_bytes(), "utf-8".to_string());
+        let whole = insert_replay_markup(
+            html::serialize_document(dom, encoding.to_string(), &options),
+            markup,
+        );
+        let dom = html::html_to_dom(html.as_bytes(), "utf-8".to_string());
+        let mut streamed = Trickle(vec![]);
+        let last_byte = html::serialize_document_into(
+            dom,
+            encoding.to_string(),
+            &options,
+            Some(markup.as_bytes()),
+            &mut streamed,
+        )
+        .unwrap();
+        assert_eq!(last_byte, streamed.0.last().copied());
+
+        (whole, streamed.0)
+    }
+
+    #[test]
+    fn markup_goes_right_after_head_tag() {
+        let (whole, streamed) = serialize_both_ways(
+            "<!-- <hea --><HEAD data-x=\"1\"><title>T</title></HEAD><body>Hi</body>",
+            "utf-8",
+            "<script>replay()</script>",
+        );
+
+        assert_eq!(streamed, whole);
+        assert!(
+            String::from_utf8_lossy(&streamed)
+                .contains("<head data-x=\"1\"><script>replay()</script><title>")
+        );
+    }
+
+    #[test]
+    fn characters_get_encoded_whole() {
+        let text = "メイリオ — ü ✓ 🙂 ".repeat(2000);
+        for encoding in [
+            "Shift_JIS",
+            "windows-1252",
+            "ISO-2022-JP",
+            "UTF-16LE",
+            "utf-8",
+        ] {
+            let (whole, streamed) = serialize_both_ways(
+                &format!("<html><head></head><body><p>{}</p></body></html>", text),
+                encoding,
+                "",
+            );
+
+            assert_eq!(streamed, whole, "{}", encoding);
+        }
+    }
+
+    #[test]
+    fn unencodable_characters_become_references() {
+        let (_, streamed) = serialize_both_ways("<body>✓</body>", "windows-1252", "");
+
+        assert!(String::from_utf8_lossy(&streamed).contains("&#10003;"));
+    }
+}

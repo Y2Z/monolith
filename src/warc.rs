@@ -584,38 +584,60 @@ impl Writer {
     }
 }
 
+/// Archive that gets written record by record: what's been put together goes out with take(), so
+/// nothing but the record being written has to stay around.
+pub(crate) struct WarcStream {
+    writer: Writer,
+}
+
+impl WarcStream {
+    /// Starts an archive, with a record that says what it is.
+    pub(crate) fn new(compress: bool) -> WarcStream {
+        let mut writer = Writer {
+            compress,
+            output: vec![],
+            warcinfo_id: record_id("warcinfo"),
+        };
+        let info = format!(
+            "software: {}/{}\r\nformat: WARC File Format 1.1\r\n\
+             conformsTo: https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/\r\n",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION")
+        );
+        let warcinfo_id = writer.warcinfo_id.clone();
+        writer.write_record(
+            "warcinfo",
+            &warcinfo_id,
+            &Utc::now(),
+            &[],
+            "application/warc-fields",
+            info.as_bytes(),
+        );
+
+        WarcStream { writer }
+    }
+
+    pub(crate) fn add(&mut self, exchange: &Exchange) {
+        self.writer.write_exchange(exchange);
+    }
+
+    /// What's been put together since the last time.
+    pub(crate) fn take(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.writer.output)
+    }
+}
+
 /// Puts everything the session has recorded into an archive.
 pub fn create_warc_document(session: &Session) -> Vec<u8> {
-    let now = Utc::now();
-    let mut writer = Writer {
-        compress: session.options.output_format == MonolithOutputFormat::WARCGZ,
-        output: vec![],
-        warcinfo_id: record_id("warcinfo"),
-    };
-
-    let info = format!(
-        "software: {}/{}\r\nformat: WARC File Format 1.1\r\n\
-         conformsTo: https://iipc.github.io/warc-specifications/specifications/warc-format/warc-1.1/\r\n",
-        env!("CARGO_PKG_NAME"),
-        env!("CARGO_PKG_VERSION")
-    );
-    let warcinfo_id = writer.warcinfo_id.clone();
-    writer.write_record(
-        "warcinfo",
-        &warcinfo_id,
-        &now,
-        &[],
-        "application/warc-fields",
-        info.as_bytes(),
-    );
+    let mut stream = WarcStream::new(session.options.output_format == MonolithOutputFormat::WARCGZ);
 
     if let Some(cache) = session.cache() {
         for index in 0..cache.exchange_count() {
             if let Some(exchange) = cache.exchange(index) {
-                writer.write_exchange(&exchange);
+                stream.add(&exchange);
             }
         }
     }
 
-    writer.output
+    stream.take()
 }

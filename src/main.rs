@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Error as IoError, Read, Write};
+use std::io::{self, BufWriter, Error as IoError, Read, Write};
 use std::path::Path;
 use std::process;
 
@@ -133,62 +133,43 @@ struct Cli {
     target: String,
 }
 
-pub enum Output {
-    Stdout(io::Stdout),
-    File(fs::File),
-}
+/// Opens what the result gets written into: STDOUT, or a file named after the document.
+fn open_output(
+    destination: &str,
+    document_title: &str,
+    format: MonolithOutputFormat,
+    create_dirs: bool,
+) -> Result<Box<dyn Write>, IoError> {
+    if destination.is_empty() || destination.eq("-") {
+        Ok(Box::new(BufWriter::new(io::stdout())))
+    } else {
+        let final_destination = format_output_path(destination, document_title, format);
 
-impl Output {
-    fn new(
-        destination: &str,
-        document_title: &str,
-        format: MonolithOutputFormat,
-        create_dirs: bool,
-    ) -> Result<Output, IoError> {
-        if destination.is_empty() || destination.eq("-") {
-            Ok(Output::Stdout(io::stdout()))
-        } else {
-            let final_destination = format_output_path(destination, document_title, format);
-
-            // Create directories in the path to output file if they are
-            // missing and the user opted in via --create-dirs (like curl).
-            // Without the flag a clear error is reported instead of creating
-            // directory trees the user did not ask for.
-            if let Some(parent) = Path::new(&final_destination).parent()
-                && !parent.as_os_str().is_empty()
-                && !parent.exists()
-            {
-                if create_dirs {
-                    fs::create_dir_all(parent)?;
-                } else {
-                    return Err(IoError::new(
-                        io::ErrorKind::NotFound,
-                        format!(
-                            "cannot write to '{}': directory '{}' does not exist (use --create-dirs to create it)",
-                            final_destination,
-                            parent.display()
-                        ),
-                    ));
-                }
-            }
-
-            // Nothing gets replaced, files that would be get saved under names of their own
-            let (file, _) = create_output_file(&final_destination)?;
-            Ok(Output::File(file))
-        }
-    }
-
-    fn write(&mut self, bytes: &[u8]) -> Result<(), IoError> {
-        match self {
-            Output::Stdout(stdout) => {
-                stdout.write_all(bytes)?;
-                stdout.flush()
-            }
-            Output::File(file) => {
-                file.write_all(bytes)?;
-                file.flush()
+        // Create directories in the path to output file if they are
+        // missing and the user opted in via --create-dirs (like curl).
+        // Without the flag a clear error is reported instead of creating
+        // directory trees the user did not ask for.
+        if let Some(parent) = Path::new(&final_destination).parent()
+            && !parent.as_os_str().is_empty()
+            && !parent.exists()
+        {
+            if create_dirs {
+                fs::create_dir_all(parent)?;
+            } else {
+                return Err(IoError::new(
+                    io::ErrorKind::NotFound,
+                    format!(
+                        "cannot write to '{}': directory '{}' does not exist (use --create-dirs to create it)",
+                        final_destination,
+                        parent.display()
+                    ),
+                ));
             }
         }
+
+        // Nothing gets replaced, files that would be get saved under names of their own
+        let (file, _) = create_output_file(&final_destination)?;
+        Ok(Box::new(BufWriter::new(file)))
     }
 }
 
@@ -303,7 +284,18 @@ fn main() {
     // Initiate session
     let output_format = options.output_format.clone();
     let silent = options.silent;
-    let session: Session = Session::new(cache, cookies, options);
+    let mut session: Session = Session::new(cache, cookies, options);
+    // The result gets written as it's being made, once it's known what to call it
+    let destination = destination.unwrap_or_default();
+    let create_dirs = cli.create_dirs;
+    session.set_destination(Box::new(move |title| {
+        open_output(
+            &destination,
+            title.unwrap_or_default(),
+            output_format,
+            create_dirs,
+        )
+    }));
 
     // The option is always there, builds that can't do what it asks for say so
     if cli.browser && cfg!(not(feature = "browser")) {
@@ -330,36 +322,12 @@ fn main() {
         create_monolithic_document(session, cli.target)
     };
 
-    // Output result
-    match result {
-        Ok((result, title)) => {
-            // Define output
-            match Output::new(
-                &destination.unwrap_or(String::new()),
-                &title.unwrap_or_default(),
-                output_format,
-                cli.create_dirs,
-            ) {
-                Ok(mut output) => {
-                    // Write result into STDOUT or file
-                    output.write(&result).expect("could not write output");
-                }
-                Err(error) => {
-                    if !silent {
-                        print_error_message(&format!("Error: {}", error));
-                    }
-
-                    exit_code = 1;
-                }
-            }
+    if let Err(error) = result {
+        if !silent {
+            print_error_message(&format!("Error: {}", error));
         }
-        Err(error) => {
-            if !silent {
-                print_error_message(&format!("Error: {}", error));
-            }
 
-            exit_code = 1;
-        }
+        exit_code = 1;
     }
 
     // TODO: bring this back

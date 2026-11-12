@@ -16,18 +16,18 @@ use crate::browser::{ColorScheme, render_page};
 use crate::har::{is_har, parse_har};
 use crate::html::{
     add_favicon, get_base_url, get_charset, get_robots, get_title, has_favicon, html_to_dom,
-    inline_stylesheets, serialize_document, set_base_url, set_charset, set_metadata, set_robots,
-    strip_elements, targets_element_anywhere, walk,
+    inline_stylesheets, serialize_document, serialize_document_into, set_base_url, set_charset,
+    set_metadata, set_robots, strip_elements, targets_element_anywhere, walk,
 };
-use crate::mhtml::{ArchivedAsset, MhtmlArchive, create_mhtml_document, is_mhtml, parse_mhtml};
+use crate::mhtml::{ArchivedAsset, MhtmlArchive, is_mhtml, parse_mhtml, write_mhtml_document};
 use crate::replay::{
-    CapturedAsset, CapturedPage, create_replay_markup, exchanges_of, insert_replay_markup, is_html,
-    is_script, rewrite_scripts, rewrite_stylesheets,
+    CapturedAsset, CapturedPage, create_replay_markup, exchanges_of, is_html, is_script,
+    rewrite_scripts, rewrite_stylesheets,
 };
 use crate::session::Session;
 use crate::simple::simplify_document;
 use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
-use crate::warc::{create_warc_document, is_warc, parse_warc};
+use crate::warc::{is_warc, parse_warc};
 use crate::webarchive::{is_webarchive, parse_webarchive};
 
 #[derive(Debug)]
@@ -40,6 +40,12 @@ impl MonolithError {
         MonolithError {
             details: msg.to_string(),
         }
+    }
+}
+
+impl From<io::Error> for MonolithError {
+    fn from(error: io::Error) -> MonolithError {
+        MonolithError::new(&error.to_string())
     }
 }
 
@@ -147,6 +153,20 @@ const PLAINTEXT_MEDIA_TYPES: &[&str] = &[
     "image/svg+xml",                   // .svg
 ];
 
+type MonolithResult = Result<(Vec<u8>, Option<String>), MonolithError>;
+
+/// Done with what has been recorded, or written in other ways.
+fn finish(mut session: Session, title: Option<String>) -> MonolithResult {
+    Ok((session.finish_output(title.as_deref())?, title))
+}
+
+/// Provides what has been obtained the way it is, without processing it (the way browsers do).
+fn finish_as_is(mut session: Session, data: &[u8]) -> MonolithResult {
+    session.open_output(None)?;
+    session.write_output(data);
+    finish(session, None)
+}
+
 fn record_captured_page(session: &mut Session, page: &CapturedPage) {
     for asset in &page.assets {
         for exchange in exchanges_of(asset) {
@@ -199,7 +219,7 @@ pub fn create_monolithic_document_from_data(
     input_data: Vec<u8>,
     input_encoding: Option<String>,
     input_target: Option<String>,
-) -> Result<(Vec<u8>, Option<String>), MonolithError> {
+) -> MonolithResult {
     // Simplified documents have no use for JavaScript
     if session.options.simplify {
         session.options.no_js = true;
@@ -244,16 +264,15 @@ pub fn create_monolithic_document_from_data(
 
         if session.is_recording() {
             record_captured_page(&mut session, &page);
-            return Ok((create_warc_document(&session), None));
+            return finish(session, None);
         }
 
         if !is_html(&page.content_type) {
-            // Provide output as is (without processing it, the way browsers do)
             let root = page
                 .assets
                 .into_iter()
                 .find(|asset| asset.destination == "document");
-            return Ok((root.map(|root| root.data).unwrap_or_default(), None));
+            return finish_as_is(session, &root.map(|root| root.data).unwrap_or_default());
         }
         if !session.options.no_js
             && !session.options.simplify
@@ -298,11 +317,10 @@ pub fn create_monolithic_document_from_data(
                 let url = url.clone();
                 session.load_archive(archive);
                 session.record_resource(&url, &data, &media_type, &charset);
-                return Ok((create_warc_document(&session), None));
+                return finish(session, None);
             }
 
-            // Provide output as is (without processing it, the way browsers do)
-            return Ok((root.data.clone(), None));
+            return finish_as_is(session, &root.data);
         }
         let data: Vec<u8> = root.data.clone();
         let encoding: Option<String> = Some(root.charset.clone()).filter(|c| !c.is_empty());
@@ -437,6 +455,11 @@ pub fn create_monolithic_document_from_data(
         &session.options.wipe_elements,
     );
 
+    // The result can start being written as soon as it's known what to call it: what's done
+    // with the document doesn't change its title
+    let document_title: Option<String> = session.title.take().or_else(|| get_title(&dom.document));
+    session.open_output(document_title.as_deref())?;
+
     session.prefetch_assets(&base_url, &dom.document);
 
     // A byte order mark beats any declaration when it comes to decoding the document
@@ -447,6 +470,12 @@ pub fn create_monolithic_document_from_data(
     // Traverse through the document and embed remote assets
     session.environment_encoding = environment_encoding;
     walk(&mut session, &base_url, &dom.document);
+
+    if session.is_recording() {
+        // What has been put together only served to find out what it's made of
+        return finish(session, document_title);
+    }
+
     // Stylesheets go where they can be as long as they need to be
     if session.options.output_format == MonolithOutputFormat::HTML {
         inline_stylesheets(&dom, &dom.document);
@@ -508,51 +537,48 @@ pub fn create_monolithic_document_from_data(
             .as_ref(),
     );
 
-    let document_title: Option<String> = get_title(&dom.document);
-    // Serialize DOM tree
-    let mut html: Vec<u8> = serialize_document(dom, document_encoding.clone(), &session.options);
-
-    // Document's own URL (data URLs aren't of much use in archives)
-    let document_location: Option<Url> = input_target
-        .as_deref()
-        .and_then(|target| Url::parse(target).ok())
-        .filter(|url| url.scheme() != "data");
-
-    if session.is_recording() {
-        // What has been put together only served to find out what it's made of
-        return Ok((create_warc_document(&session), document_title));
-    }
+    let mut output = session.take_output(document_title.as_deref())?;
 
     if session.options.output_format == MonolithOutputFormat::MHTML {
-        // Outputting in MHTML format
-        let mhtml: Vec<u8> = create_mhtml_document(
+        // Document's own URL (data URLs aren't of much use in archives)
+        let document_location: Option<Url> = input_target
+            .as_deref()
+            .and_then(|target| Url::parse(target).ok())
+            .filter(|url| url.scheme() != "data");
+        let html: Vec<u8> = serialize_document(dom, document_encoding.clone(), &session.options);
+        let result = write_mhtml_document(
             &mut session,
+            &mut output,
             html,
             &base_url,
             document_location.as_ref(),
             &document_encoding,
             document_title.as_deref(),
         );
-
-        // Return
-        Ok((mhtml, document_title))
+        session.put_output(output);
+        result?;
     } else {
-        // Outputting in HTML format
-
-        // Ensure newline at end of result
-        if html.last() != Some(&b"\n"[0]) {
-            html.extend_from_slice(b"\n");
-        }
-
-        // Return
-        Ok((html, document_title))
+        let markup = session.replay_markup.take();
+        let result = serialize_document_into(
+            dom,
+            document_encoding,
+            &session.options,
+            markup.as_deref().map(str::as_bytes),
+            &mut output,
+        )
+        .and_then(|last_byte| match last_byte {
+            // Results end with a newline
+            Some(b'\n') => Ok(()),
+            _ => output.write_all(b"\n"),
+        });
+        session.put_output(output);
+        result?;
     }
+
+    finish(session, document_title)
 }
 
-pub fn create_monolithic_document(
-    mut session: Session,
-    target: String,
-) -> Result<(Vec<u8>, Option<String>), MonolithError> {
+pub fn create_monolithic_document(mut session: Session, target: String) -> MonolithResult {
     // Check if target was provided
     if target.is_empty() {
         return Err(MonolithError::new("no target specified"));
@@ -664,11 +690,10 @@ pub fn create_monolithic_document(
                             &media_type,
                             &charset,
                         );
-                        return Ok((create_warc_document(&session), None));
+                        return finish(session, None);
                     }
 
-                    // Provide output as text (without processing it, the way browsers do)
-                    return Ok((retrieved_data, None));
+                    return finish_as_is(session, &retrieved_data);
                 }
 
                 // If got redirected, set target_url to that
@@ -724,7 +749,7 @@ fn add_captured_assets(session: &mut Session, assets: &[CapturedAsset]) {
 pub fn create_monolithic_document_from_capture(
     mut session: Session,
     mut page: CapturedPage,
-) -> Result<(Vec<u8>, Option<String>), MonolithError> {
+) -> MonolithResult {
     if session.is_recording() {
         record_captured_page(&mut session, &page);
         // Without the page itself there would be nothing to open, what the browser has ended up
@@ -742,7 +767,7 @@ pub fn create_monolithic_document_from_capture(
             session.record_resource(&url, page.html.as_bytes(), "text/html", "utf-8");
         }
         let title = Some(page.title).filter(|title| !title.is_empty());
-        return Ok((create_warc_document(&session), title));
+        return finish(session, title);
     }
 
     let source_document = page
@@ -792,17 +817,16 @@ pub fn create_monolithic_document_from_capture(
         );
         let charset = parse_media_type(&source_document.content_type).1;
         let source_url = source_document.urls.last().cloned();
-        let (document, title) = create_monolithic_document_from_data(
+        // What the page has ended up calling itself beats what it started out with
+        session.title = Some(page.title).filter(|title| !title.is_empty());
+        session.replay_markup = Some(markup);
+
+        return create_monolithic_document_from_data(
             session,
             source_document.data,
             charset,
             source_url,
-        )?;
-
-        return Ok((
-            insert_replay_markup(document, &markup),
-            Some(page.title).filter(|title| !title.is_empty()).or(title),
-        ));
+        );
     }
 
     add_captured_assets(&mut session, &page.assets);

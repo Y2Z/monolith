@@ -181,6 +181,11 @@ impl Cache {
         Some(exchange)
     }
 
+    /// Forgets recorded exchanges, those that come after start over from the first index.
+    pub fn clear_exchanges(&mut self) {
+        self.exchanges.clear();
+    }
+
     /// Whether anything has been recorded for given URL.
     pub fn has_exchange(&self, url: &str) -> bool {
         self.exchanges
