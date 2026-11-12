@@ -137,4 +137,14 @@ mod passing {
 
         assert_eq!(final_destination, r#"Title.mht"#);
     }
+
+    #[test]
+    fn file_name_extension_compressed_warc() {
+        for template in ["%title%.%extension%", "%title%.%ext%"] {
+            assert_eq!(
+                format_output_path(template, "Page", MonolithOutputFormat::WARCGZ),
+                "Page.warc.gz"
+            );
+        }
+    }
 }

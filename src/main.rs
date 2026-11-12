@@ -65,7 +65,7 @@ struct Cli {
     #[arg(short = 'E', long, value_name = "UTF-8")]
     encoding: Option<String>,
 
-    /// Set output format: HTML (default), MHTML, or WARC (compressed if output file ends with .gz)
+    /// Set output format: HTML (default), MHTML, WARC, or WARCGZ (WARC compressed record by record)
     #[arg(short = 'F', long, value_name = "HTML")]
     format: Option<MonolithOutputFormat>,
 
@@ -244,10 +244,6 @@ fn main() {
 
         cookie_file_path = cli.cookie_file;
         destination = cli.output.clone();
-        options.compress = options.output_format == MonolithOutputFormat::WARC
-            && destination
-                .as_deref()
-                .is_some_and(|path| path.to_lowercase().ends_with(".gz"));
     }
 
     // Set up cache (attempt to create temporary file)

@@ -358,4 +358,38 @@ mod warc_output {
         assert!(!success);
         assert!(errors.contains("-b can provide one"));
     }
+
+    #[test]
+    fn compression_is_a_format_of_its_own() {
+        let directory = tempfile::tempdir().unwrap();
+        let named_like_compressed = directory.path().join("page.warc.gz");
+        let (_, _, success) = bytes(
+            &[
+                "-q",
+                "-F",
+                "WARC",
+                "-b",
+                "https://a.test/",
+                "-o",
+                named_like_compressed.to_str().unwrap(),
+                "-",
+            ],
+            b"<p>hi",
+        );
+        assert!(success);
+        // File names don't decide anything
+        assert!(
+            std::fs::read(&named_like_compressed)
+                .unwrap()
+                .starts_with(b"WARC/1.1")
+        );
+
+        let (output, _, success) = bytes(
+            &["-q", "-F", "WARCGZ", "-b", "https://a.test/", "-"],
+            b"<p>hi",
+        );
+        assert!(success);
+        assert!(output.starts_with(&[0x1f, 0x8b]));
+        assert_eq!(parse_warc(&output, None).unwrap().0.html, "<p>hi");
+    }
 }

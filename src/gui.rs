@@ -129,16 +129,23 @@ enum OutputFormat {
     Html,
     Mhtml,
     Warc,
+    WarcGz,
 }
 
 impl OutputFormat {
-    const ALL: [OutputFormat; 3] = [OutputFormat::Html, OutputFormat::Mhtml, OutputFormat::Warc];
+    const ALL: [OutputFormat; 4] = [
+        OutputFormat::Html,
+        OutputFormat::Mhtml,
+        OutputFormat::Warc,
+        OutputFormat::WarcGz,
+    ];
 
     fn label(self) -> &'static str {
         match self {
             OutputFormat::Html => "HTML",
             OutputFormat::Mhtml => "MHTML",
             OutputFormat::Warc => "WARC",
+            OutputFormat::WarcGz => "WARCGZ",
         }
     }
 
@@ -147,6 +154,7 @@ impl OutputFormat {
             OutputFormat::Html => MonolithOutputFormat::HTML,
             OutputFormat::Mhtml => MonolithOutputFormat::MHTML,
             OutputFormat::Warc => MonolithOutputFormat::WARC,
+            OutputFormat::WarcGz => MonolithOutputFormat::WARCGZ,
         }
     }
 }

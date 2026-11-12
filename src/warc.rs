@@ -13,6 +13,7 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 use crate::cache::Exchange;
+use crate::core::MonolithOutputFormat;
 use crate::replay::{
     ArchivedResponse, CapturedPage, HttpDetails, create_page_from_responses, is_html,
 };
@@ -587,7 +588,7 @@ impl Writer {
 pub fn create_warc_document(session: &Session) -> Vec<u8> {
     let now = Utc::now();
     let mut writer = Writer {
-        compress: session.options.compress,
+        compress: session.options.output_format == MonolithOutputFormat::WARCGZ,
         output: vec![],
         warcinfo_id: record_id("warcinfo"),
     };

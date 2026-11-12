@@ -6,8 +6,10 @@ mod helpers {
 
     pub fn session(compress: bool) -> Session {
         let options = MonolithOptions {
-            output_format: MonolithOutputFormat::WARC,
-            compress,
+            output_format: match compress {
+                true => MonolithOutputFormat::WARCGZ,
+                false => MonolithOutputFormat::WARC,
+            },
             ..Default::default()
         };
 

@@ -61,8 +61,20 @@ pub enum MonolithOutputFormat {
     HTML,
     MHTML,
     WARC,
+    /// WARC, compressed record by record
+    WARCGZ,
     // ZIM,
     // HAR,
+}
+
+impl MonolithOutputFormat {
+    /// Whether it's an archive of what has been exchanged with servers, rather than a document.
+    pub fn is_warc(&self) -> bool {
+        matches!(
+            self,
+            MonolithOutputFormat::WARC | MonolithOutputFormat::WARCGZ
+        )
+    }
 }
 
 impl FromStr for MonolithOutputFormat {
@@ -73,8 +85,9 @@ impl FromStr for MonolithOutputFormat {
             "html" | "htm" => Ok(MonolithOutputFormat::HTML),
             "mhtml" | "mht" => Ok(MonolithOutputFormat::MHTML),
             "warc" => Ok(MonolithOutputFormat::WARC),
+            "warcgz" => Ok(MonolithOutputFormat::WARCGZ),
             _ => Err(format!(
-                "unknown format \"{}\", use HTML, MHTML, or WARC",
+                "unknown format \"{}\", use HTML, MHTML, WARC, or WARCGZ",
                 format
             )),
         }
@@ -84,8 +97,6 @@ impl FromStr for MonolithOutputFormat {
 #[derive(Default)]
 pub struct MonolithOptions {
     pub base_url: Option<String>,
-    /// Compress output, for formats that can be compressed (WARC)
-    pub compress: bool,
     #[cfg(feature = "browser")]
     pub browser: bool,
     /// Overrides MONOLITH_BROWSER_COLOR_SCHEME, the system decides if neither is set
@@ -897,6 +908,8 @@ pub fn format_output_path(
                 "mht"
             } else if output_format == MonolithOutputFormat::WARC {
                 "warc"
+            } else if output_format == MonolithOutputFormat::WARCGZ {
+                "warc.gz"
             } else {
                 ""
             },
@@ -909,6 +922,8 @@ pub fn format_output_path(
                 "mhtml"
             } else if output_format == MonolithOutputFormat::WARC {
                 "warc"
+            } else if output_format == MonolithOutputFormat::WARCGZ {
+                "warc.gz"
             } else {
                 ""
             },

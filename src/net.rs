@@ -13,7 +13,6 @@ use reqwest::{StatusCode, Version};
 
 use crate::cache::Exchange;
 use crate::cookies::Cookie;
-use crate::core::MonolithOutputFormat;
 use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_info_message};
 use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{
@@ -419,7 +418,7 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
 
     s.spawn(move |s| {
         let mut exchanges: Vec<Exchange> = vec![];
-        let is_recording = ctx.options.output_format == MonolithOutputFormat::WARC;
+        let is_recording = ctx.options.output_format.is_warc();
         let (data, final_url, media_type, charset) = match fetch_remote_asset(
             ctx.client,
             ctx.cookies,

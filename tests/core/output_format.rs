@@ -36,6 +36,16 @@ mod passing_warc {
             );
         }
     }
+
+    #[test]
+    fn compressed_warc_in_any_case() {
+        for format in ["WARCGZ", "warcgz", "WarcGz"] {
+            assert_eq!(
+                format.parse::<MonolithOutputFormat>(),
+                Ok(MonolithOutputFormat::WARCGZ)
+            );
+        }
+    }
 }
 
 #[cfg(test)]
