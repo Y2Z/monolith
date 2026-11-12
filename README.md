@@ -126,7 +126,7 @@ monolith crawl.warc.gz -b https://some.site/page -o page.html
  - `-j`: Exclude JavaScript
  - `-k`: Accept invalid X.509 (TLS) certificates
  - `-n`: Extract contents of NOSCRIPT elements
- - `-o`: Write output to `file` (use “-” for STDOUT)
+ - `-o`: Write output to `file` (use “-” for STDOUT), files that are there already never get replaced: " (2)", " (3)"… get added to new files' names
  - `-q`: Be quiet
  - `-r`: Remove elements matching `selector` from the document (can be used multiple times)
  - `-s`: Exclude styles

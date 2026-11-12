@@ -12,7 +12,8 @@ use monolith::cache::Cache;
 use monolith::cookies::{Cookie, parse_cookie_file_contents};
 use monolith::core::{
     MonolithOptions, MonolithOutputFormat, create_monolithic_document,
-    create_monolithic_document_from_data, format_output_path, print_error_message,
+    create_monolithic_document_from_data, create_output_file, format_output_path,
+    print_error_message,
 };
 use monolith::session::Session;
 
@@ -171,7 +172,9 @@ impl Output {
                 }
             }
 
-            Ok(Output::File(fs::File::create(final_destination)?))
+            // Nothing gets replaced, files that would be get saved under names of their own
+            let (file, _) = create_output_file(&final_destination)?;
+            Ok(Output::File(file))
         }
     }
 
