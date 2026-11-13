@@ -73,7 +73,29 @@ fn starts(browser: &Path) -> bool {
 /// browser that can be started.
 pub fn browsers() -> Vec<PathBuf> {
     static BROWSERS: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    BROWSERS.get_or_init(find_browsers).clone()
+    BROWSERS
+        .get_or_init(|| {
+            let browsers = find_browsers();
+            match browsers.is_empty() {
+                true => say("no browsers found, nothing is going to be tested in browsers"),
+                false => say(&format!(
+                    "testing in {}",
+                    browsers
+                        .iter()
+                        .map(|browser| browser.display().to_string())
+                        .collect::<Vec<String>>()
+                        .join(" and ")
+                )),
+            }
+            browsers
+        })
+        .clone()
+}
+
+/// Says something no matter what: tests only get their output shown if they fail, this goes
+/// around that (only print!() and the like get captured).
+fn say(text: &str) {
+    let _ = writeln!(std::io::stderr(), "{}", text);
 }
 
 fn find_browsers() -> Vec<PathBuf> {
@@ -90,6 +112,18 @@ fn find_browsers() -> Vec<PathBuf> {
                 .filter(|path| uses_devtools(path) == is_devtools)
                 .cloned(),
         );
+        // PATH can have the same directory more than once (or links to it); what's in it can't
+        // be told apart by where it leads, snaps all lead to the same program
+        let mut seen: Vec<PathBuf> = vec![];
+        candidates.retain(|path| {
+            let path = match (path.parent().map(fs::canonicalize), path.file_name()) {
+                (Some(Ok(directory)), Some(name)) => directory.join(name),
+                _ => path.clone(),
+            };
+            let is_new = !seen.contains(&path);
+            seen.push(path);
+            is_new
+        });
         candidates
     };
 
@@ -99,7 +133,10 @@ fn find_browsers() -> Vec<PathBuf> {
         .find(|browser| match starts(browser) {
             true => true,
             false => {
-                println!("{} doesn't start, it won't be tested", browser.display());
+                say(&format!(
+                    "{} doesn't start, it won't be tested",
+                    browser.display()
+                ));
                 false
             }
         });
@@ -109,12 +146,7 @@ fn find_browsers() -> Vec<PathBuf> {
 
 /// Runs given test for every browser there is.
 pub fn with_each_browser(test: impl Fn(&Path)) {
-    let browsers = browsers();
-    if browsers.is_empty() {
-        println!("no browsers found, nothing has been tested");
-    }
-
-    for browser in browsers {
+    for browser in browsers() {
         let (running, finished) = &BROWSERS_RUNNING;
         let mut count = running.lock().unwrap_or_else(|error| error.into_inner());
         while *count >= MAX_BROWSERS_AT_ONCE {
