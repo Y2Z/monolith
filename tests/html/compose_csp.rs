@@ -25,9 +25,9 @@ mod passing {
     }
 
     #[test]
-    fn no_styles() {
+    fn remove_styles() {
         let options = MonolithOptions {
-            no_styles: true,
+            remove_styles: true,
             ..Default::default()
         };
         let csp_content = html::compose_csp(&options);
@@ -36,9 +36,9 @@ mod passing {
     }
 
     #[test]
-    fn no_fonts() {
+    fn remove_fonts() {
         let options = MonolithOptions {
-            no_fonts: true,
+            remove_fonts: true,
             ..Default::default()
         };
         let csp_content = html::compose_csp(&options);
@@ -91,9 +91,9 @@ mod passing {
     }
 
     #[test]
-    fn no_js() {
+    fn remove_js() {
         let options = MonolithOptions {
-            no_js: true,
+            remove_js: true,
             ..Default::default()
         };
         let csp_content = html::compose_csp(&options);
@@ -102,9 +102,9 @@ mod passing {
     }
 
     #[test]
-    fn no_images() {
+    fn remove_images() {
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             ..Default::default()
         };
         let csp_content = html::compose_csp(&options);
@@ -116,11 +116,11 @@ mod passing {
     fn all() {
         let options = MonolithOptions {
             isolate: true,
-            no_styles: true,
-            no_fonts: true,
+            remove_styles: true,
+            remove_fonts: true,
             wipe_elements: vec!["frame,iframe".to_string()],
-            no_js: true,
-            no_images: true,
+            remove_js: true,
+            remove_images: true,
             ..Default::default()
         };
         let csp_content = html::compose_csp(&options);

@@ -16,7 +16,7 @@ mod passing {
     fn session() -> Session {
         let options = MonolithOptions {
             silent: true,
-            no_images: true,
+            remove_images: true,
             ..Default::default()
         };
 
@@ -75,7 +75,7 @@ mod passing {
     #[test]
     fn freezes_the_page_without_scripts() {
         let mut session = session();
-        session.options.no_js = true;
+        session.options.remove_js = true;
 
         let (data, title) = create_monolithic_document_from_capture(session, page()).unwrap();
         let html = String::from_utf8_lossy(&data);

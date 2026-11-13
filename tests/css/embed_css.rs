@@ -169,7 +169,7 @@ mod passing {
     fn style_exclude_unquoted_images() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -202,7 +202,7 @@ mod passing {
     fn style_exclude_single_quoted_images() {
         let document_url: Url = Url::parse("data:,").unwrap();
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -390,7 +390,7 @@ mod passing {
     fn exclude_fonts() {
         let document_url: Url = Url::parse("https://doesntmatter.local/").unwrap();
         let options = MonolithOptions {
-            no_fonts: true,
+            remove_fonts: true,
             silent: true,
             ..Default::default()
         };

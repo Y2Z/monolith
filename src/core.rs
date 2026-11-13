@@ -113,6 +113,10 @@ pub struct MonolithOptions {
     /// Overrides MONOLITH_BROWSER_COLOR_SCHEME, the system decides if neither is set
     #[cfg(feature = "browser")]
     pub browser_color_scheme: Option<ColorScheme>,
+    /// Overrides MONOLITH_BROWSER_DISABLE_JS: whether pages get to run JavaScript in the browser
+    /// (unlike remove_js, which is about what ends up in the document)
+    #[cfg(feature = "browser")]
+    pub browser_disable_js: Option<bool>,
     /// Overrides MONOLITH_BROWSER_SCROLL_LIMIT: how many screens to go through, zero for none
     #[cfg(feature = "browser")]
     pub browser_scroll_limit: Option<u32>,
@@ -127,10 +131,10 @@ pub struct MonolithOptions {
     pub ignore_errors: bool,
     pub insecure: bool,
     pub isolate: bool,
-    pub no_styles: bool,
-    pub no_fonts: bool,
-    pub no_images: bool,
-    pub no_js: bool,
+    pub remove_styles: bool,
+    pub remove_fonts: bool,
+    pub remove_images: bool,
+    pub remove_js: bool,
     pub output_format: MonolithOutputFormat,
     pub remove_elements: Vec<String>,
     /// Set for documents that replay responses, instead of relying on a network
@@ -243,7 +247,7 @@ fn create_monolithic_document_from_bytes(
 ) -> MonolithResult {
     // Simplified documents have no use for JavaScript
     if session.options.simplify {
-        session.options.no_js = true;
+        session.options.remove_js = true;
     }
 
     // Validate options
@@ -292,7 +296,7 @@ fn create_monolithic_document_from_bytes(
                 .find(|asset| asset.destination == "document");
             return finish_as_is(session, &root.map(|root| root.data).unwrap_or_default());
         }
-        if !session.options.no_js
+        if !session.options.remove_js
             && !session.options.simplify
             && session.options.output_format == MonolithOutputFormat::HTML
         {
@@ -462,7 +466,7 @@ fn create_monolithic_document_from_bytes(
 
     let had_favicon: bool = has_favicon(&dom.document);
     if session.options.simplify
-        && !simplify_document(&dom, !session.options.no_styles)
+        && !simplify_document(&dom, !session.options.remove_styles)
         && !session.options.silent
     {
         print_error_message("found no article to simplify, the page may rely on JavaScript");
@@ -539,7 +543,7 @@ fn create_monolithic_document_from_bytes(
     }
 
     // Request and embed /favicon.ico (unless it's already linked in the document)
-    if !session.options.no_images
+    if !session.options.remove_images
         && !(had_favicon || targets_element_anywhere(&session.options, &["head", "html", "link"]))
         && !session.has_archive()
         && (base_url.scheme() == "http" || base_url.scheme() == "https")
@@ -1097,7 +1101,7 @@ pub fn create_monolithic_document_from_capture(
         .cloned();
 
     if let Some(source_document) = source_document.filter(|_| {
-        !session.options.no_js
+        !session.options.remove_js
             && !session.options.simplify
             && session.options.output_format == MonolithOutputFormat::HTML
     }) {
@@ -1153,7 +1157,7 @@ pub fn create_monolithic_document_from_capture(
 
     // What a browser leaves behind has already been through JavaScript, running it again would
     // only break it
-    session.options.no_js = true;
+    session.options.remove_js = true;
 
     create_monolithic_document_from_data(
         session,

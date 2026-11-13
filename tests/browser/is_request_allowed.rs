@@ -14,7 +14,7 @@ mod passing {
     fn what_was_not_excluded() {
         let options = MonolithOptions {
             domains: Some(vec!["ads.example.com".to_string()]),
-            no_images: true,
+            remove_images: true,
             ..Default::default()
         };
 
@@ -42,7 +42,7 @@ mod failing {
     #[test]
     fn excluded_kind_of_asset() {
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             ..Default::default()
         };
 

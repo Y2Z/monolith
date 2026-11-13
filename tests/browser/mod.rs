@@ -8,6 +8,7 @@ mod is_request_allowed;
 mod is_snap;
 mod is_unsupported_browser;
 mod parse_color_scheme;
+mod parse_disable_js;
 mod parse_endpoint;
 mod parse_gsettings_color_scheme;
 mod parse_macos_color_scheme;

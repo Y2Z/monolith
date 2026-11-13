@@ -735,10 +735,10 @@ fn collect_html(
                         if types.contains(&LinkType::Favicon)
                             || types.contains(&LinkType::AppleTouchIcon)
                         {
-                            if !options.no_images {
+                            if !options.remove_images {
                                 push_job(jobs, base_url, &href, AssetKind::Other);
                             }
-                        } else if types.contains(&LinkType::Stylesheet) && !options.no_styles {
+                        } else if types.contains(&LinkType::Stylesheet) && !options.remove_styles {
                             push_job(jobs, base_url, &href, AssetKind::Css);
                         } else if types.contains(&LinkType::Manifest) {
                             push_job(jobs, base_url, &href, AssetKind::Other);
@@ -746,14 +746,14 @@ fn collect_html(
                     }
                 }
                 "body" => {
-                    if !options.no_images
+                    if !options.remove_images
                         && let Some(background) = get_node_attr(node, "background")
                     {
                         push_job(jobs, base_url, &background, AssetKind::Other);
                     }
                 }
                 "img" => {
-                    if !options.no_images && !is_cors {
+                    if !options.remove_images && !is_cors {
                         let src = get_node_attr(node, "src").unwrap_or_default();
                         push_job(jobs, base_url, &src, AssetKind::Other);
 
@@ -763,7 +763,7 @@ fn collect_html(
                     }
                 }
                 "input" => {
-                    if !options.no_images
+                    if !options.remove_images
                         && get_node_attr(node, "type")
                             .unwrap_or_default()
                             .eq_ignore_ascii_case("image")
@@ -773,7 +773,7 @@ fn collect_html(
                     }
                 }
                 "image" => {
-                    if !options.no_images {
+                    if !options.remove_images {
                         for attr_name in ["href", "xlink:href"] {
                             if let Some(href) = get_node_attr(node, attr_name) {
                                 push_job(jobs, base_url, &href, AssetKind::Other);
@@ -782,7 +782,7 @@ fn collect_html(
                     }
                 }
                 "use" => {
-                    if !options.no_images {
+                    if !options.remove_images {
                         for attr_name in ["href", "xlink:href"] {
                             if let Some(href) = get_node_attr(node, attr_name) {
                                 // It's a document of its own whose contents get walked, and it
@@ -800,7 +800,7 @@ fn collect_html(
                         push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                     if parent_name == "picture"
-                        && !options.no_images
+                        && !options.remove_images
                         && !is_cors
                         && let Some(srcset) = get_node_attr(node, "srcset")
                     {
@@ -808,7 +808,7 @@ fn collect_html(
                     }
                 }
                 "script" => {
-                    if !options.no_js
+                    if !options.remove_js
                         && !is_cors
                         && let Some(src) = get_node_attr(node, "src")
                     {
@@ -816,7 +816,7 @@ fn collect_html(
                     }
                 }
                 "style" => {
-                    if !options.no_styles {
+                    if !options.remove_styles {
                         for css in node_text(node) {
                             collect_css_str(&css, base_url, options, jobs);
                         }
@@ -836,7 +836,7 @@ fn collect_html(
                     if let Some(src) = get_node_attr(node, "src").filter(|_| !is_cors) {
                         push_job(jobs, base_url, &src, AssetKind::Other);
                     }
-                    if !options.no_images
+                    if !options.remove_images
                         && let Some(poster) = get_node_attr(node, "poster")
                     {
                         push_job(jobs, base_url, &poster, AssetKind::Other);
@@ -851,7 +851,7 @@ fn collect_html(
                 _ => {}
             }
 
-            if !options.no_styles
+            if !options.remove_styles
                 && let Some(style) = get_node_attr(node, "style")
             {
                 collect_css_str(&style, base_url, options, jobs);
@@ -909,7 +909,7 @@ fn collect_css(
 
         match token {
             Token::ParenthesisBlock | Token::SquareBracketBlock | Token::CurlyBracketBlock => {
-                if options.no_fonts && curr_rule == "font-face" {
+                if options.remove_fonts && curr_rule == "font-face" {
                     continue; // Unconsumed block gets skipped by the parser
                 }
                 let prop = curr_prop.clone();
@@ -950,7 +950,7 @@ fn collect_css(
                     curr_rule = "".to_string();
                     push_job(jobs, base_url, value, AssetKind::Css);
                 } else if func_name == "url"
-                    && !(options.no_images && is_image_url_prop(&curr_prop))
+                    && !(options.remove_images && is_image_url_prop(&curr_prop))
                     && !is_requested_with_cors(rule_name)
                 {
                     push_job(jobs, base_url, value, AssetKind::Other);
@@ -960,7 +960,7 @@ fn collect_css(
                 if curr_rule == "import" {
                     curr_rule = "".to_string();
                     push_job(jobs, base_url, value, AssetKind::Css);
-                } else if !(options.no_images && is_image_url_prop(&curr_prop))
+                } else if !(options.remove_images && is_image_url_prop(&curr_prop))
                     && !is_requested_with_cors(rule_name)
                 {
                     push_job(jobs, base_url, value, AssetKind::Other);

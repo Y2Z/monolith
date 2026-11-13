@@ -118,7 +118,7 @@ fn freezes_if_javascript_is_not_wanted() {
     with_each_browser(|browser| {
         let server = app();
 
-        let html = Workspace::new(browser).render(&server.url("/"), &["--no-js"]);
+        let html = Workspace::new(browser).render(&server.url("/"), &["--remove-js"]);
 
         assert!(!html.contains("data-monolith-url"));
         assert!(html.contains("fetched|xhr"));
@@ -361,7 +361,7 @@ fn lazy_content_loads_again_when_needed() {
         let reopened = workspace
             .monolith()
             .env("MONOLITH_BROWSER_SCROLL_LIMIT", "10")
-            .arg("--no-js")
+            .arg("--remove-js")
             .arg(
                 Url::from_file_path(workspace.directory.path().join("saved.html"))
                     .unwrap()
@@ -604,7 +604,7 @@ fn other_origins_allow_saved_pages_what_they_allowed() {
         // "*" isn't enough for what comes with credentials
         let expected = "allowed|refused|opaque0|refused|xhr|refused";
 
-        let live = workspace.render(&server.url("/"), &["--no-js"]);
+        let live = workspace.render(&server.url("/"), &["--remove-js"]);
         assert!(live.contains(expected), "live: {}", live);
 
         let saved = workspace.save(&server.url("/"), &[]);

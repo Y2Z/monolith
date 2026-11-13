@@ -145,11 +145,11 @@ pub fn compose_csp(options: &MonolithOptions) -> String {
         string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data:;");
     }
 
-    if options.no_styles {
+    if options.remove_styles {
         string_list.push("style-src 'none';");
     }
 
-    if options.no_fonts {
+    if options.remove_fonts {
         string_list.push("font-src 'none';");
     }
 
@@ -158,15 +158,15 @@ pub fn compose_csp(options: &MonolithOptions) -> String {
         string_list.push("child-src 'none';");
     }
 
-    if options.no_js {
+    if options.remove_js {
         string_list.push("script-src 'none';");
     }
 
-    if options.no_js || targets_any_element(options, &["embed", "object"]) {
+    if options.remove_js || targets_any_element(options, &["embed", "object"]) {
         string_list.push("object-src 'none';");
     }
 
-    if options.no_images {
+    if options.remove_images {
         // Note: "data:" is required for transparent pixel images to work
         string_list.push("img-src data:;");
     }
@@ -257,7 +257,7 @@ pub fn embed_srcset_as(
     let mut result: String = "".to_string();
     let mut i: usize = srcset_items.len();
     for srcset_item in srcset_items {
-        if session.options.no_images {
+        if session.options.remove_images {
             result.push_str(EMPTY_IMAGE_DATA_URL);
         } else {
             let image_full_url: Url = resolve_url(document_url, srcset_item.path);
@@ -1697,7 +1697,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     {
                         // Find and resolve LINK's href attribute
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
-                            if !session.options.no_images && !link_attr_href_value.is_empty() {
+                            if !session.options.remove_images && !link_attr_href_value.is_empty() {
                                 retrieve_and_embed_asset(
                                     session,
                                     document_url,
@@ -1712,7 +1712,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     } else if link_node_types.contains(&LinkType::Stylesheet) {
                         // Resolve LINK's href attribute
                         if let Some(link_attr_href_value) = get_node_attr(node, "href") {
-                            if session.options.no_styles {
+                            if session.options.remove_styles {
                                 set_node_attr(node, "href", None);
                                 // Wipe integrity attribute
                                 set_node_attr(node, "integrity", None);
@@ -1769,7 +1769,8 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         // Remove background BODY node attribute by default
                         set_node_attr(node, "background", None);
 
-                        if !session.options.no_images && !body_attr_background_value.is_empty() {
+                        if !session.options.remove_images && !body_attr_background_value.is_empty()
+                        {
                             retrieve_and_embed_asset(
                                 session,
                                 document_url,
@@ -1785,7 +1786,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     // attributes that only scripts know the meaning of get left alone
                     let img_src: Option<String> = get_node_attr(node, "src");
 
-                    if session.options.no_images {
+                    if session.options.remove_images {
                         // Put empty image into src attribute
                         if img_src.is_some() {
                             set_node_attr(node, "src", Some(EMPTY_IMAGE_DATA_URL.to_string()));
@@ -1828,7 +1829,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         && input_attr_type_value.eq_ignore_ascii_case("image")
                         && let Some(input_attr_src_value) = get_node_attr(node, "src")
                     {
-                        if session.options.no_images || input_attr_src_value.is_empty() {
+                        if session.options.remove_images || input_attr_src_value.is_empty() {
                             let value = if input_attr_src_value.is_empty() {
                                 ""
                             } else {
@@ -1847,7 +1848,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "svg" => {
-                    if session.options.no_images {
+                    if session.options.remove_images {
                         // Remove all children
                         node.children.borrow_mut().clear();
                     }
@@ -1857,7 +1858,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
 
                     for attr_name in attr_names.into_iter() {
                         if let Some(image_attr_href_value) = get_node_attr(node, attr_name) {
-                            if session.options.no_images {
+                            if session.options.remove_images {
                                 set_node_attr(node, attr_name, None);
                             } else {
                                 retrieve_and_embed_asset(
@@ -1879,7 +1880,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
 
                     for attr_name in attr_names.into_iter() {
                         if let Some(use_attr_href_value) = get_node_attr(node, attr_name) {
-                            if session.options.no_images {
+                            if session.options.remove_images {
                                 set_node_attr(node, attr_name, None);
                             } else if use_attr_href_value.clone().starts_with('#') {
                                 // Relative symbol that resolves to its own URL; keep as-is.
@@ -2089,7 +2090,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         && parent_node_name == "picture"
                         && !source_attr_srcset_value.is_empty()
                     {
-                        if session.options.no_images {
+                        if session.options.remove_images {
                             set_node_attr(node, "srcset", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         } else {
                             let resolved_srcset: String = embed_srcset_as(
@@ -2109,7 +2110,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             .trim()
                             .starts_with("javascript:")
                         {
-                            if session.options.no_js {
+                            if session.options.remove_js {
                                 // Replace with empty JS call to preserve original behavior
                                 set_node_attr(node, "href", Some("javascript:;".to_string()));
                             }
@@ -2127,7 +2128,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "script" => {
-                    if session.options.no_js {
+                    if session.options.remove_js {
                         // TODO: remove this whole node from DOM instead of messing with it
                         // Empty contents
                         node.children.borrow_mut().clear();
@@ -2204,7 +2205,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     }
                 }
                 "style" => {
-                    if session.options.no_styles {
+                    if session.options.remove_styles {
                         // Empty inner content of STYLE tags
                         node.children.borrow_mut().clear();
                     } else {
@@ -2248,7 +2249,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         }
 
                         // Sandbox iframe if JS is disabled
-                        if name.local.as_ref() == "iframe" && session.options.no_js {
+                        if name.local.as_ref() == "iframe" && session.options.remove_js {
                             set_node_attr(node, "sandbox", Some("allow-forms".to_string()));
                         }
                     }
@@ -2305,7 +2306,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     if let Some(video_attr_poster_value) = get_node_attr(node, "poster") {
                         // Skip posters with empty source
                         if !video_attr_poster_value.is_empty() {
-                            if session.options.no_images {
+                            if session.options.remove_images {
                                 set_node_attr(
                                     node,
                                     "poster",
@@ -2348,7 +2349,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
             }
 
             // Process style attributes
-            if session.options.no_styles {
+            if session.options.remove_styles {
                 // Get rid of style attributes
                 set_node_attr(node, "style", None);
             } else {
@@ -2360,7 +2361,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
             }
 
             // Strip all JS from document
-            if session.options.no_js {
+            if session.options.remove_js {
                 let attrs_mut = &mut attrs.borrow_mut();
                 // Get rid of JS event attributes
                 let mut js_attr_indexes = Vec::new();
@@ -2389,7 +2390,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
             }
         }
         _ => {
-            // Note: in case of options.no_js being set to true, there's no need to worry about
+            // Note: in case of options.remove_js being set to true, there's no need to worry about
             //       getting rid of comments that may contain scripts, e.g. <!--[if IE]><script>...
             //       since that's not part of W3C standard and therefore gets ignored
             //       by browsers other than IE [5, 9]

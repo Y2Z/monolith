@@ -38,6 +38,7 @@ use crate::replay::{
 use crate::session::Session;
 
 const BROWSER_COLOR_SCHEME_VARIABLE: &str = "MONOLITH_BROWSER_COLOR_SCHEME";
+const BROWSER_DISABLE_JS_VARIABLE: &str = "MONOLITH_BROWSER_DISABLE_JS";
 const BROWSER_PATH_VARIABLE: &str = "MONOLITH_BROWSER";
 const BROWSER_SCROLL_LIMIT_VARIABLE: &str = "MONOLITH_BROWSER_SCROLL_LIMIT";
 const BROWSER_VIEWPORT_VARIABLE: &str = "MONOLITH_BROWSER_VIEWPORT";
@@ -348,8 +349,16 @@ fn has_display() -> bool {
 }
 
 #[doc(hidden)]
-pub fn profile_preferences(options: &MonolithOptions, color_scheme: Option<ColorScheme>) -> String {
+pub fn profile_preferences(
+    options: &MonolithOptions,
+    color_scheme: Option<ColorScheme>,
+    is_js_disabled: bool,
+) -> String {
     let mut preferences = PROFILE_PREFERENCES.to_string();
+
+    if is_js_disabled {
+        preferences.push_str("user_pref(\"javascript.enabled\", false);\n");
+    }
 
     if let Some(user_agent) = &options.browser_user_agent {
         preferences.push_str(&format!(
@@ -409,6 +418,31 @@ fn choose_viewport(options: &MonolithOptions) -> Result<(u32, u32), String> {
         Some(value) => parse_viewport(&value.to_string_lossy())
             .map_err(|error| format!("{}: {}", BROWSER_VIEWPORT_VARIABLE, error)),
         None => Ok(DEFAULT_VIEWPORT),
+    }
+}
+
+/// Reads whether the browser is to keep pages from running JavaScript.
+#[doc(hidden)]
+pub fn parse_disable_js(value: &str) -> Result<bool, String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "" | "0" | "false" | "no" | "off" => Ok(false),
+        _ => Err(format!(
+            "\"{}\" is neither yes nor no, it can be 1 or 0, true or false",
+            value
+        )),
+    }
+}
+
+fn choose_js_disabled(options: &MonolithOptions) -> Result<bool, String> {
+    if let Some(is_js_disabled) = options.browser_disable_js {
+        return Ok(is_js_disabled);
+    }
+
+    match env::var_os(BROWSER_DISABLE_JS_VARIABLE) {
+        Some(value) => parse_disable_js(&value.to_string_lossy())
+            .map_err(|error| format!("{}: {}", BROWSER_DISABLE_JS_VARIABLE, error)),
+        None => Ok(false),
     }
 }
 
@@ -574,9 +608,9 @@ pub fn cookie_to_json(cookie: &Cookie) -> Value {
 /// Tells whether Monolith would've made this request.
 pub fn is_request_allowed(url: &str, destination: &str, options: &MonolithOptions) -> bool {
     let is_wanted = match destination {
-        "font" => !options.no_fonts,
-        "image" => !options.no_images,
-        "style" => !options.no_styles,
+        "font" => !options.remove_fonts,
+        "image" => !options.remove_images,
+        "style" => !options.remove_styles,
         _ => true,
     };
 
@@ -888,6 +922,7 @@ impl<'a> Browser<'a> {
         let is_snap = is_snap(executable);
         let color_scheme = choose_color_scheme(options)?;
         let viewport = choose_viewport(options)?;
+        let is_js_disabled = choose_js_disabled(options)?;
         let profile = create_profile_directory(executable, is_snap)
             .map_err(|error| format!("could not create browser profile: {}", error))?;
 
@@ -901,7 +936,7 @@ impl<'a> Browser<'a> {
 
             command.args(devtools_arguments(profile.path(), options, is_visible));
         } else {
-            let preferences = profile_preferences(options, color_scheme);
+            let preferences = profile_preferences(options, color_scheme, is_js_disabled);
             fs::write(profile.path().join("user.js"), preferences)
                 .map_err(|error| format!("could not create browser profile: {}", error))?;
 
@@ -997,6 +1032,7 @@ impl<'a> Browser<'a> {
             is_devtools,
             color_scheme,
             viewport,
+            is_js_disabled,
         )?);
 
         Ok(browser)
@@ -1041,6 +1077,8 @@ struct Connection<'a> {
     captured_responses: HashMap<String, CapturedResponse>,
     color_scheme: Option<ColorScheme>,
     is_devtools: bool,
+    /// Pages get to run nothing
+    is_js_disabled: bool,
     is_page_loaded: bool,
     last_command_id: u64,
     logged_urls: HashSet<String>,
@@ -1062,6 +1100,7 @@ impl<'a> Connection<'a> {
         is_devtools: bool,
         color_scheme: Option<ColorScheme>,
         viewport: (u32, u32),
+        is_js_disabled: bool,
     ) -> Result<Connection<'a>, String> {
         let (address, path) = endpoint.split_once('/').unwrap_or((endpoint, "session"));
         let stream = TcpStream::connect(address)
@@ -1080,6 +1119,7 @@ impl<'a> Connection<'a> {
             captured_responses: HashMap::new(),
             color_scheme,
             is_devtools,
+            is_js_disabled,
             is_page_loaded: false,
             last_command_id: 0,
             logged_urls: HashSet::new(),
@@ -1155,9 +1195,9 @@ impl<'a> Connection<'a> {
 
     fn is_filtering_requests(&self) -> bool {
         self.options.domains.is_some()
-            || self.options.no_fonts
-            || self.options.no_images
-            || self.options.no_styles
+            || self.options.remove_fonts
+            || self.options.remove_images
+            || self.options.remove_styles
     }
 
     fn start_devtools_session(
@@ -1207,6 +1247,14 @@ impl<'a> Connection<'a> {
         // Has to work, the alternative is contacting what the user has asked not to be contacted
         if self.is_filtering_requests() {
             self.command("Fetch.enable", json!({}), deadline)?;
+        }
+        // Same here, the alternative is running what the user has asked not to be run
+        if self.is_js_disabled {
+            self.command(
+                "Emulation.setScriptExecutionDisabled",
+                json!({"value": true}),
+                deadline,
+            )?;
         }
         if let Some(color_scheme) = self.color_scheme {
             let value = match color_scheme {
@@ -1854,6 +1902,19 @@ impl Connection<'_> {
                 let _ = self.send_to(session, "Network.enable", network_buffers());
                 if self.is_filtering_requests() {
                     let _ = self.send_to(session, "Fetch.enable", json!({}));
+                }
+                // Frames from other websites are pages of their own
+                if self.is_js_disabled
+                    && matches!(
+                        params["targetInfo"]["type"].as_str(),
+                        Some("iframe" | "page")
+                    )
+                {
+                    let _ = self.send_to(
+                        session,
+                        "Emulation.setScriptExecutionDisabled",
+                        json!({"value": true}),
+                    );
                 }
                 let _ = self.send_to(
                     session,

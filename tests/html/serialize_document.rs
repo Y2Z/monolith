@@ -60,7 +60,7 @@ mod passing {
                     <div style=\"display: none;\"></div>";
         let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let options = MonolithOptions {
-            no_styles: true,
+            remove_styles: true,
             ..Default::default()
         };
 
@@ -118,11 +118,11 @@ mod passing {
         let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let options = MonolithOptions {
             isolate: true,
-            no_styles: true,
-            no_fonts: true,
+            remove_styles: true,
+            remove_fonts: true,
             wipe_elements: vec!["frame,iframe".to_string()],
-            no_js: true,
-            no_images: true,
+            remove_js: true,
+            remove_images: true,
             ..Default::default()
         };
 

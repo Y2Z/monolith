@@ -18,7 +18,7 @@ mod passing {
     fn small_medium_large() {
         let srcset_value = "small.png 1x, medium.png 1.5x, large.png 2x";
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -39,7 +39,7 @@ mod passing {
     fn small_medium_only_medium_has_scale() {
         let srcset_value = "small.png, medium.png 1.5x";
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -57,7 +57,7 @@ mod passing {
     fn commas_within_file_names() {
         let srcset_value = "small,s.png 1x, large,l.png 2x";
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -75,7 +75,7 @@ mod passing {
     fn narrow_whitespaces_within_file_names() {
         let srcset_value = "small\u{202f}s.png 1x, large\u{202f}l.png 2x";
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -93,7 +93,7 @@ mod passing {
     fn tabs_and_newlines_after_commas() {
         let srcset_value = "small-s.png 1x,\tmedium,m.png 2x,\nlarge-l.png 3x";
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -114,7 +114,7 @@ mod passing {
     fn no_whitespace_after_commas() {
         let srcset_value = "small-s.png 1x,medium-m.png 2x,large-l.png 3x";
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -135,7 +135,7 @@ mod passing {
     fn last_without_descriptor() {
         let srcset_value = "small-s.png 400w, medium-m.png 800w, large-l.png";
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -173,7 +173,7 @@ mod failing {
     fn trailing_comma() {
         let srcset_value = "small.png 1x, large.png 2x,";
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };

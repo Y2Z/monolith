@@ -25,7 +25,7 @@ fn does_not_contact_blacklisted_domains() {
     with_each_browser(|browser| {
         let server = website("localhost:1");
         let host = "ads.invalid";
-        let html = Workspace::new(browser).render(&server.url("/"), &["--no-js", "-d", host]);
+        let html = Workspace::new(browser).render(&server.url("/"), &["--remove-js", "-d", host]);
 
         assert!(html.contains("data:image/png"));
 
@@ -39,7 +39,10 @@ fn does_not_contact_blacklisted_domains() {
             ),
             ("/tracker.png", "image/png", b"\x89PNG"),
         ]);
-        Workspace::new(browser).render(&blocked_server.url("/"), &["--no-js", "-d", "localhost"]);
+        Workspace::new(browser).render(
+            &blocked_server.url("/"),
+            &["--remove-js", "-d", "localhost"],
+        );
 
         assert!(!blocked_server.was_asked_for("/tracker.png"));
     });
@@ -58,7 +61,7 @@ fn only_contacts_whitelisted_domains() {
             ("/tracker.png", "image/png", b"\x89PNG"),
         ]);
 
-        Workspace::new(browser).render(&server.url("/"), &["--no-js", "-W", "-d", "127.0.0.1"]);
+        Workspace::new(browser).render(&server.url("/"), &["--remove-js", "-W", "-d", "127.0.0.1"]);
 
         assert!(server.was_asked_for("/"));
         assert!(!server.was_asked_for("/tracker.png"));
@@ -77,7 +80,7 @@ fn does_not_request_what_got_excluded() {
             ("/a.png", "image/png", b"\x89PNG"),
         ]);
 
-        Workspace::new(browser).render(&server.url("/"), &["--no-js", "--no-images"]);
+        Workspace::new(browser).render(&server.url("/"), &["--remove-js", "--remove-images"]);
 
         assert!(!server.was_asked_for("/a.png"));
     });
@@ -135,7 +138,7 @@ fn leaves_typed_passwords_out() {
               <script>p.value='hunter2';n.value='Typed name'</script>",
         )]);
 
-        let html = Workspace::new(browser).render(&server.url("/"), &["--no-js"]);
+        let html = Workspace::new(browser).render(&server.url("/"), &["--remove-js"]);
 
         assert!(html.contains("Typed name"));
         assert!(!html.contains("value=\"hunter2\""));

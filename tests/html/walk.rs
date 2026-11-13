@@ -167,11 +167,11 @@ mod passing {
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/_data_/svg/index.html"),
         )
         .unwrap();
-        for no_images in [false, true] {
+        for remove_images in [false, true] {
             let source = "<img src=\"data:,placeholder\" data-src=\"image.svg\">".to_string();
             let dom = html::html_to_dom(&source.into_bytes(), "".to_string());
             let options = MonolithOptions {
-                no_images,
+                remove_images,
                 silent: true,
                 ..Default::default()
             };
@@ -277,7 +277,7 @@ mod passing {
     }
 
     #[test]
-    fn no_styles() {
+    fn remove_styles() {
         let html = "\
             <link rel=\"stylesheet\" href=\"main.css\">\
             <link rel=\"alternate stylesheet\" href=\"main.css\">\
@@ -288,7 +288,7 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let options = MonolithOptions {
-            no_styles: true,
+            remove_styles: true,
             silent: true,
             ..Default::default()
         };
@@ -323,14 +323,14 @@ mod passing {
     }
 
     #[test]
-    fn no_images() {
+    fn remove_images() {
         let html = "<link rel=\"icon\" href=\"favicon.ico\">\
                     <div><img src=\"http://localhost/assets/mono_lisa.png\" /></div>";
         let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -373,7 +373,7 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -472,7 +472,7 @@ mod passing {
     }
 
     #[test]
-    fn no_js() {
+    fn remove_js() {
         let html = "\
             <div onClick=\"void(0)\">\
                 <script src=\"http://localhost/assets/some.js\"></script>\
@@ -483,7 +483,7 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let options = MonolithOptions {
-            no_js: true,
+            remove_js: true,
             silent: true,
             ..Default::default()
         };
@@ -565,8 +565,8 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let options = MonolithOptions {
-            no_styles: true,
-            no_js: true,
+            remove_styles: true,
+            remove_js: true,
             silent: true,
             ..Default::default()
         };
@@ -609,8 +609,8 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let options = MonolithOptions {
-            no_styles: true,
-            no_js: true,
+            remove_styles: true,
+            remove_js: true,
             silent: true,
             ..Default::default()
         };
@@ -659,9 +659,9 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let options = MonolithOptions {
-            no_styles: true,
-            no_js: true,
-            no_images: true,
+            remove_styles: true,
+            remove_js: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };
@@ -706,7 +706,7 @@ mod passing {
         let url: Url = Url::parse("http://localhost").unwrap();
 
         let options = MonolithOptions {
-            no_images: true,
+            remove_images: true,
             silent: true,
             ..Default::default()
         };

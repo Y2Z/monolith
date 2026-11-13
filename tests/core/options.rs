@@ -14,12 +14,12 @@ mod passing {
         let options: MonolithOptions = MonolithOptions::default();
 
         assert_eq!(options.base_url, None);
-        assert!(!options.no_styles);
+        assert!(!options.remove_styles);
         assert_eq!(options.encoding, None);
-        assert!(!options.no_fonts);
-        assert!(!options.no_images);
+        assert!(!options.remove_fonts);
+        assert!(!options.remove_images);
         assert!(!options.isolate);
-        assert!(!options.no_js);
+        assert!(!options.remove_js);
         assert!(!options.insecure);
         assert_eq!(options.output_format, MonolithOutputFormat::HTML);
         assert!(!options.simplify);
