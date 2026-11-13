@@ -1354,6 +1354,36 @@ impl Write for HeadInjector<'_> {
     }
 }
 
+/// Documents that frames have in their srcdoc attributes are the same as any other, they just
+/// don't come from anywhere: they're of the same origin as what they're in, and their URLs get
+/// resolved the same way, unless they say otherwise with BASE elements of their own.
+fn embed_srcdoc(session: &mut Session, document_url: &Url, srcdoc: &str) -> String {
+    let frame_dom = html_to_dom(srcdoc.as_bytes(), "utf-8".to_string());
+    let frame_url = match get_base_url(&frame_dom.document) {
+        Some(base_url) => resolve_url(document_url, &base_url),
+        None => document_url.clone(),
+    };
+
+    strip_elements(
+        &frame_dom.document,
+        &session.options.remove_elements,
+        &session.options.wipe_elements,
+    );
+    let environment_encoding = session.environment_encoding.replace(UTF_8);
+    // What's in it isn't anything that could be referencing itself, so it goes past the check
+    // that the document itself would get stopped by (it has the URL of what it's in)
+    for child_node in frame_dom.document.children.borrow().iter() {
+        walk(session, &frame_url, child_node);
+    }
+    session.environment_encoding = environment_encoding;
+
+    let mut frame_data: Vec<u8> = Vec::new();
+    let serializable: SerializableHandle = frame_dom.document.into();
+    serialize(&mut frame_data, &serializable, SerializeOpts::default()).unwrap();
+
+    String::from_utf8_lossy(&frame_data).into_owned()
+}
+
 pub fn retrieve_and_embed_asset(
     session: &mut Session,
     document_url: &Url,
@@ -2226,6 +2256,21 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         let form_action_full_url: Url =
                             resolve_url(document_url, &form_attr_action_value);
                         set_node_attr(node, "action", Some(form_action_full_url.to_string()));
+                    }
+                }
+                "iframe" if get_node_attr(node, "srcdoc").is_some() => {
+                    let srcdoc = get_node_attr(node, "srcdoc").unwrap_or_default();
+                    set_node_attr(
+                        node,
+                        "srcdoc",
+                        Some(embed_srcdoc(session, document_url, &srcdoc)),
+                    );
+                    // Browsers go with what's in srcdoc, src never gets loaded
+                    set_node_attr(node, "src", None);
+
+                    // Sandbox iframe if JS is disabled
+                    if session.options.remove_js {
+                        set_node_attr(node, "sandbox", Some("allow-forms".to_string()));
                     }
                 }
                 "frame" | "iframe" => {
