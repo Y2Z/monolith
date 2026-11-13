@@ -3,9 +3,9 @@ use cssparser::{
 };
 use encoding_rs::{Encoding, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252};
 
-use crate::core::{MonolithOutputFormat, declared_encoding};
+use crate::core::{MonolithOutputFormat, declared_encoding, print_error_message};
 use crate::session::Session;
-use crate::url::{EMPTY_IMAGE_DATA_URL, Url, create_data_url, resolve_url};
+use crate::url::{EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, resolve_url};
 
 const CHARSET_RULE_PREFIX: &str = "@charset \"";
 const CHARSET_RULE_SUFFIX: &str = "\";";
@@ -101,10 +101,66 @@ pub fn embed_stylesheet(session: &mut Session, url: &Url, data: &[u8], charset: 
 
     // Stylesheets imported by this one use its encoding as their environment encoding
     let environment_encoding = session.environment_encoding.replace(encoding);
+    // What it imports can't import it again
+    session
+        .stylesheet_chain
+        .push(clean_url(url.clone()).to_string());
     let result = embed_css(session, url, &css);
+    session.stylesheet_chain.pop();
     session.environment_encoding = environment_encoding;
 
     result
+}
+
+/// How deep imports of stylesheets can go: imports that import stylesheets that import others
+/// and so on (with no cycles) could otherwise go on forever.
+const MAX_IMPORT_DEPTH: usize = 64;
+
+/// Stylesheet that imports nothing, and has nothing in it.
+const EMPTY_STYLESHEET: &str = "data:text/css,";
+
+/// What an @import's URL becomes: the stylesheet embedded as a data URL, quoted.
+/// Stylesheets that import stylesheets that import them (or that import themselves) get ignored
+/// the way browsers ignore them: imports in such cycles become empty stylesheets, by URL, before
+/// and after redirects. The same stylesheet imported more than once (but not in a cycle) gets
+/// embedded each time.
+fn import_stylesheet(session: &mut Session, document_url: &Url, value: &str) -> String {
+    let import_url: Url = resolve_url(document_url, value);
+    let is_in_chain = |session: &Session, url: &Url| {
+        let url = clean_url(url.clone()).to_string();
+        session.stylesheet_chain.contains(&url)
+    };
+
+    if is_in_chain(session, &import_url) {
+        return format_quoted_string(EMPTY_STYLESHEET);
+    }
+    if session.stylesheet_chain.len() >= MAX_IMPORT_DEPTH {
+        if !session.options.silent {
+            print_error_message(&format!(
+                "{} (stylesheets import more than {} levels deep)",
+                import_url, MAX_IMPORT_DEPTH
+            ));
+        }
+        return format_quoted_string(EMPTY_STYLESHEET);
+    }
+
+    match session.retrieve_asset(document_url, &import_url) {
+        // Redirected to what's in the chain already
+        Ok((_, final_url, _, _)) if is_in_chain(session, &final_url) => {
+            format_quoted_string(EMPTY_STYLESHEET)
+        }
+        Ok((data, final_url, media_type, charset)) => {
+            let css = embed_stylesheet(session, &final_url, &data, &charset);
+            let data_url =
+                create_data_url(&media_type, "utf-8", css, &final_url, import_url.fragment());
+            format_quoted_string(&data_url)
+        }
+        // Keep remote reference if unable to retrieve the asset
+        Err(_) if import_url.scheme() == "http" || import_url.scheme() == "https" => {
+            format_quoted_string(import_url.as_ref())
+        }
+        Err(_) => String::new(),
+    }
 }
 
 /// Extracts the encoding from a leading `@charset "...";` rule.
@@ -262,39 +318,7 @@ pub fn process_css(
                         continue;
                     }
 
-                    let import_full_url: Url = resolve_url(document_url, value);
-                    match session.retrieve_asset(document_url, &import_full_url) {
-                        Ok((
-                            import_contents,
-                            import_final_url,
-                            import_media_type,
-                            import_charset,
-                        )) => {
-                            let import_data_url = create_data_url(
-                                &import_media_type,
-                                "utf-8",
-                                embed_stylesheet(
-                                    session,
-                                    &import_final_url,
-                                    &import_contents,
-                                    &import_charset,
-                                ),
-                                &import_final_url,
-                                import_full_url.fragment(),
-                            );
-                            result.push_str(format_quoted_string(&import_data_url).as_str());
-                        }
-                        Err(_) => {
-                            // Keep remote reference if unable to retrieve the asset
-                            if import_full_url.scheme() == "http"
-                                || import_full_url.scheme() == "https"
-                            {
-                                result.push_str(
-                                    format_quoted_string(import_full_url.as_ref()).as_str(),
-                                );
-                            }
-                        }
-                    }
+                    result.push_str(&import_stylesheet(session, document_url, value));
                 } else if func_name == "url" {
                     // Skip empty url()'s
                     if value.is_empty() {
@@ -400,25 +424,7 @@ pub fn process_css(
 
                 result.push_str("url(");
                 if is_import {
-                    let full_url: Url = resolve_url(document_url, value);
-                    match session.retrieve_asset(document_url, &full_url) {
-                        Ok((css, final_url, media_type, charset)) => {
-                            let data_url = create_data_url(
-                                &media_type,
-                                "utf-8",
-                                embed_stylesheet(session, &final_url, &css, &charset),
-                                &final_url,
-                                full_url.fragment(),
-                            );
-                            result.push_str(format_quoted_string(&data_url).as_str());
-                        }
-                        Err(_) => {
-                            // Keep remote reference if unable to retrieve the asset
-                            if full_url.scheme() == "http" || full_url.scheme() == "https" {
-                                result.push_str(format_quoted_string(full_url.as_ref()).as_str());
-                            }
-                        }
-                    }
+                    result.push_str(&import_stylesheet(session, document_url, value));
                 } else if is_image_url_prop(curr_prop.as_str()) && session.options.no_images {
                     result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                 } else {

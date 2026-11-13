@@ -114,6 +114,8 @@ pub struct Session {
     pub(crate) page_url: Option<String>,
     /// Archives to take everything from, instead of going online
     pub(crate) source_archives: Vec<Arc<Vec<u8>>>,
+    /// URLs of stylesheets being embedded, each one imported by the one before it
+    pub(crate) stylesheet_chain: Vec<String>,
     /// Markup to put right after the opening tag of HEAD
     pub(crate) replay_markup: Option<String>,
     /// Title to name the result by, instead of what the document says
@@ -197,6 +199,7 @@ impl Session {
             page_url: None,
             recorded_urls: Records::default(),
             source_archives: vec![],
+            stylesheet_chain: vec![],
             replay_markup: None,
             title: None,
             warc: None,
