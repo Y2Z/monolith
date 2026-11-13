@@ -17,6 +17,7 @@ use crate::core::{
     MonolithOptions, MonolithOutputFormat, detect_media_type, print_error_message,
     print_info_message,
 };
+use crate::cors::{CorsRequest, PageOrigin, RequestMode};
 use crate::mhtml::MhtmlArchive;
 use crate::net::{self, Credentials, PrefetchProgress, without_credentials};
 use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
@@ -80,6 +81,8 @@ pub struct Session {
     /// Whether the document came from an archive that only has original responses in it
     is_offline: bool,
     pub asset_urls: Vec<String>,
+    /// How logged assets get requested, for those that don't get requested the usual way
+    asset_modes: HashMap<String, RequestMode>,
     cache: Option<Cache>,
     client: Client,
     pub(crate) cookies: Option<Vec<Cookie>>,
@@ -114,6 +117,14 @@ pub struct Session {
     pub(crate) page_url: Option<String>,
     /// Archives to take everything from, instead of going online
     pub(crate) source_archives: Vec<Arc<Vec<u8>>>,
+    /// Origin of the document being saved, None for documents that have none (CORS doesn't
+    /// apply to those)
+    pub(crate) page_origin: Option<PageOrigin>,
+    /// Whether the document has been put together by a browser (its assets are what the browser
+    /// has received)
+    pub(crate) is_captured: bool,
+    /// What captured and archived assets have been received with, by URL (see record_headers())
+    recorded_headers: HashMap<String, (Url, Vec<(String, String)>)>,
     /// URLs of stylesheets being embedded, each one imported by the one before it
     pub(crate) stylesheet_chain: Vec<String>,
     /// Markup to put right after the opening tag of HEAD
@@ -180,6 +191,7 @@ impl Session {
         Session {
             archive: None,
             asset_urls: Vec::new(),
+            asset_modes: HashMap::new(),
             is_offline: false,
             cache,
             cookies,
@@ -200,6 +212,9 @@ impl Session {
             recorded_urls: Records::default(),
             source_archives: vec![],
             stylesheet_chain: vec![],
+            page_origin: None,
+            is_captured: false,
+            recorded_headers: HashMap::new(),
             replay_markup: None,
             title: None,
             warc: None,
@@ -224,6 +239,22 @@ impl Session {
         self.cache
             .get_or_insert_with(|| Cache::new(0, None))
             .set(&key, data, media_type, charset);
+    }
+
+    /// Keeps what something was received with, under URLs it's been received for (the last one
+    /// being where it ended up): what other origins allowed to be done with it depends on it.
+    pub fn record_headers(
+        &mut self,
+        urls: &[Url],
+        final_url: &Url,
+        headers: Vec<(String, String)>,
+    ) {
+        for url in urls {
+            self.recorded_headers.insert(
+                clean_url(url.clone()).to_string(),
+                (final_url.clone(), headers.clone()),
+            );
+        }
     }
 
     pub fn is_recording(&self) -> bool {
@@ -446,9 +477,25 @@ impl Session {
     }
 
     pub fn log_asset_url(&mut self, url: &Url) {
+        self.log_asset_url_as(url, RequestMode::NoCors);
+    }
+
+    /// Same as log_asset_url(), for assets that get requested in given mode (see cors.rs).
+    pub fn log_asset_url_as(&mut self, url: &Url, mode: RequestMode) {
         if !self.asset_urls.contains(&url.as_str().to_string()) {
             self.asset_urls.push(url.as_str().to_string());
         }
+        if mode != RequestMode::NoCors {
+            self.asset_modes.insert(url.as_str().to_string(), mode);
+        }
+    }
+
+    /// How a logged asset gets requested.
+    pub(crate) fn asset_mode(&self, url: &str) -> RequestMode {
+        self.asset_modes
+            .get(url)
+            .copied()
+            .unwrap_or(RequestMode::NoCors)
     }
 
     /// Downloads every asset the walk is about to request on a thread pool and puts
@@ -471,6 +518,7 @@ impl Session {
                 client: &self.client,
                 cookies: self.cookies.as_deref(),
                 credentials: &self.credentials,
+                cors: None,
             },
             &self.options,
             document_url,
@@ -494,15 +542,48 @@ impl Session {
         parent_url: &Url,
         url: &Url,
     ) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
+        match self.retrieve(parent_url, url, RequestMode::NoCors)? {
+            Some(asset) => Ok(asset),
+            // Only CORS requests get blocked
+            None => Err(self.client.get("").send().unwrap_err()),
+        }
+    }
+
+    /// Whether what gets retrieved has to be allowed by other origins (see cors.rs): only for
+    /// documents that have an origin.
+    pub(crate) fn checks_cors(&self) -> bool {
+        self.page_origin.is_some()
+    }
+
+    /// Same as retrieve_asset(), for requests made in given mode: None for what the page isn't
+    /// allowed to use (see cors.rs), browsers drop that.
+    pub fn retrieve(
+        &mut self,
+        parent_url: &Url,
+        url: &Url,
+        mode: RequestMode,
+    ) -> Result<Option<net::Asset>, reqwest::Error> {
+        // CORS is about origins, pages without one have nothing to check
+        let cors: Option<CorsRequest> = match (mode, &self.page_origin) {
+            (RequestMode::Cors { with_credentials }, Some(origin)) => Some(CorsRequest {
+                origin: origin.clone(),
+                with_credentials,
+            }),
+            _ => None,
+        };
         // Credentials only ever go along with requests, never with URLs
         let url: &Url = &self.credentials.take_from(url);
         let parent_url: &Url = &without_credentials(parent_url);
         let cache_key: String = clean_url(url.clone()).as_str().to_string();
-        let identity_key: String = self.credentials.cache_key(url);
+        let cors_suffix: String = cors
+            .as_ref()
+            .map(CorsRequest::cache_key_suffix)
+            .unwrap_or_default();
+        let identity_key: String = self.credentials.cache_key(url) + &cors_suffix;
 
         if url.scheme() == "data" {
             let (media_type, charset, data) = parse_data_url(url);
-            Ok((data, url.clone(), media_type, charset))
+            Ok(Some((data, url.clone(), media_type, charset)))
         } else if let Some(archive) = &self.archive {
             // Documents that come from MHTML archives get assets from the archive, never from the network or filesystem
             let asset = archive.get(url).map(|asset| {
@@ -513,15 +594,31 @@ impl Session {
                     asset.charset.clone(),
                 )
             });
+            // What other origins allowed is known only for what has been received over HTTP
+            let is_blocked = match (cors.as_ref(), archive.get(url)) {
+                (Some(cors), Some(archived)) => {
+                    archived.response_headers.as_ref().is_some_and(|headers| {
+                        !cors.allows_recorded(archived.url.as_ref().unwrap_or(url), headers)
+                    })
+                }
+                _ => false,
+            };
 
             match asset {
+                Some(_) if is_blocked => {
+                    if !self.options.silent {
+                        print_error_message(&format!("{} (blocked by CORS)", cache_key));
+                    }
+
+                    Ok(None)
+                }
                 Some(asset) if net::is_domain_allowed(url, &self.options) => {
                     if !self.options.silent {
                         print_info_message(&cache_key);
                     }
                     self.record_resource(&asset.1, &asset.0, &asset.2, &asset.3);
 
-                    Ok(asset)
+                    Ok(Some(asset))
                 }
                 Some(_) => {
                     // Provoke error
@@ -547,6 +644,17 @@ impl Session {
                 self.client.get("").send()?;
             }
 
+            // Files outside of the page's directory aren't the page's own (the way Firefox has it)
+            if let Some(cors) = cors.as_ref()
+                && !cors.origin.is_same_origin(url)
+            {
+                if !self.options.silent {
+                    print_error_message(&format!("{} (blocked by CORS)", cache_key));
+                }
+
+                return Ok(None);
+            }
+
             let path_buf: PathBuf = url.to_file_path().unwrap().clone();
             let path: &Path = path_buf.as_path();
             if path.exists() {
@@ -569,7 +677,7 @@ impl Session {
                         self.record_resource(url, &file_blob, &media_type, "");
                     }
 
-                    Ok((file_blob, url.clone(), media_type, "".to_string()))
+                    Ok(Some((file_blob, url.clone(), media_type, "".to_string())))
                 }
             } else {
                 if !self.options.silent {
@@ -582,6 +690,28 @@ impl Session {
         } else if !net::is_domain_allowed(url, &self.options) {
             // Provoke error
             Err(self.client.get("").send().unwrap_err())
+        } else if let Some(cors) = cors.as_ref()
+            && (self.is_captured || self.is_offline)
+            && let Some((data, media_type, charset)) = self
+                .cache
+                .as_ref()
+                .and_then(|cache| cache.get(&self.credentials.cache_key(url)).ok())
+        {
+            // What's been captured or archived is what was received, along with what it was
+            // received with
+            let is_blocked = self
+                .recorded_headers
+                .get(&cache_key)
+                .is_some_and(|(final_url, headers)| !cors.allows_recorded(final_url, headers));
+            if is_blocked {
+                if !self.options.silent {
+                    print_error_message(&format!("{} (blocked by CORS)", cache_key));
+                }
+
+                return Ok(None);
+            }
+
+            Ok(Some((data, url.clone(), media_type, charset)))
         } else if let Some((data, media_type, charset)) = self
             .cache
             .as_ref()
@@ -589,7 +719,7 @@ impl Session {
             .and_then(|cache| cache.get(&identity_key).ok())
         {
             // URL is in cache, we get and return it
-            Ok((data, url.clone(), media_type, charset))
+            Ok(Some((data, url.clone(), media_type, charset)))
         } else if self.is_offline {
             if !self.options.silent {
                 print_error_message(&format!("{} (not found in archive)", cache_key));
@@ -609,10 +739,13 @@ impl Session {
 
             let mut exchanges: Vec<Exchange> = vec![];
             let is_recording = self.is_recording();
-            let result = net::fetch_remote_asset(
-                &self.client,
-                self.cookies.as_deref(),
-                &self.credentials,
+            let result = net::fetch_cors_asset(
+                &net::Requester {
+                    client: &self.client,
+                    cookies: self.cookies.as_deref(),
+                    credentials: &self.credentials,
+                    cors: cors.as_ref(),
+                },
                 &self.options,
                 parent_url,
                 url,
@@ -621,15 +754,18 @@ impl Session {
             for exchange in exchanges {
                 self.record_exchange(exchange);
             }
-            let (data, response_url, media_type, charset) = result?;
+            let Some((data, response_url, media_type, charset)) = result? else {
+                return Ok(None);
+            };
 
             // Add retrieved resource to cache
             if let Some(cache) = self.cache.as_mut() {
-                let new_cache_key: String = self.credentials.cache_key(&response_url);
+                let new_cache_key: String =
+                    self.credentials.cache_key(&response_url) + &cors_suffix;
                 cache.set(&new_cache_key, &data, media_type.clone(), charset.clone());
             }
 
-            Ok((data, response_url, media_type, charset))
+            Ok(Some((data, response_url, media_type, charset)))
         }
     }
 }

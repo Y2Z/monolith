@@ -12,6 +12,7 @@ use url::Url;
 
 use crate::cache::Exchange;
 use crate::core::parse_media_type;
+use crate::cors::was_blocked;
 use crate::css::decode_stylesheet;
 
 /// What else there is to know about a response, for archives that keep track of it.
@@ -154,7 +155,7 @@ pub fn create_replay_markup(
     for (asset, aliases) in stored {
         let url = asset.urls.last().unwrap();
         markup.push_str(&format!(
-            "<script type=\"text/plain\" data-monolith-url=\"{}\"{} data-monolith-method=\"{}\" \
+            "<script type=\"text/plain\" data-monolith-url=\"{}\"{}{} data-monolith-method=\"{}\" \
              data-monolith-status=\"{}\" data-monolith-type=\"{}\">{}</script>",
             escape_attribute(url),
             match aliases.is_empty() {
@@ -164,6 +165,7 @@ pub fn create_replay_markup(
                     escape_attribute(&aliases.join(" "))
                 ),
             },
+            cors_attributes(asset),
             escape_attribute(&asset.method),
             asset.status,
             escape_attribute(asset.content_type.split(';').next().unwrap_or("")),
@@ -688,6 +690,10 @@ pub fn rewrite_scripts(
     let mut imports: Vec<(String, String, String)> = vec![];
     let mut mapped: HashSet<String> = HashSet::new();
     for (index, asset) in assets.iter().enumerate() {
+        // Modules other origins didn't allow pages to use didn't get to run
+        if is_blocked(asset) {
+            continue;
+        }
         // Not everything that gets imported is written as a module
         if modules[index] || asset.urls.iter().any(|url| imported.contains(url)) {
             let media_type = match is_script(asset) {
@@ -706,6 +712,46 @@ pub fn rewrite_scripts(
     imports
 }
 
+/// Whether what has been captured was kept from the page by CORS (see cors.rs).
+fn is_blocked(asset: &CapturedAsset) -> bool {
+    let Some(url) = asset.urls.last().and_then(|url| Url::parse(url).ok()) else {
+        return false;
+    };
+
+    !asset.http.is_resource
+        && was_blocked(
+            &url,
+            &asset.http.request_headers,
+            &asset.http.response_headers,
+        )
+}
+
+/// What other origins have said about letting pages use the response, for the replay emulator
+/// to go by the way browsers do; nothing for what hasn't been received over HTTP.
+fn cors_attributes(asset: &CapturedAsset) -> String {
+    if asset.http.is_resource {
+        return String::new();
+    }
+    let values = |name: &str| -> Vec<&str> {
+        asset
+            .http
+            .response_headers
+            .iter()
+            .filter(|(header, _)| header.trim().eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.trim())
+            .collect()
+    };
+    // More than one isn't allowed, those can't match anything
+    let origin = values("access-control-allow-origin").join(", ");
+    let credentials = values("access-control-allow-credentials").join(", ");
+
+    format!(
+        " data-monolith-allow-origin=\"{}\" data-monolith-allow-credentials=\"{}\"",
+        escape_attribute(&origin),
+        escape_attribute(&credentials)
+    )
+}
+
 /// Stylesheets that pages load on their own don't get to go through what Monolith does to the rest
 /// of them, and whatever they point at can't be found once they're inside of a document.
 #[doc(hidden)]
@@ -714,10 +760,12 @@ pub fn rewrite_stylesheets(
     document_encoding: Option<&'static Encoding>,
 ) {
     let mut data_urls: HashMap<String, String> = HashMap::new();
-    for asset in assets
-        .iter()
-        .filter(|asset| asset.is_reusable && matches!(asset.destination.as_str(), "font" | "image"))
-    {
+    for asset in assets.iter().filter(|asset| {
+        asset.is_reusable
+            && matches!(asset.destination.as_str(), "font" | "image")
+            // Fonts other origins didn't allow pages to use didn't get used
+            && !is_blocked(asset)
+    }) {
         let data_url = format!(
             "data:{};base64,{}",
             asset.content_type.split(';').next().unwrap_or(""),

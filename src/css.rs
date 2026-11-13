@@ -4,6 +4,7 @@ use cssparser::{
 use encoding_rs::{Encoding, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252};
 
 use crate::core::{MonolithOutputFormat, declared_encoding, print_error_message};
+use crate::cors::RequestMode;
 use crate::session::Session;
 use crate::url::{EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, resolve_url};
 
@@ -211,6 +212,16 @@ pub fn is_image_url_prop(prop_name: &str) -> bool {
         .any(|p| prop_name.eq_ignore_ascii_case(p))
 }
 
+const FONT_FACE_RULE: &str = "font-face";
+
+/// How what url() points at gets requested: fonts in CORS mode, everything else not.
+fn url_mode(rule_name: &str) -> RequestMode {
+    match rule_name == FONT_FACE_RULE {
+        true => RequestMode::FONT,
+        false => RequestMode::NoCors,
+    }
+}
+
 pub fn process_css(
     session: &mut Session,
     document_url: &Url,
@@ -259,13 +270,19 @@ pub fn process_css(
                     "}"
                 };
 
+                // What's inside of @font-face blocks is about fonts, all the way down
+                let block_rule: &str = if curr_rule == FONT_FACE_RULE {
+                    FONT_FACE_RULE
+                } else {
+                    rule_name
+                };
                 let block_css: String = parser
                     .parse_nested_block(|parser| {
                         process_css(
                             session,
                             document_url,
                             parser,
-                            rule_name,
+                            block_rule,
                             curr_prop.as_str(),
                             func_name,
                         )
@@ -331,8 +348,11 @@ pub fn process_css(
                         let resolved_url: Url = resolve_url(document_url, value);
 
                         if session.options.output_format != MonolithOutputFormat::MHTML {
-                            match session.retrieve_asset(document_url, &resolved_url) {
-                                Ok((data, final_url, media_type, charset)) => {
+                            match session.retrieve(document_url, &resolved_url, url_mode(rule_name))
+                            {
+                                // Fonts other origins don't allow the page to use don't get used
+                                Ok(None) => result.push_str(&format_quoted_string("")),
+                                Ok(Some((data, final_url, media_type, charset))) => {
                                     // TODO: if it's @font-face, exclude definitions of non-woff/woff-2 fonts (if woff/woff-2 are present)
                                     let data_url = create_data_url(
                                         &media_type,
@@ -356,7 +376,7 @@ pub fn process_css(
                             }
                         } else {
                             result.push_str(format_quoted_string(resolved_url.as_ref()).as_str());
-                            session.log_asset_url(&resolved_url);
+                            session.log_asset_url_as(&resolved_url, url_mode(rule_name));
                         }
                     }
                 } else {
@@ -431,8 +451,10 @@ pub fn process_css(
                     let full_url: Url = resolve_url(document_url, value);
 
                     if session.options.output_format != MonolithOutputFormat::MHTML {
-                        match session.retrieve_asset(document_url, &full_url) {
-                            Ok((data, final_url, media_type, charset)) => {
+                        match session.retrieve(document_url, &full_url, url_mode(rule_name)) {
+                            // Fonts other origins don't allow the page to use don't get used
+                            Ok(None) => result.push_str(&format_quoted_string("")),
+                            Ok(Some((data, final_url, media_type, charset))) => {
                                 let data_url = create_data_url(
                                     &media_type,
                                     &charset,
@@ -452,7 +474,7 @@ pub fn process_css(
                         }
                     } else {
                         result.push_str(format_quoted_string(full_url.as_ref()).as_str());
-                        session.log_asset_url(&full_url);
+                        session.log_asset_url_as(&full_url, url_mode(rule_name));
                     }
                 }
                 result.push(')');
@@ -464,13 +486,18 @@ pub fn process_css(
                 result.push_str(function_name);
                 result.push('(');
 
+                let function_rule: &str = if rule_name == FONT_FACE_RULE {
+                    FONT_FACE_RULE
+                } else {
+                    curr_rule.as_str()
+                };
                 let block_css: String = parser
                     .parse_nested_block(|parser| {
                         process_css(
                             session,
                             document_url,
                             parser,
-                            curr_rule.as_str(),
+                            function_rule,
                             curr_prop.as_str(),
                             function_name,
                         )

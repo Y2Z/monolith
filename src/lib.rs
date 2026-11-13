@@ -3,6 +3,7 @@ pub mod browser;
 pub mod cache;
 pub mod cookies;
 pub mod core;
+pub mod cors;
 pub mod css;
 pub mod har;
 pub mod html;

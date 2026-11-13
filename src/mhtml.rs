@@ -42,6 +42,9 @@ pub struct ArchivedAsset {
     pub media_type: String,
     /// Empty if not specified
     pub charset: String,
+    /// What it was received with, for archives that keep that (captures of pages, WARC, HAR):
+    /// it says what other origins have allowed pages to do with it (see cors.rs)
+    pub response_headers: Option<Vec<(String, String)>>,
 }
 
 pub struct MhtmlArchive {
@@ -202,6 +205,7 @@ pub fn parse_mhtml(data: &[u8], fallback_url: Option<&Url>) -> Option<MhtmlArchi
             url,
             media_type,
             charset,
+            response_headers: None,
         });
     }
 
@@ -296,6 +300,7 @@ pub(crate) fn write_mhtml_document(
     let mut packed: Vec<String> = Vec::new();
 
     for asset_url in session.asset_urls.clone().iter() {
+        let mode = session.asset_mode(asset_url);
         let asset_url: Url = match Url::parse(asset_url) {
             Ok(asset_url) => clean_url(asset_url),
             Err(_) => continue,
@@ -312,8 +317,9 @@ pub(crate) fn write_mhtml_document(
 
         // Errors are already reported by retrieve_asset(); assets that couldn't be retrieved
         // remain referenced by their full URLs in the document, the way they do in HTML output
-        if let Ok((data, _final_url, media_type, charset)) =
-            session.retrieve_asset(document_url, &asset_url)
+        // What the page isn't allowed to use doesn't get packed (see cors.rs)
+        if let Ok(Some((data, _final_url, media_type, charset))) =
+            session.retrieve(document_url, &asset_url, mode)
         {
             let mut part: Vec<u8> = vec![];
             push_part(&mut part, &media_type, &charset, Some(&asset_url), &data);

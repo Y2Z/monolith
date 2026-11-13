@@ -610,3 +610,49 @@ mod warc_output {
         assert_eq!(parse_warc(&output, None).unwrap().0.html, "<p>hi");
     }
 }
+
+#[cfg(test)]
+mod what_other_origins_allowed {
+    use super::helpers::{monolith, warc_of};
+
+    /// Page with fonts from its own origin, and another one, some allowed and some not.
+    fn site() -> Vec<u8> {
+        warc_of(&[
+            (
+                "https://a.test/",
+                "text/html",
+                "<title>Fonts</title><style>\
+                 @font-face{font-family:a;src:url(https://cdn.test/allowed.woff)}\
+                 @font-face{font-family:b;src:url(https://cdn.test/denied.woff)}\
+                 @font-face{font-family:c;src:url(/own.woff)}</style>",
+            ),
+            // Headers other than Content-Type go along with it
+            (
+                "https://cdn.test/allowed.woff",
+                "font/woff\r\nAccess-Control-Allow-Origin: *",
+                "ALLOWEDFONT",
+            ),
+            ("https://cdn.test/denied.woff", "font/woff", "DENIEDFONT"),
+            ("https://a.test/own.woff", "font/woff", "OWNFONT"),
+        ])
+    }
+
+    #[test]
+    fn fonts_out_of_archives() {
+        for args in [&["-j"][..], &[][..]] {
+            let (output, errors, success) = monolith(&site(), args);
+
+            assert!(success, "{:?}", args);
+            let style = &output[output.find("<style>").unwrap()..output.find("</style>").unwrap()];
+            assert!(style.contains("ALLOWEDFONT"), "{:?}: {}", args, style);
+            assert!(style.contains("OWNFONT"), "{:?}: {}", args, style);
+            assert!(!style.contains("DENIEDFONT"), "{:?}: {}", args, style);
+            assert!(style.contains("url(\"\")"), "{:?}: {}", args, style);
+            assert!(
+                errors.contains("https://cdn.test/denied.woff (blocked by CORS)"),
+                "{:?}",
+                args
+            );
+        }
+    }
+}
