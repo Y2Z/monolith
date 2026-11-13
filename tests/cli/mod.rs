@@ -15,6 +15,7 @@ mod source_maps;
 mod srcdoc;
 mod targets;
 mod unusual_encodings;
+mod use_elements;
 
 /// Monolith, writing to STDOUT unless told otherwise.
 pub fn monolith() -> assert_cmd::Command {
