@@ -731,6 +731,7 @@ impl Session {
             &self.options,
             document_url,
             document,
+            self.page_origin.as_ref(),
             self.prefetch_progress.as_deref(),
             |key| cache.contains_key(key),
         );

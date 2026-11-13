@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::support::{Server, Workspace, assert_success, with_each_browser};
 
 fn page_that_describes_itself(script: &str) -> Vec<u8> {
@@ -175,5 +177,43 @@ fn runs_no_javascript_when_told_not_to() {
         assert!(html.contains(">static<"), "{html}");
         assert!(!server.was_asked_for("/page"));
         assert!(!server.was_asked_for("/from-frame"));
+    });
+}
+
+#[test]
+fn leaves_svgs_of_other_origins_out() {
+    with_each_browser(|browser| {
+        // The page points at the server under another name, which makes it another origin
+        let page: Arc<Mutex<String>> = Arc::default();
+        let server = {
+            let page = Arc::clone(&page);
+            Server::with_responder(Box::new(move |request| match request.path.as_str() {
+                "/" => (200, "text/html", page.lock().unwrap().clone().into_bytes()),
+                _ => (
+                    200,
+                    "image/svg+xml",
+                    b"<svg xmlns=\"http://www.w3.org/2000/svg\">\
+                      <symbol id=\"x\"><rect width=\"1\" height=\"1\"/></symbol></svg>"
+                        .to_vec(),
+                ),
+            }))
+        };
+        *page.lock().unwrap() = format!(
+            "<!doctype html><title>t</title><svg id=own><use href=/own.svg#x></use></svg>\
+             <svg id=other><use href={}#x></use></svg>",
+            server.url("/other.svg").replace("127.0.0.1", "localhost")
+        );
+
+        for arguments in [&[][..], &["--remove-js"][..]] {
+            let html = Workspace::new(browser).render(&server.url("/"), arguments);
+            assert!(html.contains("<symbol id=\"x\">"), "{html}");
+            assert!(
+                html.contains("<svg id=\"other\"><use></use></svg>"),
+                "{html}"
+            );
+        }
+        // Browsers don't ask for them, neither does Monolith
+        assert!(server.was_asked_for("/own.svg"));
+        assert!(!server.was_asked_for("/other.svg"));
     });
 }

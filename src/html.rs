@@ -1415,6 +1415,27 @@ impl Write for HeadInjector<'_> {
     }
 }
 
+/// Whether USE elements get to show what's at given URL: browsers only fetch what's of the page's
+/// own origin for them (in "same-origin" mode, CORS doesn't help), and nothing out of data URLs.
+fn is_usable_by_use(session: &Session, url: &Url) -> bool {
+    let is_usable = url.scheme() != "data"
+        && session
+            .page_origin
+            .as_ref()
+            .is_none_or(|origin| origin.is_same_origin(url));
+    if !is_usable && !session.options.silent {
+        print_error_message(&format!(
+            "{} (browsers don't use SVGs of {})",
+            clean_url(url.clone()),
+            match url.scheme() {
+                "data" => "data URLs",
+                _ => "other origins",
+            }
+        ));
+    }
+    is_usable
+}
+
 /// Whether SCRIPT elements have code in them (or point at some), rather than data.
 fn is_executable_script(node: &Handle) -> bool {
     let script_type = get_node_attr(node, "type").unwrap_or_default();
@@ -2189,11 +2210,24 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     continue;
                                 }
 
+                                // Browsers only use what's of the page's own origin, they don't
+                                // even ask for anything else (see cors.rs)
+                                if !is_usable_by_use(session, &image_asset_url) {
+                                    set_node_attr(node, attr_name, None);
+                                    continue;
+                                }
+
                                 match session.retrieve_asset_for(
                                     document_url,
                                     &image_asset_url,
                                     &Request::to(Destination::Image),
                                 ) {
+                                    // Not even after having been redirected elsewhere
+                                    Ok((_, final_url, _, _))
+                                        if !is_usable_by_use(session, &final_url) =>
+                                    {
+                                        set_node_attr(node, attr_name, None);
+                                    }
                                     Ok((data, final_url, media_type, charset)) => {
                                         if media_type == "image/svg+xml" {
                                             let final_url_without_fragment: Url =

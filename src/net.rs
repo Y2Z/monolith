@@ -14,7 +14,7 @@ use reqwest::{StatusCode, Version};
 use crate::cache::Exchange;
 use crate::cookies::Cookie;
 use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_info_message};
-use crate::cors::{CorsRequest, RequestMode};
+use crate::cors::{CorsRequest, PageOrigin, RequestMode};
 use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{
     LinkType, document_policies, get_node_attr, html_to_dom, parse_link_type, parse_srcset,
@@ -89,6 +89,8 @@ struct Ctx<'a> {
     credentials: &'a Credentials,
     options: &'a MonolithOptions,
     progress: Option<&'a PrefetchProgress>,
+    /// Whether what's requested depends on origins of documents (see cors.rs)
+    checks_origins: bool,
     seen: Mutex<HashSet<String>>,
     results_tx: mpsc::Sender<Fetched>,
 }
@@ -542,11 +544,12 @@ pub fn prefetch_assets(
     options: &MonolithOptions,
     document_url: &Url,
     document: &Handle,
+    origin: Option<&PageOrigin>,
     progress: Option<&PrefetchProgress>,
     is_cached: impl Fn(&str) -> bool,
 ) -> Vec<CacheEntry> {
     let mut jobs: Vec<Job> = vec![];
-    collect_html(document, "", document_url, options, &mut jobs);
+    collect_html(document, "", document_url, options, origin, &mut jobs);
     for job in &mut jobs {
         job.depth = 1;
     }
@@ -578,6 +581,7 @@ pub fn prefetch_assets(
         credentials,
         options,
         progress,
+        checks_origins: origin.is_some(),
         seen: Mutex::new(seen),
         results_tx: tx,
     };
@@ -677,11 +681,17 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
                     let policies =
                         document_policies(&frame_dom.document, &final_url, policy.as_deref());
                     if !policies.restricts_anything() {
+                        // Frames have origins of their own
+                        let origin = ctx
+                            .checks_origins
+                            .then(|| PageOrigin::of(&final_url))
+                            .flatten();
                         collect_html(
                             &frame_dom.document,
                             "",
                             &final_url,
                             ctx.options,
+                            origin.as_ref(),
                             &mut more_jobs,
                         );
                     }
@@ -757,12 +767,13 @@ fn collect_html(
     parent_name: &str,
     base_url: &Url,
     options: &MonolithOptions,
+    origin: Option<&PageOrigin>,
     jobs: &mut Vec<Job>,
 ) {
     match node.data {
         NodeData::Document => {
             for child in node.children.borrow().iter() {
-                collect_html(child, "", base_url, options, jobs);
+                collect_html(child, "", base_url, options, origin, jobs);
             }
         }
         NodeData::Element { ref name, .. } => {
@@ -827,6 +838,11 @@ fn collect_html(
                     if !options.remove_images {
                         for attr_name in ["href", "xlink:href"] {
                             if let Some(href) = get_node_attr(node, attr_name) {
+                                // Browsers don't ask other origins for these at all
+                                let url = resolve_url(base_url, &href);
+                                if origin.is_some_and(|origin| !origin.is_same_origin(&url)) {
+                                    continue;
+                                }
                                 // It's a document of its own whose contents get walked, and it
                                 // has to be retrieved under its canonical URL so that redirects
                                 // into cycles stay detectable
@@ -887,7 +903,7 @@ fn collect_html(
                 "noscript" => {
                     for contents in node_text(node) {
                         let noscript_dom = html_to_dom(&contents.into_bytes(), "".to_string());
-                        collect_html(&noscript_dom.document, "", base_url, options, jobs);
+                        collect_html(&noscript_dom.document, "", base_url, options, origin, jobs);
                     }
                 }
                 _ => {}
@@ -900,7 +916,7 @@ fn collect_html(
             }
 
             for child in node.children.borrow().iter() {
-                collect_html(child, name, base_url, options, jobs);
+                collect_html(child, name, base_url, options, origin, jobs);
             }
         }
         _ => {}
