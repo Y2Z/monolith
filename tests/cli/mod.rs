@@ -2,6 +2,7 @@ mod archives;
 mod base_url;
 mod basic;
 mod browser;
+mod cors;
 mod credentials;
 mod data_url;
 mod http_encoding;

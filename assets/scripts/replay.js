@@ -13,6 +13,9 @@
             url: element.dataset.monolithUrl,
             // Where it was asked for before getting redirected
             aliases: (element.dataset.monolithAliases || "").split(" ").filter(Boolean),
+            // What other origins said about letting pages use it (nothing for what didn't come over HTTP)
+            allowOrigin: element.dataset.monolithAllowOrigin,
+            allowCredentials: element.dataset.monolithAllowCredentials,
             used: false,
         });
         element.remove();
@@ -86,6 +89,33 @@
         return sameResource.length ? pick(sameResource) : undefined;
     };
 
+    // What other origins allow pages to use, the way browsers go by it (see cors.rs)
+    const pageUrl = new URL(PAGE_URL);
+    const pageOrigin = pageUrl.origin; // "null" for files
+    const isSameOrigin = (url) => {
+        try {
+            const target = new URL(url);
+            if (pageUrl.protocol === "file:") {
+                // The page's directory, and what's within it, the way Firefox has it
+                return target.protocol === "file:" && target.href.startsWith(new URL("./", pageUrl).href);
+            }
+            return target.origin === pageOrigin;
+        } catch (error) {
+            return false;
+        }
+    };
+    const isAllowed = (response, withCredentials) => {
+        if (response.allowOrigin === undefined) {
+            return true; // Nothing to go by
+        }
+        if (!withCredentials) {
+            return response.allowOrigin === "*" || response.allowOrigin === pageOrigin;
+        }
+        return response.allowOrigin === pageOrigin && response.allowCredentials === "true";
+    };
+    const isCrossOrigin = (url, found) => !isSameOrigin(absoluteUrl(url)) || !isSameOrigin(found.url);
+    const networkError = () => new TypeError("NetworkError when attempting to fetch resource.");
+
     const toBytes = (response) => Uint8Array.from(atob(response.body), (c) => c.charCodeAt(0));
     const toText = (response) => new TextDecoder().decode(toBytes(response));
     const replayStatus = (response) => (response.status === 304 ? 200 : response.status);
@@ -99,9 +129,24 @@
             return originalFetch(input, init); // data:, blob:
         }
         const method = ((init && init.method) || (request && request.method) || "GET").toUpperCase();
+        const mode = (init && init.mode) || (request && request.mode) || "cors";
+        const credentials = (init && init.credentials) || (request && request.credentials) || "same-origin";
+        if (!isSameOrigin(absoluteUrl(url)) && mode === "no-cors") {
+            // There, but nothing about it can be seen (browsers don't even keep it for others to see)
+            const opaque = new Response(null, { status: 200 });
+            for (const [name, value] of Object.entries({ ok: false, status: 0, statusText: "", type: "opaque", url: "" })) {
+                Object.defineProperty(opaque, name, { value });
+            }
+            return opaque;
+        }
         const found = findResponse(method, url);
         if (!found) {
-            throw new TypeError("NetworkError when attempting to fetch resource.");
+            throw networkError();
+        }
+        if (isCrossOrigin(url, found)) {
+            if (mode === "same-origin" || !isAllowed(found, credentials === "include")) {
+                throw networkError();
+            }
         }
         const status = replayStatus(found);
         const hasBody = ![101, 204, 205, 304].includes(status);
@@ -166,6 +211,10 @@
                 }
                 this.emit("loadstart");
                 this.found = findResponse(this.method, this.url);
+                // Requests to other origins are always CORS requests
+                if (this.found && isCrossOrigin(this.url, this.found) && !isAllowed(this.found, this.withCredentials)) {
+                    this.found = undefined;
+                }
                 this.readyState = 4;
                 if (!this.found) {
                     this.emit("readystatechange");

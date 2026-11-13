@@ -4,6 +4,7 @@ mod cache;
 mod cli;
 mod cookies;
 mod core;
+mod cors;
 mod css;
 mod har;
 mod html;

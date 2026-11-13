@@ -7,8 +7,7 @@
 
 #[cfg(test)]
 mod passing {
-    use monolith::replay::CapturedAsset;
-    use monolith::replay::create_replay_markup;
+    use monolith::replay::{CapturedAsset, HttpDetails, create_replay_markup, rewrite_stylesheets};
 
     fn asset(url: &str, destination: &str) -> CapturedAsset {
         CapturedAsset {
@@ -108,6 +107,83 @@ mod passing {
         assert_eq!(markup.matches("data-monolith-url=").count(), 1);
         assert!(
             markup.contains("data-monolith-aliases=\"https://a.test/old-a https://a.test/old-b\"")
+        );
+    }
+
+    /// What has come from another origin in CORS mode, with given response headers.
+    fn from_other_origin(url: &str, destination: &str, headers: &[(&str, &str)]) -> CapturedAsset {
+        CapturedAsset {
+            content_type: "font/woff2".to_string(),
+            data: format!("FONT {}", url).into_bytes(),
+            destination: destination.to_string(),
+            http: HttpDetails {
+                request_headers: vec![("Origin".to_string(), "https://a.b".to_string())],
+                response_headers: headers
+                    .iter()
+                    .map(|(name, value)| (name.to_string(), value.to_string()))
+                    .collect(),
+                ..Default::default()
+            },
+            ..asset(url, destination)
+        }
+    }
+
+    #[test]
+    fn tells_emulator_what_other_origins_allowed() {
+        let markup = create_replay_markup(
+            &[
+                from_other_origin(
+                    "https://c.d/allowed",
+                    "",
+                    &[("Access-Control-Allow-Origin", "*")],
+                ),
+                from_other_origin("https://c.d/denied", "", &[]),
+            ],
+            &[],
+            "https://a.b/",
+            7,
+        );
+
+        assert!(markup.contains(
+            "data-monolith-url=\"https://c.d/allowed\" data-monolith-allow-origin=\"*\" \
+             data-monolith-allow-credentials=\"\""
+        ));
+        assert!(markup.contains(
+            "data-monolith-url=\"https://c.d/denied\" data-monolith-allow-origin=\"\" \
+             data-monolith-allow-credentials=\"\""
+        ));
+    }
+
+    #[test]
+    fn stylesheets_get_only_fonts_that_were_allowed() {
+        let mut stylesheet = asset("https://a.b/style.css", "style");
+        stylesheet.content_type = "text/css".to_string();
+        stylesheet.data = b"@font-face{font-family:a;src:url(https://c.d/allowed)}\
+            @font-face{font-family:b;src:url(https://c.d/denied)}"
+            .to_vec();
+        let mut assets = vec![
+            stylesheet,
+            from_other_origin(
+                "https://c.d/allowed",
+                "font",
+                &[("Access-Control-Allow-Origin", "*")],
+            ),
+            from_other_origin("https://c.d/denied", "font", &[]),
+        ];
+
+        rewrite_stylesheets(&mut assets, None);
+
+        let stylesheet = String::from_utf8(assets[0].data.clone()).unwrap();
+        assert!(
+            stylesheet.contains("url(\"data:font/woff2;base64,"),
+            "{}",
+            stylesheet
+        );
+        // What browsers didn't let the page use stays where it was
+        assert!(
+            stylesheet.contains("url(https://c.d/denied)"),
+            "{}",
+            stylesheet
         );
     }
 }

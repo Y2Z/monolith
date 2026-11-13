@@ -15,6 +15,7 @@ use url::Url;
 
 #[cfg(feature = "browser")]
 use crate::browser::{ColorScheme, render_page};
+use crate::cors::PageOrigin;
 use crate::har::{is_har, parse_har};
 use crate::html::{
     add_favicon, get_base_url, get_charset, get_robots, get_title, has_favicon, html_to_dom,
@@ -207,6 +208,7 @@ fn create_archive_from_page(page: &CapturedPage) -> MhtmlArchive {
                         url: urls.last().cloned(),
                         media_type,
                         charset: charset.unwrap_or_default(),
+                        response_headers: recorded_headers(asset),
                     },
                 ),
             )
@@ -476,6 +478,13 @@ fn create_monolithic_document_from_bytes(
     session.links_are_absolute = get_base_url(&dom.document).is_some()
         || session.options.base_url.is_some()
         || session.options.output_format == MonolithOutputFormat::MHTML;
+
+    // Where the document is from decides what other origins allow it to use (base URLs don't
+    // change that), documents with no URL have no origin
+    session.page_origin = input_target
+        .as_deref()
+        .and_then(|target| Url::parse(target).ok())
+        .and_then(|url| PageOrigin::of(&url));
 
     // The result can start being written as soon as it's known what to call it: what's done
     // with the document doesn't change its title
@@ -987,16 +996,29 @@ fn is_captured_document(page: &CapturedPage) -> bool {
 fn add_captured_assets(session: &mut Session, assets: &[CapturedAsset]) {
     for asset in assets.iter().filter(|asset| asset.is_reusable) {
         let (media_type, charset, _) = parse_media_type(&asset.content_type);
+        let urls: Vec<Url> = asset
+            .urls
+            .iter()
+            .filter_map(|url| Url::parse(url).ok())
+            .collect();
 
-        for url in asset.urls.iter().filter_map(|url| Url::parse(url).ok()) {
+        for url in &urls {
             session.add_asset(
-                &url,
+                url,
                 &asset.data,
                 media_type.clone(),
                 charset.clone().unwrap_or_default(),
             );
         }
+        if let (Some(headers), Some(final_url)) = (recorded_headers(asset), urls.last()) {
+            session.record_headers(&urls, final_url, headers);
+        }
     }
+}
+
+/// Headers something has been received with, if it was received over HTTP.
+fn recorded_headers(asset: &CapturedAsset) -> Option<Vec<(String, String)>> {
+    (!asset.http.is_resource).then(|| asset.http.response_headers.clone())
 }
 
 /// Creates a document out of a page that has already been loaded by something else.
@@ -1008,6 +1030,8 @@ pub fn create_monolithic_document_from_capture(
     mut session: Session,
     mut page: CapturedPage,
 ) -> MonolithResult {
+    // The browser has seen to what other origins allow
+    session.is_captured = true;
     // What browsers report may have credentials in it, those don't get saved
     let mut strip = |url: &mut String| {
         if let Ok(parsed) = Url::parse(url)

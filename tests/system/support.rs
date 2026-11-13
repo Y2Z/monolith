@@ -104,6 +104,8 @@ type Responder = Box<dyn Fn(&Request) -> (u16, &'static str, Vec<u8>) + Send + S
 pub struct Server {
     pub address: String,
     requests: Arc<Mutex<Vec<Request>>>,
+    /// Header lines to send along with what's at given paths
+    headers: Arc<Mutex<HashMap<String, Vec<String>>>>,
 }
 
 impl Server {
@@ -127,18 +129,35 @@ impl Server {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap().to_string();
         let requests = Arc::new(Mutex::new(vec![]));
+        let headers: Arc<Mutex<HashMap<String, Vec<String>>>> = Arc::default();
         let responder = Arc::new(responder);
         let recorded = Arc::clone(&requests);
+        let extra = Arc::clone(&headers);
 
         thread::spawn(move || {
             for stream in listener.incoming().map_while(Result::ok) {
                 let responder = Arc::clone(&responder);
                 let recorded = Arc::clone(&recorded);
-                thread::spawn(move || respond(stream, &responder, &recorded));
+                let extra = Arc::clone(&extra);
+                thread::spawn(move || respond(stream, &responder, &recorded, &extra));
             }
         });
 
-        Server { address, requests }
+        Server {
+            address,
+            requests,
+            headers,
+        }
+    }
+
+    /// Makes what's at given path come with given header line.
+    pub fn add_header(&self, path: &str, header: &str) {
+        self.headers
+            .lock()
+            .unwrap()
+            .entry(path.to_string())
+            .or_default()
+            .push(header.to_string());
     }
 
     pub fn url(&self, path: &str) -> String {
@@ -156,7 +175,12 @@ impl Server {
     }
 }
 
-fn respond(mut stream: TcpStream, responder: &Responder, requests: &Mutex<Vec<Request>>) {
+fn respond(
+    mut stream: TcpStream,
+    responder: &Responder,
+    requests: &Mutex<Vec<Request>>,
+    headers: &Mutex<HashMap<String, Vec<String>>>,
+) {
     let mut received = vec![];
     let mut buffer = [0; 4096];
 
@@ -212,11 +236,18 @@ fn respond(mut stream: TcpStream, responder: &Responder, requests: &Mutex<Vec<Re
         ),
         false => String::new(),
     };
+    let extra: String = headers
+        .lock()
+        .unwrap()
+        .get(request.path.split('?').next().unwrap_or(""))
+        .map(|lines| lines.iter().map(|line| format!("{}\r\n", line)).collect())
+        .unwrap_or_default();
     let head = format!(
-        "HTTP/1.1 {} Status\r\nContent-Type: {}\r\n{}Content-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} Status\r\nContent-Type: {}\r\n{}{}Content-Length: {}\r\nConnection: close\r\n\r\n",
         status,
         media_type,
         location,
+        extra,
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());

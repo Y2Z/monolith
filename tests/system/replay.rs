@@ -82,7 +82,13 @@ fn with_each_browser_for_opening(saving_browser: &std::path::Path) {
     with_each_browser(|browser| {
         let html = Workspace::new(browser).open(&saved);
 
-        assert!(html.contains("fetched|xhr|posted"));
+        assert!(
+            html.contains("fetched|xhr|posted"),
+            "saved with {}, opened with {}: {}",
+            saving_browser.display(),
+            browser.display(),
+            html
+        );
     });
 }
 
@@ -537,5 +543,72 @@ fn what_got_redirected_can_be_found_where_it_was_asked_for() {
                 html
             );
         }
+    });
+}
+
+/// Asks another origin for things it does and doesn't allow pages to have.
+const CORS_APP: &str = r#"<!doctype html><title>CORS</title><div id=a></div><script>
+(async () => {
+  const other = 'OTHER';
+  const results = [];
+  const read = (url, init) => fetch(other + url, init).then((r) => r.json()).then((j) => j.name, () => 'refused');
+  results.push(await read('/allowed.json'));
+  results.push(await read('/denied.json'));
+  results.push(await fetch(other + '/denied.json', {mode: 'no-cors'}).then((r) => r.type + r.status, () => 'refused'));
+  results.push(await read('/allowed.json', {credentials: 'include'}));
+  for (const path of ['/allowed-xhr.json', '/denied-xhr.json']) {
+    results.push(await new Promise((done) => {
+      const x = new XMLHttpRequest();
+      x.open('GET', other + path);
+      x.responseType = 'json';
+      x.onload = () => done(x.response.name);
+      x.onerror = () => done('refused');
+      x.send();
+    }));
+  }
+  a.textContent = results.join('|');
+})();
+</script>"#;
+
+#[test]
+fn other_origins_allow_saved_pages_what_they_allowed() {
+    with_each_browser(|browser| {
+        let other = Server::new(&[
+            (
+                "/allowed.json",
+                "application/json",
+                br#"{"name":"allowed"}"#,
+            ),
+            ("/denied.json", "application/json", br#"{"name":"denied"}"#),
+            (
+                "/allowed-xhr.json",
+                "application/json",
+                br#"{"name":"xhr"}"#,
+            ),
+            (
+                "/denied-xhr.json",
+                "application/json",
+                br#"{"name":"denied"}"#,
+            ),
+        ]);
+        other.add_header("/allowed.json", "Access-Control-Allow-Origin: *");
+        other.add_header("/allowed-xhr.json", "Access-Control-Allow-Origin: *");
+        let page: &'static [u8] = Box::leak(
+            CORS_APP
+                .replace("OTHER", &other.url(""))
+                .into_bytes()
+                .into_boxed_slice(),
+        );
+        let server = Server::new(&[("/", "text/html", page)]);
+        let workspace = Workspace::new(browser);
+        // "*" isn't enough for what comes with credentials
+        let expected = "allowed|refused|opaque0|refused|xhr|refused";
+
+        let live = workspace.render(&server.url("/"), &["--no-js"]);
+        assert!(live.contains(expected), "live: {}", live);
+
+        let saved = workspace.save(&server.url("/"), &[]);
+        let html = workspace.open(&saved);
+        assert!(html.contains(expected), "saved: {}", html);
     });
 }

@@ -14,7 +14,10 @@ use std::default::Default;
 use std::io::{self, Write};
 use std::rc::Rc;
 
-use crate::core::{MonolithOptions, MonolithOutputFormat, declared_encoding, parse_media_type};
+use crate::core::{
+    MonolithOptions, MonolithOutputFormat, declared_encoding, parse_media_type, print_error_message,
+};
+use crate::cors::{PageOrigin, RequestMode};
 use crate::css::{embed_css, embed_stylesheet};
 use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::replay::rewrite_imports;
@@ -229,6 +232,16 @@ pub fn set_metadata(dom: &RcDom, source: Option<&Url>) {
 }
 
 pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> String {
+    embed_srcset_as(session, document_url, srcset, RequestMode::NoCors)
+}
+
+/// Same as embed_srcset(), for images requested in given mode (see cors.rs).
+pub fn embed_srcset_as(
+    session: &mut Session,
+    document_url: &Url,
+    srcset: &str,
+    mode: RequestMode,
+) -> String {
     let srcset_items: Vec<SrcSetItem> = parse_srcset(srcset);
 
     // Embed assets
@@ -239,8 +252,10 @@ pub fn embed_srcset(session: &mut Session, document_url: &Url, srcset: &str) -> 
             result.push_str(EMPTY_IMAGE_DATA_URL);
         } else {
             let image_full_url: Url = resolve_url(document_url, srcset_item.path);
-            match session.retrieve_asset(document_url, &image_full_url) {
-                Ok((image_data, image_final_url, image_media_type, image_charset)) => {
+            match session.retrieve(document_url, &image_full_url, mode) {
+                // What the page isn't allowed to use shows nothing
+                Ok(None) => result.push_str(EMPTY_IMAGE_DATA_URL),
+                Ok(Some((image_data, image_final_url, image_media_type, image_charset))) => {
                     if session.options.output_format != MonolithOutputFormat::MHTML {
                         // Append retrieved asset as a data URL
                         result.push_str(&create_srcset_data_url(
@@ -1313,11 +1328,53 @@ pub fn retrieve_and_embed_asset(
     attr_value: &str,
 ) {
     let resolved_url: Url = resolve_url(document_url, attr_value);
+    let node_name: &str = get_node_name(node).unwrap();
+    let crossorigin: Option<String> = get_node_attr(node, "crossorigin");
+    let mode: RequestMode = match (node_name, attr_name) {
+        ("script", _) => RequestMode::of_script(
+            get_node_attr(node, "type").as_deref(),
+            crossorigin.as_deref(),
+        ),
+        // Posters aren't what crossorigin is about
+        ("video", "poster") => RequestMode::NoCors,
+        ("img" | "audio" | "video" | "link", _) => {
+            RequestMode::of_attribute(crossorigin.as_deref())
+        }
+        _ => RequestMode::NoCors,
+    };
 
-    match session.retrieve_asset(&document_url.clone(), &resolved_url) {
-        Ok((data, final_url, media_type, charset)) => {
-            let node_name: &str = get_node_name(node).unwrap();
+    // Integrity of what comes from other origins can't be checked without CORS, browsers don't
+    // use what they can't check
+    let has_integrity = matches!(node_name, "link" | "script")
+        && get_node_attr(node, "integrity").is_some_and(|integrity| !integrity.is_empty());
+    let is_cross_origin = session
+        .page_origin
+        .as_ref()
+        .is_some_and(|origin| !origin.is_same_origin(&resolved_url));
+    if has_integrity
+        && is_cross_origin
+        && mode == RequestMode::NoCors
+        && resolved_url.scheme() != "data"
+        && session.checks_cors()
+    {
+        if !session.options.silent {
+            print_error_message(&format!(
+                "{} (integrity can't be checked without CORS)",
+                resolved_url
+            ));
+        }
+        set_node_attr(node, "integrity", None);
+        set_node_attr(node, attr_name, None);
+        return;
+    }
 
+    match session.retrieve(&document_url.clone(), &resolved_url, mode) {
+        // What the page isn't allowed to use doesn't get to be in it
+        Ok(None) => {
+            set_node_attr(node, "integrity", None);
+            set_node_attr(node, attr_name, None);
+        }
+        Ok(Some((data, final_url, media_type, charset))) => {
             // Check integrity if it's a LINK or SCRIPT element
             let mut ok_to_include: bool = true;
             if node_name == "link" || node_name == "script" {
@@ -1367,6 +1424,13 @@ pub fn retrieve_and_embed_asset(
 
                     let environment_encoding =
                         std::mem::replace(&mut session.environment_encoding, frame_encoding);
+                    // Frames are documents of their own, with origins of their own
+                    let page_origin = match session.page_origin.is_some() {
+                        true => {
+                            std::mem::replace(&mut session.page_origin, PageOrigin::of(&final_url))
+                        }
+                        false => None,
+                    };
                     strip_elements(
                         &frame_dom.document,
                         &session.options.remove_elements,
@@ -1374,6 +1438,9 @@ pub fn retrieve_and_embed_asset(
                     );
                     walk(session, &final_url, &frame_dom.document);
                     session.environment_encoding = environment_encoding;
+                    if page_origin.is_some() {
+                        session.page_origin = page_origin;
+                    }
 
                     let mut frame_data: Vec<u8> = Vec::new();
                     let serializable: SerializableHandle = frame_dom.document.into();
@@ -1642,7 +1709,12 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         } else {
                             let img_src_full_url: Url = resolve_url(document_url, &img_src);
                             set_node_attr(node, "src", Some(img_src_full_url.to_string()));
-                            session.log_asset_url(&img_src_full_url);
+                            session.log_asset_url_as(
+                                &img_src_full_url,
+                                RequestMode::of_attribute(
+                                    get_node_attr(node, "crossorigin").as_deref(),
+                                ),
+                            );
                         }
                     }
 
@@ -1650,8 +1722,11 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     if let Some(img_srcset) = get_node_attr(node, "srcset")
                         && !img_srcset.is_empty()
                     {
+                        let mode = RequestMode::of_attribute(
+                            get_node_attr(node, "crossorigin").as_deref(),
+                        );
                         let resolved_srcset: String =
-                            embed_srcset(session, document_url, &img_srcset);
+                            embed_srcset_as(session, document_url, &img_srcset, mode);
                         set_node_attr(node, "srcset", Some(resolved_srcset));
                     }
                 }
@@ -1924,7 +1999,13 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 let script_src_full_url: Url =
                                     resolve_url(document_url, script_src);
                                 set_node_attr(node, "src", Some(script_src_full_url.to_string()));
-                                session.log_asset_url(&script_src_full_url);
+                                session.log_asset_url_as(
+                                    &script_src_full_url,
+                                    RequestMode::of_script(
+                                        get_node_attr(node, "type").as_deref(),
+                                        get_node_attr(node, "crossorigin").as_deref(),
+                                    ),
+                                );
                             }
                         } else if session.options.replay {
                             for child_node in node.children.borrow_mut().iter_mut() {
@@ -2003,7 +2084,12 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             let audio_src_full_url: Url =
                                 resolve_url(document_url, &audio_attr_src_value);
                             set_node_attr(node, "src", Some(audio_src_full_url.to_string()));
-                            session.log_asset_url(&audio_src_full_url);
+                            session.log_asset_url_as(
+                                &audio_src_full_url,
+                                RequestMode::of_attribute(
+                                    get_node_attr(node, "crossorigin").as_deref(),
+                                ),
+                            );
                         }
                     }
                 }
@@ -2022,7 +2108,12 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             let video_src_full_url: Url =
                                 resolve_url(document_url, &video_attr_src_value);
                             set_node_attr(node, "src", Some(video_src_full_url.to_string()));
-                            session.log_asset_url(&video_src_full_url);
+                            session.log_asset_url_as(
+                                &video_src_full_url,
+                                RequestMode::of_attribute(
+                                    get_node_attr(node, "crossorigin").as_deref(),
+                                ),
+                            );
                         }
                     }
 

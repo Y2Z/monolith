@@ -216,6 +216,7 @@ fn parse_resource(resource: &Plist) -> Option<(Vec<Url>, ArchivedAsset)> {
                 .get("WebResourceTextEncodingName")
                 .and_then(Plist::as_string)
                 .unwrap_or_default(),
+            response_headers: None,
         },
     ))
 }

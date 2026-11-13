@@ -8,12 +8,13 @@ use cssparser::{ParseError, Parser, Token};
 use markup5ever_rcdom::{Handle, NodeData};
 use rayon::{Scope, ThreadPoolBuilder};
 use reqwest::blocking::{Client, Response};
-use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, LOCATION, REFERER};
+use reqwest::header::{CONTENT_TYPE, COOKIE, HeaderMap, HeaderValue, LOCATION, ORIGIN, REFERER};
 use reqwest::{StatusCode, Version};
 
 use crate::cache::Exchange;
 use crate::cookies::Cookie;
 use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_info_message};
+use crate::cors::{CorsRequest, RequestMode};
 use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{
     LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset, strip_elements,
@@ -265,8 +266,62 @@ pub fn fetch_remote_asset(
     options: &MonolithOptions,
     parent_url: &Url,
     url: &Url,
-    mut exchanges: Option<&mut Vec<Exchange>>,
+    exchanges: Option<&mut Vec<Exchange>>,
 ) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
+    let requester = Requester {
+        client,
+        cookies,
+        credentials,
+        cors: None,
+    };
+
+    match fetch(&requester, options, parent_url, url, exchanges)? {
+        Outcome::Asset(data, url, media_type, charset) => Ok((data, url, media_type, charset)),
+        // Only CORS requests can get blocked
+        Outcome::Blocked => Err(client.get("").send().unwrap_err()),
+    }
+}
+
+/// Same as fetch_remote_asset(), for requests made in CORS mode: None for what doesn't allow
+/// the page to use it (see cors.rs), what browsers would drop.
+pub fn fetch_cors_asset(
+    requester: &Requester,
+    options: &MonolithOptions,
+    parent_url: &Url,
+    url: &Url,
+    exchanges: Option<&mut Vec<Exchange>>,
+) -> Result<Option<Asset>, reqwest::Error> {
+    match fetch(requester, options, parent_url, url, exchanges)? {
+        Outcome::Asset(data, url, media_type, charset) => {
+            Ok(Some((data, url, media_type, charset)))
+        }
+        Outcome::Blocked => Ok(None),
+    }
+}
+
+/// What's been retrieved: its data, where it has ended up being, its media type, and charset.
+pub type Asset = (Vec<u8>, Url, String, String);
+
+/// What a request has ended up with.
+enum Outcome {
+    Asset(Vec<u8>, Url, String, String),
+    /// Not allowed to be used by the page
+    Blocked,
+}
+
+fn fetch(
+    requester: &Requester,
+    options: &MonolithOptions,
+    parent_url: &Url,
+    url: &Url,
+    mut exchanges: Option<&mut Vec<Exchange>>,
+) -> Result<Outcome, reqwest::Error> {
+    let Requester {
+        client,
+        cookies,
+        credentials,
+        cors,
+    } = *requester;
     // Credentials that come with the URL itself are for that URL's origin
     let mut credentials = credentials.clone();
     let url: &Url = &credentials.take_from(url);
@@ -284,11 +339,20 @@ pub fn fetch_remote_asset(
     let mut current_url: Url = url.clone();
     let mut redirects: usize = 0;
     let (response, sent_headers) = loop {
-        let sent_headers = request_headers(cookies, parent_url, &current_url);
+        // CORS requests carry credentials only where they're meant to, and say where they're from
+        let sends_credentials = cors.is_none_or(|cors| cors.sends_credentials_to(&current_url));
+        let mut sent_headers = request_headers(
+            cookies.filter(|_| sends_credentials),
+            parent_url,
+            &current_url,
+        );
+        if let Some(origin) = cors.and_then(|cors| cors.origin_header_for(&current_url)) {
+            sent_headers.insert(ORIGIN, HeaderValue::from_str(origin).unwrap());
+        }
         let mut request = client
             .get(current_url.as_str())
             .headers(sent_headers.clone());
-        if let Some((user, password)) = credentials.of(&current_url) {
+        if let Some((user, password)) = credentials.of(&current_url).filter(|_| sends_credentials) {
             request = request.basic_auth(user, password.as_ref());
         }
         let response = match request.send() {
@@ -359,6 +423,22 @@ pub fn fetch_remote_asset(
 
     let response_url: Url = response.url().clone();
 
+    if let Some(cors) = cors
+        && !cors.allows(&response_url, response.headers())
+    {
+        if !options.silent {
+            print_error_message(&format!("{} (blocked by CORS)", cache_key));
+        }
+
+        // Archives keep what has been received, even if the page didn't get to use it
+        if let (Some(exchanges), Some(mut exchange)) = (exchanges, exchange) {
+            exchange.body = response.bytes().map(|b| b.to_vec()).unwrap_or_default();
+            exchanges.push(exchange);
+        }
+
+        return Ok(Outcome::Blocked);
+    }
+
     if !options.silent {
         if url.as_str() == response_url.as_str() {
             print_info_message(&cache_key.to_string());
@@ -395,14 +475,17 @@ pub fn fetch_remote_asset(
         exchanges.push(exchange);
     }
 
-    Ok((data, response_url, media_type, charset))
+    Ok(Outcome::Asset(data, response_url, media_type, charset))
 }
 
 /// What requests get made with.
+#[derive(Clone, Copy)]
 pub struct Requester<'a> {
     pub client: &'a Client,
     pub cookies: Option<&'a [Cookie]>,
     pub credentials: &'a Credentials,
+    /// For requests made in CORS mode
+    pub cors: Option<&'a CorsRequest>,
 }
 
 pub fn prefetch_assets(
@@ -419,6 +502,7 @@ pub fn prefetch_assets(
         client,
         cookies,
         credentials,
+        ..
     } = requester;
     jobs.retain(|job| !is_cached(&credentials.cache_key(&job.url)));
     if jobs.is_empty() {
@@ -612,12 +696,13 @@ fn collect_html(
         }
         NodeData::Element { ref name, .. } => {
             let name: &str = name.local.as_ref();
+            let is_cors = has_cors_mode(node, name);
 
             match name {
                 "link" => {
                     let types: Vec<LinkType> =
                         parse_link_type(&get_node_attr(node, "rel").unwrap_or_default());
-                    if let Some(href) = get_node_attr(node, "href") {
+                    if let Some(href) = get_node_attr(node, "href").filter(|_| !is_cors) {
                         if types.contains(&LinkType::Favicon)
                             || types.contains(&LinkType::AppleTouchIcon)
                         {
@@ -639,7 +724,7 @@ fn collect_html(
                     }
                 }
                 "img" => {
-                    if !options.no_images {
+                    if !options.no_images && !is_cors {
                         let src = get_node_attr(node, "src").unwrap_or_default();
                         push_job(jobs, base_url, &src, AssetKind::Other);
 
@@ -682,6 +767,7 @@ fn collect_html(
                 }
                 "script" => {
                     if !options.no_js
+                        && !is_cors
                         && let Some(src) = get_node_attr(node, "src")
                     {
                         push_job(jobs, base_url, &src, AssetKind::Other);
@@ -700,12 +786,12 @@ fn collect_html(
                     }
                 }
                 "audio" => {
-                    if let Some(src) = get_node_attr(node, "src") {
+                    if let Some(src) = get_node_attr(node, "src").filter(|_| !is_cors) {
                         push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                 }
                 "video" => {
-                    if let Some(src) = get_node_attr(node, "src") {
+                    if let Some(src) = get_node_attr(node, "src").filter(|_| !is_cors) {
                         push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                     if !options.no_images
@@ -737,6 +823,26 @@ fn collect_html(
     }
 }
 
+/// Fonts get requested in CORS mode, and what's cached for such requests isn't what's cached for
+/// others: those get left for when they're needed (see cors.rs).
+fn is_requested_with_cors(rule_name: &str) -> bool {
+    rule_name == "font-face"
+}
+
+/// Whether the element gets what it points at in CORS mode (crossorigin, module scripts).
+fn has_cors_mode(node: &Handle, name: &str) -> bool {
+    let crossorigin = get_node_attr(node, "crossorigin");
+    match name {
+        "script" => {
+            RequestMode::of_script(
+                get_node_attr(node, "type").as_deref(),
+                crossorigin.as_deref(),
+            ) != RequestMode::NoCors
+        }
+        _ => crossorigin.is_some(),
+    }
+}
+
 fn collect_css_str(css: &str, base_url: &Url, options: &MonolithOptions, jobs: &mut Vec<Job>) {
     let mut parser = Parser::new(css);
     collect_css(&mut parser, base_url, options, "", "", "", jobs);
@@ -765,14 +871,23 @@ fn collect_css(
                     continue; // Unconsumed block gets skipped by the parser
                 }
                 let prop = curr_prop.clone();
+                // What's inside of @font-face blocks is about fonts, all the way down
+                let rule = match curr_rule == "font-face" {
+                    true => "font-face",
+                    false => rule_name,
+                };
                 let _ = parser.parse_nested_block(|parser| -> Result<(), ParseError<()>> {
-                    collect_css(parser, base_url, options, rule_name, &prop, func_name, jobs);
+                    collect_css(parser, base_url, options, rule, &prop, func_name, jobs);
                     Ok(())
                 });
             }
             Token::Function(ref name) => {
                 let name = name.to_string();
-                let (rule, prop) = (curr_rule.clone(), curr_prop.clone());
+                let rule = match rule_name == "font-face" {
+                    true => rule_name.to_string(),
+                    false => curr_rule.clone(),
+                };
+                let prop = curr_prop.clone();
                 let _ = parser.parse_nested_block(|parser| -> Result<(), ParseError<()>> {
                     collect_css(parser, base_url, options, &rule, &prop, &name, jobs);
                     Ok(())
@@ -794,6 +909,7 @@ fn collect_css(
                     push_job(jobs, base_url, value, AssetKind::Css);
                 } else if func_name == "url"
                     && !(options.no_images && is_image_url_prop(&curr_prop))
+                    && !is_requested_with_cors(rule_name)
                 {
                     push_job(jobs, base_url, value, AssetKind::Other);
                 }
@@ -802,7 +918,9 @@ fn collect_css(
                 if curr_rule == "import" {
                     curr_rule = "".to_string();
                     push_job(jobs, base_url, value, AssetKind::Css);
-                } else if !(options.no_images && is_image_url_prop(&curr_prop)) {
+                } else if !(options.no_images && is_image_url_prop(&curr_prop))
+                    && !is_requested_with_cors(rule_name)
+                {
                     push_job(jobs, base_url, value, AssetKind::Other);
                 }
             }
