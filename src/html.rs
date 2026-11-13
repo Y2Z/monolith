@@ -38,6 +38,14 @@ const ELEMENTS_WITH_RAW_CONTENTS: [&str; 3] = ["noscript", "script", "style"];
 
 const FAVICON_VALUES: &[&str] = &["icon", "shortcut icon"];
 
+/// SVG contents that an element has brought in, by the URL it was requested by and where it
+/// ended up, along with the fragment that was taken from it (if any).
+struct InlinedSvg {
+    requested_url: Url,
+    final_url: Url,
+    fragment: Option<String>,
+}
+
 #[derive(PartialEq, Eq)]
 pub enum LinkType {
     Alternate,
@@ -1368,6 +1376,29 @@ pub fn retrieve_and_embed_asset(
         ("source", _) => source_request_mode(node),
         _ => RequestMode::NoCors,
     };
+    let is_stylesheet_link = node_name == "link"
+        && parse_link_type(&get_node_attr(node, "rel").unwrap_or(String::from("")))
+            .contains(&LinkType::Stylesheet);
+    let is_frame = node_name == "frame" || node_name == "iframe";
+
+    // Something that's being expanded already is referencing itself, directly or through other
+    // assets; leave an empty asset in its place instead of expanding it forever
+    if is_stylesheet_link && session.is_expanding(&resolved_url) {
+        let empty_stylesheet = create_data_url("text/css", "utf-8", "", &resolved_url, None);
+        set_node_attr(node, attr_name, Some(empty_stylesheet));
+        return;
+    }
+    if is_frame && session.is_expanding(&resolved_url) {
+        let empty_document = create_data_url(
+            "text/html",
+            "utf-8",
+            "",
+            &resolved_url,
+            resolved_url.fragment(),
+        );
+        set_node_attr(node, attr_name, Some(empty_document));
+        return;
+    }
 
     // Integrity of what comes from other origins can't be checked without CORS, browsers don't
     // use what they can't check
@@ -1419,68 +1450,89 @@ pub fn retrieve_and_embed_asset(
             }
 
             if ok_to_include {
-                if node_name == "link"
-                    && parse_link_type(&get_node_attr(node, "rel").unwrap_or(String::from("")))
-                        .contains(&LinkType::Stylesheet)
-                {
+                if is_stylesheet_link {
                     // Stylesheet LINK elements require special treatment
+                    let alias = session.enter_expansion_alias(&resolved_url, &final_url);
                     let css: String = embed_stylesheet(session, &final_url, &data, &charset);
+                    if let Some(key) = alias {
+                        session.leave_expansion_alias(&key);
+                    }
 
                     // Create and embed data URL (decoded stylesheets are always stored as UTF-8)
                     let css_data_url = create_data_url(&media_type, "utf-8", css, &final_url, None);
                     set_node_attr(node, attr_name, Some(css_data_url));
-                } else if node_name == "frame" || node_name == "iframe" {
-                    // (I)FRAMEs are also quite different from conventional resources
-                    let mut frame_dom = html_to_dom(&data, charset.clone());
-                    let mut frame_encoding: Option<&'static Encoding> = declared_encoding(&charset);
+                } else if is_frame {
+                    // The frame's own URL can be where the request redirected to, even if it was
+                    // requested by another one
+                    if session.is_expanding(&final_url) {
+                        let empty_document = create_data_url(
+                            &media_type,
+                            "utf-8",
+                            "",
+                            &final_url,
+                            resolved_url.fragment(),
+                        );
+                        set_node_attr(node, attr_name, Some(empty_document));
+                    } else {
+                        // (I)FRAMEs are also quite different from conventional resources
+                        let mut frame_dom = html_to_dom(&data, charset.clone());
+                        let mut frame_encoding: Option<&'static Encoding> =
+                            declared_encoding(&charset);
 
-                    // Without a charset from the protocol, look for one declared inside the document
-                    if frame_encoding.is_none()
-                        && let Some(frame_charset) = get_charset(&frame_dom.document)
-                        && let Some(encoding) = declared_encoding(&frame_charset)
-                    {
-                        frame_dom = html_to_dom(&data, encoding.name().to_string());
-                        frame_encoding = Some(encoding);
-                    }
-
-                    // A byte order mark beats any declaration when it comes to decoding
-                    if let Some((bom_encoding, _)) = Encoding::for_bom(&data) {
-                        frame_encoding = Some(bom_encoding);
-                    }
-
-                    let environment_encoding =
-                        std::mem::replace(&mut session.environment_encoding, frame_encoding);
-                    // Frames are documents of their own, with origins of their own
-                    let page_origin = match session.page_origin.is_some() {
-                        true => {
-                            std::mem::replace(&mut session.page_origin, PageOrigin::of(&final_url))
+                        // Without a charset from the protocol, look for one declared inside the document
+                        if frame_encoding.is_none()
+                            && let Some(frame_charset) = get_charset(&frame_dom.document)
+                            && let Some(encoding) = declared_encoding(&frame_charset)
+                        {
+                            frame_dom = html_to_dom(&data, encoding.name().to_string());
+                            frame_encoding = Some(encoding);
                         }
-                        false => None,
-                    };
-                    strip_elements(
-                        &frame_dom.document,
-                        &session.options.remove_elements,
-                        &session.options.wipe_elements,
-                    );
-                    walk(session, &final_url, &frame_dom.document);
-                    session.environment_encoding = environment_encoding;
-                    if page_origin.is_some() {
-                        session.page_origin = page_origin;
+
+                        // A byte order mark beats any declaration when it comes to decoding
+                        if let Some((bom_encoding, _)) = Encoding::for_bom(&data) {
+                            frame_encoding = Some(bom_encoding);
+                        }
+
+                        let alias = session.enter_expansion_alias(&resolved_url, &final_url);
+                        let environment_encoding =
+                            std::mem::replace(&mut session.environment_encoding, frame_encoding);
+                        // Frames are documents of their own, with origins of their own
+                        let page_origin = match session.page_origin.is_some() {
+                            true => std::mem::replace(
+                                &mut session.page_origin,
+                                PageOrigin::of(&final_url),
+                            ),
+                            false => None,
+                        };
+                        strip_elements(
+                            &frame_dom.document,
+                            &session.options.remove_elements,
+                            &session.options.wipe_elements,
+                        );
+                        walk(session, &final_url, &frame_dom.document);
+                        session.environment_encoding = environment_encoding;
+                        if page_origin.is_some() {
+                            session.page_origin = page_origin;
+                        }
+                        if let Some(key) = alias {
+                            session.leave_expansion_alias(&key);
+                        }
+
+                        let mut frame_data: Vec<u8> = Vec::new();
+                        let serializable: SerializableHandle = frame_dom.document.into();
+                        serialize(&mut frame_data, &serializable, SerializeOpts::default())
+                            .unwrap();
+
+                        // Create and embed data URL (serialized frames are always UTF-8)
+                        let frame_data_url = create_data_url(
+                            &media_type,
+                            "utf-8",
+                            frame_data,
+                            &final_url,
+                            resolved_url.fragment(),
+                        );
+                        set_node_attr(node, attr_name, Some(frame_data_url));
                     }
-
-                    let mut frame_data: Vec<u8> = Vec::new();
-                    let serializable: SerializableHandle = frame_dom.document.into();
-                    serialize(&mut frame_data, &serializable, SerializeOpts::default()).unwrap();
-
-                    // Create and embed data URL (serialized frames are always UTF-8)
-                    let frame_data_url = create_data_url(
-                        &media_type,
-                        "utf-8",
-                        frame_data,
-                        &final_url,
-                        resolved_url.fragment(),
-                    );
-                    set_node_attr(node, attr_name, Some(frame_data_url));
                 } else {
                     // Every other type of element gets processed here
 
@@ -1581,16 +1633,28 @@ pub fn retrieve_and_embed_asset(
 pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
     match node.data {
         NodeData::Document => {
+            // A document that's being walked already is referencing itself, directly or through
+            // frames; its contents are on their way into the result, so there's nothing more to add
+            let Some(expansion_key) = session.enter_expansion(document_url) else {
+                return;
+            };
+
             // Dig deeper
             for child_node in node.children.borrow().iter() {
                 walk(session, document_url, child_node);
             }
+
+            session.leave_expansion(&expansion_key);
         }
         NodeData::Element {
             ref name,
             ref attrs,
             ..
         } => {
+            let mut expansions_to_leave: Vec<(String, Option<String>)> = Vec::new();
+            // External SVG contents brought into this element are relative to where that SVG is
+            let mut child_document_url: Option<Url> = None;
+
             match name.local.as_ref() {
                 "meta" => {
                     if let Some(meta_attr_http_equiv_value) = get_node_attr(node, "http-equiv") {
@@ -1806,6 +1870,9 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 }
                 "use" => {
                     let attr_names: [&str; 2] = ["href", "xlink:href"];
+                    // USE elements tend to point at the same symbol with both attributes, the
+                    // contents only have to be brought in once
+                    let mut inlined_svg: Option<InlinedSvg> = None;
 
                     for attr_name in attr_names.into_iter() {
                         if let Some(use_attr_href_value) = get_node_attr(node, attr_name) {
@@ -1817,10 +1884,76 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             } else {
                                 let image_asset_url: Url =
                                     resolve_url(document_url, &use_attr_href_value);
+                                let image_asset_url_without_fragment: Url =
+                                    clean_url(image_asset_url.clone());
+
+                                // The other attribute has already brought in this very SVG,
+                                // possibly by another URL that leads to the same one
+                                if let Some(inlined) = &inlined_svg
+                                    && inlined.fragment.as_deref() == image_asset_url.fragment()
+                                    && (inlined.requested_url == image_asset_url_without_fragment
+                                        || inlined.final_url == image_asset_url_without_fragment)
+                                {
+                                    if let Some(fragment) = &inlined.fragment {
+                                        set_node_attr(
+                                            node,
+                                            attr_name,
+                                            Some(format!("#{}", fragment)),
+                                        );
+                                    }
+                                    continue;
+                                }
+
+                                if session.is_expanding(&image_asset_url) {
+                                    set_node_attr(node, attr_name, None);
+                                    continue;
+                                }
 
                                 match session.retrieve_asset(document_url, &image_asset_url) {
                                     Ok((data, final_url, media_type, charset)) => {
                                         if media_type == "image/svg+xml" {
+                                            let final_url_without_fragment: Url =
+                                                clean_url(final_url.clone());
+
+                                            // This URL may be another name for what the other
+                                            // attribute has already brought in
+                                            if let Some(inlined) = &inlined_svg
+                                                && inlined.fragment.as_deref()
+                                                    == image_asset_url.fragment()
+                                                && inlined.final_url == final_url_without_fragment
+                                            {
+                                                if let Some(fragment) = &inlined.fragment {
+                                                    set_node_attr(
+                                                        node,
+                                                        attr_name,
+                                                        Some(format!("#{}", fragment)),
+                                                    );
+                                                }
+                                                continue;
+                                            }
+
+                                            // Keep the SVG being expanded until its contents have
+                                            // been walked, so that it can't use itself
+                                            if session.is_expanding(&final_url) {
+                                                set_node_attr(node, attr_name, None);
+                                                continue;
+                                            }
+
+                                            let alias = session.enter_expansion_alias(
+                                                &image_asset_url,
+                                                &final_url,
+                                            );
+                                            let Some(expansion_key) =
+                                                session.enter_expansion(&final_url)
+                                            else {
+                                                if let Some(key) = alias {
+                                                    session.leave_expansion_alias(&key);
+                                                }
+                                                set_node_attr(node, attr_name, None);
+                                                continue;
+                                            };
+                                            expansions_to_leave.push((expansion_key, alias));
+
                                             // Parse SVG
                                             let svg_dom: RcDom = parse_document(
                                                 RcDom::default(),
@@ -1894,6 +2027,16 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                                 }
                                                 // TODO: decide if we resort to using data URL here or stick with embedding the DOM
                                             }
+
+                                            // What got brought in is relative to where it came from
+                                            child_document_url = Some(final_url.clone());
+                                            inlined_svg = Some(InlinedSvg {
+                                                requested_url: image_asset_url_without_fragment,
+                                                final_url: final_url_without_fragment,
+                                                fragment: image_asset_url
+                                                    .fragment()
+                                                    .map(str::to_string),
+                                            });
                                         } else {
                                             // It's likely a raster image; embed it as data URL
                                             let image_asset_data: String = create_data_url(
@@ -2184,7 +2327,11 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                 "noscript" => {
                     // Embed assets of NOSCRIPT node contents
                     process_noscript_contents(node, |fragment| {
-                        walk(session, document_url, &fragment.document);
+                        // This fragment is part of the current document, not a document of its
+                        // own, so it doesn't need its own expansion scope
+                        for child_node in fragment.document.children.borrow().iter() {
+                            walk(session, document_url, child_node);
+                        }
                     });
                 }
                 _ => {}
@@ -2219,8 +2366,16 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
             }
 
             // Dig deeper
+            let child_document_url: &Url = child_document_url.as_ref().unwrap_or(document_url);
             for child_node in node.children.borrow().iter() {
-                walk(session, document_url, child_node);
+                walk(session, child_document_url, child_node);
+            }
+
+            for (expansion_key, alias) in expansions_to_leave {
+                session.leave_expansion(&expansion_key);
+                if let Some(key) = alias {
+                    session.leave_expansion_alias(&key);
+                }
             }
         }
         _ => {

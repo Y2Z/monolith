@@ -499,8 +499,29 @@ fn create_monolithic_document_from_bytes(
     }
 
     // Traverse through the document and embed remote assets
+    // A document can refer to itself by the URL it was requested from, and a base URL can make it
+    // get processed under another one; neither one can be taken for a cycle before the walk starts
+    let redirected_target: Option<Url> = session.take_redirected_target();
+    let input_target_url: Option<Url> = input_target
+        .as_deref()
+        .and_then(|target| Url::parse(target).ok())
+        .filter(|url| url.scheme() != "data");
+    let mut input_target_aliases: Vec<String> = vec![];
+    for target_url in [redirected_target.as_ref(), input_target_url.as_ref()]
+        .into_iter()
+        .flatten()
+    {
+        if let Some(key) = session.enter_expansion_alias(target_url, &base_url) {
+            input_target_aliases.push(key);
+        }
+    }
+
     session.environment_encoding = environment_encoding;
     walk(&mut session, &base_url, &dom.document);
+
+    for key in input_target_aliases {
+        session.leave_expansion_alias(&key);
+    }
 
     if session.is_recording() {
         // What has been put together only served to find out what it's made of
@@ -701,6 +722,8 @@ pub fn create_monolithic_document(mut session: Session, target: String) -> Monol
 
                 // If got redirected, set target_url to that
                 if final_url != target_url {
+                    // The document can still refer to itself by the URL it was requested from
+                    session.set_redirected_target(target_url.clone());
                     target_url = final_url.clone();
                 }
 
@@ -1002,9 +1025,11 @@ fn add_captured_assets(session: &mut Session, assets: &[CapturedAsset]) {
             .filter_map(|url| Url::parse(url).ok())
             .collect();
 
+        // The last URL is where the request ended up
         for url in &urls {
-            session.add_asset(
+            session.add_asset_with_final_url(
                 url,
+                urls.last(),
                 &asset.data,
                 media_type.clone(),
                 charset.clone().unwrap_or_default(),

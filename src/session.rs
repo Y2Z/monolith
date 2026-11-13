@@ -52,6 +52,10 @@ pub(crate) enum Output {
     Stream(Box<dyn Write + Send>),
 }
 
+/// How deeply assets can be nested before expansion gets cut off. Distinct URLs can always be
+/// produced dynamically, so tracking what's being expanded is not enough on its own.
+pub(crate) const MAX_EXPANSION_DEPTH: usize = 32;
+
 impl Write for Output {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
@@ -100,6 +104,14 @@ pub struct Session {
     /// Encoding of the document (or stylesheet) currently being processed, if it declares one.
     /// Stylesheets that don't specify their own encoding get decoded using it.
     pub environment_encoding: Option<&'static Encoding>,
+    /// Normalized URLs of documents, stylesheets, and SVGs that are being expanded right now;
+    /// coming across one of them again means going in circles.
+    expanding_urls: HashSet<String>,
+    /// How deeply assets are being expanded right now.
+    expansion_depth: usize,
+    /// URL the document was requested by before it redirected, if it did; the document may still
+    /// refer to itself by it.
+    redirected_target: Option<Url>,
     pub options: MonolithOptions,
     /// What the result has been written into so far, None until it's known what to call it
     output: Option<Output>,
@@ -125,8 +137,6 @@ pub struct Session {
     pub(crate) is_captured: bool,
     /// What captured and archived assets have been received with, by URL (see record_headers())
     recorded_headers: HashMap<String, (Url, Vec<(String, String)>)>,
-    /// URLs of stylesheets being embedded, each one imported by the one before it
-    pub(crate) stylesheet_chain: Vec<String>,
     /// Markup to put right after the opening tag of HEAD
     pub(crate) replay_markup: Option<String>,
     /// Title to name the result by, instead of what the document says
@@ -199,6 +209,9 @@ impl Session {
             credentials: Credentials::default(),
             destination: None,
             environment_encoding: None,
+            expanding_urls: HashSet::new(),
+            expansion_depth: 0,
+            redirected_target: None,
             linked_files: HashMap::new(),
             links_are_absolute: false,
             own_file: None,
@@ -211,7 +224,6 @@ impl Session {
             page_url: None,
             recorded_urls: Records::default(),
             source_archives: vec![],
-            stylesheet_chain: vec![],
             page_origin: None,
             is_captured: false,
             recorded_headers: HashMap::new(),
@@ -234,11 +246,95 @@ impl Session {
     }
 
     pub fn add_asset(&mut self, url: &Url, data: &Vec<u8>, media_type: String, charset: String) {
+        self.add_asset_with_final_url(url, None, data, media_type, charset);
+    }
+
+    /// Makes the given asset available without requesting it, remembering the URL it ended up at
+    /// if it was requested by another one (after a redirect).
+    pub fn add_asset_with_final_url(
+        &mut self,
+        url: &Url,
+        final_url: Option<&Url>,
+        data: &Vec<u8>,
+        media_type: String,
+        charset: String,
+    ) {
         let key: String = self.credentials.cache_key(url);
+        let final_url: Option<String> =
+            final_url.map(|final_url| clean_url(without_credentials(final_url)).to_string());
 
         self.cache
             .get_or_insert_with(|| Cache::new(0, None))
-            .set(&key, data, media_type, charset);
+            .set_with_final_url(&key, data, media_type, charset, final_url);
+    }
+
+    /// What an asset is tracked by while it's being expanded: fragments don't make a different
+    /// asset, and neither do credentials, which don't change what a URL points at.
+    fn expansion_key(&self, url: &Url) -> String {
+        clean_url(without_credentials(url)).to_string()
+    }
+
+    /// Whether assets are nested too deeply to go any deeper.
+    pub(crate) fn is_too_deep(&self) -> bool {
+        self.expansion_depth >= MAX_EXPANSION_DEPTH
+    }
+
+    /// Whether `url` is being expanded right now, or assets are nested too deeply already.
+    pub(crate) fn is_expanding(&self, url: &Url) -> bool {
+        self.expansion_depth >= MAX_EXPANSION_DEPTH
+            || self.expanding_urls.contains(&self.expansion_key(url))
+    }
+
+    /// Marks `url` as being expanded until `leave_expansion` gets called with the returned key.
+    /// Returns None when it's being expanded already, or assets are nested too deeply.
+    /// The key is returned rather than recomputed on the way out, because taking credentials from
+    /// a nested URL may change what `url` is tracked by.
+    pub(crate) fn enter_expansion(&mut self, url: &Url) -> Option<String> {
+        if self.is_expanding(url) {
+            return None;
+        }
+
+        let key = self.expansion_key(url);
+        self.expanding_urls.insert(key.clone());
+        self.expansion_depth += 1;
+        Some(key)
+    }
+
+    /// Marks a URL from `enter_expansion` as done being expanded.
+    pub(crate) fn leave_expansion(&mut self, key: &str) {
+        self.expanding_urls.remove(key);
+        self.expansion_depth -= 1;
+    }
+
+    /// Keeps the URL an asset was requested by marked as being expanded, in addition to the URL
+    /// it ended up at, until `leave_expansion_alias` gets called with the returned key.
+    /// Returns None if both URLs are the same, or the requested one is marked already.
+    pub(crate) fn enter_expansion_alias(
+        &mut self,
+        requested_url: &Url,
+        final_url: &Url,
+    ) -> Option<String> {
+        let key = self.expansion_key(requested_url);
+        if key == self.expansion_key(final_url) {
+            return None;
+        }
+
+        self.expanding_urls.insert(key.clone()).then_some(key)
+    }
+
+    /// Marks a URL from `enter_expansion_alias` as done being expanded.
+    pub(crate) fn leave_expansion_alias(&mut self, key: &str) {
+        self.expanding_urls.remove(key);
+    }
+
+    /// Remembers where the document was requested from, if that's not where it ended up.
+    pub(crate) fn set_redirected_target(&mut self, url: Url) {
+        self.redirected_target = Some(url);
+    }
+
+    /// Takes where the document was requested from, to be kept from looking like a cycle.
+    pub(crate) fn take_redirected_target(&mut self) -> Option<Url> {
+        self.redirected_target.take()
     }
 
     /// Keeps what something was received with, under URLs it's been received for (the last one
@@ -529,7 +625,13 @@ impl Session {
 
         for entry in entries {
             if let Some(cache) = self.cache.as_mut() {
-                cache.set(&entry.key, &entry.data, entry.media_type, entry.charset);
+                cache.set_with_final_url(
+                    &entry.key,
+                    &entry.data,
+                    entry.media_type,
+                    entry.charset,
+                    entry.final_url,
+                );
             }
             for exchange in entry.exchanges {
                 self.record_exchange(exchange);
@@ -692,10 +794,12 @@ impl Session {
             Err(self.client.get("").send().unwrap_err())
         } else if let Some(cors) = cors.as_ref()
             && (self.is_captured || self.is_offline)
-            && let Some((data, media_type, charset)) = self
-                .cache
-                .as_ref()
-                .and_then(|cache| cache.get(&self.credentials.cache_key(url)).ok())
+            && let Some((data, media_type, charset, final_url)) =
+                self.cache.as_ref().and_then(|cache| {
+                    cache
+                        .get_with_final_url(&self.credentials.cache_key(url))
+                        .ok()
+                })
         {
             // What's been captured or archived is what was received, along with what it was
             // received with
@@ -710,16 +814,23 @@ impl Session {
 
                 return Ok(None);
             }
+            let final_url = final_url
+                .and_then(|final_url| Url::parse(&final_url).ok())
+                .unwrap_or_else(|| url.clone());
 
-            Ok(Some((data, url.clone(), media_type, charset)))
-        } else if let Some((data, media_type, charset)) = self
+            Ok(Some((data, final_url, media_type, charset)))
+        } else if let Some((data, media_type, charset, final_url)) = self
             .cache
             .as_ref()
             .filter(|cache| cache.contains_key(&identity_key))
-            .and_then(|cache| cache.get(&identity_key).ok())
+            .and_then(|cache| cache.get_with_final_url(&identity_key).ok())
         {
             // URL is in cache, we get and return it
-            Ok(Some((data, url.clone(), media_type, charset)))
+            let final_url = final_url
+                .and_then(|final_url| Url::parse(&final_url).ok())
+                .unwrap_or_else(|| url.clone());
+
+            Ok(Some((data, final_url, media_type, charset)))
         } else if self.is_offline {
             if !self.options.silent {
                 print_error_message(&format!("{} (not found in archive)", cache_key));
@@ -762,7 +873,24 @@ impl Session {
             if let Some(cache) = self.cache.as_mut() {
                 let new_cache_key: String =
                     self.credentials.cache_key(&response_url) + &cors_suffix;
-                cache.set(&new_cache_key, &data, media_type.clone(), charset.clone());
+                let final_url: String = clean_url(without_credentials(&response_url)).to_string();
+                // What was asked for is worth keeping along with where it ended up
+                if new_cache_key != identity_key {
+                    cache.set_with_final_url(
+                        &identity_key,
+                        &data,
+                        media_type.clone(),
+                        charset.clone(),
+                        Some(final_url.clone()),
+                    );
+                }
+                cache.set_with_final_url(
+                    &new_cache_key,
+                    &data,
+                    media_type.clone(),
+                    charset.clone(),
+                    Some(final_url),
+                );
             }
 
             Ok(Some((data, response_url, media_type, charset)))

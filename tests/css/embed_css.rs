@@ -10,7 +10,7 @@ mod passing {
     use reqwest::Url;
 
     use monolith::core::MonolithOptions;
-    use monolith::css::embed_css;
+    use monolith::css::{embed_css, embed_stylesheet};
     use monolith::session::Session;
     use monolith::url::EMPTY_IMAGE_DATA_URL;
 
@@ -453,6 +453,136 @@ mod passing {
             ";
 
         assert_eq!(embed_css(&mut session, &document_url, CSS), CSS_OUT);
+    }
+
+    #[test]
+    fn self_importing_stylesheet() {
+        let url = Url::parse("https://example.com/site.css").unwrap();
+        let self_importing = "@import url(\"site.css\");body{color:#123456}";
+        let mut session = Session::new(
+            None,
+            None,
+            MonolithOptions {
+                silent: true,
+                ..Default::default()
+            },
+        );
+        session.add_asset(
+            &url,
+            &self_importing.as_bytes().to_vec(),
+            "text/css".to_string(),
+            "".to_string(),
+        );
+
+        let result = embed_stylesheet(&mut session, &url, self_importing.as_bytes(), "");
+
+        // The rule from the stylesheet that imports itself is kept, and the cyclic
+        // import is replaced with an empty stylesheet
+        assert!(result.contains("body{color:#123456}"), "{result}");
+        assert_eq!(result.matches("data:text/css").count(), 1, "{result}");
+    }
+
+    #[test]
+    fn mutually_importing_stylesheets() {
+        let url_a = Url::parse("https://example.com/a.css").unwrap();
+        let url_b = Url::parse("https://example.com/b.css").unwrap();
+        let mut session = Session::new(
+            None,
+            None,
+            MonolithOptions {
+                silent: true,
+                ..Default::default()
+            },
+        );
+        session.add_asset(
+            &url_b,
+            &b"@import \"a.css\";.b{color:blue}".to_vec(),
+            "text/css".to_string(),
+            "".to_string(),
+        );
+        session.add_asset(
+            &url_a,
+            &b"@import \"b.css\";.a{color:red}".to_vec(),
+            "text/css".to_string(),
+            "".to_string(),
+        );
+
+        let result = embed_stylesheet(&mut session, &url_a, b"@import \"b.css\";.a{color:red}", "");
+
+        // Rules from both stylesheets are kept, and the import that closes the cycle is empty
+        assert_eq!(result.matches(".a{color:red}").count(), 1, "{result}");
+        assert_eq!(result.matches(".b{color:blue}").count(), 1, "{result}");
+    }
+
+    #[test]
+    fn sibling_imports_of_same_stylesheet_both_embed() {
+        let document_url = Url::parse("https://example.com/page.html").unwrap();
+        let stylesheet_url = Url::parse("https://example.com/shared.css").unwrap();
+        let mut session = Session::new(
+            None,
+            None,
+            MonolithOptions {
+                silent: true,
+                ..Default::default()
+            },
+        );
+        session.add_asset(
+            &stylesheet_url,
+            &b".shared{color:green}".to_vec(),
+            "text/css".to_string(),
+            "".to_string(),
+        );
+
+        let result = embed_css(
+            &mut session,
+            &document_url,
+            "@import \"shared.css\";@import \"shared.css\";",
+        );
+
+        // Importing the same stylesheet more than once is not a cycle
+        assert_eq!(
+            result.matches(".shared{color:green}").count(),
+            2,
+            "{result}"
+        );
+    }
+
+    #[test]
+    fn deep_import_chain_stops_at_max_depth() {
+        let document_url = Url::parse("https://example.com/page.html").unwrap();
+        let depth = 40;
+        let mut session = Session::new(
+            None,
+            None,
+            MonolithOptions {
+                silent: true,
+                ..Default::default()
+            },
+        );
+
+        for level in 0..depth {
+            let url = Url::parse(&format!("https://example.com/s{level}.css")).unwrap();
+            let css = if level + 1 < depth {
+                format!("@import \"s{}.css\";.level{level}{{color:red}}", level + 1)
+            } else {
+                format!(".level{level}{{color:red}}")
+            };
+            session.add_asset(
+                &url,
+                &css.into_bytes(),
+                "text/css".to_string(),
+                "".to_string(),
+            );
+        }
+
+        let result = embed_css(&mut session, &document_url, "@import \"s0.css\";");
+
+        // Nesting is bounded, so levels beyond the limit never get embedded
+        assert!(result.contains(".level0{color:red}"), "{result}");
+        assert!(
+            !result.contains(&format!(".level{}{{color:red}}", depth - 1)),
+            "{result}"
+        );
     }
 
     #[test]

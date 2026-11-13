@@ -21,6 +21,7 @@ use crate::html::{
     strip_elements,
 };
 use crate::mhtml::percent_decode;
+use crate::session::MAX_EXPANSION_DEPTH;
 use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, resolve_url};
 
 /// What Session should put into its cache.
@@ -29,6 +30,8 @@ pub struct CacheEntry {
     pub data: Vec<u8>,
     pub media_type: String,
     pub charset: String,
+    /// Where requesting the key ended up, when it's not the key itself
+    pub final_url: Option<String>,
     /// What it took to get it, for archives that keep that
     pub exchanges: Vec<Exchange>,
 }
@@ -55,6 +58,7 @@ impl PrefetchProgress {
 enum AssetKind {
     Css,   // Will be parsed for further url()s and @imports
     Html,  // (i)frame document; will be parsed for further assets
+    Svg,   // <use> target; may be reparented and walked as part of the document
     Other, // Images, scripts, fonts, media...
 }
 
@@ -62,6 +66,8 @@ struct Job {
     url: Url,
     parent_url: Url,
     kind: AssetKind,
+    /// How deeply the asset is nested, the document's own assets are at depth 1
+    depth: usize,
 }
 
 struct Fetched {
@@ -70,7 +76,6 @@ struct Fetched {
     final_url: Url,
     media_type: String,
     charset: String,
-    kind: AssetKind,
     exchanges: Vec<Exchange>,
 }
 
@@ -138,12 +143,22 @@ impl Credentials {
     /// What given URL gets cached under: what's retrieved as someone isn't what's retrieved
     /// as someone else (or as nobody), user names keep them apart; passwords stay out of it.
     pub fn cache_key(&self, url: &Url) -> String {
+        // Credentials the URL comes with are for its origin as well
+        let identity = (!url.username().is_empty() || url.password().is_some())
+            .then(|| {
+                (
+                    percent_decode(url.username()),
+                    url.password().map(percent_decode),
+                )
+            })
+            .or_else(|| self.of(url).cloned());
+
         let mut url = clean_url(without_credentials(url));
-        match self.of(&url) {
+        match identity {
             // Password alone is still someone, URLs can't show that
             Some((user, _)) if user.is_empty() => format!("(password) {}", url),
             Some((user, _)) => {
-                let _ = url.set_username(user);
+                let _ = url.set_username(&user);
                 url.to_string()
             }
             None => url.to_string(),
@@ -499,6 +514,9 @@ pub fn prefetch_assets(
 ) -> Vec<CacheEntry> {
     let mut jobs: Vec<Job> = vec![];
     collect_html(document, "", document_url, options, &mut jobs);
+    for job in &mut jobs {
+        job.depth = 1;
+    }
     let Requester {
         client,
         cookies,
@@ -543,18 +561,19 @@ pub fn prefetch_assets(
     let mut entries: Vec<CacheEntry> = vec![];
     for fetched in rx {
         let final_key = credentials.cache_key(&fetched.final_url);
+        let final_url = Some(clean_url(without_credentials(&fetched.final_url)).to_string());
 
-        // Session::retrieve_asset() looks assets up by their *request* URL and, on a
-        // cache hit, reports that same URL as the final one. That's harmless for leaf
-        // assets, but stylesheets and frames use their final URL as the base for
-        // resolving relative URLs, so redirected CSS/HTML is left for the walk to
-        // re-request.
-        if fetched.request_key != final_key && fetched.kind == AssetKind::Other {
+        // Session::retrieve_asset() looks assets up by their *request* URL. Keeping where the
+        // request ended up along with the response lets stylesheets, frames, and SVGs brought in
+        // by <use> use their final URL as the base for resolving what's inside them (and for
+        // detecting cycles), without having to request the redirected asset again.
+        if fetched.request_key != final_key {
             entries.push(CacheEntry {
                 key: fetched.request_key,
                 data: fetched.data.clone(),
                 media_type: fetched.media_type.clone(),
                 charset: fetched.charset.clone(),
+                final_url: final_url.clone(),
                 exchanges: vec![],
             });
         }
@@ -564,6 +583,7 @@ pub fn prefetch_assets(
             data: fetched.data,
             media_type: fetched.media_type,
             charset: fetched.charset,
+            final_url,
             exchanges: fetched.exchanges,
         });
     }
@@ -599,31 +619,38 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
 
         // Discover nested assets while we're still on a worker thread
         let mut more_jobs: Vec<Job> = vec![];
-        match job.kind {
-            AssetKind::Css => {
-                // TODO: check integrity here to avoid dealing with bad files
+        // Distinct URLs can always be produced dynamically, so nesting has to be bounded
+        if job.depth < MAX_EXPANSION_DEPTH {
+            match job.kind {
+                AssetKind::Css => {
+                    // TODO: check integrity here to avoid dealing with bad files
 
-                // Decode exactly the way the walk will, so both discover the same URLs
-                let stylesheet = decode_css(&data, &charset);
-                collect_css_str(&stylesheet, &final_url, ctx.options, &mut more_jobs);
+                    // Decode exactly the way the walk will, so both discover the same URLs
+                    let stylesheet = decode_css(&data, &charset);
+                    collect_css_str(&stylesheet, &final_url, ctx.options, &mut more_jobs);
+                }
+                AssetKind::Html => {
+                    // RcDom is !Send, but it's created and dropped right here on this thread
+                    let frame_dom = html_to_dom(&data, charset.clone());
+                    strip_elements(
+                        &frame_dom.document,
+                        &ctx.options.remove_elements,
+                        &ctx.options.wipe_elements,
+                    );
+                    collect_html(
+                        &frame_dom.document,
+                        "",
+                        &final_url,
+                        ctx.options,
+                        &mut more_jobs,
+                    );
+                }
+                AssetKind::Svg | AssetKind::Other => {}
             }
-            AssetKind::Html => {
-                // RcDom is !Send, but it's created and dropped right here on this thread
-                let frame_dom = html_to_dom(&data, charset.clone());
-                strip_elements(
-                    &frame_dom.document,
-                    &ctx.options.remove_elements,
-                    &ctx.options.wipe_elements,
-                );
-                collect_html(
-                    &frame_dom.document,
-                    "",
-                    &final_url,
-                    ctx.options,
-                    &mut more_jobs,
-                );
+
+            for more_job in &mut more_jobs {
+                more_job.depth = job.depth + 1;
             }
-            AssetKind::Other => {}
         }
 
         let _ = ctx.results_tx.send(Fetched {
@@ -632,7 +659,6 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             final_url,
             media_type,
             charset,
-            kind: job.kind,
             exchanges,
         });
 
@@ -658,6 +684,8 @@ fn push_job(jobs: &mut Vec<Job>, base_url: &Url, value: &str, kind: AssetKind) {
             url,
             parent_url: base_url.clone(),
             kind,
+            // Filled in once the jobs of a whole document or stylesheet are known
+            depth: 0,
         });
     }
 }
@@ -744,11 +772,23 @@ fn collect_html(
                         push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                 }
-                "image" | "use" => {
+                "image" => {
                     if !options.no_images {
                         for attr_name in ["href", "xlink:href"] {
                             if let Some(href) = get_node_attr(node, attr_name) {
                                 push_job(jobs, base_url, &href, AssetKind::Other);
+                            }
+                        }
+                    }
+                }
+                "use" => {
+                    if !options.no_images {
+                        for attr_name in ["href", "xlink:href"] {
+                            if let Some(href) = get_node_attr(node, attr_name) {
+                                // It's a document of its own whose contents get walked, and it
+                                // has to be retrieved under its canonical URL so that redirects
+                                // into cycles stay detectable
+                                push_job(jobs, base_url, &href, AssetKind::Svg);
                             }
                         }
                     }

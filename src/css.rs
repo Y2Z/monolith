@@ -6,7 +6,7 @@ use encoding_rs::{Encoding, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252};
 use crate::core::{MonolithOutputFormat, declared_encoding, print_error_message};
 use crate::cors::RequestMode;
 use crate::session::Session;
-use crate::url::{EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, resolve_url};
+use crate::url::{EMPTY_IMAGE_DATA_URL, Url, create_data_url, resolve_url};
 
 const CHARSET_RULE_PREFIX: &str = "@charset \"";
 const CHARSET_RULE_SUFFIX: &str = "\";";
@@ -98,24 +98,23 @@ pub fn decode_stylesheet(
 /// Decodes a stylesheet (see `decode_stylesheet`) and embeds all of its assets.
 /// The resulting text is meant to be stored as UTF-8.
 pub fn embed_stylesheet(session: &mut Session, url: &Url, data: &[u8], charset: &str) -> String {
+    // A stylesheet that's being expanded already is importing itself, directly or through other
+    // stylesheets; its contents are on their way into the result, so there's nothing more to add
+    let Some(expansion_key) = session.enter_expansion(url) else {
+        return String::new();
+    };
+
     let (css, encoding) = decode_stylesheet(data, charset, session.environment_encoding);
 
     // Stylesheets imported by this one use its encoding as their environment encoding
     let environment_encoding = session.environment_encoding.replace(encoding);
-    // What it imports can't import it again
-    session
-        .stylesheet_chain
-        .push(clean_url(url.clone()).to_string());
     let result = embed_css(session, url, &css);
-    session.stylesheet_chain.pop();
     session.environment_encoding = environment_encoding;
+
+    session.leave_expansion(&expansion_key);
 
     result
 }
-
-/// How deep imports of stylesheets can go: imports that import stylesheets that import others
-/// and so on (with no cycles) could otherwise go on forever.
-const MAX_IMPORT_DEPTH: usize = 64;
 
 /// Stylesheet that imports nothing, and has nothing in it.
 const EMPTY_STYLESHEET: &str = "data:text/css,";
@@ -123,35 +122,28 @@ const EMPTY_STYLESHEET: &str = "data:text/css,";
 /// What an @import's URL becomes: the stylesheet embedded as a data URL, quoted.
 /// Stylesheets that import stylesheets that import them (or that import themselves) get ignored
 /// the way browsers ignore them: imports in such cycles become empty stylesheets, by URL, before
-/// and after redirects. The same stylesheet imported more than once (but not in a cycle) gets
-/// embedded each time.
+/// and after redirects (see Session::enter_expansion()). The same stylesheet imported more than
+/// once (but not in a cycle) gets embedded each time.
 fn import_stylesheet(session: &mut Session, document_url: &Url, value: &str) -> String {
     let import_url: Url = resolve_url(document_url, value);
-    let is_in_chain = |session: &Session, url: &Url| {
-        let url = clean_url(url.clone()).to_string();
-        session.stylesheet_chain.contains(&url)
-    };
 
-    if is_in_chain(session, &import_url) {
-        return format_quoted_string(EMPTY_STYLESHEET);
-    }
-    if session.stylesheet_chain.len() >= MAX_IMPORT_DEPTH {
-        if !session.options.silent {
-            print_error_message(&format!(
-                "{} (stylesheets import more than {} levels deep)",
-                import_url, MAX_IMPORT_DEPTH
-            ));
+    if session.is_expanding(&import_url) {
+        if session.is_too_deep() && !session.options.silent {
+            print_error_message(&format!("{} (assets are nested too deep)", import_url));
         }
         return format_quoted_string(EMPTY_STYLESHEET);
     }
 
     match session.retrieve_asset(document_url, &import_url) {
-        // Redirected to what's in the chain already
-        Ok((_, final_url, _, _)) if is_in_chain(session, &final_url) => {
-            format_quoted_string(EMPTY_STYLESHEET)
-        }
         Ok((data, final_url, media_type, charset)) => {
+            // The stylesheet can refer to itself by the URL it was requested by, even if it
+            // ended up somewhere else
+            let alias = session.enter_expansion_alias(&import_url, &final_url);
             let css = embed_stylesheet(session, &final_url, &data, &charset);
+            if let Some(key) = alias {
+                session.leave_expansion_alias(&key);
+            }
+
             let data_url =
                 create_data_url(&media_type, "utf-8", css, &final_url, import_url.fragment());
             format_quoted_string(&data_url)
@@ -435,7 +427,7 @@ pub fn process_css(
                 if value.is_empty() {
                     result.push_str("url()");
                     continue;
-                } else if value.starts_with("#") {
+                } else if !is_import && value.starts_with("#") {
                     result.push_str("url(");
                     result.push_str(value);
                     result.push(')');
