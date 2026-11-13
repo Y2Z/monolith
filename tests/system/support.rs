@@ -4,8 +4,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::sync::{Arc, Condvar, Mutex};
+use std::process::{Command, Output, Stdio};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::thread;
 
 use monolith::browser::{executable_name, find_installed_browsers, uses_devtools};
@@ -13,49 +13,98 @@ use monolith::url::Url;
 use tempfile::TempDir;
 
 const FIREFOX_NAMES: [&str; 4] = ["firefox", "firefox-esr", "librewolf", "icecat"];
-const CHROMIUM_NAMES: [&str; 6] = [
+const CHROMIUM_NAMES: [&str; 7] = [
     "chromium",
     "chromium-browser",
     "google-chrome",
     "google-chrome-stable",
     "brave-browser",
+    "brave",
     "microsoft-edge",
 ];
+
 // Browsers aren't small, and running too many of them at once only leads to timeouts
 const MAX_BROWSERS_AT_ONCE: usize = 3;
 static BROWSERS_RUNNING: (Mutex<usize>, Condvar) = (Mutex::new(0), Condvar::new());
 
-fn find_in_path(names: &[&str]) -> Option<PathBuf> {
-    let directories: Vec<PathBuf> = env::split_paths(&env::var_os("PATH")?).collect();
+/// Browsers of given names found in PATH, in the order of the names.
+fn find_in_path(names: &[&str]) -> Vec<PathBuf> {
+    let Some(path) = env::var_os("PATH") else {
+        return vec![];
+    };
+    let directories: Vec<PathBuf> = env::split_paths(&path).collect();
 
-    names.iter().find_map(|name| {
-        directories.iter().find_map(|directory| {
-            let path = directory.join(executable_name(name));
-            path.is_file().then_some(path)
+    names
+        .iter()
+        .flat_map(|name| {
+            directories
+                .iter()
+                .map(|directory| directory.join(executable_name(name)))
+                .filter(|path| path.is_file())
+                .collect::<Vec<PathBuf>>()
         })
-    })
+        .collect()
 }
 
-/// Browsers to test, one of each kind.
+/// Whether a Chromium-based browser works for Monolith at all: some are installed in ways that
+/// keep them from starting (snaps missing what they depend on, for one), those don't get tested.
+fn starts(browser: &Path) -> bool {
+    let server = Server::new(&[("/", "text/html", b"<title>t</title>works")]);
+    let Ok(temporary_directory) = TempDir::new() else {
+        return false;
+    };
+    Command::new(env!("CARGO_BIN_EXE_monolith"))
+        .env("MONOLITH_BROWSER", browser)
+        .env("MONOLITH_BROWSER_SCROLL_LIMIT", "0")
+        .env("TMPDIR", temporary_directory.path())
+        .env("TEMP", temporary_directory.path())
+        .env("TMP", temporary_directory.path())
+        .args(["--browser", "--quiet", "--timeout", "60", "--output", "-"])
+        .arg(server.url("/"))
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .is_ok_and(|output| {
+            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("works")
+        })
+}
+
+/// Browsers to test: Firefox (or anything based on it) first, then the first Chromium-based
+/// browser that can be started.
 pub fn browsers() -> Vec<PathBuf> {
+    static BROWSERS: OnceLock<Vec<PathBuf>> = OnceLock::new();
+    BROWSERS.get_or_init(find_browsers).clone()
+}
+
+fn find_browsers() -> Vec<PathBuf> {
     if let Some(paths) = env::var_os("MONOLITH_TEST_BROWSERS").filter(|paths| !paths.is_empty()) {
         return env::split_paths(&paths).collect();
     }
 
     let installed = find_installed_browsers();
-    let find = |names: &[&str], is_devtools: bool| {
-        find_in_path(names).or_else(|| {
+    let candidates = |names: &[&str], is_devtools: bool| {
+        let mut candidates = find_in_path(names);
+        candidates.extend(
             installed
                 .iter()
-                .find(|path| uses_devtools(path) == is_devtools)
-                .cloned()
-        })
+                .filter(|path| uses_devtools(path) == is_devtools)
+                .cloned(),
+        );
+        candidates
     };
 
-    [find(&FIREFOX_NAMES, false), find(&CHROMIUM_NAMES, true)]
+    let firefox = candidates(&FIREFOX_NAMES, false).into_iter().next();
+    let chromium = candidates(&CHROMIUM_NAMES, true)
         .into_iter()
-        .flatten()
-        .collect()
+        .find(|browser| match starts(browser) {
+            true => true,
+            false => {
+                println!("{} doesn't start, it won't be tested", browser.display());
+                false
+            }
+        });
+
+    [firefox, chromium].into_iter().flatten().collect()
 }
 
 /// Runs given test for every browser there is.
