@@ -186,4 +186,16 @@ mod passing {
             stylesheet
         );
     }
+
+    #[test]
+    fn stylesheets_lose_references_to_source_maps() {
+        let mut stylesheet = asset("https://a.b/style.css", "style");
+        stylesheet.content_type = "text/css".to_string();
+        stylesheet.data = b"a{}\n/*# sourceMappingURL=style.css.map */\n".to_vec();
+        let mut assets = vec![stylesheet];
+
+        rewrite_stylesheets(&mut assets, None);
+
+        assert_eq!(String::from_utf8(assets[0].data.clone()).unwrap(), "a{}\n");
+    }
 }

@@ -155,4 +155,15 @@ mod passing {
             "y = '\u{e9}';"
         );
     }
+
+    #[test]
+    fn references_to_source_maps_go() {
+        let mut assets = [asset(
+            "https://a.b/a.js",
+            "a();\n//# sourceMappingURL=a.js.map\n",
+        )];
+        rewrite_scripts(&mut assets, None);
+
+        assert_eq!(String::from_utf8(assets[0].data.clone()).unwrap(), "a();\n");
+    }
 }

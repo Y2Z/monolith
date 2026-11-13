@@ -16,6 +16,7 @@ use url::Url;
 
 use crate::core::{detect_media_type, is_plaintext_media_type};
 use crate::session::Session;
+use crate::source_maps::remove_source_map_reference;
 use crate::url::clean_url;
 
 /// Boundary between parts of MHTML documents monolith writes.
@@ -321,8 +322,17 @@ pub(crate) fn write_mhtml_document(
         if let Ok(Some((data, _final_url, media_type, charset))) =
             session.retrieve(document_url, &asset_url, mode)
         {
+            // Source maps don't come along (see source_maps.rs)
+            let essence = media_type.trim().to_ascii_lowercase();
+            let data: &[u8] = match essence.ends_with("javascript")
+                || essence.ends_with("ecmascript")
+                || essence == "text/css"
+            {
+                true => remove_source_map_reference(&data),
+                false => &data,
+            };
             let mut part: Vec<u8> = vec![];
-            push_part(&mut part, &media_type, &charset, Some(&asset_url), &data);
+            push_part(&mut part, &media_type, &charset, Some(&asset_url), data);
             out.write_all(&part)?;
             packed.push(asset_url.to_string());
         }

@@ -14,6 +14,7 @@ use crate::cache::Exchange;
 use crate::core::parse_media_type;
 use crate::cors::was_blocked;
 use crate::css::decode_stylesheet;
+use crate::source_maps::remove_source_map_reference_from_text;
 
 /// What else there is to know about a response, for archives that keep track of it.
 #[derive(Clone, Debug, Default)]
@@ -679,7 +680,8 @@ pub fn rewrite_scripts(
         if is_script(asset) {
             let text =
                 decode_text_with_fallback(&asset.data, &asset.content_type, document_encoding);
-            let script = rewrite_imports(&text, &url);
+            // Source maps don't come along (see source_maps.rs)
+            let script = rewrite_imports(remove_source_map_reference_from_text(&text), &url);
             store_as_utf8(asset, script.code);
             // Scripts are free to be modules without using any of what makes them look like ones
             modules[index] = true;
@@ -784,7 +786,11 @@ pub fn rewrite_stylesheets(
             // Stylesheets have rules of their own: @charset is there, and comes before guessing
             let charset = parse_media_type(&asset.content_type).1.unwrap_or_default();
             let stylesheet = decode_stylesheet(&asset.data, &charset, document_encoding).0;
-            let stylesheet = embed_stylesheet_urls(&stylesheet, &url, &data_urls);
+            let stylesheet = embed_stylesheet_urls(
+                remove_source_map_reference_from_text(&stylesheet),
+                &url,
+                &data_urls,
+            );
             store_as_utf8(asset, stylesheet);
         }
     }
