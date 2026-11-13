@@ -14,6 +14,7 @@ mod net;
 mod replay;
 mod session;
 mod simple;
+mod source_maps;
 mod url;
 mod warc;
 mod webarchive;

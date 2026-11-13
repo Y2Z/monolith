@@ -13,6 +13,7 @@ pub mod net;
 pub mod replay;
 pub mod session;
 pub mod simple;
+pub mod source_maps;
 pub mod url;
 pub mod warc;
 pub mod webarchive;

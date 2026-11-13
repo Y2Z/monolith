@@ -6,6 +6,7 @@ use encoding_rs::{Encoding, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252};
 use crate::core::{MonolithOutputFormat, declared_encoding, print_error_message};
 use crate::cors::RequestMode;
 use crate::session::Session;
+use crate::source_maps::is_source_map_comment;
 use crate::url::{EMPTY_IMAGE_DATA_URL, Url, create_data_url, resolve_url};
 
 const CHARSET_RULE_PREFIX: &str = "@charset \"";
@@ -241,7 +242,10 @@ pub fn process_css(
         match *token {
             Token::Comment(_) => {
                 let token_slice = parser.slice_from(token_offset);
-                result.push_str(token_slice);
+                // Source maps don't come along (see source_maps.rs)
+                if !is_source_map_comment(token_slice) {
+                    result.push_str(token_slice);
+                }
             }
             Token::Semicolon => result.push(';'),
             Token::Colon => result.push(':'),

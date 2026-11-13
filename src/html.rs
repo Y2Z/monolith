@@ -22,6 +22,7 @@ use crate::css::{embed_css, embed_stylesheet};
 use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::replay::rewrite_imports;
 use crate::session::Session;
+use crate::source_maps::{remove_source_map_reference, remove_source_map_reference_from_text};
 use crate::url::{
     EMPTY_IMAGE_DATA_URL, Url, clean_url, create_data_url, create_srcset_data_url,
     is_url_and_has_protocol, parse_data_url, resolve_url,
@@ -1538,6 +1539,8 @@ pub fn retrieve_and_embed_asset(
 
                     // Parse media type for SCRIPT elements
                     if node_name == "script" {
+                        // Source maps don't come along (see source_maps.rs)
+                        let data: &[u8] = remove_source_map_reference(&data);
                         let mut script_media_type =
                             get_node_attr(node, "type").unwrap_or(String::from("text/javascript"));
 
@@ -1583,9 +1586,9 @@ pub fn retrieve_and_embed_asset(
                                     tendril.clear();
                                     let code = match Encoding::for_label(charset.as_bytes()) {
                                         Some(encoding) => {
-                                            encoding.decode_with_bom_removal(&data).0.into_owned()
+                                            encoding.decode_with_bom_removal(data).0.into_owned()
                                         }
-                                        None => String::from_utf8_lossy(&data).into_owned(),
+                                        None => String::from_utf8_lossy(data).into_owned(),
                                     };
                                     tendril.push_slice(&escape_script_end_tag(&code));
                                 }
@@ -2181,13 +2184,20 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     ),
                                 );
                             }
-                        } else if session.options.replay {
+                        } else {
                             for child_node in node.children.borrow_mut().iter_mut() {
                                 if let NodeData::Text { ref contents } = child_node.data {
                                     let mut tendril = contents.borrow_mut();
-                                    let script = rewrite_imports(tendril.as_ref(), document_url);
+                                    // Source maps don't come along (see source_maps.rs)
+                                    let code =
+                                        remove_source_map_reference_from_text(tendril.as_ref())
+                                            .to_string();
+                                    let code = match session.options.replay {
+                                        true => rewrite_imports(&code, document_url).code,
+                                        false => code,
+                                    };
                                     tendril.clear();
-                                    tendril.push_slice(&script.code);
+                                    tendril.push_slice(&code);
                                 }
                             }
                         }
