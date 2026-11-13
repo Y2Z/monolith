@@ -11,6 +11,7 @@ mod local_files;
 mod mhtml;
 mod noscript;
 mod source_maps;
+mod srcdoc;
 mod targets;
 mod unusual_encodings;
 

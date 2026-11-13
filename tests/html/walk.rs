@@ -1034,4 +1034,49 @@ mod passing {
             </html>"
         );
     }
+
+    #[test]
+    fn remove_js_from_srcdoc() {
+        let html = "<iframe src=\"other.html\" srcdoc=\"\
+                <p onclick='void(0)'>a</p><script>alert(1)</script>\
+                <iframe srcdoc='&lt;script>alert(2)&lt;/script>'></iframe>\
+            \"></iframe>";
+        let dom = html::html_to_dom(html.as_bytes(), "".to_string());
+        let url: Url = Url::parse("http://localhost").unwrap();
+
+        let options = MonolithOptions {
+            remove_js: true,
+            silent: true,
+            ..Default::default()
+        };
+
+        let mut session: Session = Session::new(None, None, options);
+
+        html::walk(&mut session, &url, &dom.document);
+
+        let mut buf: Vec<u8> = Vec::new();
+        serialize(
+            &mut buf,
+            &SerializableHandle::from(dom.document.clone()),
+            SerializeOpts::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            String::from_utf8(buf).unwrap(),
+            "<html><head></head><body>\
+                <iframe srcdoc=\"\
+                    &lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;\
+                    &lt;p&gt;a&lt;/p&gt;&lt;script&gt;&lt;/script&gt;\
+                    &lt;iframe srcdoc=&quot;\
+                        &amp;lt;html&amp;gt;&amp;lt;head&amp;gt;\
+                        &amp;lt;script&amp;gt;&amp;lt;/script&amp;gt;\
+                        &amp;lt;/head&amp;gt;&amp;lt;body&amp;gt;\
+                        &amp;lt;/body&amp;gt;&amp;lt;/html&amp;gt;\
+                    &quot; sandbox=&quot;allow-forms&quot;&gt;&lt;/iframe&gt;\
+                    &lt;/body&gt;&lt;/html&gt;\
+                \" sandbox=\"allow-forms\"></iframe>\
+            </body></html>"
+        );
+    }
 }
