@@ -16,10 +16,11 @@ use monolith::cookies::{Cookie, parse_cookie_file_contents};
 use monolith::core::{
     MonolithOptions, MonolithOutputFormat, create_monolithic_document,
     create_monolithic_document_from_data, create_output_file, format_output_path,
-    output_file_pattern, parse_target, print_error_message, probe_target, untitled_name,
+    output_file_pattern, parse_target, print_error_message, probe_target, read_archives,
+    untitled_name,
 };
 use monolith::net::Credentials;
-use monolith::session::Session;
+use monolith::session::{Records, Session};
 use url::Url;
 
 const ASCII: &str = " \
@@ -42,7 +43,12 @@ const DEFAULT_USER_AGENT: &str =
 #[command(version)] // Read version from Cargo.toml
 #[command(about = ASCII.to_owned() + "\n" + env!("CARGO_PKG_NAME") + " " + env!("CARGO_PKG_VERSION") + "\n\n" + env!("CARGO_PKG_DESCRIPTION"), long_about = None)]
 struct Cli {
-    /// Set custom base URL, or pick the page to save out of a WARC or HAR archive
+    /// Take everything from given archive (WARC, HAR, MHTML, WebArchive), never going online:
+    /// targets are URLs of pages in it; can be given more than once
+    #[arg(short = 'a', long = "archive", value_name = "crawl.warc")]
+    archives: Vec<String>,
+
+    /// Set custom base URL
     #[arg(short, long, value_name = "http://localhost/")]
     base_url: Option<String>,
 
@@ -367,6 +373,36 @@ fn main() {
         exit("STDIN can only be read once", temp_cache_file);
     }
 
+    // Archives are all there is to work with, if there are any
+    let mut archives: Vec<Vec<u8>> = vec![];
+    for path in &cli.archives {
+        match fs::read(path) {
+            Ok(data) => archives.push(data),
+            Err(error) => exit(
+                &format!("could not read archive {}: {}", path, error),
+                temp_cache_file,
+            ),
+        }
+    }
+    let archives = match read_archives(archives) {
+        Ok(archives) => archives,
+        Err(error) => exit(&error.to_string(), temp_cache_file),
+    };
+    if !archives.is_empty() {
+        if cli.browser {
+            exit(
+                "browser would go online, archives are all there is with -a",
+                temp_cache_file,
+            );
+        }
+        if stdin_count > 0 {
+            exit(
+                "targets are URLs of pages in archives with -a, STDIN can't be one",
+                temp_cache_file,
+            );
+        }
+    }
+
     // Saving the same thing twice wouldn't do anything
     let mut targets: Vec<String> = vec![];
     for target in &cli.targets {
@@ -389,7 +425,13 @@ fn main() {
         Some(destination) => destination,
         None => DEFAULT_OUTPUT.to_string(),
     };
-    let new_session = || Session::new(cache.clone(), cookies.clone(), options.clone());
+    let new_session = || {
+        let mut session = Session::new(cache.clone(), cookies.clone(), options.clone());
+        if !archives.is_empty() {
+            session.use_archives(&archives);
+        }
+        session
+    };
     let save = |session: Session, target: &str| match target {
         "-" => create_monolithic_document_from_data(session, read_stdin(), None, None),
         _ => create_monolithic_document(session, target.to_string()),
@@ -399,8 +441,11 @@ fn main() {
         // One file for everything: it gets named after the first document that makes it in,
         // documents after it get added to it
         let output = SharedOutput::default();
+        // What one target has put into the archive, others don't put in again
+        let records = Records::default();
         for target in &targets {
             let mut session = new_session();
+            session.share_records(&records);
             let shared = output.clone();
             let destination = destination.clone();
             let output_format = output_format.clone();

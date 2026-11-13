@@ -50,20 +50,14 @@ mod passing {
         // "テスト" in Shift_JIS
         let data = b"<meta charset=\"Shift_JIS\"><title>\x83\x65\x83\x58\x83\x67</title>";
 
-        assert_eq!(
-            probe_data(&MonolithOptions::default(), data, None, None).as_deref(),
-            Some("テスト")
-        );
+        assert_eq!(probe_data(data, None, None).as_deref(), Some("テスト"));
     }
 
     #[test]
     fn blank_titles_are_no_titles() {
         let data = b"<title>  </title>";
 
-        assert_eq!(
-            probe_data(&MonolithOptions::default(), data, None, None),
-            None
-        );
+        assert_eq!(probe_data(data, None, None), None);
     }
 
     #[test]

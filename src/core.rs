@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -5,6 +6,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, IsTerminal, Write};
 use std::path::{MAIN_SEPARATOR, Path};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use chrono::{SecondsFormat, Utc};
 use encoding_rs::{Encoding, UTF_8};
@@ -28,8 +30,8 @@ use crate::replay::{
 };
 use crate::session::Session;
 use crate::simple::simplify_document;
-use crate::url::{create_data_url, is_windows_drive_path, resolve_url};
-use crate::warc::{is_warc, parse_warc};
+use crate::url::{clean_url, create_data_url, is_windows_drive_path, resolve_url};
+use crate::warc::{decompress_warc, is_warc, parse_warc};
 use crate::webarchive::{is_webarchive, parse_webarchive};
 
 #[derive(Debug)]
@@ -217,8 +219,23 @@ fn create_archive_from_page(page: &CapturedPage) -> MhtmlArchive {
 }
 
 pub fn create_monolithic_document_from_data(
-    mut session: Session,
+    session: Session,
     input_data: Vec<u8>,
+    input_encoding: Option<String>,
+    input_target: Option<String>,
+) -> MonolithResult {
+    create_monolithic_document_from_bytes(
+        session,
+        Cow::Owned(input_data),
+        input_encoding,
+        input_target,
+    )
+}
+
+/// Same as create_monolithic_document_from_data(), for data that may be someone else's (archives).
+fn create_monolithic_document_from_bytes(
+    mut session: Session,
+    input_data: Cow<'_, [u8]>,
     input_encoding: Option<String>,
     input_target: Option<String>,
 ) -> MonolithResult {
@@ -244,11 +261,8 @@ pub fn create_monolithic_document_from_data(
     let mut archive: Option<MhtmlArchive> = None;
     let is_warc_archive = is_warc(&input_data);
     if is_warc_archive || is_har(&input_data) {
-        let wanted_url = session
-            .options
-            .base_url
-            .take()
-            .filter(|url| !url.is_empty());
+        // The first page, unless it's been looked for by its URL
+        let wanted_url = session.page_url.take();
         let (page, has_other_pages) = match is_warc_archive {
             true => parse_warc(&input_data, wanted_url.as_deref()),
             false => parse_har(&input_data, wanted_url.as_deref()),
@@ -259,7 +273,7 @@ pub fn create_monolithic_document_from_data(
 
         if has_other_pages && wanted_url.is_none() && !session.options.silent {
             print_info_message(&format!(
-                "saving {}, the archive may have other pages, -b picks which one to save",
+                "saving {}, the archive may have other pages: -a takes archives, for their URLs to be targets",
                 page.url
             ));
         }
@@ -324,7 +338,7 @@ pub fn create_monolithic_document_from_data(
 
             return finish_as_is(session, &root.data);
         }
-        let data: Vec<u8> = root.data.clone();
+        let data: Cow<'_, [u8]> = Cow::Owned(root.data.clone());
         let encoding: Option<String> = Some(root.charset.clone()).filter(|c| !c.is_empty());
         // The document's original URL, unless the archive doesn't have it
         let target: Option<String> = match &root.url {
@@ -609,6 +623,19 @@ pub fn create_monolithic_document(mut session: Session, target: String) -> Monol
     // Credentials go along with requests from now on, and never into what gets saved
     let mut target_url = session.take_credentials(&target_with_credentials);
 
+    if session.uses_archives() {
+        // Everything comes from archives, nothing from anywhere else
+        let archive = archive_with(&session, &target_url)?;
+        session.page_url = Some(target_url.to_string());
+
+        return create_monolithic_document_from_bytes(
+            session,
+            Cow::Borrowed(&archive),
+            None,
+            Some(target_url.to_string()),
+        );
+    }
+
     #[cfg(feature = "browser")]
     if session.options.browser {
         // Browsers deal with credentials on their own
@@ -763,6 +790,16 @@ pub fn probe_target(mut session: Session, target: &str) -> Result<ProbedTarget, 
     let target_with_credentials = parse_target(target)?;
     let target_url = session.take_credentials(&target_with_credentials);
 
+    if session.uses_archives() {
+        let archive = archive_with(&session, &target_url)?;
+        let (title, url) = probe_archive(&archive, target_url.as_str());
+
+        return Ok(ProbedTarget {
+            title,
+            url: url.unwrap_or(target_url),
+        });
+    }
+
     #[cfg(feature = "browser")]
     if session.options.browser {
         let page = render_page(target_with_credentials.as_str(), &session)
@@ -780,7 +817,7 @@ pub fn probe_target(mut session: Session, target: &str) -> Result<ProbedTarget, 
     let is_document = media_type.eq_ignore_ascii_case("text/html")
         || media_type.eq_ignore_ascii_case("application/xhtml+xml");
     let title = match is_document || is_archive(&data) {
-        true => probe_data(&session.options, &data, Some(&charset), Some(&url)),
+        true => probe_data(&data, Some(&charset), Some(&url)),
         false => None,
     };
 
@@ -789,26 +826,9 @@ pub fn probe_target(mut session: Session, target: &str) -> Result<ProbedTarget, 
 
 /// Finds out what a document is called, for documents that have already been obtained:
 /// archives are called whatever the page they have in them is called.
-pub fn probe_data(
-    options: &MonolithOptions,
-    data: &[u8],
-    charset: Option<&str>,
-    url: Option<&Url>,
-) -> Option<String> {
+pub fn probe_data(data: &[u8], charset: Option<&str>, url: Option<&Url>) -> Option<String> {
     if is_warc(data) || is_har(data) {
-        let wanted_url = options.base_url.as_deref().filter(|url| !url.is_empty());
-        let (page, _) = match is_warc(data) {
-            true => parse_warc(data, wanted_url),
-            false => parse_har(data, wanted_url),
-        }
-        .ok()?;
-        let document = page
-            .assets
-            .iter()
-            .find(|asset| asset.destination == "document")?;
-        let charset = parse_media_type(&document.content_type).1;
-
-        is_html(&page.content_type).then(|| title_of(&document.data, charset.as_deref()))?
+        probe_page_in_archive(data, None).0
     } else if is_mhtml(data) || is_webarchive(data) {
         let archive = match is_mhtml(data) {
             true => parse_mhtml(data, url),
@@ -820,6 +840,102 @@ pub fn probe_data(
     } else {
         title_of(data, charset)
     }
+}
+
+/// Title of a page in a WARC or HAR archive (the first one, unless it's looked for by its URL),
+/// and where it has ended up being.
+fn probe_page_in_archive(data: &[u8], wanted_url: Option<&str>) -> (Option<String>, Option<Url>) {
+    let Ok((page, _)) = (match is_warc(data) {
+        true => parse_warc(data, wanted_url),
+        false => parse_har(data, wanted_url),
+    }) else {
+        return (None, None);
+    };
+    let title = page
+        .assets
+        .iter()
+        .find(|asset| asset.destination == "document")
+        .filter(|_| is_html(&page.content_type))
+        .and_then(|document| {
+            let charset = parse_media_type(&document.content_type).1;
+            title_of(&document.data, charset.as_deref())
+        });
+
+    (title, Url::parse(&page.url).ok())
+}
+
+/// Title of the page at given URL in an archive, and where it has ended up being.
+fn probe_archive(data: &[u8], url: &str) -> (Option<String>, Option<Url>) {
+    if is_warc(data) || is_har(data) {
+        return probe_page_in_archive(data, Some(url));
+    }
+
+    let archive = match is_mhtml(data) {
+        true => parse_mhtml(data, None),
+        false => parse_webarchive(data),
+    };
+    let title = archive.and_then(|archive| {
+        let root = archive.root();
+        is_html(&root.media_type).then(|| title_of(&root.data, Some(&root.charset)))?
+    });
+
+    (title, None)
+}
+
+/// Archives to take everything from: WARC archives get put together into one (the way
+/// concatenated WARC files are one), pages in them may have their assets in others.
+pub fn read_archives(archives: Vec<Vec<u8>>) -> Result<Vec<Arc<Vec<u8>>>, MonolithError> {
+    let mut warc: Vec<u8> = vec![];
+    let mut others: Vec<Arc<Vec<u8>>> = vec![];
+
+    for (index, data) in archives.into_iter().enumerate() {
+        if is_warc(&data) {
+            warc.extend_from_slice(&decompress_warc(data));
+        } else if is_har(&data) || is_mhtml(&data) || is_webarchive(&data) {
+            others.push(Arc::new(data));
+        } else {
+            return Err(MonolithError::new(&format!(
+                "archive #{} is neither WARC, HAR, MHTML, nor WebArchive",
+                index + 1
+            )));
+        }
+    }
+
+    if !warc.is_empty() {
+        others.insert(0, Arc::new(warc));
+    }
+
+    Ok(others)
+}
+
+/// Archive that has given URL in it, out of those the session takes everything from.
+fn archive_with(session: &Session, url: &Url) -> Result<Arc<Vec<u8>>, MonolithError> {
+    let wanted = clean_url(url.clone());
+
+    session
+        .source_archives
+        .iter()
+        .find(|data| {
+            if is_warc(data) || is_har(data) {
+                return match is_warc(data) {
+                    true => parse_warc(data, Some(url.as_str())),
+                    false => parse_har(data, Some(url.as_str())),
+                }
+                .is_ok();
+            }
+
+            match is_mhtml(data) {
+                true => parse_mhtml(data, None),
+                false => parse_webarchive(data),
+            }
+            .and_then(|archive| archive.root().url.clone())
+            .is_some_and(|root_url| clean_url(root_url) == wanted)
+        })
+        .cloned()
+        .ok_or(MonolithError::new(&format!(
+            "none of the archives have {}",
+            url
+        )))
 }
 
 /// Title of an HTML document, decoded the way the document would be.

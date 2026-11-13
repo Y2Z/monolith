@@ -261,6 +261,86 @@ mod passing {
         assert!(names[0].ends_with("--a.html.htm"), "{:?}", names);
     }
 
+    /// Site where /old redirects to /b, along with how many times each path got asked for.
+    fn redirecting_site() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let requests = std::sync::Arc::new(std::sync::Mutex::new(vec![]));
+        let recorded = std::sync::Arc::clone(&requests);
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().map_while(Result::ok) {
+                let mut received = vec![];
+                let mut buffer = [0; 4096];
+                while !received.windows(4).any(|part| part == b"\r\n\r\n") {
+                    match stream.read(&mut buffer) {
+                        Ok(0) | Err(_) => break,
+                        Ok(size) => received.extend_from_slice(&buffer[..size]),
+                    }
+                }
+                let head = String::from_utf8_lossy(&received).to_string();
+                let path = head.split(' ').nth(1).unwrap_or("").to_string();
+                recorded.lock().unwrap().push(path.clone());
+                let response = match path.as_str() {
+                    "/old" => "HTTP/1.1 301 Moved Permanently\r\nLocation: /b\r\n\
+                               Content-Length: 0\r\nConnection: close\r\n\r\n"
+                        .to_string(),
+                    _ => {
+                        let body = format!("<title>{}</title>", path);
+                        format!(
+                            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\
+                             Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            body.len(),
+                            body
+                        )
+                    }
+                };
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+
+        (origin, requests)
+    }
+
+    #[test]
+    fn warc_has_everything_once() {
+        for order in [["/a", "/b", "/old"], ["/old", "/b", "/a"]] {
+            let ((origin, _), saved) = (redirecting_site(), tempfile::tempdir().unwrap());
+            let targets: Vec<String> = order
+                .iter()
+                .map(|path| format!("{}{}", origin, path))
+                .collect();
+
+            let output = run(
+                saved.path(),
+                &[
+                    "-q",
+                    "-F",
+                    "WARC",
+                    "-o",
+                    "site.warc",
+                    &targets[0],
+                    &targets[1],
+                    &targets[2],
+                ],
+            );
+
+            assert!(output.status.success());
+            let warc = fs::read(saved.path().join("site.warc")).unwrap();
+            let warc = String::from_utf8_lossy(&warc);
+            for path in ["/a", "/b", "/old"] {
+                let uri = format!("WARC-Target-URI: {}{}\r\n", origin, path);
+                let responses = warc
+                    .split("WARC/1.1\r\n")
+                    .filter(|record| record.contains("WARC-Type: response\r\n"))
+                    .filter(|record| record.contains(&uri))
+                    .count();
+                assert_eq!(responses, 1, "{:?}: {}", order, path);
+            }
+        }
+    }
+
     #[test]
     fn output_option_can_only_be_given_once() {
         let (site, saved) = (site(), tempfile::tempdir().unwrap());
