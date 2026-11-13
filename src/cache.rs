@@ -31,6 +31,7 @@ pub struct CacheMetadataItem {
     data: Option<Vec<u8>>, // Asset's blob; used for caching small files or if on-disk database isn't utilized
     media_type: Option<String>, // MIME-type, things like "text/plain", "image/png"...
     charset: Option<String>, // "UTF-8", "UTF-16"...
+    final_url: Option<String>, // Where requesting the URL ended up (after redirects)
 }
 
 /// What gets cached, along with where it's cached (see Cache).
@@ -77,7 +78,14 @@ impl CacheData {
         }
     }
 
-    fn set(&mut self, key: &str, data: &Vec<u8>, media_type: String, charset: String) {
+    fn set(
+        &mut self,
+        key: &str,
+        data: &Vec<u8>,
+        media_type: String,
+        charset: String,
+        final_url: Option<String>,
+    ) {
         let mut cache_metadata_item: CacheMetadataItem = CacheMetadataItem {
             data: if self.db_ok.is_some() && self.db_ok.unwrap() {
                 None
@@ -86,6 +94,7 @@ impl CacheData {
             },
             media_type: Some(media_type.to_owned()),
             charset: Some(charset),
+            final_url,
         };
 
         if (self.db_ok.is_none() || !self.db_ok.unwrap()) || data.len() <= self.min_file_size {
@@ -111,7 +120,7 @@ impl CacheData {
             .insert((*key).to_string(), cache_metadata_item);
     }
 
-    fn get(&self, key: &str) -> Result<(Vec<u8>, String, String), Error> {
+    fn get(&self, key: &str) -> Result<(Vec<u8>, String, String, Option<String>), Error> {
         if self.metadata.contains_key(key) {
             let metadata_item = self.metadata.get(key).unwrap();
 
@@ -120,6 +129,7 @@ impl CacheData {
                     data.to_vec(),
                     metadata_item.media_type.as_ref().expect("").to_string(),
                     metadata_item.charset.as_ref().expect("").to_string(),
+                    metadata_item.final_url.clone(),
                 ));
             } else if self.db_ok.is_some() && self.db_ok.unwrap() {
                 let read_txn = self.db.as_ref().unwrap().begin_read()?;
@@ -131,6 +141,7 @@ impl CacheData {
                     bytes.value().to_vec(),
                     metadata_item.media_type.as_ref().expect("").to_string(),
                     metadata_item.charset.as_ref().expect("").to_string(),
+                    metadata_item.final_url.clone(),
                 ));
             }
         }
@@ -259,10 +270,31 @@ impl Cache {
     }
 
     pub fn set(&mut self, key: &str, data: &Vec<u8>, media_type: String, charset: String) {
-        self.data().set(key, data, media_type, charset)
+        self.set_with_final_url(key, data, media_type, charset, None)
+    }
+
+    /// Same as set(), remembering where requesting the given URL ended up (after redirects).
+    pub fn set_with_final_url(
+        &mut self,
+        key: &str,
+        data: &Vec<u8>,
+        media_type: String,
+        charset: String,
+        final_url: Option<String>,
+    ) {
+        self.data().set(key, data, media_type, charset, final_url)
     }
 
     pub fn get(&self, key: &str) -> Result<(Vec<u8>, String, String), Error> {
+        self.get_with_final_url(key)
+            .map(|(data, media_type, charset, _)| (data, media_type, charset))
+    }
+
+    /// Same as get(), providing where requesting the given URL ended up (if it was recorded).
+    pub fn get_with_final_url(
+        &self,
+        key: &str,
+    ) -> Result<(Vec<u8>, String, String, Option<String>), Error> {
         self.data().get(key)
     }
 

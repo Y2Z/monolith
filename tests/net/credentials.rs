@@ -69,6 +69,20 @@ mod passing {
     }
 
     #[test]
+    fn credentials_in_urls_count_for_their_cache_keys() {
+        let credentials = Credentials::default();
+
+        assert_eq!(
+            credentials.cache_key(&url("https://user:pass@example.com/a#b")),
+            "https://user@example.com/a"
+        );
+        assert_eq!(
+            credentials.cache_key(&url("https://:pass@example.com/a")),
+            "(password) https://example.com/a"
+        );
+    }
+
+    #[test]
     fn urls_without_credentials() {
         assert_eq!(
             without_credentials(&url("https://user:pass@example.com/a")).as_str(),

@@ -110,8 +110,8 @@ mod passing {
 
         let result = embed(directory.path(), "@import \"0.css\";");
 
-        assert!(result.contains("l63{color:red}"));
-        assert!(!result.contains("l64{color:red}"));
+        assert!(result.contains("l31{color:red}"));
+        assert!(!result.contains("l32{color:red}"));
     }
 
     #[test]
