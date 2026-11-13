@@ -210,7 +210,13 @@ const SCROLL_TO_TOP_SCRIPT: &str = r#"(() => {
 // Makes the document's current state a part of its HTML, then serializes it.
 // Passwords stay out, that's the only thing here which could've been typed in by a script
 // and yet shouldn't end up in a file.
+// Nonces are hidden from the markup, they get to be in it again (policies of the page name
+// elements by them, see csp.rs); STYLE elements made out of constructed stylesheets aren't up to
+// policies, they get marked as such.
 const SNAPSHOT_SCRIPT: &str = r#"(() => {
+    const adoptedStyleMarker = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+    ).join("");
     const rules = (sheet) => {
         try {
             return Array.from(sheet.cssRules, (rule) => rule.cssText).join("\n");
@@ -223,11 +229,19 @@ const SNAPSHOT_SCRIPT: &str = r#"(() => {
         for (const style of root.querySelectorAll("style")) {
             if (style.sheet && !style.textContent.trim()) {
                 style.textContent = rules(style.sheet);
+                // What's been allowed in empty can't be checked again with what's in it now
+                style.setAttribute("data-monolith-adopted", adoptedStyleMarker);
+            }
+        }
+        for (const element of root.querySelectorAll("[nonce]")) {
+            if (element.nonce) {
+                element.setAttribute("nonce", element.nonce);
             }
         }
         for (const sheet of root.adoptedStyleSheets || []) {
             const style = document.createElement("style");
             style.textContent = rules(sheet);
+            style.setAttribute("data-monolith-adopted", adoptedStyleMarker);
             (root === document ? document.head : root).appendChild(style);
         }
         for (const input of root.querySelectorAll("input")) {
@@ -261,6 +275,7 @@ const SNAPSHOT_SCRIPT: &str = r#"(() => {
     return JSON.stringify({
         contentType: document.contentType,
         html: doctype + document.documentElement.outerHTML,
+        adoptedStyleMarker,
         title: document.title,
         url: location.href,
     });
@@ -1511,6 +1526,7 @@ impl<'a> Connection<'a> {
             assets: vec![],
             content_type: snapshot["contentType"].as_str().unwrap_or("").to_string(),
             html: snapshot["html"].as_str().unwrap_or("").to_string(),
+            adopted_style_marker: snapshot["adoptedStyleMarker"].as_str().map(str::to_string),
             title: snapshot["title"].as_str().unwrap_or("").to_string(),
             url: snapshot["url"].as_str().unwrap_or("").to_string(),
         })

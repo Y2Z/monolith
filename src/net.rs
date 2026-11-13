@@ -17,8 +17,8 @@ use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_
 use crate::cors::{CorsRequest, RequestMode};
 use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{
-    LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset, source_request_mode,
-    strip_elements,
+    LinkType, document_policies, get_node_attr, html_to_dom, parse_link_type, parse_srcset,
+    source_request_mode, strip_elements,
 };
 use crate::mhtml::percent_decode;
 use crate::session::MAX_EXPANSION_DEPTH;
@@ -34,6 +34,8 @@ pub struct CacheEntry {
     pub final_url: Option<String>,
     /// What it took to get it, for archives that keep that
     pub exchanges: Vec<Exchange>,
+    /// What its Content-Security-Policy headers say
+    pub policy: Option<String>,
 }
 
 /// How far along prefetching is; meant to be shared with whoever displays the progress.
@@ -77,6 +79,7 @@ struct Fetched {
     media_type: String,
     charset: String,
     exchanges: Vec<Exchange>,
+    policy: Option<String>,
 }
 
 /// Shared, read-only state handed to every worker.
@@ -283,7 +286,7 @@ pub fn fetch_remote_asset(
     parent_url: &Url,
     url: &Url,
     exchanges: Option<&mut Vec<Exchange>>,
-) -> Result<(Vec<u8>, Url, String, String), reqwest::Error> {
+) -> Result<(Asset, Option<String>), reqwest::Error> {
     let requester = Requester {
         client,
         cookies,
@@ -292,7 +295,9 @@ pub fn fetch_remote_asset(
     };
 
     match fetch(&requester, options, parent_url, url, exchanges)? {
-        Outcome::Asset(data, url, media_type, charset) => Ok((data, url, media_type, charset)),
+        Outcome::Asset(data, url, media_type, charset, policy) => {
+            Ok(((data, url, media_type, charset), policy))
+        }
         // Only CORS requests can get blocked
         Outcome::Blocked => Err(client.get("").send().unwrap_err()),
     }
@@ -306,10 +311,10 @@ pub fn fetch_cors_asset(
     parent_url: &Url,
     url: &Url,
     exchanges: Option<&mut Vec<Exchange>>,
-) -> Result<Option<Asset>, reqwest::Error> {
+) -> Result<Option<(Asset, Option<String>)>, reqwest::Error> {
     match fetch(requester, options, parent_url, url, exchanges)? {
-        Outcome::Asset(data, url, media_type, charset) => {
-            Ok(Some((data, url, media_type, charset)))
+        Outcome::Asset(data, url, media_type, charset, policy) => {
+            Ok(Some(((data, url, media_type, charset), policy)))
         }
         Outcome::Blocked => Ok(None),
     }
@@ -318,9 +323,30 @@ pub fn fetch_cors_asset(
 /// What's been retrieved: its data, where it has ended up being, its media type, and charset.
 pub type Asset = (Vec<u8>, Url, String, String);
 
+/// What Content-Security-Policy headers of a response say (see csp.rs), all of them together.
+pub fn content_security_policy(headers: &HeaderMap) -> Option<String> {
+    let values: Vec<&str> = headers
+        .get_all("content-security-policy")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .collect();
+    (!values.is_empty()).then(|| values.join(", "))
+}
+
+/// Same as content_security_policy(), for headers that have been recorded.
+pub fn recorded_content_security_policy(headers: &[(String, String)]) -> Option<String> {
+    let values: Vec<&str> = headers
+        .iter()
+        .filter(|(name, _)| name.trim().eq_ignore_ascii_case("content-security-policy"))
+        .map(|(_, value)| value.trim())
+        .collect();
+    (!values.is_empty()).then(|| values.join(", "))
+}
+
 /// What a request has ended up with.
 enum Outcome {
-    Asset(Vec<u8>, Url, String, String),
+    /// Along with what Content-Security-Policy headers say
+    Asset(Vec<u8>, Url, String, String, Option<String>),
     /// Not allowed to be used by the page
     Blocked,
 }
@@ -473,6 +499,7 @@ fn fetch(
     // Leave charset empty if not given, so that the document's META can be used
     let (media_type, charset, _is_base64) = parse_media_type(content_type);
     let charset: String = charset.unwrap_or_default();
+    let policy: Option<String> = content_security_policy(response.headers());
 
     // Convert response into a byte array, what broke off partway is no use
     let data: Vec<u8> = match response.bytes() {
@@ -491,7 +518,13 @@ fn fetch(
         exchanges.push(exchange);
     }
 
-    Ok(Outcome::Asset(data, response_url, media_type, charset))
+    Ok(Outcome::Asset(
+        data,
+        response_url,
+        media_type,
+        charset,
+        policy,
+    ))
 }
 
 /// What requests get made with.
@@ -575,6 +608,7 @@ pub fn prefetch_assets(
                 charset: fetched.charset.clone(),
                 final_url: final_url.clone(),
                 exchanges: vec![],
+                policy: fetched.policy.clone(),
             });
         }
 
@@ -585,6 +619,7 @@ pub fn prefetch_assets(
             charset: fetched.charset,
             final_url,
             exchanges: fetched.exchanges,
+            policy: fetched.policy,
         });
     }
 
@@ -601,7 +636,7 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
     s.spawn(move |s| {
         let mut exchanges: Vec<Exchange> = vec![];
         let is_recording = ctx.options.output_format.is_warc();
-        let (data, final_url, media_type, charset) = match fetch_remote_asset(
+        let ((data, final_url, media_type, charset), policy) = match fetch_remote_asset(
             ctx.client,
             ctx.cookies,
             ctx.credentials,
@@ -637,13 +672,19 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
                         &ctx.options.remove_elements,
                         &ctx.options.wipe_elements,
                     );
-                    collect_html(
-                        &frame_dom.document,
-                        "",
-                        &final_url,
-                        ctx.options,
-                        &mut more_jobs,
-                    );
+                    // What the frame is allowed to load is left for when it's known
+                    // exactly (see csp.rs)
+                    let policies =
+                        document_policies(&frame_dom.document, &final_url, policy.as_deref());
+                    if !policies.restricts_anything() {
+                        collect_html(
+                            &frame_dom.document,
+                            "",
+                            &final_url,
+                            ctx.options,
+                            &mut more_jobs,
+                        );
+                    }
                 }
                 AssetKind::Svg | AssetKind::Other => {}
             }
@@ -660,6 +701,7 @@ fn spawn_job<'s>(s: &Scope<'s>, ctx: &'s Ctx<'s>, job: Job) {
             media_type,
             charset,
             exchanges,
+            policy,
         });
 
         // Nested jobs get counted first, so that the total can't be reached too early

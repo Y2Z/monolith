@@ -14,6 +14,8 @@ mod support;
 
 #[path = "system/capture.rs"]
 mod capture;
+#[path = "system/csp.rs"]
+mod csp;
 #[path = "system/page.rs"]
 mod page;
 #[path = "system/privacy.rs"]

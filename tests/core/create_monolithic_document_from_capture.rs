@@ -55,6 +55,7 @@ mod passing {
             ],
             content_type: "text/html".to_string(),
             html: "<html><head><title>After</title></head><body>Rendered</body></html>".to_string(),
+            adopted_style_marker: None,
             title: "After".to_string(),
             url: "https://a.b/".to_string(),
         }

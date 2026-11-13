@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'nonce-abc'; img-src 'self'; style-src 'self'">
+<link rel="stylesheet" href="style.css">
+<style>p { color: red; }</style>
+</head>
+<body>
+<img src="image.png"><img src="https://example.com/x.png">
+<p style="color: blue" onclick="clicked()">p</p>
+<script nonce="abc">var kept = 1;</script>
+<script>var dropped = 1;</script>
+</body>
+</html>
