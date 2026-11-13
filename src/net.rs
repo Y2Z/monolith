@@ -17,7 +17,8 @@ use crate::core::{MonolithOptions, parse_media_type, print_error_message, print_
 use crate::cors::{CorsRequest, RequestMode};
 use crate::css::{decode_css, is_image_url_prop};
 use crate::html::{
-    LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset, strip_elements,
+    LinkType, get_node_attr, html_to_dom, parse_link_type, parse_srcset, source_request_mode,
+    strip_elements,
 };
 use crate::mhtml::percent_decode;
 use crate::url::{Url, clean_url, domain_is_within_domain, get_referer_url, resolve_url};
@@ -753,13 +754,14 @@ fn collect_html(
                     }
                 }
                 "source" => {
-                    // Note: html::get_parent_node() take()s the parent pointer,
-                    // so we track the parent's name ourselves instead of calling it
-                    if let Some(src) = get_node_attr(node, "src") {
+                    // What's requested in CORS mode is left for when it's needed (see cors.rs)
+                    let is_cors = source_request_mode(node) != RequestMode::NoCors;
+                    if let Some(src) = get_node_attr(node, "src").filter(|_| !is_cors) {
                         push_job(jobs, base_url, &src, AssetKind::Other);
                     }
                     if parent_name == "picture"
                         && !options.no_images
+                        && !is_cors
                         && let Some(srcset) = get_node_attr(node, "srcset")
                     {
                         push_srcset(jobs, base_url, &srcset);

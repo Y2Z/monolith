@@ -501,6 +501,31 @@ pub fn get_parent_node(child: &Handle) -> Handle {
     parent
 }
 
+/// How what SOURCE elements point at gets requested: the way their AUDIO or VIDEO element says,
+/// or the IMG element of their PICTURE element (it comes after them), see cors.rs.
+pub fn source_request_mode(node: &Handle) -> RequestMode {
+    let Some(parent) = node
+        .parent
+        .take()
+        .inspect(|parent| node.parent.set(Some(parent.clone())))
+        .and_then(|parent| parent.upgrade())
+    else {
+        return RequestMode::NoCors;
+    };
+    let crossorigin = match get_node_name(&parent) {
+        Some("audio" | "video") => get_node_attr(&parent, "crossorigin"),
+        Some("picture") => parent
+            .children
+            .borrow()
+            .iter()
+            .find(|child| get_node_name(child) == Some("img"))
+            .and_then(|img| get_node_attr(img, "crossorigin")),
+        _ => None,
+    };
+
+    RequestMode::of_attribute(crossorigin.as_deref())
+}
+
 pub fn get_robots(handle: &Handle) -> Option<String> {
     for meta_node in find_nodes(handle, vec!["html", "head", "meta"]).iter() {
         // Only the first base tag matters (we ignore the rest, if there's any)
@@ -1340,6 +1365,7 @@ pub fn retrieve_and_embed_asset(
         ("img" | "audio" | "video" | "link", _) => {
             RequestMode::of_attribute(crossorigin.as_deref())
         }
+        ("source", _) => source_request_mode(node),
         _ => RequestMode::NoCors,
     };
 
@@ -1908,7 +1934,8 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         } else {
                             let source_src_full_url: Url = resolve_url(document_url, &source_src);
                             set_node_attr(node, "src", Some(source_src_full_url.to_string()));
-                            session.log_asset_url(&source_src_full_url);
+                            session
+                                .log_asset_url_as(&source_src_full_url, source_request_mode(node));
                         }
                     }
 
@@ -1919,8 +1946,12 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         if session.options.no_images {
                             set_node_attr(node, "srcset", Some(EMPTY_IMAGE_DATA_URL.to_string()));
                         } else {
-                            let resolved_srcset: String =
-                                embed_srcset(session, document_url, &source_attr_srcset_value);
+                            let resolved_srcset: String = embed_srcset_as(
+                                session,
+                                document_url,
+                                &source_attr_srcset_value,
+                                source_request_mode(node),
+                            );
                             set_node_attr(node, "srcset", Some(resolved_srcset));
                         }
                     }
