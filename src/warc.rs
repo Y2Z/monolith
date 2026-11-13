@@ -217,6 +217,14 @@ fn is_gzip(data: &[u8]) -> bool {
 }
 
 /// Compressed archives are compressed record by record, and may end up being cut short.
+/// WARC archive as it is, uncompressed.
+pub(crate) fn decompress_warc(data: Vec<u8>) -> Vec<u8> {
+    match is_gzip(&data) {
+        true => decompress_archive(&data),
+        false => data,
+    }
+}
+
 fn decompress_archive(data: &[u8]) -> Vec<u8> {
     let mut decompressed = vec![];
     let _ = MultiGzDecoder::new(data).read_to_end(&mut decompressed);

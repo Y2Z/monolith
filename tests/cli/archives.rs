@@ -25,8 +25,7 @@ mod helpers {
     }
 
     pub fn warc() -> Vec<u8> {
-        let mut warc = vec![];
-        for (url, content_type, body) in [
+        warc_of(&[
             (
                 "https://a.test/",
                 "text/html",
@@ -40,7 +39,13 @@ mod helpers {
                 "document.title='Two'",
             ),
             ("https://a.test/b", "text/html", "<title>Other</title>"),
-        ] {
+        ])
+    }
+
+    /// WARC archive of given responses: URLs, media types, and bodies.
+    pub fn warc_of(responses: &[(&str, &str, &str)]) -> Vec<u8> {
+        let mut warc = vec![];
+        for (url, content_type, body) in responses {
             let block = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: {}\r\n\r\n{}",
                 content_type, body
@@ -57,6 +62,29 @@ mod helpers {
             );
         }
         warc
+    }
+
+    /// Monolith taking everything from given archives (-a), saving given targets to STDOUT.
+    pub fn from_archives(
+        archives: &[Vec<u8>],
+        args: &[&str],
+        targets: &[&str],
+    ) -> (String, String, bool) {
+        let directory = tempfile::tempdir().unwrap();
+        let mut command = Command::new(assert_cmd::cargo_bin!("monolith"));
+        command.current_dir(directory.path()).args(["-o", "-"]);
+        for (index, archive) in archives.iter().enumerate() {
+            let path = directory.path().join(format!("archive-{}", index));
+            std::fs::write(&path, archive).unwrap();
+            command.arg("-a").arg(path);
+        }
+        let output = command.args(args).args(targets).output().unwrap();
+
+        (
+            crate::cli::without_metadata(&output.stdout),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+            output.status.success(),
+        )
     }
 
     pub fn har() -> Vec<u8> {
@@ -106,16 +134,16 @@ mod passing {
     fn other_pages_get_mentioned() {
         let (_, errors, _) = monolith(&warc(), &[]);
 
-        assert!(errors.contains("-b picks"));
+        assert!(errors.contains("-a takes archives, for their URLs to be targets"));
     }
 
     #[test]
-    fn page_can_be_picked_with_base_url() {
-        let (output, errors, success) = monolith(&warc(), &["-b", "https://a.test/b"]);
+    fn base_url_does_not_pick_pages() {
+        let (output, _, success) = monolith(&warc(), &["-q", "-j", "-b", "https://a.test/b"]);
 
         assert!(success);
-        assert!(output.contains("<title>Other</title>"));
-        assert!(!errors.contains("-b picks"));
+        assert!(output.contains("<title>One</title>"));
+        assert!(output.contains("<base href=\"https://a.test/b\">"));
     }
 
     #[test]
@@ -193,14 +221,191 @@ mod passing {
 
 #[cfg(test)]
 mod failing {
-    use super::helpers::{monolith, warc};
+    use super::helpers::{from_archives, warc};
 
     #[test]
     fn page_that_is_not_in_the_archive() {
-        let (_, errors, success) = monolith(&warc(), &["-b", "https://b.test/"]);
+        let (_, errors, success) = from_archives(&[warc()], &[], &["https://b.test/"]);
 
         assert!(!success);
-        assert!(errors.contains("archive has no page at https://b.test/"));
+        assert!(errors.contains("none of the archives have https://b.test/"));
+    }
+
+    #[test]
+    fn what_is_not_an_archive() {
+        let (_, errors, success) = from_archives(
+            &[b"<title>Page</title>".to_vec()],
+            &[],
+            &["https://a.test/"],
+        );
+
+        assert!(!success);
+        assert_eq!(
+            errors,
+            "Error: archive #1 is neither WARC, HAR, MHTML, nor WebArchive\n"
+        );
+    }
+
+    #[test]
+    fn archives_need_targets() {
+        let (_, errors, success) = from_archives(&[warc()], &[], &[]);
+
+        assert!(!success);
+        assert!(errors.contains("required arguments were not provided"));
+    }
+
+    #[test]
+    fn browsers_and_stdin_would_not_use_archives() {
+        for (args, error) in [
+            (
+                ["-B", "https://a.test/"],
+                match cfg!(feature = "browser") {
+                    true => "browser would go online",
+                    false => "no browser support",
+                },
+            ),
+            (["-j", "-"], "STDIN can't be one"),
+        ] {
+            let (_, errors, success) = from_archives(&[warc()], &args[..1], &args[1..]);
+
+            assert!(!success);
+            assert!(errors.contains(error), "{}", errors);
+        }
+    }
+}
+
+#[cfg(test)]
+mod taking_everything_from_archives {
+    use std::io::Write;
+
+    use super::helpers::{from_archives, har, warc, warc_of};
+
+    #[test]
+    fn pages_get_picked_by_their_urls() {
+        for archive in [warc(), har()] {
+            let (output, _, success) =
+                from_archives(&[archive], &["-q", "-j"], &["https://a.test/"]);
+
+            assert!(success);
+            assert!(output.contains("<title>One</title>"));
+        }
+
+        let (output, _, success) = from_archives(&[warc()], &["-q", "-j"], &["https://a.test/b"]);
+        assert!(success);
+        assert!(output.contains("<title>Other</title>"));
+    }
+
+    #[test]
+    fn pages_get_replayed() {
+        let (output, _, success) = from_archives(&[warc()], &["-q"], &["https://a.test/"]);
+
+        assert!(success);
+        assert!(output.contains("PAGE_URL=\"https://a.test/\""));
+    }
+
+    #[test]
+    fn assets_can_be_in_other_warc_archives() {
+        let page = warc_of(&[(
+            "https://c.test/",
+            "text/html",
+            "<title>C</title><link rel=stylesheet href=c.css>",
+        )]);
+        let mut style = vec![];
+        flate2::write::GzEncoder::new(&mut style, flate2::Compression::default())
+            .write_all(&warc_of(&[(
+                "https://c.test/c.css",
+                "text/css",
+                "c{color:blue}",
+            )]))
+            .unwrap();
+
+        let (output, _, success) =
+            from_archives(&[page, style], &["-q", "-j"], &["https://c.test/"]);
+
+        assert!(success);
+        assert!(output.contains("<title>C</title>"));
+        assert!(output.contains("c{color:blue}"));
+    }
+
+    #[test]
+    fn nothing_comes_from_anywhere_else() {
+        let page = warc_of(&[(
+            "https://c.test/",
+            "text/html",
+            "<link rel=stylesheet href=https://127.0.0.1:9/x.css><img src=gone.png>",
+        )]);
+
+        let (output, errors, success) = from_archives(&[page], &["-j"], &["https://c.test/"]);
+
+        assert!(success);
+        assert!(
+            errors.contains("https://127.0.0.1:9/x.css (not found in archive)"),
+            "{}",
+            errors
+        );
+        assert!(
+            errors.contains("https://c.test/gone.png (not found in archive)"),
+            "{}",
+            errors
+        );
+        // What couldn't be found stays where it was, the way it does online
+        assert!(output.contains("href=\"https://127.0.0.1:9/x.css\""));
+    }
+
+    #[test]
+    fn several_pages_get_linked_to_each_other() {
+        let site = warc_of(&[
+            (
+                "https://s.test/",
+                "text/html",
+                "<title>Home</title><a href=/about>About</a>",
+            ),
+            (
+                "https://s.test/about",
+                "text/html",
+                "<title>About</title><a href=/>Home</a>",
+            ),
+        ]);
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("site.warc"), site).unwrap();
+
+        let output = assert_cmd::Command::new(assert_cmd::cargo_bin!("monolith"))
+            .current_dir(directory.path())
+            .args(["-q", "-j", "-a", "site.warc", "-o", "saved/"])
+            .args(["https://s.test/", "https://s.test/about"])
+            .output()
+            .unwrap();
+
+        assert!(output.status.success());
+        let read = |name: &str| std::fs::read_to_string(directory.path().join("saved").join(name));
+        assert!(
+            read("Home.html")
+                .unwrap()
+                .contains("<a href=\"About.html\">About</a>")
+        );
+        assert!(
+            read("About.html")
+                .unwrap()
+                .contains("<a href=\"Home.html\">Home</a>")
+        );
+    }
+
+    #[test]
+    fn mhtml_archives_have_pages_at_their_urls() {
+        let mhtml = "From: <Saved by Monolith>\r\nSnapshot-Content-Location: https://m.test/\r\n\
+                     MIME-Version: 1.0\r\nContent-Type: multipart/related; type=\"text/html\"; \
+                     boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/html\r\n\
+                     Content-Location: https://m.test/\r\n\r\n<title>M</title>\r\n--b--\r\n";
+
+        let (output, _, success) =
+            from_archives(&[mhtml.as_bytes().to_vec()], &["-q"], &["https://m.test/"]);
+        assert!(success);
+        assert!(output.contains("<title>M</title>"));
+
+        let (_, errors, success) =
+            from_archives(&[mhtml.as_bytes().to_vec()], &[], &["https://m.test/other"]);
+        assert!(!success);
+        assert!(errors.contains("none of the archives have https://m.test/other"));
     }
 }
 

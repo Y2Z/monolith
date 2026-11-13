@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use chrono::Utc;
@@ -21,6 +21,26 @@ use crate::mhtml::MhtmlArchive;
 use crate::net::{self, Credentials, PrefetchProgress, without_credentials};
 use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
 use crate::warc::WarcStream;
+
+/// URLs of what has been recorded into an archive: sessions that write into the same archive
+/// share them (see Session::share_records()), for nothing to get recorded more than once.
+#[derive(Clone, Default)]
+pub struct Records(Arc<Mutex<HashSet<String>>>);
+
+impl Records {
+    fn urls(&self) -> std::sync::MutexGuard<'_, HashSet<String>> {
+        self.0.lock().unwrap_or_else(|error| error.into_inner())
+    }
+
+    /// Whether it's new, it's what has been recorded from now on either way.
+    fn insert(&self, url: &str) -> bool {
+        self.urls().insert(url.to_string())
+    }
+
+    pub fn contains(&self, url: &str) -> bool {
+        self.urls().contains(url)
+    }
+}
 
 /// Provides what the result gets written into, given the title of the document (if it has one).
 pub type OutputOpener = Box<dyn FnOnce(Option<&str>) -> io::Result<Box<dyn Write + Send>> + Send>;
@@ -89,7 +109,11 @@ pub struct Session {
     /// Gets updated as assets are being prefetched, if set
     pub prefetch_progress: Option<Arc<PrefetchProgress>>,
     /// URLs of everything that has been recorded
-    recorded_urls: HashSet<String>,
+    recorded_urls: Records,
+    /// URL of the page to save out of an archive (the first page, if there's none)
+    pub(crate) page_url: Option<String>,
+    /// Archives to take everything from, instead of going online
+    pub(crate) source_archives: Vec<Arc<Vec<u8>>>,
     /// Markup to put right after the opening tag of HEAD
     pub(crate) replay_markup: Option<String>,
     /// Title to name the result by, instead of what the document says
@@ -170,7 +194,9 @@ impl Session {
             output_error: None,
             original_data: HashMap::new(),
             prefetch_progress: None,
-            recorded_urls: HashSet::new(),
+            page_url: None,
+            recorded_urls: Records::default(),
+            source_archives: vec![],
             replay_markup: None,
             title: None,
             warc: None,
@@ -240,6 +266,12 @@ impl Session {
             (Some(own_file), false) => own_file.make_relative(&file),
             _ => Some(file.to_string()),
         }
+    }
+
+    /// Makes the session know what other sessions have recorded into the archive they write into,
+    /// and the other way around: what's in there already doesn't get recorded again.
+    pub fn share_records(&mut self, records: &Records) {
+        self.recorded_urls = records.clone();
     }
 
     /// Makes the result get written as it's being made, into whatever given function provides
@@ -338,7 +370,10 @@ impl Session {
         if !self.is_recording() {
             return;
         }
-        self.recorded_urls.insert(exchange.url.clone());
+        if !self.recorded_urls.insert(&exchange.url) {
+            // It's in the archive already (another session may have put it there)
+            return;
+        }
 
         if let Some(warc) = self.warc.as_mut() {
             // The result has somewhere to go already, there's no need to keep it around
@@ -389,6 +424,17 @@ impl Session {
 
     pub fn has_archive(&self) -> bool {
         self.archive.is_some() || self.is_offline
+    }
+
+    /// Makes the session take everything from given archives (see read_archives()), and
+    /// nothing from anywhere else: targets are URLs of pages in them.
+    pub fn use_archives(&mut self, archives: &[Arc<Vec<u8>>]) {
+        self.source_archives = archives.to_vec();
+        self.go_offline();
+    }
+
+    pub fn uses_archives(&self) -> bool {
+        !self.source_archives.is_empty()
     }
 
     /// Keeps the session from going online: what it needs has to be in the cache already.

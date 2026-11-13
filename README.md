@@ -114,7 +114,7 @@ monolith page-saved-by-browser.mhtml -o page.html
 ```
 
 ```console
-monolith crawl.warc.gz -b https://some.site/page -o page.html
+monolith -a crawl.warc.gz https://some.site/ https://some.site/page
 ```
 
 ```console
@@ -141,7 +141,8 @@ Results get saved into files named after the pages' titles. Several targets can 
 
 ## Options
 
- - `-b`: Use `custom base URL`, or pick the page to save out of a WARC or HAR archive
+ - `-a`: Take everything from `archive` (WARC, HAR, MHTML, WebArchive) without going online, targets are URLs of pages in it
+ - `-b`: Use `custom base URL`
  - `-B`: Let a browser render the page first (requires Firefox, or anything based on it or Chromium)
  - `-C`: Read cookies from `file`
  - `-d`: Forbid retrieving assets from specified `domain`
@@ -253,8 +254,10 @@ Please open an issue if something is wrong, that helps make this project better.
 
 Besides documents, Monolith takes archives as targets, and never goes online to complete them: whatever isn't in there stays missing.
 
- - WARC (`.warc`, `.warc.gz`) and HAR (`.har`) hold the responses a page has received. It gets saved along with its JavaScript and those responses, which get replayed to it the same way `-B` does it, unless scripts get removed with `-j`. They may hold many pages: the first one is what gets saved, unless `-b` points at another one. HAR files have to be exported with contents.
+ - WARC (`.warc`, `.warc.gz`) and HAR (`.har`) hold the responses a page has received. It gets saved along with its JavaScript and those responses, which get replayed to it the same way `-B` does it, unless scripts get removed with `-j`. They may hold many pages: the first one is what gets saved, unless the archive comes with `-a`, and URLs of pages in it are targets. HAR files have to be exported with contents.
  - MHTML (`.mhtml`, `.mht`) and WebArchive (`.webarchive`) hold a document with what it's made of. Its assets get embedded into it.
+
+With `-a`, archives are all there is to work with: targets are URLs of pages in them (each one gets a file of its own, linked to the others), and nothing comes from anywhere else. WARC archives given with `-a` more than once work as one, pages in one of them may have their assets in another.
 
 ## Testing
 
