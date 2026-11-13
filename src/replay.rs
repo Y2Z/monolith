@@ -70,6 +70,9 @@ pub struct CapturedPage {
     pub content_type: String,
     /// What the page has turned into, for when it gets saved without JavaScript
     pub html: String,
+    /// What STYLE elements made out of constructed stylesheets are marked with in there (those
+    /// aren't up to policies, see csp.rs)
+    pub adopted_style_marker: Option<String>,
     pub title: String,
     pub url: String,
 }
@@ -1062,6 +1065,7 @@ pub fn create_page_from_responses(
         assets,
         content_type,
         html,
+        adopted_style_marker: None,
         title: String::new(),
         url,
     })

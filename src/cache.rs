@@ -42,6 +42,7 @@ struct CacheData {
     db_ok: Option<bool>, // None by default, Some(true) if was able to initialize database, Some (false) if an error occurred
     db_file_path: Option<String>, // Filesystem path to file used for storing database
     exchanges: Vec<(Exchange, bool)>, // Network exchanges, along with whether their bodies are in the database
+    policies: HashMap<String, String>, // Content-Security-Policy headers documents have been received with (see csp.rs)
 }
 
 const FILE_WRITE_BUF_LEN: usize = 1024 * 100; // On-disk cache file write buffer size (in bytes)
@@ -57,6 +58,7 @@ impl CacheData {
             db_ok: None,
             db_file_path: db_file_path.clone(),
             exchanges: vec![],
+            policies: HashMap::new(),
         };
 
         if let Some(db_file_path) = &db_file_path {
@@ -299,6 +301,18 @@ impl Cache {
     }
 
     /// Keeps a record of a network exchange, bodies that are large enough go into the database.
+    /// Keeps what Content-Security-Policy headers say for what's been cached under given key.
+    pub fn set_policy(&mut self, key: &str, policy: Option<String>) {
+        if let Some(policy) = policy {
+            self.data().policies.insert(key.to_string(), policy);
+        }
+    }
+
+    /// What Content-Security-Policy headers said for what's been cached under given key.
+    pub fn policy(&self, key: &str) -> Option<String> {
+        self.data().policies.get(key).cloned()
+    }
+
     pub fn add_exchange(&mut self, exchange: Exchange) {
         self.data().add_exchange(exchange)
     }

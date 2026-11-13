@@ -16,11 +16,14 @@ use url::Url;
 #[cfg(feature = "browser")]
 use crate::browser::{ColorScheme, render_page};
 use crate::cors::PageOrigin;
+use crate::csp::{Destination, Policies, Request};
 use crate::har::{is_har, parse_har};
 use crate::html::{
-    add_favicon, get_base_url, get_charset, get_robots, get_title, has_favicon, html_to_dom,
-    inline_stylesheets, serialize_document, serialize_document_into, set_base_url, set_charset,
-    set_metadata, set_robots, strip_elements, targets_element_anywhere, walk,
+    add_favicon, base_url_allowed, document_policies, enter_document, find_nodes, get_base_url,
+    get_charset, get_robots, get_title, has_favicon, hash_named_elements, html_to_dom,
+    inline_stylesheets, saved_policies, serialize_document, serialize_document_into, set_base_url,
+    set_charset, set_content_security_policies, set_metadata, set_node_attr, set_robots,
+    strip_elements, targets_element_anywhere, walk,
 };
 use crate::mhtml::{
     ArchivedAsset, MhtmlArchive, is_mhtml, parse_mhtml, percent_decode, write_mhtml_document,
@@ -421,12 +424,43 @@ fn create_monolithic_document_from_bytes(
         }
     }
 
+    // What the document is allowed to do comes with it, and from its META elements (see
+    // csp.rs); documents without a URL of their own have no origin
+    let document_url: Url = input_target
+        .as_deref()
+        .and_then(|target| Url::parse(target).ok())
+        .unwrap_or_else(|| Url::parse("data:text/html,").unwrap());
+    let policies = Policies::of(
+        &document_url,
+        session.received_policy(&document_url).as_deref(),
+    );
+    // Assets only get prefetched for what's allowed to load anything
+    let is_prefetchable = !document_policies(
+        &dom.document,
+        &document_url,
+        session.received_policy(&document_url).as_deref(),
+    )
+    .restricts_anything();
+    let _ = enter_document(&mut session, &dom, policies);
+    if session.options.remove_images {
+        // Images get replaced with data URLs
+        session.saved_content.data.insert(Destination::Image);
+    }
+
     // Use custom base URL if specified; read and use what's in the DOM otherwise
     let custom_base_url: String = session.options.base_url.clone().unwrap_or_default();
     if custom_base_url.is_empty() {
         // No custom base URL is specified; try to see if document has BASE element
-        if let Some(existing_base_url) = get_base_url(&dom.document) {
-            base_url = resolve_url(&base_url, &existing_base_url);
+        if get_base_url(&dom.document).is_some() {
+            match base_url_allowed(&session, &dom, &base_url) {
+                Some(allowed_base_url) => base_url = allowed_base_url,
+                // Browsers ignore what policies don't allow
+                None => {
+                    for base in find_nodes(&dom.document, vec!["html", "head", "base"]) {
+                        set_node_attr(&base, "href", None);
+                    }
+                }
+            }
         }
     } else {
         // Custom base URL provided
@@ -485,17 +519,22 @@ fn create_monolithic_document_from_bytes(
 
     // Where the document is from decides what other origins allow it to use (base URLs don't
     // change that), documents with no URL have no origin
-    session.page_origin = input_target
-        .as_deref()
-        .and_then(|target| Url::parse(target).ok())
-        .and_then(|url| PageOrigin::of(&url));
+    session.page_origin = match session.content_security.has_opaque_origin() {
+        true => Some(PageOrigin::Opaque),
+        false => input_target
+            .as_deref()
+            .and_then(|target| Url::parse(target).ok())
+            .and_then(|url| PageOrigin::of(&url)),
+    };
 
     // The result can start being written as soon as it's known what to call it: what's done
     // with the document doesn't change its title
     let document_title: Option<String> = session.title.take().or_else(|| get_title(&dom.document));
     session.open_output(document_title.as_deref())?;
 
-    session.prefetch_assets(&base_url, &dom.document);
+    if is_prefetchable {
+        session.prefetch_assets(&base_url, &dom.document);
+    }
 
     // A byte order mark beats any declaration when it comes to decoding the document
     if let Some((bom_encoding, _)) = Encoding::for_bom(&input_data) {
@@ -554,7 +593,11 @@ fn create_monolithic_document_from_bytes(
     {
         let favicon_ico_url: Url = resolve_url(&base_url, "/favicon.ico");
 
-        match session.retrieve_asset(/*&target_url, */ &base_url, &favicon_ico_url) {
+        match session.retrieve_asset_for(
+            &base_url,
+            &favicon_ico_url,
+            &Request::to(Destination::Image),
+        ) {
             Ok((data, final_url, media_type, charset)) => {
                 let favicon_data_url: String =
                     create_data_url(&media_type, &charset, data, &final_url, None);
@@ -592,6 +635,11 @@ fn create_monolithic_document_from_bytes(
             .and_then(|target| Url::parse(target).ok())
             .as_ref(),
     );
+
+    // Policies of the page, made to allow what it's been made of (see csp.rs), and what Monolith
+    // keeps it from doing
+    hash_named_elements(&mut session, &dom.document);
+    set_content_security_policies(&dom, &saved_policies(&session));
 
     let mut output = session.take_output(document_title.as_deref())?;
 
@@ -1154,6 +1202,7 @@ pub fn create_monolithic_document_from_capture(
     }
 
     add_captured_assets(&mut session, &page.assets);
+    session.adopted_style_marker = page.adopted_style_marker.take();
 
     // What a browser leaves behind has already been through JavaScript, running it again would
     // only break it

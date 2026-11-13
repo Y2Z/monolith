@@ -5,6 +5,7 @@ use encoding_rs::{Encoding, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_1252};
 
 use crate::core::{MonolithOutputFormat, declared_encoding, print_error_message};
 use crate::cors::RequestMode;
+use crate::csp::{Destination, Request};
 use crate::session::Session;
 use crate::source_maps::is_source_map_comment;
 use crate::url::{EMPTY_IMAGE_DATA_URL, Url, create_data_url, resolve_url};
@@ -135,8 +136,17 @@ fn import_stylesheet(session: &mut Session, document_url: &Url, value: &str) -> 
         return format_quoted_string(EMPTY_STYLESHEET);
     }
 
-    match session.retrieve_asset(document_url, &import_url) {
-        Ok((data, final_url, media_type, charset)) => {
+    match session.retrieve_for(
+        document_url,
+        &import_url,
+        RequestMode::NoCors,
+        &Request::to(Destination::Style),
+    ) {
+        // What the policies don't allow doesn't get imported
+        Ok(None) => format_quoted_string(EMPTY_STYLESHEET),
+        Ok(Some((data, final_url, media_type, charset))) => {
+            // What's in data URLs can't be named by nonce, policies have to allow them as they are
+            session.saved_content.has_imports = true;
             // The stylesheet can refer to itself by the URL it was requested by, even if it
             // ended up somewhere else
             let alias = session.enter_expansion_alias(&import_url, &final_url);
@@ -208,6 +218,14 @@ pub fn is_image_url_prop(prop_name: &str) -> bool {
 const FONT_FACE_RULE: &str = "font-face";
 
 /// How what url() points at gets requested: fonts in CORS mode, everything else not.
+/// What url()s are for, when it comes to policies (see csp.rs).
+fn url_request(rule_name: &str) -> Request<'static> {
+    Request::to(match rule_name == FONT_FACE_RULE {
+        true => Destination::Font,
+        false => Destination::Image,
+    })
+}
+
 fn url_mode(rule_name: &str) -> RequestMode {
     match rule_name == FONT_FACE_RULE {
         true => RequestMode::FONT,
@@ -344,8 +362,12 @@ pub fn process_css(
                         let resolved_url: Url = resolve_url(document_url, value);
 
                         if session.options.output_format != MonolithOutputFormat::MHTML {
-                            match session.retrieve(document_url, &resolved_url, url_mode(rule_name))
-                            {
+                            match session.retrieve_for(
+                                document_url,
+                                &resolved_url,
+                                url_mode(rule_name),
+                                &url_request(rule_name),
+                            ) {
                                 // Fonts other origins don't allow the page to use don't get used
                                 Ok(None) => result.push_str(&format_quoted_string("")),
                                 Ok(Some((data, final_url, media_type, charset))) => {
@@ -371,8 +393,13 @@ pub fn process_css(
                                 }
                             }
                         } else {
-                            result.push_str(format_quoted_string(resolved_url.as_ref()).as_str());
-                            session.log_asset_url_as(&resolved_url, url_mode(rule_name));
+                            if session.is_allowed(&resolved_url, &url_request(rule_name)) {
+                                result
+                                    .push_str(format_quoted_string(resolved_url.as_ref()).as_str());
+                                session.log_asset_url_as(&resolved_url, url_mode(rule_name));
+                            } else {
+                                result.push_str(&format_quoted_string(""));
+                            }
                         }
                     }
                 } else {
@@ -447,7 +474,12 @@ pub fn process_css(
                     let full_url: Url = resolve_url(document_url, value);
 
                     if session.options.output_format != MonolithOutputFormat::MHTML {
-                        match session.retrieve(document_url, &full_url, url_mode(rule_name)) {
+                        match session.retrieve_for(
+                            document_url,
+                            &full_url,
+                            url_mode(rule_name),
+                            &url_request(rule_name),
+                        ) {
                             // Fonts other origins don't allow the page to use don't get used
                             Ok(None) => result.push_str(&format_quoted_string("")),
                             Ok(Some((data, final_url, media_type, charset))) => {
@@ -469,8 +501,12 @@ pub fn process_css(
                             }
                         }
                     } else {
-                        result.push_str(format_quoted_string(full_url.as_ref()).as_str());
-                        session.log_asset_url_as(&full_url, url_mode(rule_name));
+                        if session.is_allowed(&full_url, &url_request(rule_name)) {
+                            result.push_str(format_quoted_string(full_url.as_ref()).as_str());
+                            session.log_asset_url_as(&full_url, url_mode(rule_name));
+                        } else {
+                            result.push_str(&format_quoted_string(""));
+                        }
                     }
                 }
                 result.push(')');

@@ -18,8 +18,11 @@ use crate::core::{
     print_info_message,
 };
 use crate::cors::{CorsRequest, PageOrigin, RequestMode};
+use crate::csp::{Policies, Request, Saved};
 use crate::mhtml::MhtmlArchive;
-use crate::net::{self, Credentials, PrefetchProgress, without_credentials};
+use crate::net::{
+    self, Credentials, PrefetchProgress, recorded_content_security_policy, without_credentials,
+};
 use crate::url::{Url, clean_url, domain_is_within_domain, parse_data_url};
 use crate::warc::WarcStream;
 
@@ -139,6 +142,18 @@ pub struct Session {
     recorded_headers: HashMap<String, (Url, Vec<(String, String)>)>,
     /// Markup to put right after the opening tag of HEAD
     pub(crate) replay_markup: Option<String>,
+    /// Policies the document being processed right now has to abide by (see csp.rs)
+    pub(crate) content_security: Policies,
+    /// What the saved document is made of, that its policies have to allow
+    pub(crate) saved_content: Saved,
+    /// Whether elements of the document being processed get named by nonce: the document (or
+    /// what it's in) has policies
+    pub(crate) names_elements: bool,
+    /// What STYLE elements a browser has made out of constructed stylesheets are marked with,
+    /// those aren't up to policies
+    pub(crate) adopted_style_marker: Option<String>,
+    /// What Content-Security-Policy headers have said, by URL (see received_policy())
+    received_policies: HashMap<String, String>,
     /// Title to name the result by, instead of what the document says
     pub(crate) title: Option<String>,
     /// Records exchanges as they come, once the result has somewhere to go
@@ -228,6 +243,11 @@ impl Session {
             is_captured: false,
             recorded_headers: HashMap::new(),
             replay_markup: None,
+            content_security: Policies::default(),
+            saved_content: Saved::new(),
+            names_elements: false,
+            adopted_style_marker: None,
+            received_policies: HashMap::new(),
             title: None,
             warc: None,
         }
@@ -350,6 +370,98 @@ impl Session {
                 clean_url(url.clone()).to_string(),
                 (final_url.clone(), headers.clone()),
             );
+        }
+    }
+
+    /// What Content-Security-Policy headers given URL has been received with said, wherever it
+    /// has been received from.
+    pub fn received_policy(&self, url: &Url) -> Option<String> {
+        let key = clean_url(without_credentials(url)).to_string();
+        if let Some((_, headers)) = self.recorded_headers.get(&key) {
+            return recorded_content_security_policy(headers);
+        }
+        if let Some(archived) = self.archive.as_ref().and_then(|archive| archive.get(url)) {
+            return archived
+                .response_headers
+                .as_deref()
+                .and_then(recorded_content_security_policy);
+        }
+        self.received_policies.get(&key).cloned().or_else(|| {
+            self.cache
+                .as_ref()
+                .and_then(|cache| cache.policy(&self.credentials.cache_key(url)))
+        })
+    }
+
+    /// Whether the document's policies allow the request, saying so if they don't.
+    pub fn is_allowed(&self, url: &Url, request: &Request) -> bool {
+        let is_allowed = self.content_security.allows(
+            request.destination,
+            url,
+            request.nonce,
+            request.integrity,
+            false,
+        );
+        if !is_allowed && !self.options.silent {
+            print_error_message(&format!(
+                "{} (blocked by Content Security Policy)",
+                clean_url(without_credentials(url))
+            ));
+        }
+        is_allowed
+    }
+
+    /// Same as retrieve(), for what the document's policies have to allow (see csp.rs): None
+    /// for what they don't, browsers don't load that.
+    pub fn retrieve_for(
+        &mut self,
+        parent_url: &Url,
+        url: &Url,
+        mode: RequestMode,
+        request: &Request,
+    ) -> Result<Option<net::Asset>, reqwest::Error> {
+        let url: Url = self.content_security.upgrade(url, request.destination);
+        if !self.is_allowed(&url, request) {
+            return Ok(None);
+        }
+
+        let asset = self.retrieve(parent_url, &url, mode)?;
+        // Where it's been redirected to has to be allowed too
+        if let Some((_, final_url, _, _)) = &asset
+            && clean_url(final_url.clone()) != clean_url(url.clone())
+            && !self.content_security.allows(
+                request.destination,
+                final_url,
+                request.nonce,
+                request.integrity,
+                true,
+            )
+        {
+            if !self.options.silent {
+                print_error_message(&format!(
+                    "{} (blocked by Content Security Policy)",
+                    clean_url(without_credentials(final_url))
+                ));
+            }
+            return Ok(None);
+        }
+        if asset.is_some() {
+            self.saved_content.data.insert(request.destination);
+        }
+
+        Ok(asset)
+    }
+
+    /// Same as retrieve_asset(), for what the document's policies have to allow.
+    pub fn retrieve_asset_for(
+        &mut self,
+        parent_url: &Url,
+        url: &Url,
+        request: &Request,
+    ) -> Result<net::Asset, reqwest::Error> {
+        match self.retrieve_for(parent_url, url, RequestMode::NoCors, request)? {
+            Some(asset) => Ok(asset),
+            None => Err(self.client.get("").send().unwrap_err()),
         }
     }
 
@@ -632,6 +744,7 @@ impl Session {
                     entry.charset,
                     entry.final_url,
                 );
+                cache.set_policy(&entry.key, entry.policy);
             }
             for exchange in entry.exchanges {
                 self.record_exchange(exchange);
@@ -865,9 +978,15 @@ impl Session {
             for exchange in exchanges {
                 self.record_exchange(exchange);
             }
-            let Some((data, response_url, media_type, charset)) = result? else {
+            let Some(((data, response_url, media_type, charset), policy)) = result? else {
                 return Ok(None);
             };
+            if let Some(policy) = &policy {
+                self.received_policies.insert(
+                    clean_url(without_credentials(&response_url)).to_string(),
+                    policy.clone(),
+                );
+            }
 
             // Add retrieved resource to cache
             if let Some(cache) = self.cache.as_mut() {
@@ -883,7 +1002,9 @@ impl Session {
                         charset.clone(),
                         Some(final_url.clone()),
                     );
+                    cache.set_policy(&identity_key, policy.clone());
                 }
+                cache.set_policy(&new_cache_key, policy);
                 cache.set_with_final_url(
                     &new_cache_key,
                     &data,

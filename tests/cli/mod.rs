@@ -4,6 +4,7 @@ mod basic;
 mod browser;
 mod cors;
 mod credentials;
+mod csp;
 mod cycles;
 mod data_url;
 mod http_encoding;

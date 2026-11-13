@@ -18,6 +18,7 @@ use crate::core::{
     MonolithOptions, MonolithOutputFormat, declared_encoding, parse_media_type, print_error_message,
 };
 use crate::cors::{PageOrigin, RequestMode};
+use crate::csp::{Destination, Inline, Policies, Policy, Request, Restrictions};
 use crate::css::{embed_css, embed_stylesheet};
 use crate::js::{attr_is_event_handler, escape_script_end_tag};
 use crate::replay::rewrite_imports;
@@ -135,47 +136,130 @@ pub fn targets_element_anywhere(options: &MonolithOptions, names: &[&str]) -> bo
 }
 
 pub fn compose_csp(options: &MonolithOptions) -> String {
-    let mut string_list = vec![];
-
-    // Documents that replay responses have no business reaching out to anything, even if not all of
-    // their URLs could be taken care of, and their modules get put together on the spot
-    if options.replay {
-        string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data: blob:;");
-    } else if options.isolate {
-        string_list.push("default-src 'unsafe-eval' 'unsafe-inline' data:;");
-    }
-
-    if options.remove_styles {
-        string_list.push("style-src 'none';");
-    }
-
-    if options.remove_fonts {
-        string_list.push("font-src 'none';");
-    }
-
-    if targets_any_element(options, &["frame", "iframe"]) {
-        string_list.push("frame-src 'none';");
-        string_list.push("child-src 'none';");
-    }
-
-    if options.remove_js {
-        string_list.push("script-src 'none';");
-    }
-
-    if options.remove_js || targets_any_element(options, &["embed", "object"]) {
-        string_list.push("object-src 'none';");
-    }
-
-    if options.remove_images {
-        // Note: "data:" is required for transparent pixel images to work
-        string_list.push("img-src data:;");
-    }
-
-    string_list.join(" ")
+    restrictions(options)
+        .as_policy()
+        .map(|policy| policy.serialize())
+        .unwrap_or_default()
 }
 
 /// Names of META elements that say where documents have come from, when, and what has saved them.
 pub const METADATA_NAMES: [&str; 3] = ["generator", "dcterms.source", "dcterms.created"];
+
+/// What Monolith keeps documents it saves from doing, on top of what their policies do.
+pub fn restrictions(options: &MonolithOptions) -> Restrictions {
+    Restrictions {
+        // Documents that replay responses have no business reaching out to anything, even if not
+        // all of their URLs could be taken care of, and their modules get put together on the spot
+        isolate: options.isolate || options.replay,
+        allows_blobs: options.replay,
+        no_scripts: options.remove_js,
+        no_styles: options.remove_styles,
+        no_fonts: options.remove_fonts,
+        no_images: options.remove_images,
+        no_frames: targets_any_element(options, &["frame", "iframe"]),
+        no_objects: targets_any_element(options, &["embed", "object"]),
+        custom_base: options.base_url.is_some(),
+    }
+}
+
+/// Whether the element is a META element of HEAD that has a Content Security Policy in it (only
+/// those count, see csp.rs).
+fn is_csp_meta(node: &Handle) -> bool {
+    let weak_parent = node.parent.take();
+    let parent: Option<Handle> = weak_parent.as_ref().and_then(|weak| weak.upgrade());
+    node.parent.set(weak_parent);
+
+    get_node_name(node) == Some("meta")
+        && parent.is_some_and(|parent| get_node_name(&parent) == Some("head"))
+        && get_node_attr(node, "http-equiv")
+            .is_some_and(|value| value.trim().eq_ignore_ascii_case("content-security-policy"))
+}
+
+/// Policies of META elements of the document's HEAD, in order.
+pub fn csp_meta_contents(document: &Handle) -> Vec<String> {
+    find_nodes(document, vec!["html", "head", "meta"])
+        .iter()
+        .filter(|node| is_csp_meta(node))
+        .filter_map(|node| get_node_attr(node, "content"))
+        .collect()
+}
+
+/// Policies the document is going to have: those it came with, and those of its META elements.
+pub fn document_policies(document: &Handle, url: &Url, header: Option<&str>) -> Policies {
+    let mut policies = Policies::of(url, header);
+    for content in csp_meta_contents(document) {
+        policies.add_meta(&content);
+    }
+    policies
+}
+
+/// Puts given policies into META elements at the very start of the document's HEAD, instead of
+/// whatever policies it had there.
+pub fn set_content_security_policies(dom: &RcDom, policies: &[String]) {
+    let Some(head) = get_child_node_by_name(&dom.document, "html")
+        .and_then(|html| get_child_node_by_name(&html, "head"))
+    else {
+        return;
+    };
+    head.children.borrow_mut().retain(|node| !is_csp_meta(node));
+
+    let metas: Vec<Handle> = policies
+        .iter()
+        .map(|policy| {
+            let meta = create_element(
+                dom,
+                QualName::new(None, ns!(html), LocalName::from("meta")),
+                vec![
+                    Attribute {
+                        name: QualName::new(None, ns!(), LocalName::from("http-equiv")),
+                        value: format_tendril!("Content-Security-Policy"),
+                    },
+                    Attribute {
+                        name: QualName::new(None, ns!(), LocalName::from("content")),
+                        value: format_tendril!("{}", policy),
+                    },
+                ],
+            );
+            meta.parent.set(Some(Rc::downgrade(&head)));
+            meta
+        })
+        .collect();
+    // Policies only apply to what comes after them
+    head.children.borrow_mut().splice(0..0, metas);
+}
+
+/// Keeps hashes of what's in elements named by nonce, the way they're about to be saved
+/// (stylesheets may have become STYLE elements, see inline_stylesheets()).
+pub fn hash_named_elements(session: &mut Session, node: &Handle) {
+    if let Some(name) = get_node_name(node)
+        && matches!(name, "script" | "style")
+        && get_node_attr(node, "nonce").as_deref() == Some(session.saved_content.nonce.as_str())
+        && get_node_attr(node, "src").is_none()
+    {
+        let inline = match name {
+            "script" => Inline::Script,
+            _ => Inline::Style,
+        };
+        session
+            .saved_content
+            .add_inline(inline, &node_text_content(node));
+    }
+    for child in node.children.borrow().iter() {
+        hash_named_elements(session, child);
+    }
+}
+
+/// Policies the saved document gets: those of the page rewritten to allow what it's been made of,
+/// with what Monolith keeps documents from doing added to the first one.
+pub fn saved_policies(session: &Session) -> Vec<String> {
+    let mut policies = session.content_security.rewritten(&session.saved_content);
+    let restrictions = restrictions(&session.options);
+    match policies.first_mut() {
+        Some(policy) => restrictions.apply(policy, &session.saved_content),
+        None => policies.extend(restrictions.as_policy()),
+    }
+    policies.iter().map(|policy| policy.serialize()).collect()
+}
 
 fn remove_named_meta_elements(node: &Handle, name: &str) {
     node.children.borrow_mut().retain(|child| {
@@ -261,7 +345,12 @@ pub fn embed_srcset_as(
             result.push_str(EMPTY_IMAGE_DATA_URL);
         } else {
             let image_full_url: Url = resolve_url(document_url, srcset_item.path);
-            match session.retrieve(document_url, &image_full_url, mode) {
+            match session.retrieve_for(
+                document_url,
+                &image_full_url,
+                mode,
+                &Request::to(Destination::Image),
+            ) {
                 // What the page isn't allowed to use shows nothing
                 Ok(None) => result.push_str(EMPTY_IMAGE_DATA_URL),
                 Ok(Some((image_data, image_final_url, image_media_type, image_charset))) => {
@@ -1150,34 +1239,6 @@ pub fn serialize_document_into(
     after_head: Option<&[u8]>,
     out: &mut dyn Write,
 ) -> io::Result<Option<u8>> {
-    if !compose_csp(options).is_empty() {
-        // Take care of CSP
-        if let Some(html) = get_child_node_by_name(&dom.document, "html")
-            && let Some(head) = get_child_node_by_name(&html, "head")
-        {
-            let meta = create_element(
-                &dom,
-                QualName::new(None, ns!(html), LocalName::from("meta")),
-                vec![
-                    Attribute {
-                        name: QualName::new(None, ns!(), LocalName::from("http-equiv")),
-                        value: format_tendril!("Content-Security-Policy"),
-                    },
-                    Attribute {
-                        name: QualName::new(None, ns!(), LocalName::from("content")),
-                        value: format_tendril!("{}", compose_csp(options)),
-                    },
-                ],
-            );
-            // The CSP meta-tag has to be prepended, never appended,
-            //  since there already may be one defined in the original document,
-            //   and browsers don't allow re-defining them (for obvious reasons)
-            head.children.borrow_mut().reverse();
-            head.children.borrow_mut().push(meta.clone());
-            head.children.borrow_mut().reverse();
-        }
-    }
-
     if options.unwrap_noscript {
         unwrap_noscripts(&dom.document);
     }
@@ -1354,21 +1415,147 @@ impl Write for HeadInjector<'_> {
     }
 }
 
+/// Whether SCRIPT elements have code in them (or point at some), rather than data.
+fn is_executable_script(node: &Handle) -> bool {
+    let script_type = get_node_attr(node, "type").unwrap_or_default();
+    let script_type = script_type.trim().to_ascii_lowercase();
+    script_type.is_empty()
+        || ["module", "importmap", "speculationrules"].contains(&script_type.as_str())
+        || ["javascript", "ecmascript", "jscript", "livescript"]
+            .iter()
+            .any(|kind| script_type.contains(kind))
+}
+
+/// Text of an element, the way policies see it.
+fn node_text_content(node: &Handle) -> String {
+    node.children
+        .borrow()
+        .iter()
+        .filter_map(|child| match &child.data {
+            NodeData::Text { contents } => Some(contents.borrow().to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Names the element by the nonce that the saved document's policies allow, if it has any, and
+/// has anything to run or apply.
+fn name_by_nonce(session: &mut Session, node: &Handle, destination: Destination) {
+    let has_source = ["src", "href"]
+        .iter()
+        .any(|attr_name| get_node_attr(node, attr_name).is_some_and(|value| !value.is_empty()));
+    let content = node_text_content(node);
+    if session.names_elements && (has_source || !content.trim().is_empty()) {
+        set_node_attr(node, "nonce", Some(session.saved_content.nonce.clone()));
+        session.saved_content.named.insert(destination);
+        if !has_source {
+            let inline = match destination {
+                Destination::Script => Inline::Script,
+                _ => Inline::Style,
+            };
+            session.saved_content.add_inline(inline, &content);
+        }
+    }
+}
+
+/// What a document that's in another one changes about the session, for when it's done.
+pub struct OuterDocument {
+    policies: Policies,
+    names_elements: bool,
+    remove_js: bool,
+}
+
+/// Makes given policies the ones of the document that's about to be processed.
+pub fn enter_document(session: &mut Session, dom: &RcDom, policies: Policies) -> OuterDocument {
+    // Elements get named by what the policies (those of META elements too) have
+    let mut every_policy: Vec<Policy> = policies.list().to_vec();
+    every_policy.extend(
+        csp_meta_contents(&dom.document)
+            .iter()
+            .filter_map(|content| Policy::parse_meta(content)),
+    );
+    session.saved_content.add_nonces(&every_policy);
+    let outer = OuterDocument {
+        policies: std::mem::replace(&mut session.content_security, policies),
+        names_elements: session.names_elements,
+        remove_js: session.options.remove_js,
+    };
+    // Documents have the policies of what they're in, once saved (see csp.rs)
+    session.names_elements = session.names_elements
+        || !session.content_security.is_empty()
+        || !csp_meta_contents(&dom.document).is_empty();
+    // Sandboxes can be without scripts
+    if session.content_security.forbids_scripts() {
+        session.options.remove_js = true;
+    }
+    outer
+}
+
+/// Puts policies of the document that's been processed into it (those after the first n, the
+/// rest are of what it's in), and makes the session what it was before.
+pub fn leave_document(session: &mut Session, dom: &RcDom, n: usize, outer: OuterDocument) {
+    let policies: Vec<String> = session
+        .content_security
+        .rewritten_from(n, &session.saved_content)
+        .iter()
+        .map(|policy| policy.serialize())
+        .collect();
+    set_content_security_policies(dom, &policies);
+
+    session.content_security = outer.policies;
+    session.names_elements = outer.names_elements;
+    session.options.remove_js = outer.remove_js;
+}
+
+/// Where the document's BASE element points, if it does, and its policies allow it.
+pub fn base_url_allowed(session: &Session, dom: &RcDom, document_url: &Url) -> Option<Url> {
+    let base_url = resolve_url(document_url, &get_base_url(&dom.document)?);
+    // What META elements before it say counts
+    let mut policies = session.content_security.clone();
+    for node in find_nodes(&dom.document, vec!["html", "head"])
+        .iter()
+        .flat_map(|head| head.children.borrow().clone())
+    {
+        if get_node_name(&node) == Some("base") && get_node_attr(&node, "href").is_some() {
+            break;
+        }
+        if is_csp_meta(&node)
+            && let Some(content) = get_node_attr(&node, "content")
+        {
+            policies.add_meta(&content);
+        }
+    }
+    if !policies.allows_base(&base_url) {
+        if !session.options.silent {
+            print_error_message(&format!(
+                "{} (base URL blocked by Content Security Policy)",
+                base_url
+            ));
+        }
+        return None;
+    }
+    Some(base_url)
+}
+
 /// Documents that frames have in their srcdoc attributes are the same as any other, they just
 /// don't come from anywhere: they're of the same origin as what they're in, and their URLs get
 /// resolved the same way, unless they say otherwise with BASE elements of their own.
 fn embed_srcdoc(session: &mut Session, document_url: &Url, srcdoc: &str) -> String {
     let frame_dom = html_to_dom(srcdoc.as_bytes(), "utf-8".to_string());
-    let frame_url = match get_base_url(&frame_dom.document) {
-        Some(base_url) => resolve_url(document_url, &base_url),
-        None => document_url.clone(),
-    };
-
     strip_elements(
         &frame_dom.document,
         &session.options.remove_elements,
         &session.options.wipe_elements,
     );
+    // They have the policies of what they're in, and those of their own
+    let inherited = session.content_security.len();
+    let policies = session.content_security.inherited_by(document_url);
+    let outer = enter_document(session, &frame_dom, policies);
+    let frame_url = match base_url_allowed(session, &frame_dom, document_url) {
+        Some(base_url) => base_url,
+        None => document_url.clone(),
+    };
+
     let environment_encoding = session.environment_encoding.replace(UTF_8);
     // What's in it isn't anything that could be referencing itself, so it goes past the check
     // that the document itself would get stopped by (it has the URL of what it's in)
@@ -1376,6 +1563,7 @@ fn embed_srcdoc(session: &mut Session, document_url: &Url, srcdoc: &str) -> Stri
         walk(session, &frame_url, child_node);
     }
     session.environment_encoding = environment_encoding;
+    leave_document(session, &frame_dom, inherited, outer);
 
     let mut frame_data: Vec<u8> = Vec::new();
     let serializable: SerializableHandle = frame_dom.document.into();
@@ -1411,6 +1599,31 @@ pub fn retrieve_and_embed_asset(
         && parse_link_type(&get_node_attr(node, "rel").unwrap_or(String::from("")))
             .contains(&LinkType::Stylesheet);
     let is_frame = node_name == "frame" || node_name == "iframe";
+    let destination: Destination = match (node_name, attr_name) {
+        ("script", _) => Destination::Script,
+        ("link", _) if is_stylesheet_link => Destination::Style,
+        ("link", _)
+            if parse_link_type(&get_node_attr(node, "rel").unwrap_or_default())
+                .contains(&LinkType::Manifest) =>
+        {
+            Destination::Manifest
+        }
+        ("frame" | "iframe", _) => Destination::Frame,
+        ("object" | "embed" | "applet", _) => Destination::Object,
+        ("audio" | "source" | "track", _) | ("video", "src") => Destination::Media,
+        _ => Destination::Image,
+    };
+    let nonce: Option<String> = matches!(destination, Destination::Script | Destination::Style)
+        .then(|| get_node_attr(node, "nonce"))
+        .flatten();
+    let integrity: Option<String> = (destination == Destination::Script)
+        .then(|| get_node_attr(node, "integrity"))
+        .flatten();
+    let request = Request {
+        destination,
+        nonce: nonce.as_deref(),
+        integrity: integrity.as_deref(),
+    };
 
     // Something that's being expanded already is referencing itself, directly or through other
     // assets; leave an empty asset in its place instead of expanding it forever
@@ -1456,7 +1669,7 @@ pub fn retrieve_and_embed_asset(
         return;
     }
 
-    match session.retrieve(&document_url.clone(), &resolved_url, mode) {
+    match session.retrieve_for(&document_url.clone(), &resolved_url, mode, &request) {
         // What the page isn't allowed to use doesn't get to be in it
         Ok(None) => {
             set_node_attr(node, "integrity", None);
@@ -1527,19 +1740,38 @@ pub fn retrieve_and_embed_asset(
                         let alias = session.enter_expansion_alias(&resolved_url, &final_url);
                         let environment_encoding =
                             std::mem::replace(&mut session.environment_encoding, frame_encoding);
-                        // Frames are documents of their own, with origins of their own
-                        let page_origin = match session.page_origin.is_some() {
-                            true => std::mem::replace(
-                                &mut session.page_origin,
-                                PageOrigin::of(&final_url),
-                            ),
-                            false => None,
-                        };
                         strip_elements(
                             &frame_dom.document,
                             &session.options.remove_elements,
                             &session.options.wipe_elements,
                         );
+                        // Frames have policies of their own, documents of data URLs have those of
+                        // what they're in too (see csp.rs)
+                        let (frame_policies, inherited) = match final_url.scheme() == "data" {
+                            true => (
+                                session.content_security.inherited_by(&final_url),
+                                session.content_security.len(),
+                            ),
+                            false => (
+                                Policies::of(
+                                    &final_url,
+                                    session.received_policy(&final_url).as_deref(),
+                                ),
+                                0,
+                            ),
+                        };
+                        let outer = enter_document(session, &frame_dom, frame_policies);
+                        // Frames are documents of their own, with origins of their own
+                        let page_origin = match session.page_origin.is_some() {
+                            true => std::mem::replace(
+                                &mut session.page_origin,
+                                match session.content_security.has_opaque_origin() {
+                                    true => Some(PageOrigin::Opaque),
+                                    false => PageOrigin::of(&final_url),
+                                },
+                            ),
+                            false => None,
+                        };
                         walk(session, &final_url, &frame_dom.document);
                         session.environment_encoding = environment_encoding;
                         if page_origin.is_some() {
@@ -1548,6 +1780,7 @@ pub fn retrieve_and_embed_asset(
                         if let Some(key) = alias {
                             session.leave_expansion_alias(&key);
                         }
+                        leave_document(session, &frame_dom, inherited, outer);
 
                         let mut frame_data: Vec<u8> = Vec::new();
                         let serializable: SerializableHandle = frame_dom.document.into();
@@ -1690,6 +1923,12 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
 
             match name.local.as_ref() {
                 "meta" => {
+                    // Policies apply from where they are on (see csp.rs)
+                    if is_csp_meta(node)
+                        && let Some(content) = get_node_attr(node, "content")
+                    {
+                        session.content_security.add_meta(&content);
+                    }
                     if let Some(meta_attr_http_equiv_value) = get_node_attr(node, "http-equiv") {
                         let meta_attr_http_equiv_value: &str = &meta_attr_http_equiv_value;
                         if meta_attr_http_equiv_value.eq_ignore_ascii_case("refresh")
@@ -1754,6 +1993,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     "href",
                                     &link_attr_href_value,
                                 );
+                                name_by_nonce(session, node, Destination::Style);
                             }
                         }
                     } else if link_node_types.contains(&LinkType::Manifest) {
@@ -1832,13 +2072,19 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             retrieve_and_embed_asset(session, document_url, node, "src", &img_src);
                         } else {
                             let img_src_full_url: Url = resolve_url(document_url, &img_src);
-                            set_node_attr(node, "src", Some(img_src_full_url.to_string()));
-                            session.log_asset_url_as(
-                                &img_src_full_url,
-                                RequestMode::of_attribute(
-                                    get_node_attr(node, "crossorigin").as_deref(),
-                                ),
-                            );
+                            if session
+                                .is_allowed(&img_src_full_url, &Request::to(Destination::Image))
+                            {
+                                set_node_attr(node, "src", Some(img_src_full_url.to_string()));
+                                session.log_asset_url_as(
+                                    &img_src_full_url,
+                                    RequestMode::of_attribute(
+                                        get_node_attr(node, "crossorigin").as_deref(),
+                                    ),
+                                );
+                            } else {
+                                set_node_attr(node, "src", None);
+                            }
                         }
                     }
 
@@ -1943,7 +2189,11 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     continue;
                                 }
 
-                                match session.retrieve_asset(document_url, &image_asset_url) {
+                                match session.retrieve_asset_for(
+                                    document_url,
+                                    &image_asset_url,
+                                    &Request::to(Destination::Image),
+                                ) {
                                     Ok((data, final_url, media_type, charset)) => {
                                         if media_type == "image/svg+xml" {
                                             let final_url_without_fragment: Url =
@@ -2110,9 +2360,17 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                             );
                         } else {
                             let source_src_full_url: Url = resolve_url(document_url, &source_src);
-                            set_node_attr(node, "src", Some(source_src_full_url.to_string()));
-                            session
-                                .log_asset_url_as(&source_src_full_url, source_request_mode(node));
+                            if session
+                                .is_allowed(&source_src_full_url, &Request::to(Destination::Media))
+                            {
+                                set_node_attr(node, "src", Some(source_src_full_url.to_string()));
+                                session.log_asset_url_as(
+                                    &source_src_full_url,
+                                    source_request_mode(node),
+                                );
+                            } else {
+                                set_node_attr(node, "src", None);
+                            }
                         }
                     }
 
@@ -2169,13 +2427,28 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                     } else {
                         // Read values of integrity and src attributes
                         let script_src: &str = &get_node_attr(node, "src").unwrap_or_default();
+                        let is_executable = is_executable_script(node);
+                        let nonce: Option<String> = get_node_attr(node, "nonce");
+                        let integrity: Option<String> = get_node_attr(node, "integrity");
+                        let request = Request {
+                            destination: Destination::Script,
+                            nonce: nonce.as_deref(),
+                            integrity: integrity.as_deref(),
+                        };
 
                         let is_module = get_node_attr(node, "type")
                             .is_some_and(|value| value.eq_ignore_ascii_case("module"));
 
-                        if !script_src.is_empty() && session.options.replay && is_module {
+                        if !script_src.is_empty()
+                            && !session.is_allowed(&resolve_url(document_url, script_src), &request)
+                        {
+                            // What policies don't allow doesn't get to run (see csp.rs)
+                            set_node_attr(node, "src", None);
+                            set_node_attr(node, "integrity", None);
+                        } else if !script_src.is_empty() && session.options.replay && is_module {
                             // Everything that imports it has to end up with the same instance
                             // of it, so it can't become a separate copy of itself in here
+                            session.saved_content.blob.insert(Destination::Script);
                             let script_url = resolve_url(document_url, script_src);
                             let integrity = get_node_attr(node, "integrity").unwrap_or_default();
                             let is_intact = integrity.is_empty()
@@ -2215,6 +2488,20 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                     ),
                                 );
                             }
+                        } else if is_executable
+                            && !session.content_security.allows_inline(
+                                Inline::Script,
+                                nonce.as_deref(),
+                                &node_text_content(node),
+                            )
+                        {
+                            if !session.options.silent {
+                                print_error_message(&format!(
+                                    "{} (inline script blocked by Content Security Policy)",
+                                    document_url
+                                ));
+                            }
+                            node.children.borrow_mut().clear();
                         } else {
                             for child_node in node.children.borrow_mut().iter_mut() {
                                 if let NodeData::Text { ref contents } = child_node.data {
@@ -2232,11 +2519,33 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 }
                             }
                         }
+                        if is_executable {
+                            name_by_nonce(session, node, Destination::Script);
+                        }
                     }
                 }
                 "style" => {
+                    // What browsers have made out of constructed stylesheets isn't up to policies
+                    let is_adopted = session.adopted_style_marker.is_some()
+                        && get_node_attr(node, "data-monolith-adopted")
+                            == session.adopted_style_marker;
+                    set_node_attr(node, "data-monolith-adopted", None);
                     if session.options.remove_styles {
                         // Empty inner content of STYLE tags
+                        node.children.borrow_mut().clear();
+                    } else if !is_adopted
+                        && !session.content_security.allows_inline(
+                            Inline::Style,
+                            get_node_attr(node, "nonce").as_deref(),
+                            &node_text_content(node),
+                        )
+                    {
+                        if !session.options.silent {
+                            print_error_message(&format!(
+                                "{} (inline style blocked by Content Security Policy)",
+                                document_url
+                            ));
+                        }
                         node.children.borrow_mut().clear();
                     } else {
                         for child_node in node.children.borrow_mut().iter_mut() {
@@ -2248,6 +2557,7 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 tendril.push_slice(&replacement);
                             }
                         }
+                        name_by_nonce(session, node, Destination::Style);
                     }
                 }
                 "form" => {
@@ -2289,8 +2599,14 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         } else {
                             let frame_src_full_url: Url =
                                 resolve_url(document_url, &frame_attr_src_value);
-                            set_node_attr(node, "src", Some(frame_src_full_url.to_string()));
-                            session.log_asset_url(&frame_src_full_url);
+                            if session
+                                .is_allowed(&frame_src_full_url, &Request::to(Destination::Frame))
+                            {
+                                set_node_attr(node, "src", Some(frame_src_full_url.to_string()));
+                                session.log_asset_url(&frame_src_full_url);
+                            } else {
+                                set_node_attr(node, "src", None);
+                            }
                         }
 
                         // Sandbox iframe if JS is disabled
@@ -2313,13 +2629,19 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         } else {
                             let audio_src_full_url: Url =
                                 resolve_url(document_url, &audio_attr_src_value);
-                            set_node_attr(node, "src", Some(audio_src_full_url.to_string()));
-                            session.log_asset_url_as(
-                                &audio_src_full_url,
-                                RequestMode::of_attribute(
-                                    get_node_attr(node, "crossorigin").as_deref(),
-                                ),
-                            );
+                            if session
+                                .is_allowed(&audio_src_full_url, &Request::to(Destination::Media))
+                            {
+                                set_node_attr(node, "src", Some(audio_src_full_url.to_string()));
+                                session.log_asset_url_as(
+                                    &audio_src_full_url,
+                                    RequestMode::of_attribute(
+                                        get_node_attr(node, "crossorigin").as_deref(),
+                                    ),
+                                );
+                            } else {
+                                set_node_attr(node, "src", None);
+                            }
                         }
                     }
                 }
@@ -2337,13 +2659,19 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         } else {
                             let video_src_full_url: Url =
                                 resolve_url(document_url, &video_attr_src_value);
-                            set_node_attr(node, "src", Some(video_src_full_url.to_string()));
-                            session.log_asset_url_as(
-                                &video_src_full_url,
-                                RequestMode::of_attribute(
-                                    get_node_attr(node, "crossorigin").as_deref(),
-                                ),
-                            );
+                            if session
+                                .is_allowed(&video_src_full_url, &Request::to(Destination::Media))
+                            {
+                                set_node_attr(node, "src", Some(video_src_full_url.to_string()));
+                                session.log_asset_url_as(
+                                    &video_src_full_url,
+                                    RequestMode::of_attribute(
+                                        get_node_attr(node, "crossorigin").as_deref(),
+                                    ),
+                                );
+                            } else {
+                                set_node_attr(node, "src", None);
+                            }
                         }
                     }
 
@@ -2369,12 +2697,19 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                                 } else {
                                     let video_poster_full_url: Url =
                                         resolve_url(document_url, &video_attr_poster_value);
-                                    set_node_attr(
-                                        node,
-                                        "poster",
-                                        Some(video_poster_full_url.to_string()),
-                                    );
-                                    session.log_asset_url(&video_poster_full_url);
+                                    if session.is_allowed(
+                                        &video_poster_full_url,
+                                        &Request::to(Destination::Image),
+                                    ) {
+                                        set_node_attr(
+                                            node,
+                                            "poster",
+                                            Some(video_poster_full_url.to_string()),
+                                        );
+                                        session.log_asset_url(&video_poster_full_url);
+                                    } else {
+                                        set_node_attr(node, "poster", None);
+                                    }
                                 }
                             }
                         }
@@ -2400,8 +2735,47 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
             } else {
                 // Embed URLs found within the style attribute of this node
                 if let Some(node_attr_style_value) = get_node_attr(node, "style") {
-                    let embedded_style = embed_css(session, document_url, &node_attr_style_value);
-                    set_node_attr(node, "style", Some(embedded_style));
+                    if session.content_security.allows_inline(
+                        Inline::StyleAttribute,
+                        None,
+                        &node_attr_style_value,
+                    ) {
+                        let embedded_style =
+                            embed_css(session, document_url, &node_attr_style_value);
+                        if session.names_elements {
+                            session
+                                .saved_content
+                                .add_inline(Inline::StyleAttribute, &embedded_style);
+                        }
+                        set_node_attr(node, "style", Some(embedded_style));
+                    } else {
+                        // Browsers ignore what policies don't allow
+                        set_node_attr(node, "style", None);
+                    }
+                }
+            }
+
+            // Event handlers have to be allowed by policies, the saved document has to allow
+            // those that are (see csp.rs)
+            if !session.options.remove_js {
+                let mut attrs_mut = attrs.borrow_mut();
+                let content_security = &session.content_security;
+                attrs_mut.retain(|attr| {
+                    !attr_is_event_handler(&attr.name.local)
+                        || content_security.allows_inline(
+                            Inline::ScriptAttribute,
+                            None,
+                            &attr.value,
+                        )
+                });
+                if session.names_elements {
+                    for attr in attrs_mut.iter() {
+                        if attr_is_event_handler(&attr.name.local) {
+                            session
+                                .saved_content
+                                .add_inline(Inline::ScriptAttribute, &attr.value);
+                        }
+                    }
                 }
             }
 

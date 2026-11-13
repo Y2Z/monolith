@@ -26,13 +26,15 @@ mod passing {
     fn full_page_with_no_html_head_or_body() {
         let html = "<title>Isolated document</title>\
                     <link rel=\"something\" href=\"some.css\" />\
-                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                     <div><script src=\"some.js\"></script></div>";
         let dom = html::html_to_dom(html.as_bytes(), "".to_string());
         let options = MonolithOptions {
             isolate: true,
             ..Default::default()
         };
+
+        // What Monolith keeps documents from doing goes first (see csp.rs)
+        html::set_content_security_policies(&dom, &[html::compose_csp(&options)]);
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
@@ -41,7 +43,6 @@ mod passing {
                     <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:;\">\
                     <title>Isolated document</title>\
                     <link rel=\"something\" href=\"some.css\">\
-                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                 </head>\
                 <body>\
                     <div>\
@@ -63,6 +64,9 @@ mod passing {
             remove_styles: true,
             ..Default::default()
         };
+
+        // What Monolith keeps documents from doing goes first (see csp.rs)
+        html::set_content_security_policies(&dom, &[html::compose_csp(&options)]);
 
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
@@ -90,6 +94,9 @@ mod passing {
             ..Default::default()
         };
 
+        // What Monolith keeps documents from doing goes first (see csp.rs)
+        html::set_content_security_policies(&dom, &[html::compose_csp(&options)]);
+
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
             "<!DOCTYPE html>\
@@ -108,7 +115,6 @@ mod passing {
     fn doctype_and_the_rest_all_forbidden() {
         let html = "<!doctype html>\
                     <title>no-frame no-css no-js no-image isolated document</title>\
-                    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
                     <link rel=\"stylesheet\" href=\"some.css\">\
                     <div>\
                         <script src=\"some.js\"></script>\
@@ -126,6 +132,9 @@ mod passing {
             ..Default::default()
         };
 
+        // What Monolith keeps documents from doing goes first (see csp.rs)
+        html::set_content_security_policies(&dom, &[html::compose_csp(&options)]);
+
         assert_eq!(
             String::from_utf8_lossy(&html::serialize_document(dom, "".to_string(), &options)),
             "<!DOCTYPE html>\
@@ -133,8 +142,7 @@ mod passing {
                     <head>\
                         <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'unsafe-eval' 'unsafe-inline' data:; style-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; script-src 'none'; object-src 'none'; img-src data:;\">\
                         <title>no-frame no-css no-js no-image isolated document</title>\
-                        <meta http-equiv=\"Content-Security-Policy\" content=\"default-src https:\">\
-                        <link rel=\"stylesheet\" href=\"some.css\">\
+                            <link rel=\"stylesheet\" href=\"some.css\">\
                     </head>\
                     <body>\
                         <div>\

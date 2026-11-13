@@ -171,6 +171,14 @@ Results get saved into files named after the pages' titles. Several targets can 
 ---------------------------------------------------
 
 
+## Content Security Policies
+
+Pages get saved the way browsers show them: what a page's Content Security Policy (from its response headers or its META elements) doesn't allow to be loaded or run gets left out. The policy goes along with the saved document, rewritten to allow what the document has been made of and nothing else, and what `-I`, `-j`, `-s`, `-f`, and `-i` keep the document from doing goes into it too.
+
+
+---------------------------------------------------
+
+
 ## Blacklisting and whitelisting domains
 
 Option `-d` forbids retrieving assets from the specified domains, and adding `-W` flips it to allow only those domains, e.g.:
