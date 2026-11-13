@@ -14,7 +14,7 @@ fn uses_large_viewport_by_default() {
         let body = page_that_describes_itself("innerWidth+'x'+innerHeight");
         let server = Server::new(&[("/", "text/html", &body)]);
 
-        let html = Workspace::new(browser).render(&server.url("/"), &["--no-js"]);
+        let html = Workspace::new(browser).render(&server.url("/"), &["--remove-js"]);
 
         assert!(html.contains(">1920x1080<"));
     });
@@ -29,7 +29,7 @@ fn uses_specified_viewport() {
         let output = Workspace::new(browser)
             .monolith()
             .env("MONOLITH_BROWSER_VIEWPORT", "800x600")
-            .args(["--no-js", &server.url("/")])
+            .args(["--remove-js", &server.url("/")])
             .output()
             .unwrap();
 
@@ -50,7 +50,7 @@ fn uses_specified_color_scheme() {
             let output = Workspace::new(browser)
                 .monolith()
                 .env("MONOLITH_BROWSER_COLOR_SCHEME", value)
-                .args(["--no-js", &server.url("/")])
+                .args(["--remove-js", &server.url("/")])
                 .output()
                 .unwrap();
 
@@ -76,7 +76,7 @@ fn scrolls_through_pages() {
         let output = Workspace::new(browser)
             .monolith()
             .env("MONOLITH_BROWSER_SCROLL_LIMIT", "10")
-            .args(["--no-js", &server.url("/")])
+            .args(["--remove-js", &server.url("/")])
             .output()
             .unwrap();
 
@@ -90,7 +90,7 @@ fn does_not_scroll_if_told_not_to() {
     with_each_browser(|browser| {
         let server = Server::new(&[("/", "text/html", LAZY_PAGE), ("/c.png", "image/png", b"c")]);
 
-        Workspace::new(browser).render(&server.url("/"), &["--no-js"]);
+        Workspace::new(browser).render(&server.url("/"), &["--remove-js"]);
 
         assert!(!server.was_asked_for("/c.png"));
     });
@@ -111,7 +111,7 @@ fn stops_scrolling_pages_that_never_end() {
         let output = Workspace::new(browser)
             .monolith()
             .env("MONOLITH_BROWSER_SCROLL_LIMIT", "3")
-            .args(["--no-js", &server.url("/")])
+            .args(["--remove-js", &server.url("/")])
             .output()
             .unwrap();
 
@@ -139,12 +139,41 @@ fn freezes_web_components() {
             ("/a.png", "image/png", b"\x89PNG"),
         ]);
 
-        let html = Workspace::new(browser).render(&server.url("/"), &["--no-js"]);
+        let html = Workspace::new(browser).render(&server.url("/"), &["--remove-js"]);
 
         assert!(html.contains("shadowrootmode=\"open\""));
         assert!(html.contains("Footer text"));
         assert!(html.contains("Nested text"));
         assert!(html.contains("color: rgb(1, 2, 3)"));
         assert!(html.contains("data:image/png"));
+    });
+}
+
+#[test]
+fn runs_no_javascript_when_told_not_to() {
+    with_each_browser(|browser| {
+        let page = b"<!doctype html><title>t</title><p id=o>static</p>\
+            <iframe src=/frame></iframe><script>o.textContent='dynamic';fetch('/page')</script>";
+        let server = Server::new(&[
+            ("/", "text/html", page),
+            (
+                "/frame",
+                "text/html",
+                b"<script>fetch('/from-frame')</script>",
+            ),
+        ]);
+
+        let output = Workspace::new(browser)
+            .monolith()
+            .env("MONOLITH_BROWSER_DISABLE_JS", "1")
+            .args(["--remove-js", &server.url("/")])
+            .output()
+            .unwrap();
+
+        assert_success(&output);
+        let html = String::from_utf8_lossy(&output.stdout);
+        assert!(html.contains(">static<"), "{html}");
+        assert!(!server.was_asked_for("/page"));
+        assert!(!server.was_asked_for("/from-frame"));
     });
 }

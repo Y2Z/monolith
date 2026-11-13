@@ -78,19 +78,19 @@ struct Cli {
 
     /// Remove fonts
     #[arg(short = 'f', long)]
-    no_fonts: bool,
+    remove_fonts: bool,
 
     /// Remove images
     #[arg(short = 'i', long)]
-    no_images: bool,
+    remove_images: bool,
 
     /// Cut off document from the Internet
     #[arg(short = 'I', long)]
     isolate: bool,
 
-    /// Remove JavaScript
+    /// Remove JavaScript from the document, pages still get to run it in the browser with -B
     #[arg(short = 'j', long)]
-    no_js: bool,
+    remove_js: bool,
 
     /// Allow invalid X.509 (TLS) certificates
     #[arg(short = 'k', long)]
@@ -120,7 +120,7 @@ struct Cli {
 
     /// Remove styles
     #[arg(short = 's', long)]
-    no_styles: bool,
+    remove_styles: bool,
 
     /// Adjust network request timeout
     #[arg(short, long, value_name = "60")]
@@ -263,10 +263,10 @@ fn main() {
         options.ignore_errors = cli.ignore_errors;
         options.insecure = cli.insecure;
         options.isolate = cli.isolate;
-        options.no_styles = cli.no_styles;
-        options.no_fonts = cli.no_fonts;
-        options.no_images = cli.no_images;
-        options.no_js = cli.no_js;
+        options.remove_styles = cli.remove_styles;
+        options.remove_fonts = cli.remove_fonts;
+        options.remove_images = cli.remove_images;
+        options.remove_js = cli.remove_js;
         options.output_format = cli.format.unwrap_or_default();
         options.simplify = cli.simplify;
         options.remove_elements = cli.remove_elements;

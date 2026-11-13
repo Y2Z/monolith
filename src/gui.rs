@@ -799,10 +799,10 @@ impl MonolithApp {
         if !self.keep_frames {
             options.wipe_elements = vec!["frame".to_string(), "iframe".to_string()];
         }
-        options.no_fonts = !self.keep_fonts;
-        options.no_images = !self.keep_images;
-        options.no_styles = !self.keep_styles;
-        options.no_js = !self.keep_scripts;
+        options.remove_fonts = !self.keep_fonts;
+        options.remove_images = !self.keep_images;
+        options.remove_styles = !self.keep_styles;
+        options.remove_js = !self.keep_scripts;
         #[cfg(feature = "browser")]
         {
             options.browser = self.browser;

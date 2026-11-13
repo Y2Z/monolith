@@ -334,7 +334,10 @@ impl Workspace {
 
     /// Opens a saved document in the browser, and provides what it has turned into.
     pub fn open(&self, path: &Path) -> String {
-        self.render(Url::from_file_path(path).unwrap().as_str(), &["--no-js"])
+        self.render(
+            Url::from_file_path(path).unwrap().as_str(),
+            &["--remove-js"],
+        )
     }
 
     pub fn has_leftovers(&self) -> bool {

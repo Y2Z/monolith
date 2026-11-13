@@ -17,7 +17,7 @@ mod passing {
             ..Default::default()
         };
         // Keeps favicons from being requested
-        options.no_images = true;
+        options.remove_images = true;
 
         Session::new(None, None, options)
     }
@@ -161,7 +161,7 @@ mod passing {
     #[test]
     fn embeds_assets_into_saved_shadow_roots() {
         let mut session = session();
-        session.options.no_images = false;
+        session.options.remove_images = false;
         session.add_asset(
             &Url::parse("https://example.com/a.png").unwrap(),
             &vec![0x89, 0x50, 0x4E, 0x47],
@@ -199,7 +199,7 @@ mod passing {
     #[test]
     fn removes_scripts_from_templates() {
         let mut session = session();
-        session.options.no_js = true;
+        session.options.remove_js = true;
 
         let (data, _) = create_monolithic_document_from_data(
             session,

@@ -251,7 +251,7 @@ pub fn process_css(
             Token::Colon => result.push(':'),
             Token::Comma => result.push(','),
             Token::ParenthesisBlock | Token::SquareBracketBlock | Token::CurlyBracketBlock => {
-                if session.options.no_fonts && curr_rule == "font-face" {
+                if session.options.remove_fonts && curr_rule == "font-face" {
                     continue;
                 }
 
@@ -310,7 +310,7 @@ pub fn process_css(
             // @import, @font-face, @charset, @media...
             Token::AtKeyword(ref value) => {
                 curr_rule = value.to_string();
-                if session.options.no_fonts && curr_rule == "font-face" {
+                if session.options.remove_fonts && curr_rule == "font-face" {
                     continue;
                 }
                 result.push('@');
@@ -338,7 +338,7 @@ pub fn process_css(
                         continue;
                     }
 
-                    if session.options.no_images && is_image_url_prop(curr_prop.as_str()) {
+                    if session.options.remove_images && is_image_url_prop(curr_prop.as_str()) {
                         result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                     } else {
                         let resolved_url: Url = resolve_url(document_url, value);
@@ -441,7 +441,7 @@ pub fn process_css(
                 result.push_str("url(");
                 if is_import {
                     result.push_str(&import_stylesheet(session, document_url, value));
-                } else if is_image_url_prop(curr_prop.as_str()) && session.options.no_images {
+                } else if is_image_url_prop(curr_prop.as_str()) && session.options.remove_images {
                     result.push_str(format_quoted_string(EMPTY_IMAGE_DATA_URL).as_str());
                 } else {
                     let full_url: Url = resolve_url(document_url, value);
