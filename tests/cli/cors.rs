@@ -191,6 +191,39 @@ mod passing {
     }
 
     #[test]
+    fn sources_go_by_what_they_are_in() {
+        let (page_origin, _, _) = page(
+            "<video crossorigin><source id=a src=ASSETS/denied.mp4>\
+             <source id=b src=ASSETS/allowed.mp4></video>\
+             <audio><source id=c src=ASSETS/denied-plain.ogg></audio>\
+             <picture><source id=d srcset=ASSETS/denied.webp>\
+             <img crossorigin src=ASSETS/allowed.png></picture>\
+             <picture><source id=e srcset=ASSETS/denied-plain.webp><img src=ASSETS/plain.png></picture>",
+        );
+
+        let (output, errors) = save(&format!("{}/", page_origin), &["-j"]);
+
+        // Media elements say how their sources get requested
+        assert!(output.contains("<source id=\"a\">"), "{}", output);
+        assert!(output.contains("ASSET/allowed.mp4"));
+        assert!(output.contains("ASSET/denied-plain.ogg"));
+        // Pictures go by their images
+        assert!(!output.contains("ASSET/denied.webp"));
+        assert!(output.contains("ASSET/allowed.png"));
+        // Sets of sources are base64-encoded
+        assert!(output.contains(&base64::Engine::encode(
+            &base64::prelude::BASE64_STANDARD,
+            "ASSET/denied-plain.webp"
+        )));
+        assert!(!output.contains(&base64::Engine::encode(
+            &base64::prelude::BASE64_STANDARD,
+            "ASSET/denied.webp"
+        )));
+        assert!(errors.contains("/denied.mp4 (blocked by CORS)"));
+        assert!(errors.contains("/denied.webp (blocked by CORS)"));
+    }
+
+    #[test]
     fn module_scripts_have_to_be_allowed() {
         let (page_origin, _, _) = page(
             "<script type=module src=ASSETS/allowed.js></script>\
