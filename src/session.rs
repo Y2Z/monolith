@@ -18,7 +18,7 @@ use crate::core::{
     print_info_message,
 };
 use crate::cors::{CorsRequest, PageOrigin, RequestMode};
-use crate::csp::{Policies, Request, Saved};
+use crate::csp::{Destination, Policies, Request, Saved};
 use crate::mhtml::MhtmlArchive;
 use crate::net::{
     self, Credentials, PrefetchProgress, recorded_content_security_policy, without_credentials,
@@ -447,6 +447,9 @@ impl Session {
         }
         if asset.is_some() {
             self.saved_content.data.insert(request.destination);
+            if request.destination == Destination::Object {
+                self.saved_content.data.insert(Destination::Frame);
+            }
         }
 
         Ok(asset)

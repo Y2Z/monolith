@@ -1079,4 +1079,38 @@ mod passing {
             </body></html>"
         );
     }
+
+    #[test]
+    fn object_and_embed_media_become_data_urls() {
+        let url: Url = Url::parse("https://example.com/page.html").unwrap();
+        let html = "<object data=\"doc.pdf\" type=\"application/pdf\"></object>\
+            <embed src=\"doc.pdf\" type=\"application/pdf\">";
+        let mut session: Session = Session::new(
+            None,
+            None,
+            MonolithOptions {
+                silent: true,
+                ..Default::default()
+            },
+        );
+        session.add_asset(
+            &Url::parse("https://example.com/doc.pdf").unwrap(),
+            &b"%PDF".to_vec(),
+            "application/pdf".to_string(),
+            "".to_string(),
+        );
+
+        let dom = html::html_to_dom(html.as_bytes(), "utf-8".to_string());
+        html::walk(&mut session, &url, &dom.document);
+
+        let output = serialized(&dom);
+        assert!(
+            output.contains("<object data=\"data:application/pdf,%25PDF\""),
+            "{output}"
+        );
+        assert!(
+            output.contains("<embed src=\"data:application/pdf,%25PDF\""),
+            "{output}"
+        );
+    }
 }

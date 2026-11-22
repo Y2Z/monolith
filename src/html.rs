@@ -2649,6 +2649,35 @@ pub fn walk(session: &mut Session, document_url: &Url, node: &Handle) {
                         }
                     }
                 }
+                "object" | "embed" => {
+                    let attr_name = match name.local.as_ref() {
+                        "object" => "data",
+                        _ => "src",
+                    };
+                    if let Some(object_url) = get_node_attr(node, attr_name)
+                        && !object_url.trim().is_empty()
+                    {
+                        if session.options.output_format != MonolithOutputFormat::MHTML {
+                            retrieve_and_embed_asset(
+                                session,
+                                document_url,
+                                node,
+                                attr_name,
+                                &object_url,
+                            );
+                        } else {
+                            let object_full_url: Url = resolve_url(document_url, &object_url);
+                            if session
+                                .is_allowed(&object_full_url, &Request::to(Destination::Object))
+                            {
+                                set_node_attr(node, attr_name, Some(object_full_url.to_string()));
+                                session.log_asset_url(&object_full_url);
+                            } else {
+                                set_node_attr(node, attr_name, None);
+                            }
+                        }
+                    }
+                }
                 "audio" => {
                     // Embed audio source
                     if let Some(audio_attr_src_value) = get_node_attr(node, "src") {
